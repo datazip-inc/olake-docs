@@ -13,7 +13,7 @@ const config: Config = {
   url: 'https://datazip-inc.github.io/',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: 'olake-docs',
+  baseUrl: 'olake/docs',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -76,20 +76,20 @@ const config: Config = {
         alt: 'Olake Logo',
         src: 'img/logo/olake.png',
       },
-      // items: [
-      //   {
-      //     type: 'docSidebar',
-      //     sidebarId: 'tutorialSidebar',
-      //     position: 'left',
-      //     label: 'Docs',
-      //   },
-      //   // {to: '/blog', label: 'Blog', position: 'left'},
-      //   {
-      //     href: 'https://github.com/facebook/docusaurus',
-      //     label: 'GitHub',
-      //     position: 'right',
-      //   },
-      // ],
+      items: [
+        // {
+        //   type: 'docSidebar',
+        //   sidebarId: 'tutorialSidebar',
+        //   position: 'left',
+        //   label: 'Docs',
+        // },
+        // {to: '/blog', label: 'Blog', position: 'left'},
+        {
+          href: 'https://github.com/datazip-inc/olake',
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
     },
     footer: {
       style: 'dark',
