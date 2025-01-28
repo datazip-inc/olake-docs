@@ -6,110 +6,243 @@ description: Getting Started
 
 # Getting Started with OLake
 
-Follow the steps below to get started with OLake:
+OLake helps you replicate data from MongoDB (and in the future, other databases) into a local or S3-based data lake in Parquet or Iceberg format. Follow the steps below to set up OLake and run your first data sync.
 
-1. ### Prepare Your Folder
 
-    1. Create a folder on your system. Let’s call it `olake_folder_path`.
 
-    :::info
-    **Note:** In below configurations replace `olake_folder_path` with the newly created folder path.
-    :::
+## 1. Prepare Your Folder
 
-    2. Inside this folder, create two files:
-       -`config.json`: This file contains your connection details. You can find examples and instructions [here](https://github.com/datazip-inc/olake/tree/master/drivers/mongodb#config-file).
-       - `writer.json`: This file specifies where to save your data (local machine or S3).
-    
-    ### Example Structure of `writer.json` :
-    Example (For Local): 
-    ```json 
+1. **Create a new folder** on your local machine—let’s call it `olake_folder_path`.  
+2. **Inside this folder**, create two files:
+   - **`config.json`**: Contains your MongoDB connection details.  
+     - For instructions and examples, refer to the [OLake MongoDB Connector Docs](https://github.com/datazip-inc/olake/tree/master/drivers/mongodb#config-file).  
+   - **`write.json`**: Specifies where OLake will store your replicated data—whether on your local machine or S3.
+
+**Example folder structure** (add a screenshot here if you like):
+```
+olake_folder_path/
+  ├─ config.json
+  └─ write.json
+```
+
+### 1.1 Example `write.json` for Local Storage
+```json
+{
+  "type": "PARQUET",
+  "writer": {
+    "normalization": false,
+    "local_path": "/mnt/config"
+  }
+}
+```
+- `type`: Specifies the file format (e.g., `PARQUET`).
+- `normalization`: If `true`, OLake will apply a basic JSON flattening to nested fields.
+- `local_path`: Directory inside the Docker container where Parquet files will be written. (You’ll map this path to your host machine using a volume.)
+
+### 1.2 Example `write.json` for S3
+```json
+{
+  "type": "PARQUET",
+  "writer": {
+    "normalization": false,
+    "s3_bucket": "olake",
+    "s3_region": "",
+    "s3_access_key": "",
+    "s3_secret_key": "",
+    "s3_path": ""
+  }
+}
+```
+- `s3_bucket`: Your S3 bucket name.
+- `s3_path`: (Optional) The prefix or folder path within the bucket.
+- Provide valid AWS credentials (`s3_access_key` and `s3_secret_key`) if you’re not using an IAM role.
+
+:::info
+If you want level-1 JSON flattening (basic flattening for nested objects) set `"normalization"` to `true`.
+:::
+
+
+## 2. Generate a Catalog File
+
+In this step, OLake **discovers** the available streams (collections) in your MongoDB.
+
+1. **Open your terminal** and navigate to the folder containing `config.json` and `write.json`.
+2. **Run the `discover` command**:
+
+```bash
+docker run \
+  -v olake_folder_path:/mnt/config \
+  olakego/source-mongodb:latest \
+  discover \
+  --config /mnt/config/config.json
+```
+
+- The `-v olake_folder_path:/mnt/config` part **mounts your local folder** into the Docker container’s `/mnt/config` directory.
+- `--config /mnt/config/config.json` tells OLake where to find your MongoDB connection details.
+
+### 2.1 Catalog File (catalog.json)
+
+After running `discover`, OLake creates a `catalog.json` file in `olake_folder_path`. It contains:
+- **List of available streams** (collections in MongoDB).
+- **Schemas** for each stream (fields, data types, etc.).
+- **Default sync modes** (e.g., `cdc`, `full_refresh`).
+
+A simplified example of `catalog.json`:
+```json
+{
+  "selected_streams": {
+    "namespace": [
+      "orders",
+      "customers"
+    ]
+  },
+  "streams": [
     {
-      "type": "PARQUET",
-         "writer": {
-           "normalization":false, // to enable/disable level one flattening
-           "local_path": "/mnt/config/{olake_reader}" // replace olake_reader with desired folder name
+      "stream": {
+        "name": "orders",
+        "namespace": "namespace",
+        "type_schema": { ... },
+        "supported_sync_modes": ["full_refresh", "cdc"],
+        "source_defined_primary_key": ["_id"],
+        "sync_mode": "cdc"
+      }
+    },
+    {
+      "stream": {
+        "name": "customers",
+        "namespace": "namespace",
+        "type_schema": { ... },
+        "supported_sync_modes": ["full_refresh", "cdc"],
+        "source_defined_primary_key": ["_id"],
+        "sync_mode": "cdc"
       }
     }
-    ```
-    Example (For S3):
-    ```json
-    {
-      "type": "PARQUET",
-         "writer": {
-           "normalization":false, // to enable/disable level one flattening
-           "s3_bucket": "olake",  
-           "s3_region": "",
-           "s3_access_key": "", 
-           "s3_secret_key": "", 
-           "s3_path": ""
-       }
-    }
-    ```
-2. ### Generate a Catalog File
+  ]
+}
+```
 
-   Run the discovery process to identify your MongoDB data:  
-    ```bash
-   docker run -v olake_folder_path:/mnt/config olakego/source-mongodb:latest discover --config /mnt/config/config.json
-    ```
-    This will create a `catalog.json` file in your folder. The file lists the data streams from your MongoDB
-    ```json
-        {
-         "selected_streams": {
-                "namespace": [
-                    "table1",
-                    "table2"
-                ]
-            },
-            "streams": [
-                {
-                    "stream": {
-                        "name": "table1",
-                        "namespace": "namespace",
-                        // ...
-                        "sync_mode": "cdc"
-                    }
-                },
-                {
-                    "stream": {
-                        "name": "table2",
-                        "namespace": "namespace",
-                        // ...
-                        "sync_mode": "cdc"
-                    }
-                }
-            ]
-        }
-    ```
+:::tip
+By default, OLake selects all discovered streams for replication. You can manually remove or exclude streams by editing the `selected_streams` section.
+:::
 
-    #### (Optional) Exclude Unwanted Streams
-    To exclude streams, edit `catalog.json` and remove them from `selected_streams`. <br/>
-    #### Example (For Exclusion of table2) 
-    **Before**
-    ```json
-     "selected_streams": {
-        "namespace": [
-            "table1",
-            "table2"
-        ]
-     }
-    ```
-    **After Exclusion of table2**
-    ```json
-    "selected_streams": {
-        "namespace": [
-            "table1"
-        ]
-     }
-    ```
-3. ### Sync Your Data
-   Run the following command to sync data from MongoDB to your destination:
-    
-    ```bash
-   docker run -v olake_folder_path:/mnt/config olakego/source-mongodb:latest sync --config /mnt/config/config.json --catalog /mnt/config/catalog.json --destination /mnt/config/writer.json
-    ```
+**Before (including `customers`):**
+```json
+"selected_streams": {
+  "namespace": [
+    "orders",
+    "customers"
+  ]
+}
+```
+**After (to exclude `customers`):**
+```json
+"selected_streams": {
+  "namespace": [
+    "orders"
+  ]
+}
+```
 
-4. ### sync with state: 
-   If you’ve previously synced data and want to continue from where you left off, use the state file:
-    ```bash
-    docker run -v olake_folder_path:/mnt/config olakego/source-mongodb:latest sync --config /mnt/config/config.json --catalog /mnt/config/catalog.json --destination /mnt/config/writer.json --state /mnt/config/state.json
-    ```
+
+
+## 3. Sync Your Data
+
+Now that you have `catalog.json`, you can **initiate the data sync** from MongoDB to your chosen destination (local or S3).
+
+```bash
+docker run \
+  -v olake_folder_path:/mnt/config \
+  olakego/source-mongodb:latest \
+  sync \
+  --config /mnt/config/config.json \
+  --catalog /mnt/config/catalog.json \
+  --destination /mnt/config/write.json
+```
+
+- **`--destination /mnt/config/write.json`**: Instructs OLake where to write your replicated data (local folder or S3).
+
+:::tip
+This command performs both the **initial snapshot** and **incremental (CDC) sync** if you have `sync_mode` set to `"cdc"` in the `catalog.json`. If you only want a full snapshot, change it to `"full_refresh"`.
+:::
+
+
+## 4. Resuming with a State File
+
+If your sync is interrupted or you want to **resume** from a specific checkpoint, use the `--state` parameter. OLake automatically updates a `state.json` with the last checkpoint (CDC offset or snapshot progress).
+
+```bash
+docker run \
+  -v olake_folder_path:/mnt/config \
+  olakego/source-mongodb:latest \
+  sync \
+  --config /mnt/config/config.json \
+  --catalog /mnt/config/catalog.json \
+  --destination /mnt/config/write.json \
+  --state /mnt/config/state.json
+```
+
+- **`--state /mnt/config/state.json`**: Points OLake to the existing state so it can pick up where it left off.
+
+
+
+## 5. Example MongoDB `config.json`
+
+Below is a sample `config.json` for connecting to a MongoDB replica set. Customize it with your own credentials and cluster details:
+
+```json
+{
+  "hosts": [
+    "host1:27017",
+    "host2:27017",
+    "host3:27017"
+  ],
+  "username": "test",
+  "password": "test",
+  "authdb": "admin",
+  "replica-set": "rs0",
+  "read-preference": "secondaryPreferred",
+  "srv": true,
+  "server-ram": 16,
+  "database": "database",
+  "max_threads": 50,
+  "default_mode": "cdc"
+}
+```
+
+| Field               | Description                                                                                 |
+|--- |---|
+| `hosts`             | List of MongoDB hosts. For SRV-based connections, ensure `srv` is `true`.                   |
+| `username/password` | Credentials for MongoDB authentication.                                                    |
+| `authdb`            | Authentication database (often `admin`).                                                   |
+| `replica-set`       | Name of the replica set (if any).                                                          |
+| `read-preference`   | e.g., `secondaryPreferred` for offloading reads from the primary.                          |
+| `srv`               | If using DNS SRV, set to `true`.                                                           |
+| `server-ram`        | Used for memory management hints.                                                           |
+| `database`          | The specific DB within MongoDB you want to replicate.                                       |
+| `max_threads`       | Max parallel threads for chunk-based data extraction.                                       |
+| `default_mode`      | The default sync mode (e.g., `"cdc"` or `"full_refresh"`).                                  |
+
+
+
+## Wrap-Up
+
+At this point, you’ve:
+
+1. Created and configured the necessary files (`config.json`, `write.json`, `catalog.json`).
+2. Run a discovery command to generate your stream metadata.
+3. Kicked off a **full** or **CDC-based** sync.
+4. (Optional) Resumed a sync using a state file to avoid duplicates or reprocessing.
+
+**OLake** should now be replicating your MongoDB data to your specified destination. Check your local folder or S3 bucket for newly created Parquet files (or Iceberg tables) to verify that everything is working as expected.
+
+
+
+## Next Steps
+
+- **Explore Schema Evolution**: If your MongoDB schema changes, OLake can adapt automatically. Keep an eye on newly added fields or collections.  
+- **Try Out Different Writers**: OLake supports additional destinations (e.g., Iceberg in S3, or local parquet). 
+- **Integrations**: Connect your output files or Iceberg tables to analytics platforms like Trino, Spark, or other SQL engines for powerful querying.  
+
+
+
+**Congratulations!** You’ve taken your first steps with OLake. Happy syncing—and don’t forget to share feedback or open issues on [GitHub](https://github.com/datazip-inc/olake) if you run into any hurdles.

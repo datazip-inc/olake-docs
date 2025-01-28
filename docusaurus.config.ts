@@ -67,6 +67,16 @@ const config: Config = {
         // },
         // {to: '/blog', label: 'Blog', position: 'left'},
         {
+          href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+          label: 'Slack',
+          position: 'right',
+        },
+        {
+          href: 'https://datazip.io/blog',
+          label: 'Blogs',
+          position: 'right',
+        },
+        {
           href: 'https://github.com/datazip-inc/olake',
           label: 'GitHub',
           position: 'right',
@@ -78,11 +88,41 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: 'Resources',
           items: [
             {
               label: 'Docs',
               to: '/',
+            },
+            {
+              label: 'Blogs',
+              href: 'https://datazip.io/blog',
+            },
+          ],
+        },
+        {
+          title: 'Company',
+          items: [
+            {
+              label: 'About us',
+              href: 'https://datazip.io/about-us',
+            },
+          ],
+        },
+        {
+          title: 'Legal',
+          items: [
+            {
+              label: 'Terms of Use',
+              href: 'https://datazip.io/terms-of-use',
+            },
+            {
+              label: 'Privacy (Visitors)',
+              href: 'https://datazip.io/privacy-policy',
+            },
+            {
+              label: 'Privacy (Customers)',
+              href: 'https://datazip.io/privacy-policy-customer',
             },
           ],
         },
@@ -117,7 +157,7 @@ const config: Config = {
         //   ],
         // },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Datazip, Inc.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
     },
     prism: {
       theme: prismThemes.github,
