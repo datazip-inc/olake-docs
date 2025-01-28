@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'OLake',
   tagline: 'Fastest way to replicate MongoDB data in Apache Iceberg',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/logo/olake.png',
 
   // Set the production url of your site here
   url: 'https://olakedocs.datazip.io/',
@@ -38,7 +38,7 @@ const config: Config = {
       {
         docs: {
           routeBasePath: '/', 
-          sidebarPath: './sidebars.ts',
+          sidebarPath: './sidebars.js',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
@@ -71,25 +71,25 @@ const config: Config = {
     // Replace with your project's social card
     image: 'img/docusaurus-social-card.jpg',
     navbar: {
-      title: 'My Site',
+      title: 'OLake Docs',
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: 'Olake Logo',
+        src: 'img/logo/olake.png',
       },
-      items: [
-        {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'Docs',
-        },
-        // {to: '/blog', label: 'Blog', position: 'left'},
-        {
-          href: 'https://github.com/facebook/docusaurus',
-          label: 'GitHub',
-          position: 'right',
-        },
-      ],
+      // items: [
+      //   {
+      //     type: 'docSidebar',
+      //     sidebarId: 'tutorialSidebar',
+      //     position: 'left',
+      //     label: 'Docs',
+      //   },
+      //   // {to: '/blog', label: 'Blog', position: 'left'},
+      //   {
+      //     href: 'https://github.com/facebook/docusaurus',
+      //     label: 'GitHub',
+      //     position: 'right',
+      //   },
+      // ],
     },
     footer: {
       style: 'dark',
@@ -98,7 +98,7 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Tutorial',
+              label: 'Docs',
               to: '/',
             },
           ],
