@@ -42,7 +42,7 @@ const config: Config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/datazip-inc/olake-docs/',
+            'https://github.com/datazip-inc/olake-docs/tree/master/',
         },
         blog: false
       } satisfies Preset.Options,
