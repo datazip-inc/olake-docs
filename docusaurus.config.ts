@@ -10,7 +10,7 @@ const config: Config = {
   favicon: 'img/logo/olake.png',
 
   // Set the production url of your site here
-  url: 'https://datazip-inc.github.io/',
+  url: 'https://datazip.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/olake/docs/',
@@ -134,6 +134,7 @@ const config: Config = {
       darkTheme: prismThemes.dracula,
     },
   } satisfies Preset.ThemeConfig,
+
   plugins: [
     [
       '@docusaurus/plugin-client-redirects',
