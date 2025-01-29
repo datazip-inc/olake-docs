@@ -126,36 +126,6 @@ const config: Config = {
             },
           ],
         },
-        // {
-        //   title: 'Community',
-          // items: [
-            // {
-            //   label: 'Stack Overflow',
-            //   href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-            // },
-            // {
-            //   label: 'Discord',
-            //   href: 'https://discordapp.com/invite/docusaurus',
-            // },
-            // {
-            //   label: 'X',
-            //   href: 'https://x.com/docusaurus',
-            // },
-          // ],
-        // },
-        // {
-        //   title: 'More',
-        //   items: [
-        //     {
-        //       label: 'Blog',
-        //       to: '/blog',
-        //     },
-        //     {
-        //       label: 'GitHub',
-        //       href: 'https://github.com/facebook/docusaurus',
-        //     },
-        //   ],
-        // },
       ],
       copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
     },
