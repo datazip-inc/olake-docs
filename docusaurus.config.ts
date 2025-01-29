@@ -84,6 +84,20 @@ const config: Config = {
       ],
     },
 
+    imageZoom: {
+      // CSS selector to apply the plugin to, defaults to '.markdown img'
+      selector: '.markdown img',
+      // Optional medium-zoom options
+      // see: https://www.npmjs.com/package/medium-zoom#options
+      options: {
+        margin: 24,
+        background: '#000000',
+        // scrollOffset: 0,
+        // container: '#zoom-container',
+        // template: '#zoom-template',
+      },
+    },
+
     footer: {
       style: 'dark',
       links: [
@@ -136,6 +150,7 @@ const config: Config = {
   } satisfies Preset.ThemeConfig,
 
   plugins: [
+    'plugin-image-zoom',
     [
       '@docusaurus/plugin-client-redirects',
       {
