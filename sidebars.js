@@ -1,7 +1,7 @@
 module.exports = {
   docs: [
     'intro',
-    'community/contributing',
+    // 'community/contributing',
     'getting-started',
 
     // INSTALL 
@@ -29,7 +29,7 @@ module.exports = {
 
     {
       type: 'category',
-      label: 'Connectors',
+      label: 'Sources',
       link: {
         type: 'generated-index',
         title: 'OLake Connectors',
@@ -78,10 +78,10 @@ module.exports = {
 
     {
       type: 'category',
-      label: 'OLake Features',
+      label: 'Features',
       link: {
         type: 'generated-index',
-        title: 'OLake Features',
+        title: 'Features',
         description:
           "Let's learn about OLake Features!",
       },

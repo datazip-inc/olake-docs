@@ -219,7 +219,7 @@ const config: Config = {
             from: '/olake/mongodb',
           },
           {
-            to: '/category/connectors',
+            to: '/',
             from: '/olake/mongodb/colake-connectors-for-olake',
           },
           {
