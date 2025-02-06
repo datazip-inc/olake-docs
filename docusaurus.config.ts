@@ -10,7 +10,7 @@ const config: Config = {
   favicon: 'img/logo/olake.png',
 
   // Set the production url of your site here
-  url: 'https://datazip.io',
+  url: 'https://olake.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
@@ -57,7 +57,13 @@ const config: Config = {
           editUrl:
             'https://github.com/datazip-inc/olake-docs/tree/master/',
         },
-        blog: false
+        blog: {
+          showReadingTime: true,
+          blogSidebarCount: 0,
+          // Please change this to your repo.
+          // editUrl:
+          //   'https://github.com/facebook/docusaurus/edit/master/website/blog/',
+        },
       } satisfies Preset.Options,
     ],
   ],
