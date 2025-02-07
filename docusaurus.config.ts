@@ -38,7 +38,7 @@ const config: Config = {
       'classic',
       {
         docs: {
-          routeBasePath: '/',
+          routeBasePath: '/docs',
           // async contentLoaded({ actions }) {
           //   actions.setGlobalData({
           //     seo: {
