@@ -121,11 +121,11 @@ const config: Config = {
       { name: 'robots', content: 'noindex, nofollow' },
     ],
 
-    // colorMode: {
-    //   defaultMode: "dark",
-    //   disableSwitch: true,
-    //   respectPrefersColorScheme: false,
-    // },
+    colorMode: {
+      defaultMode: "dark",
+      disableSwitch: true,
+      respectPrefersColorScheme: false,
+    },
 
 
     imageZoom: {
