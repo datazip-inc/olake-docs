@@ -221,38 +221,38 @@ const config: Config = {
         redirects: [
           // /docs/oldDoc -> /docs/newDoc
           // write path after the base path URL
-          {
-            to: '/',
-            from: '/olake/mongodb',
-          },
-          {
-            to: '/',
-            from: '/olake/mongodb/colake-connectors-for-olake',
-          },
-          {
-            to: '/core/state-controller',
-            from: '/olake/mongodb/colake-state-management',
-          },
-          {
-            to: '/core/architecture',
-            from: '/olake/mongodb/framework',
-          },
-          {
-            to: '/connectors/mongodb/benchmarks',
-            from: '/olake/mongodb/benchmark',
-          },
-          {
-            to: '/getting-started',
-            from: '/olake/mongodb/how-to-start-contributing-on-olake',
-          },
-          {
-            to: '/category/mongodb',
-            from: '/olake/drivers/mongodb-poc',
-          },
-          {
-            to: '/category/resources',
-            from: '/olake/resources/terminologies',
-          },
+          // {
+          //   to: '/',
+          //   from: '/olake/mongodb',
+          // },
+          // {
+          //   to: '/',
+          //   from: '/olake/mongodb/colake-connectors-for-olake',
+          // },
+          // {
+          //   to: '/core/state-controller',
+          //   from: '/olake/mongodb/colake-state-management',
+          // },
+          // {
+          //   to: '/core/architecture',
+          //   from: '/olake/mongodb/framework',
+          // },
+          // {
+          //   to: '/connectors/mongodb/benchmarks',
+          //   from: '/olake/mongodb/benchmark',
+          // },
+          // {
+          //   to: '/getting-started',
+          //   from: '/olake/mongodb/how-to-start-contributing-on-olake',
+          // },
+          // {
+          //   to: '/category/mongodb',
+          //   from: '/olake/drivers/mongodb-poc',
+          // },
+          // {
+          //   to: '/category/resources',
+          //   from: '/olake/resources/terminologies',
+          // },
           // Redirect from multiple old paths to the new path
           // {
           //   to: '/docs/newDoc2',
