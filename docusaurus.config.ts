@@ -24,6 +24,7 @@ const config: Config = {
   onBrokenLinks: 'ignore',
   onBrokenMarkdownLinks: 'warn',
   trailingSlash: false,
+  
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -59,11 +60,24 @@ const config: Config = {
         },
         blog: {
           showReadingTime: true,
-          blogSidebarCount: 0,
+          feedOptions: {
+            type: ['rss', 'atom'],
+            xslt: true,
+          },
           // Please change this to your repo.
-          // editUrl:
-          //   'https://github.com/facebook/docusaurus/edit/master/website/blog/',
+          // Remove this to remove the "edit this page" links.
+          editUrl:
+            'https://github.com/datazip-inc/olake-docs/tree/master/',
+          // Useful options to enforce blogging best practices
+          onInlineTags: 'warn',
+          onInlineAuthors: 'warn',
+          onUntruncatedBlogPosts: 'warn',
         },
+
+        theme: {
+          customCss: require.resolve('./src/css/custom.scss'),
+        },
+
       } satisfies Preset.Options,
     ],
   ],
@@ -72,7 +86,7 @@ const config: Config = {
     // Replace with your project's social card
     image: 'img/logo/olake.png',
     navbar: {
-      title: 'OLake Docs',
+      title: 'OLake',
       logo: {
         alt: 'Olake Logo',
         src: 'img/logo/olake.png',
@@ -80,11 +94,12 @@ const config: Config = {
       items: [
         // {
         //   type: 'docSidebar',
-        //   sidebarId: 'tutorialSidebar',
+        //   // sidebarId: 'tutorialSidebar',
         //   position: 'left',
         //   label: 'Docs',
         // },
-        // {to: '/blog', label: 'Blog', position: 'left'},
+        {to: '/docs', label: 'Docs', position: 'left'},
+        {to: '/blog', label: 'Blog', position: 'left'},
         {
           href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
           label: 'Slack',
@@ -102,10 +117,16 @@ const config: Config = {
         },
       ],
     },
-    
+
     metadata: [
       { name: 'robots', content: 'noindex, nofollow' },
     ],
+
+    // colorMode: {
+    //   defaultMode: "dark",
+    //   disableSwitch: true,
+    //   respectPrefersColorScheme: false,
+    // },
 
 
     imageZoom: {
@@ -213,6 +234,10 @@ const config: Config = {
 
   plugins: [
     'plugin-image-zoom',
+    'docusaurus-plugin-sass',
+    // {
+    //   includePaths: ["node_modules/infima/scss"],
+    // },
     [
       '@docusaurus/plugin-client-redirects',
       {
