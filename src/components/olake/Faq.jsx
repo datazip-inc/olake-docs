@@ -1,39 +1,50 @@
-import React, { useState } from "react";
-import clsx from "clsx";
-import styles from '../../css/Faq.module.css'
+import React, { useState } from 'react'
+import SectionHeader from '../SectionHeader'
 
-// A simple Accordion component
 const Accordion = ({ question, answer, defaultExpanded }) => {
-  const [expanded, setExpanded] = useState(defaultExpanded || false);
+  const [expanded, setExpanded] = useState(defaultExpanded || false)
 
   return (
-    <div className={styles.accordion}>
+    <div className='border-b border-gray-200 py-4 dark:border-gray-700'>
       <div
-        className={styles.accordionSummary}
+        className='flex cursor-pointer items-center justify-between rounded p-2 transition-colors '
         onClick={() => setExpanded(!expanded)}
       >
-        <div className={styles.heading}>{question}</div>
-        <div className={clsx(styles.icon, { [styles.expanded]: expanded })}>
-          {/* A simple down arrow which rotates when expanded */}
+        <div className='text-base font-bold leading-6 text-gray-900 dark:text-white'>
+          {question}
+        </div>
+        <div
+          className={`text-xl transition-transform duration-200 ease-in-out ${
+            expanded ? 'rotate-180' : ''
+          } text-gray-900 dark:text-white`}
+        >
           &#9660;
         </div>
       </div>
       {expanded && (
-        <div className={styles.accordionDetails}>
-          <div className={styles.answer}>{answer}</div>
+        <div className='mt-3 px-2'>
+          <div className='text-sm font-normal leading-relaxed text-gray-700 dark:text-gray-300'>
+            {answer}
+          </div>
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
 const Faq = ({ data, showHeading }) => {
   return (
-    <div className={styles.root}>
+    <div className='flex w-full flex-col rounded-lg p-6 font-sans shadow-lg'>
       {showHeading && (
-        <div className={styles.headingContainer}>
-          Frequently Asked Questions
-        </div>
+        
+        <SectionHeader
+          heading={
+            <>
+              Frequently Asked Questions
+            </>
+          }
+         
+        />
       )}
       {data?.map((item, index) => (
         <Accordion
@@ -44,7 +55,7 @@ const Faq = ({ data, showHeading }) => {
         />
       ))}
     </div>
-  );
-};
+  )
+}
 
-export default Faq;
+export default Faq

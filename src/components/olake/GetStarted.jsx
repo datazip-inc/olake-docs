@@ -1,89 +1,105 @@
 import React from "react";
-import { outerLink } from '../../../utils/functions';
+import { outerLink } from "../../../utils/functions";
+import AwesomeButton from "../AwesomeButton";
+import SectionHeader from "../SectionHeader";
+import { FaHourglassStart, FaGithub, FaClock } from "react-icons/fa";
 
 const GetStarted = () => {
   return (
-    <div className="get-started-box">
-      <div className="get-started-heading">
-        Get Started with <span className="light">O</span>Lake
-      </div>
-      <div className="get-started-subheading">
-        Choose a plan that suits your organisation’s needs
-      </div>
-      <div className="get-started-list">
-        <img
-          src="/img/olake/get-started-bg.svg"
-          className="get-started-bg-img"
-          alt="get-started-bg"
-        />
-        <div className="get-started-item">
+    <div className="mx-auto flex flex-col items-center w-full max-w-[90%] px-4">
+      <SectionHeader
+        heading={
+          <>
+            Get Started with <span className="font-normal">OLake</span>
+          </>
+        }
+        subheading="Choose a plan that suits your organisation’s needs."
+      />
+
+      {/* List container */}
+      <div className="relative mt-12 flex flex-col md:flex-row gap-6 md:gap-[27px]">
+        {/* First Item */}
+        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[40px]">
           <img
             src="/img/olake/olake-github.svg"
-            className="get-started-item-img"
             alt="get-started-item"
+            className="max-h-[120px] object-contain"
           />
-          <div className="get-started-item-tag">
-            <img src="/img/olake/meteor.svg" alt="meteor" />
+          <div className="mt-[20px] flex items-center text-center text-[12px] font-normal text-[#407bff]">
+            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
             Quick Results
           </div>
-          <div className="get-started-item-heading">
-            O<span className="bold">Lake Github</span>
+          <div className="mt-[16px] bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-[28px] text-transparent">
+            O<span className="font-semibold">Lake Github</span>
           </div>
-          <div className="get-started-item-subheading">
-            Use the free & open OLake for the fastest MongoDB Replication to
+          <div className="mt-[8px] text-center text-[14px] font-normal text-[#c7c7c7]">
+            Use the free &amp; open OLake for the fastest MongoDB Replication to
             Apache Iceberg
           </div>
-          <button
-            className="get-started-item-cta get-started-item-cta-secondary"
-            onClick={() => outerLink("https://github.com/datazip-inc/olake")}
+          <AwesomeButton
+            variant="dark"
+            href="https://github.com/datazip-inc/olake"
+            className="mt-6"
+            icon={<FaGithub />}
+            size="medium"
           >
             Contribute
-          </button>
+          </AwesomeButton>
         </div>
-        <div className="get-started-item">
-          <img
-            src="/img/olake/olake-byoc.svg"
-            className="get-started-item-img"
-            alt="get-started-item"
-          />
-          <div className="get-started-item-tag">
-            <img src="/img/olake/meteor.svg" alt="meteor" />
-            Control your cloud
-          </div>
-          <div className="get-started-item-heading">
-            O<span className="bold">Lake BYOC</span>
-          </div>
-          <div className="get-started-item-subheading">
-            Use the free & open OLake for the fastest MongoDB Replication to
-            Apache Iceberg
-          </div>
-          <a
-            className="get-started-item-cta get-started-item-cta-primary"
-            href="/olake?utm_source=olake_page_waitlist_btn_byoc&utm_medium=olake_page&utm_campaign=olake&utm_content=olake_cta#olake-form-product"
-          >
-            Join Waitlist
-          </a>
-        </div>
-        <div className="get-started-item">
+
+        {/* Second Item */}
+        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[40px]">
           <img
             src="/img/olake/olake-saas.svg"
-            className="get-started-item-img"
             alt="get-started-item"
+            className="max-h-[120px] object-contain"
           />
-          <div className="get-started-item-tag">
-            <img src="/img/olake/meteor.svg" alt="meteor" />
+          <div className="mt-[20px] flex items-center text-center text-[12px] font-normal text-[#407bff]">
+            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
             For Enterprise solutions
           </div>
-          <div className="get-started-item-heading">
-            O<span className="bold">Lake SAAS</span>
+          <div className="mt-[16px] bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-[28px] text-transparent">
+            O<span className="font-semibold">Lake SaaS</span>
           </div>
-          <div className="get-started-item-subheading">
-            Use the free & open OLake for the fastest MongoDB Replication to
-            Apache Iceberg
+          <div className="mt-[8px] text-center text-[14px] font-normal text-[#c7c7c7]">
+          A complete replication service for large organisations which handle huge data
           </div>
-          <button className="get-started-item-cta get-started-item-cta-tertiary">
-            Coming soon
-          </button>
+          <AwesomeButton
+            href="#olake-form-product"
+            icon={<FaHourglassStart />}
+            className="mt-6"
+            size="medium"
+          >
+            Join Waitlist
+          </AwesomeButton>
+        </div>
+
+        {/* Third Item */}
+        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[40px]">
+          <img
+            src="/img/olake/olake-byoc.svg"
+            alt="get-started-item"
+            className="max-h-[120px] object-contain"
+          />
+          <div className="mt-[20px] flex items-center text-center text-[12px] font-normal text-[#407bff]">
+            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
+            Control your cloud
+          </div>
+          <div className="mt-[16px] bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-[28px] text-transparent">
+            O<span className="font-semibold">Lake BYOC</span>
+          </div>
+          <div className="mt-[8px] text-center text-[14px] font-normal text-[#c7c7c7]">
+          Bring the OLake powerhouse to your own cloud services for a seamless experience
+          </div>
+          <AwesomeButton
+            variant="dark"
+            href="#"
+            icon={<FaClock />}
+            className="mt-6"
+            size="medium"
+          >
+            Coming Soon
+          </AwesomeButton>
         </div>
       </div>
     </div>
