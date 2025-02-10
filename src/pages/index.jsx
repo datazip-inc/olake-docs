@@ -14,6 +14,7 @@ import AlternatingRows from '../components/AlternatingRows'
 import SectionHeader from '../components/SectionHeader'
 import CTAComponent from '../components/CTA'
 import { FaWalkieTalkie } from 'react-icons/fa6'
+import ArchitectureImage from '../components/olake/ArchitectureImage'
 
 const OlakeFaqs = [
   {
@@ -121,7 +122,7 @@ const OlakeProduct = () => {
           <img src='/img/olake/olake-logo.svg' alt='olake logo' className='w-24 md:w-32' />
         </div>
 
-        <div className='z-10 mt-36 bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-center text-[36px] md:leading-[80px] leading-[48px] text-transparent md:text-[46px] lg:text-[66px]'>
+        <div className='z-10 mt-24 md:mt-36 bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-center text-[36px] md:leading-[80px] leading-[36px] text-transparent md:text-[46px] lg:text-[66px]'>
           <span className='italic'>Fastest</span> way to Replicate your{' '}
           <span className='font-bold'>Database</span> data in Data Lake
         </div>
@@ -152,7 +153,10 @@ const OlakeProduct = () => {
 
         <br />
         {/* Architecture Image */}
-        {isMobile ? (
+
+        <ArchitectureImage />
+        
+        {/* {isMobile ? (
           <img
             src='/img/olake/cta-mobile.svg'
             alt='olake-architecture'
@@ -164,7 +168,7 @@ const OlakeProduct = () => {
             alt='olake-architecture'
             className='z-10 my-4 mt-[86px] h-auto min-w-[220px] max-w-[920px]'
           />
-        )}
+        )} */}
 
         {/* Benchmarks */}
         <div className='my-8 w-full'>
@@ -180,7 +184,7 @@ const OlakeProduct = () => {
         <div
           id='olake-form-product'
           ref={formRef}
-          className='my-8 flex w-full max-w-[90%] flex-col md:flex-row'
+          className='md:my-8 flex w-full md:max-w-[90%] flex-col md:flex-row'
         >
           <div className='flex-1 shrink-0 pl-[50px] pt-[50px] md:w-1/2'>
             <div className='flex items-center gap-2 text-[24px] font-semibold text-gray-900 dark:text-white'>
@@ -191,12 +195,14 @@ const OlakeProduct = () => {
               />
               <span>OLake</span>
             </div>
+
             <div className='mt-4 text-4xl font-normal text-gray-900 dark:text-white'>
               Interested?
               <br /> Get Early Access.
             </div>
           </div>
-          <div className='m-8 min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-10 dark:bg-white md:w-1/2'>
+
+          <div className='m-8 min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-5 md:p-10 dark:bg-white md:w-1/2'>
             <div id='olake-product-form'></div>
           </div>
         </div>

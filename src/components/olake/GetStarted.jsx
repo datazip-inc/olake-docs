@@ -6,7 +6,7 @@ import { FaHourglassStart, FaGithub, FaClock } from "react-icons/fa";
 
 const GetStarted = () => {
   return (
-    <div className="mx-auto flex flex-col items-center w-full max-w-[90%] px-4">
+    <div className="mx-auto flex flex-col items-center w-full md:max-w-[90%] px-4">
       <SectionHeader
         heading={
           <>
@@ -17,9 +17,9 @@ const GetStarted = () => {
       />
 
       {/* List container */}
-      <div className="relative mt-12 flex flex-col md:flex-row gap-6 md:gap-[27px]">
+      <div className="relative mt-12 flex flex-col md:flex-row gap-4 md:gap-[27px]">
         {/* First Item */}
-        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[40px]">
+        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[24px]  md:py-[40px]">
           <img
             src="/img/olake/olake-github.svg"
             alt="get-started-item"
@@ -48,7 +48,7 @@ const GetStarted = () => {
         </div>
 
         {/* Second Item */}
-        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[40px]">
+        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[24px]  md:py-[40px]">
           <img
             src="/img/olake/olake-saas.svg"
             alt="get-started-item"
@@ -75,7 +75,7 @@ const GetStarted = () => {
         </div>
 
         {/* Third Item */}
-        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[40px]">
+        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[24px]  md:py-[40px]">
           <img
             src="/img/olake/olake-byoc.svg"
             alt="get-started-item"

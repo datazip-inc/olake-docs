@@ -23,11 +23,11 @@ const BlogList = [
 
 const OlakeBlogList = () => {
   return (
-    <div className='mx-auto flex w-full max-w-[90%] flex-col items-center px-4 py-8'>
+    <div className='mx-auto flex w-full md:max-w-[90%] flex-col items-center md:px-4 md:py-8'>
       <SectionHeader heading={<>Read more from our blogs</>} />
 
       {/* Blog list container using grid for responsive layout */}
-      <div className='mt-16 grid grid-cols-1 gap-6 md:grid-cols-2'>
+      <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
         {BlogList.map((blog, index) => (
           <div
             key={index}

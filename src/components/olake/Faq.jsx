@@ -34,7 +34,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
 
 const Faq = ({ data, showHeading }) => {
   return (
-    <div className='flex w-full flex-col rounded-lg p-6 font-sans shadow-lg'>
+    <div className='flex w-full flex-col rounded-lg md:p-6 font-sans shadow-lg'>
       {showHeading && (
         
         <SectionHeader

@@ -3,7 +3,7 @@ import SectionHeader from "../SectionHeader";
 
 const Benchmarks = () => {
   return (
-    <div className="mx-auto mt-10 flex max-w-[90%] flex-col p-6 sm:p-8 md:p-10">
+    <div className="mx-auto mt-10 flex md:max-w-[90%] flex-col md:p-6 sm:p-8 md:p-10">
       <SectionHeader
         heading={
           <>
