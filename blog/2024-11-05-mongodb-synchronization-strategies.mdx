@@ -1,0 +1,170 @@
+---
+slug: mongodb-synchronization-strategies
+title: MongoDB Synchronization Strategies Explained - Pros, Cons, and Practical Tips
+description: MongoDB, a widely used NoSQL database, offers developers significant advantages, particularly its schema-less architecture...
+image: /img/blog/2024/11/mongodb-synchronization-strategies-cover.png
+authors: [priyansh]
+tags: [mongodb]
+---
+
+![mongodb-synchronization-strategies-cover](/img/blog/2024/11/mongodb-synchronization-strategies-cover.png)
+
+MongoDB, a widely used NoSQL database, offers developers significant advantages, particularly its schema-less architecture. This design allows for direct data dumping without the constraints of a fixed schema, providing enhanced flexibility and ease of development.
+
+However, implementing real-time analytics services with MongoDB presents several challenges that require careful management.
+
+In this blog, we will delve into the real-time data synchronization strategies available in MongoDB, as well as the specific challenges that data engineers face in achieving effective real-time data synchronization.
+
+## Sync Strategy
+
+Mainly three key strategies are being used to make MongoDB data real-time:
+
+> The following strategies of synchronization are typically used after the full load is completed. The process of full load can be executed by splitting data streams or by making use of the `.find()` queries for each stream to fetch and load.
+
+1. **Incremental Based**
+    
+2. **Oplogs Based**
+    
+3. **Change Streams Based**
+    
+    The real-time sync strategies oplog-based and CDC-based do not work with standalone MongoDB.
+    
+
+## Incremental Data Sync
+
+Many data engineers initialize an incremental strategy of synchronization using a cursor-based approach as the starting point.
+
+This method, generally, applies the use of an `updated_at` column for tracking and reading only data that was changed since the last time data were synced. This is just intuitive, but it does have some drawbacks and pitfalls:
+
+**Drawbacks of Incremental Sync Strategy**
+
+* **Data skew and missed updates**: `updated_at` may miss all the changes, particularly if timestamp updates occur simultaneously or system clocks are not perfectly in sync, leading to missing updates or duplicated entries during synchronization.
+    
+* **Performance Bottlenecks:** As the dataset grows, queries based on the `updated_at` column are badly inefficient, which leads to slower queries and higher latency in the sync process. This is particularly problematic for high-velocity environments where data updates are coming in at an enormous rate.
+    
+* **Handling Deletes:** The incremental sync method normally only tracks updated or newly inserted records. Deletions of records from the source database are not inherently tracked with this approach and can also propagate stale or inconsistent data downstream.
+    
+
+### Oplog
+
+Oplog stands for the operation log of MongoDB. It keeps track of all the insert, update, and delete operations. To sync data real-time you may need to iterate over oplog sequentially to capture all the changes that happened on the database.
+
+**Some Key Points about oplogs:**
+
+* It is used by MongoDB to make sure all the nodes have consistent data in a replica set.
+    
+* Oplogs are stored in oplog.rs collection of the Local database in MongoDB.
+    
+* Oplogs can be tailed.
+    
+* It is not available for standalone instances.
+    
+
+An oplog object looks something like this:
+
+```json
+{
+  "ts": 6642324230736186000,
+  "h": -1695843663874728400,
+  "v": 2,
+  "op": "u",
+  "ns": "analysts.datazip",
+  "o": {
+    "$set": {
+      "r": 0
+    }
+  },
+  "o2": {
+    "_id": "878262a2f76853482c9bc3c1"
+  }
+}
+```
+
+Where each entry defines
+
+| **field** | **optional** | **description** |
+| --- | --- | --- |
+| ts | NO | `BSON` Timestamp. Often converted to `64bit` `INT` for `JSON` |
+| h | YES | Random hash |
+| v | NO | `oplog` protocol version. default `1`. |
+| op | NO | Type of op. one of `i`, `u`, `d`, `n`, `c` |
+| ns | NO | `BSON` Namespacestring. Serialized as db. collection |
+| o | NO | Operation applied. object |
+| o2 | YES | Object 2. Additional information, usually operand |
+| fromMigrate | YES | Boolean. Indicates if this operation is part of chunk migration between shards |
+
+## Change Streams
+
+Change Streams on the other hand is a real-time data stream that transfers the captured changes from MongoDB to your application. It is a highly optimized way compared to `oplogs` tailing. This is totally based on `oplogs`. For more info check the [official doc](https://www.mongodb.com/blog/post/change-streams-mongodb-6-0-support-pre-post-image-retrieval-ddl-operations#:~:text=Introduced%20with%20MongoDB%203.6%2C%20a%20MongoDB%20change%20stream%20is%20an%20API%20on%20top%20of%20the%20operations%20log%20\(oplog\)%20that%20allows%20users%20to%20subscribe%20their%20applications%20to%20data%20changes%20in%20a%20collection%2C%20database%2C%20or%20entire%20deployment).
+
+Some Key Points about change streams:
+
+* Must be using `wired tiger` storage engine.
+    
+    ```go
+    db.serverStatus().storageEngine //check storage engine via command
+    ```
+    
+* Change Stream can be opened on any database even on any collection which is not possible on manually tailing `oplogs`
+    
+* It is easy to open and filter out data based on resume token and operation time.
+    
+* change streams are available regardless of read concern.
+    
+* Can look for the pre-image and post-image of the document
+    
+    * `pre-image`: document image before change applied
+        
+    * `post-image`: document image after change applied
+        
+
+Go code to open the change stream
+
+```go
+pipeline := mongo.Pipeline{bson.D{{"$match", bson.D{{"$or",
+	bson.A{
+		bson.D{{"fullDocument.username", "datazip"}},
+		bson.D{{"operationType", "delete"}}}}},
+}}}
+cs, err := coll.Watch(ctx, pipeline)
+assert.NoError(t, err)
+defer cs.Close(ctx)
+ok := cs.Next(ctx)
+next := cs.Current // document
+```
+
+## Problems Faced by Data Engineers During Real-Time Synchronization
+
+Achieving real-time data synchronization in MongoDB presents a unique set of challenges for data engineers. These challenges can impact the effectiveness and reliability of data pipelines, making it essential for engineers to identify and address them proactively. Below are some of the primary issues encountered during real-time synchronization:
+
+1. **Oplog Cursor Mismatch**: Discrepancies between the cursor and the oplog can lead to inconsistencies in data capture, resulting in missed changes or duplicated entries.
+    
+    **Solution**: To solve the cursor mismatch problem we can use simple maths to store 7 days `oplogs`
+    
+    1. use the command to get the total oplog size and total oplog hours.
+        
+        ```bash
+        rs.printReplicationInfo()
+        ```
+        
+    2. Based on the above information calculate the 1-hour oplog size and increase `oplog` size based on it.
+        
+        ```bash
+        db.adminCommand({replSetResizeOplog: 1, size: Double(16000)}) // size is in mb's
+        ```
+        
+    3. Also, increase `oplog` retention time if it is set to less than 7 days
+        
+        ```bash
+        //check for oplog min retention time
+        db.adminCommand({ getParameter: 1, oplogMinRetentionHours: 1 })
+        ```
+        
+2. **Slow Write Operations**: Suboptimal write performance can create bottlenecks in data pipelines, affecting the overall throughput and responsiveness of the system.
+    
+    **Solution**: Use `readPreference` while reading from change streams or oplogs. If you have doubts if using secondary it may miss changes you can check the official [answer](https://www.mongodb.com/community/forums/t/consume-change-streams-from-secondary-nodes/164101/4).
+    
+3. **Data Consistency Challenges**: Ensuring data consistency across distributed systems is complex, particularly when multiple sources are writing to the same MongoDB instance.
+    
+    **Solution**: Above mentioned strategies can solve this problem as per MongoDB docs there are no chances of missing the data by using any of the above strategies properly.
+    

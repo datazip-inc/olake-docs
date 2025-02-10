@@ -1,0 +1,566 @@
+---
+slug: mongodb-etl-challenges
+title: Four Critical MongoDB ETL Challenges and How to tackle them for your Data Lake and Data Warehouse?
+description: Moving data from MongoDB into a data warehouse or lakehouse for analytics...
+image: /img/blog/2024/09/mongodb-etl-challenges-cover.webp
+authors: [sandeep]
+tags: [mongodb,etl ]
+---
+
+![mongodb-etl-challenges-cover](/img/blog/2024/09/mongodb-etl-challenges-cover.webp)
+
+
+Moving data from MongoDB into a data warehouse or lakehouse for analytics and reporting can be a complex process. 
+
+MongoDB's flexible, document-based structure offers many advantages for transactional workloads but presents several challenges (which we will discuss below) when it comes to traditional analytics workflows, which are more suited to structured, relational data (SQL queried data).
+
+In this blog, we'll discuss the major pain points of MongoDB ELT (Extract, Transform, Load) processes, the best practices to follow, common mistakes to avoid, and some tips at the end.
+
+
+
+### **TLDR;**
+
+Hey there, if you're always on the go and pressed for time, this section is especially for you!
+
+Moving data from MongoDB to a data warehouse or lakehouse for analytics is challenging due to MongoDB’s flexible document-based structure, which, btw, is also the main reason why people adopted mongodb in the first place. 
+
+This leads to issues with schema consistency throughout the ELT process, performance, data quality, and complex transformations when dealing with nested and array fields. Below are four key challenges to consider when handling MongoDB ELT processes:
+
+## **Key Challenges:**
+
+**Schema Flexibility vs. Data Consistency**
+
+MongoDB allows for flexible schemas, which means data can be stored in various formats. However, this flexibility can create issues when moving data to structured systems like warehouses or lakehouses. You might face problems with inconsistent data models and type mismatches. To address this, you might want to standardize fields and handle sparse data carefully during the ELT (Extract, Load, Transform) process.
+
+**First Full Load of Big Tables and Incremental Replication**
+
+When transferring large MongoDB tables to a lakehouse, you can start with a full load and then use Change Data Capture (CDC) to keep things updated incrementally. If tables are too big first full load has to be parallelized and then incremental sync has to be configured properly so there is no data loss if sync fails due to any reason. 
+
+**Changing Data Types & Schema Evolution**
+
+If your data changes in structure or type (like having different data-types for the same field), you’ll need to transform this data for your target system. This might involve creating separate tables for complex fields or converting nested objects into a flat format. 
+
+**Complex Transformations for Nested Fields**
+
+ETL of of arrays in MongoDB into a flat relational format can be tricky and might lead to data explosion. This might require us to maintain multiple tables, updates if things are changed in arrays into those tables.  
+
+Back to the blog! 
+
+## **1\. How does MongoDB's schema flexibility affect data consistency?**
+
+MongoDB's schema-less design is one of its defining features, but this flexibility often creates a significant challenge when exporting data to a warehouse or lake, where structured formats like tables and columns dominate (in Postgres, Mysql, and more). 
+
+According to MongoDB's own documentation, the flexibility in schema design often leads to inconsistent data models, which complicates data flattening when moving to rigid structures like SQL databases or warehouses or lake houses.
+
+Adding to this, MongoDB also allows the same field to have different data types (called polymorphism data) across documents (e.g., a field being a string in one document and an integer in another), which may lead to failures or incorrect processing during the ELT pipeline.
+
+For example, in MongoDB, you might have an age field where some values are stored as strings and others as integers:
+
+```json
+{
+  "user": "John Doe",
+  "age": "25" // String
+},
+{
+  "user": "Jane Smith",
+  "age": 30   // Integer
+}
+```
+
+However, the data warehouse expects a consistent data type for each column, like an integer for age. If you have a dual data type for a few keys, convert them to a single data type that is a superset of the other. For example, you can keep 25 as an integer and a string but you can keep “abc” as a string and not a numeric data type.
+
+### **Common Mistakes:**
+
+* Assuming MongoDB's schema flexibility will automatically adapt to a data warehouse schema: This leads to inconsistency and misalignment in data representation, forcing complex post-loading transformations.
+    
+* **Skipping schema design entirely**: Many developers ignore schema design in MongoDB because it’s not required, leading to data quality issues during extraction.
+    
+* **Sparse Data**: In a collection with 1 million documents, if only 100,000 documents contain a promo\_code field (lets say), you'd have to add this field to the remaining 900,000 rows in the data warehouse, filling with nulls or placeholders. Makes sense to keep the nulls if this is a business requirement but be aware of other such instances where there are unnecessary NULLs. 
+    
+
+#### **Best Practices:**
+
+* Define a flexible schema with structure: Even though MongoDB is schema-less, establish conventions for document structure that map easily to a relational schema later.
+    
+* MongoDB can store null or undefined values, while data warehouses often require explicit handling of such values. Better to convert undefined values in MongoDB to NULL values in the data warehouse or fill in with appropriate default data.
+    
+
+> *Pro Tip:*
+> 
+> *Use MongoDB's Schema Analyzer (like* [*Variety*](https://github.com/variety/variety)*) to help understand how your documents are structured and align them with the target data warehouse schema.*
+
+## **2\. How to tackle first full load and incremental replication of large MongoDB tables into a lakehouse?**
+
+To tackle the first full load and incremental replication of large MongoDB tables into a lakehouse, keep the following points in mind.
+
+### **1\. First Full Load (Initial Bulk Data Load)**
+
+Data Volume & Transfer Speed:
+
+***Assumptions:***
+
+* Data is sent in 1 go and not in chunks (realistically sending in chunks makes more sense but can make the calculations difficult).
+    
+* We are not querying mongodb again and again (in case of making chunks and then sending)
+    
+
+Suppose you have a MongoDB collection with 10TB of data. A typical 1 Gbps network can transfer about 125 MB/s (ideally, depending on what is the speed of data incoming from mongodb side \[Source side, [Link](https://www.mongodb.com/community/forums/t/replication-syncsource-issue-with-bandwidth/277534)\]).
+
+* 10TB / 125 MB/s ≈ 22 hours of continuous transfer time.
+    
+* This doesn't account for overhead, retries, or network fluctuations, so the actual time could stretch beyond 30 hours. If you break this into smaller chunks and use parallelization (say 10 concurrent threads), you might cut the load time down to around 3-4 hours.
+    
+
+However, more threads mean more resource consumption.
+
+**Data Consistency:**
+
+MongoDB replica sets can generate an oplog  that captures real-time changes. However, the oplog size might be small if not properly configured, typically 1-2 GB (say). If your data churn is high (say 50 GB of changes daily), the oplog might only retain a few minutes or hours of changes, making it easy to miss data during the initial full load.
+
+Performing MongoDB ELT via CDC can be one of the best strategies here. 
+
+*But, what is CDC?* 
+
+Change Data Capture (CDC) is a method used to track and capture changes in a database, such as inserts, updates, and deletes, and then replicate those changes to another system. 
+
+Using CDC for MongoDB ELT (Extract, Load, Transform) for replication offers several advantages, especially when you need real-time or near-real-time data synchronization.
+
+How CDC Works with Oplog: MongoDB's CDC mechanisms, like Debezium or MongoDB’s own Change Streams, rely on the oplog  to capture and stream database changes. Since the oplog is an append-only log that records all write operations (inserts, updates, deletes), CDC tools don’t query the collection directly—they stream changes from the oplog. 
+
+### How can oplog be used for incremental sync?
+
+1. **Start a Cursor**: Begin by creating a cursor on the oplog collection, starting from a specific timestamp or last known position. This cursor will help track changes made since the last sync.
+    
+2. **Monitor Changes**: As new operations occur, the oplog entries are appended. Your cursor will continue to read these entries, capturing all changes in real-time.
+    
+3. **Apply Changes Incrementally**: Extract and apply these changes to your target system (data warehouse or lakehouse) incrementally. This approach avoids the need for full data reloads and ensures that only the latest changes are processed.
+    
+4. **Handle Failures**: Implement error handling and checkpointing to resume from the last processed position in case of failures or restarts.
+    
+
+No Need for Full-Table Scans: Since CDC tracks incremental changes, there’s no need to query or scan large collections as you would in a traditional ETL process. 
+
+Solutions: To mitigate this, either configure the oplog size to handle at least 24-48 hours of changes or take a snapshot of the MongoDB data at the start of the full load and ensure incremental sync starts from that timestamp.
+
+**System Resource Consumption:**
+
+A full load for a 10TB dataset might use significant resources. For instance:
+
+* CPU Load: Bulk read operations from MongoDB may spike CPU usage to 80-90% on read replicas or even impact production performance if run on the main node.
+    
+* Memory Consumption: If each batch of data pulled into memory is, say, 500MB and you run 20 concurrent batches, that’s 10GB of memory consumed just for the data pipeline.
+    
+
+### **2\. Incremental Replication (Ongoing Sync of New Data)**
+
+**Change Data Volume:**
+
+If your MongoDB is highly transactional and generates 100,000 document updates per hour, and the average document size is 1KB, that’s 100MB of new data per hour to sync. However, if you have multiple collections and lots of small changes, this could increase to 500MB to 1GB/hour.
+
+**Missed Changes (CDC):**
+
+If MongoDB’s oplog retention is short (due to high write volume), and your incremental process doesn’t run frequently enough (e.g., every 6 hours), you could easily miss changes. For example:
+
+A 1GB `oplog` might only capture a few hours of high-throughput operations (e.g., 50,000 updates/hour with document sizes of 2KB).
+
+If the replication process is delayed and starts after 3 hours, part of the oplog might have already been overwritten, leading to missed updates.
+
+**Solution:** 
+
+Make sure that the oplog size is large enough (set it to handle at least 12-24 hours of changes) or run the incremental process more frequently (every 30 minutes to 1 hour).
+
+[Refer to official docs for more to increase size of oplog.](https://www.mongodb.com/docs/v4.0/tutorial/change-oplog-size/)
+
+### **3\. Concurrency & Deduplication:**
+
+Running multiple parallel sync threads (e.g., 20 threads) can significantly reduce the time for large incremental loads, but introduces concurrency issues:
+
+If two threads pull updates on the same dataset concurrently, it can lead to race conditions or duplicate records. Use locking mechanisms or deduplication strategies to avoid this.
+
+For example, deduplication by a unique field (like an `id`) can help. If you’re syncing 1 million records per hour and 1% are duplicates, you need to handle 10,000 duplicates/hour efficiently.
+
+### **4\. Cost Context**
+
+**Data Transfer Costs:**
+
+If you're using a cloud provider like AWS, data replication from MongoDB to the lakehouse can incur significant costs (unless the source and destination region is the same). 
+
+For example, transferring 10TB of data into an S3-based lakehouse might [cost around](https://aws.amazon.com/s3/pricing/) $30-$40 per 1TB (assumption based on $0.03 per GB pricing, exact numbers may vary). 
+
+So, for 10TB, expect about $250-$400 just for the first full load transfer.
+
+**Compute Costs**:
+
+Processing large batches of data in tools like Spark can drive up compute costs. For instance, a m4.4xlarge AWS EC2 [instance costs around](https://instances.vantage.sh/aws/ec2/m4.4xlarge#:~:text=m4.-,4xlarge,starting%20at%20$0.8%20per%20hour.) $0.8 per hour. 
+
+If your process takes 20 hours, that's around $16 per instance. With 10 instances running in parallel, this adds up to $160 just for compute during the first full load.
+
+### **5\. Monitoring & Error Handling:**
+
+**Error Detection**:
+
+Sync failures can go unnoticed without proper monitoring. If you’re syncing 100,000 documents/hour and have a 1% error rate, that’s 1,000 missed records every hour. Without alerts and retry mechanisms, these errors could accumulate into significant data gaps over time.
+
+By backing the points with numbers and practical examples, we now have a clearer picture of the challenges and potential costs associated with large table loads and incremental replication from MongoDB to a lakehouse.
+
+#### **Best Practices:**
+
+* **Implement Change Data Capture (CDC)**: Tools like Debezium and MongoDB’s built-in change streams can help extract only the updated data, optimizing the ELT process by minimizing redundant operations.
+    
+* **Use parallel ELT pipelines**: Distribute the extraction and transformation load across multiple parallel pipelines to handle large volumes efficiently.
+    
+* **Use batching**: Break large extracts into smaller, manageable chunks to reduce resource contention.
+    
+
+## **3\. Facing Data type issues with MongoDB while replicating? Like dealing with Polymorphic Data?**
+
+Transforming polymorphic data into a flat, relational format can be complex, especially when dealing with arrays or nested objects. This requires careful normalization to ensure that all possible data structures are appropriately represented.
+
+**Example 1 (Simple case with a string for hobbies):**
+
+```json
+{
+    "_id": "user-1234abcd-5678-ef01-90gh-12345ijkl678",
+    "name": "Diana",
+    "age": 28,
+    "hobbies": "reading"
+}
+```
+
+**Example 2 (Complex case where hobbies is an array of objects):**
+
+```json
+{
+    "_id": "user-5678efgh-1234-ijkl-90mn-56789opq012",
+    "name": "Diana",
+    "age": 28,
+    "hobbies": [
+        {
+            "name": "reading",
+            "frequency": "daily",
+            "genre": "fiction"
+        }  
+    ]
+}
+```
+
+#### **Explanation:**
+
+* In the first case, hobbies is just a simple string indicating Diana’s primary hobby: "reading".
+    
+* In the second case, hobbies is an array of objects, where each object provides more detailed information about Diana’s multiple hobbies, including how often she engages in them and additional attributes like genre for reading or medium for painting.
+    
+
+### **How to handle such type of data?** 
+
+It can get tricky, but following the basic principle of transformation can help. Use:
+
+* Base Table to Store simple, non-nested fields.
+    
+* One-to-one mapping for nested or polymorphic fields without creating a separate table.
+    
+* Flatten or convert arrays or objects into rows in a new table.
+    
+* Make sure that nullable fields are managed properly in the ETL process.
+    
+
+#### **Possible Solutions**
+
+* **Custom ETL Scripts**: Develop custom ETL scripts to handle specific polymorphic structures. These scripts should be able to detect the type of data and apply appropriate transformations.
+    
+* **ETL Frameworks**: Use ETL frameworks like Apache NiFi or Apache Spark, which provide robust data transformation capabilities and can handle complex data types and structures.
+    
+* **Data Type Enforcement**: Implement data type enforcement rules in the ETL pipeline to ensure consistency. For instance, convert all variations of a field to a common format before loading it into the data lakehouse.
+    
+* **Data Validation**: Use data validation tools to check for consistency and correctness before processing. Tools like Apache Avro or JSON Schema can validate data against a predefined schema.
+    
+
+## **4\. Complex Transformations for Nested and Array Fields**
+
+MongoDB’s document-based structure allows for deeply nested fields and arrays, which are highly efficient for transactional workloads. However, transforming this nested data into a flat, relational structure that can be queried in a data warehouse requires complex ELT logic, often resulting in data loss or misinterpretation.
+
+According to MongoDB, working with deeply nested fields and arrays is one of the database’s strengths, but flattening these structures for traditional analytical workflows is an ongoing challenge.
+
+Let’s say your document has 4 levels of nesting and array fields with 100+ elements.. Flattening 100-element arrays can explode into 100 rows per document, making the final dataset several times larger than the original.
+
+#### **Common Mistakes:**
+
+* You may want to be selective about how much flattening you do. If you don’t need certain nested data, you can skip flattening those parts to avoid unnecessary complexity and data explosion (where one document becomes many rows). This way, your data remains easier to manage and query without losing the essential relationships between fields.
+    
+* **Treating all nested structures similarly**: Different nested structures require different transformation techniques, and a one-size-fits-all approach can result in inefficient and error-prone ELT jobs.
+    
+
+#### **Best Practices:**
+
+* **Consider normalization strategies**: For highly nested or complex data, consider denormalizing some fields during extraction to reduce the complexity of transformation on the later stage or avoid normalizing the data that won’t be required to perform analysis. Be selective. 
+    
+
+Let’s consider a more complex example where documents contain multiple layers of nesting and arrays. Here's a sample MongoDB document that represents an e-commerce order:
+
+#### **Nested MongoDB Data (E-commerce Order Example)**
+
+```json
+{
+  "order_id": "A123",
+  "user": {
+    "user_id": "U001",
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "order_date": "2024-08-10",
+  "shipping_address": {
+    "street": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "postal_code": "10001"
+  },
+  "items": [
+    {
+      "item_id": "I001",
+      "item_name": "Laptop",
+      "quantity": 1,
+      "price": 1000,
+      "categories": ["Electronics", "Computers"]
+    },
+    {
+      "item_id": "I002",
+      "item_name": "Wireless Mouse",
+      "quantity": 2,
+      "price": 50,
+      "categories": ["Electronics", "Accessories"]
+    }
+  ],
+  "payment": {
+    "method": "Credit Card",
+    "status": "Paid",
+    "transaction_id": "T56789"
+  }
+}
+```
+
+#### **Flattening this Nested Data into Relational Tables**
+
+To convert the semi-structured JSON data from MongoDB into a SQL-queriable format, we need to flatten the objects and separate the arrays into their own tables. We will also define Primary Keys (PK) and Foreign Keys (FK) to establish relationships between tables.
+
+#### **1\. Orders Table (Flattened from the original JSON)**
+
+![mongodb-etl-challenges-1](/img/blog/2024/09/mongodb-etl-challenges-1.webp)
+
+*Primary Key (PK):* `order_id`
+
+This table contains all the flattened information about the order itself, including the user, shipping details, and payment information. We’ve flattened the user object and `shipping_address` into this table.
+
+#### **2\. Items Table (Array: items)**
+
+Since the items is an array in the JSON, it needs its own table. This table will store each item associated with an order, with a foreign key linking back to the order.
+
+![mongodb-etl-challenges-2](/img/blog/2024/09/mongodb-etl-challenges-2.webp)
+
+*Primary Key (PK):* `item_id`
+
+*Foreign Key (FK):* `order_id` *(references Orders table)*
+
+#### **3\. Categories Table (Array: categories inside items)**
+
+The categories array inside each item needs its own table. Each category will reference the `item_id` from the items table.
+
+![mongodb-etl-challenges-3](/img/blog/2024/09/mongodb-etl-challenges-3.webp)
+
+*Primary Key (PK): Composite (*`item_id`*,* `category`*)*
+
+*Foreign Key (FK):* `item_id` *(references Items table)*
+
+**SQL Representation (Flattened Objects + Separate Arrays):**
+
+![mongodb-etl-challenges-4](/img/blog/2024/09/mongodb-etl-challenges-4.webp)
+
+### **SQL Table Definitions:**
+
+#### **1\. Orders Table**
+
+```sql
+CREATE TABLE Orders (
+    order_id VARCHAR(10) PRIMARY KEY,
+    user_id VARCHAR(10) NOT NULL,
+    user_name VARCHAR(100) NOT NULL,
+    user_email VARCHAR(100) NOT NULL,
+    order_date DATE NOT NULL,
+    shipping_street VARCHAR(255) NOT NULL,
+    shipping_city VARCHAR(100) NOT NULL,
+    shipping_state VARCHAR(50) NOT NULL,
+    shipping_postal_code VARCHAR(10) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    payment_status VARCHAR(20) NOT NULL,
+    transaction_id VARCHAR(20) NOT NULL
+);
+```
+
+#### **2\. Items Table**
+
+```sql
+CREATE TABLE Items (
+    item_id VARCHAR(10) PRIMARY KEY,
+    order_id VARCHAR(10),
+    item_name VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES Orders(order_id)
+);
+```
+
+#### **3\. Categories Table**
+
+```sql
+CREATE TABLE Categories (
+    item_id VARCHAR(10),
+    category VARCHAR(50),
+    FOREIGN KEY (item_id) REFERENCES Items(item_id)
+);
+```
+
+### **Example SQL Query:**
+
+#### **Basic Query to Retrieve Order and Items Information:**
+
+```sql
+SELECT 
+    O.order_id,
+    O.user_name,
+    O.user_email,
+    O.order_date,
+    I.item_name,
+    I.quantity,
+    I.price,
+    GROUP_CONCAT(C.category SEPARATOR ', ') AS categories
+FROM 
+    Orders O
+JOIN 
+    Items I ON O.order_id = I.order_id
+LEFT JOIN 
+    Categories C ON I.item_id = C.item_id
+GROUP BY 
+    I.item_id;
+```
+
+#### **Explanation:**
+
+* **JOIN Orders and Items**: We join the Orders table with the Items table using the `order_id` as a foreign key to fetch order and item information.
+    
+* **LEFT JOIN Categories**: We use a `LEFT JOIN` to retrieve categories for each item using the item\_id from the Categories table.
+    
+* **GROUP\_CONCAT**: This function concatenates the multiple categories into a single field, separated by commas for each item.
+    
+* **GROUP BY:** We group by item\_id to ensure each item with its categories is displayed in one row.
+    
+
+#### **Sample Output:**
+
+![mongodb-etl-challenges-5](/img/blog/2024/09/mongodb-etl-challenges-5.webp)
+
+This query retrieves the order details, including user information, item details, and the corresponding categories for each item.
+
+While this approach allows for powerful relational querying, it introduces complexity into the ELT process, as significant transformation logic is needed to split and manage these nested structures and hence you might need to:
+
+* Perform more JOINS across tables
+    
+* Maintaining a Primary and Foreign Key column to validate the `JOIN` condition. 
+    
+
+If you read thus far, congratulations. You really are facing issues with MongoDB ELT it seems. We have a few more things to talk about so read on! 
+
+### **Bonus Challenges with MongoDB ELT:**
+
+#### **1\. Troubleshooting Data Quality Issues**
+
+Data quality problems, such as missing or inconsistent values, can propagate through your ELT process and into your target data warehouse, leading to inaccurate analytics or reporting. Ensuring data quality during the ELT process is crucial to prevent these issues.
+
+**Example**:
+
+If you have inconsistent data in MongoDB, such as missing email addresses for some users, this can cause problems when inserting into a data warehouse that requires email addresses to be present (e.g., for unique constraints).
+
+#### **Handling Incomplete Data:**
+
+**Pre-Processing Step**: Add validation in the ELT pipeline to either flag incomplete records or provide default values.
+
+```python
+# Example of checking for missing email
+for user in users:
+    if not user.get('email'):
+        user['email'] = 'unknown@example.com'  # Assign default email
+```
+
+Till now we have discussed all about ”*Why*” and “*How*”, now let's quickly look into “*How*”, a.k.a which tools currently can handle the ingestion (Load) and transformations for you.
+
+#### **1\. Tools That Only Ingest Data (Transformation Required)**
+
+* **Apache NiFi**: Can handle semi-structured data. It includes processors for reading and writing JSON, XML, and Avro formats, which are common in semi-structured data scenarios. [Reference](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=60624477#ReleaseNotes-Version1.2.0)
+    
+
+* **Talend Open Studio**: Can manage semi-structured data formats such as JSON and XML. It provides components for parsing and transforming these formats but relies on the user to define detailed transformation logic..
+    
+
+* **Fivetran**: Can ingest semi-structured data by converting it into a structured format compatible with the target data warehouse, although with questionable performance with regard to data flattening. 
+    
+
+#### **2\. Tools That Perform Transformations as Well**
+
+* **Apache Spark**: Excels in handling semi-structured data. It natively supports JSON, XML, and Avro formats and provides powerful APIs for transforming and processing such data (including handling polymorphic data).
+    
+
+* **Databricks**: Built on Apache Spark, handles semi-structured data effectively. It also supports various formats like JSON, Avro, and Parquet, and provides capabilities for advanced transformations.
+    
+
+* **Talend Cloud**: Can manage semi-structured data. It includes tools for processing JSON, XML, and other formats, allowing for both ingestion and transformation.
+    
+
+* **Apache Hudi:** Handles semi-structured data by integrating with Apache Spark. It supports formats like Avro and Parquet, allowing for efficient storage and transformation.
+    
+
+* **Delta Lake**: Supports semi-structured data formats like JSON and Parquet through its integration with Apache Spark. It facilitates ACID transactions and schema evolution.
+    
+
+* **dbt (data build tool)**: Focuses on transforming structured data in data warehouses. It is less suited for direct ingestion of semi-structured data, which usually needs to be converted into a structured format first.
+    
+
+Choosing the right tool will depend on your specific needs for processing and transforming semi-structured data in your ETL workflows.
+
+Before we end this blog, here are some quick steps if you are looking to replicate your mongo data into a lakehouse and the involved steps. We will discuss this in more detail in upcoming articles so stay tuned! 
+
+### **MongoDB to Iceberg Replication using CDC**
+
+Let's say a media company is using MongoDB to manage its user interactions and preferences. They want to replicate this data to Iceberg to run advanced analytics on content consumption patterns.
+
+1. **Setup CDC for MongoDB**: Using a tool like Debezium or MongoDB Atlas Data Streams, you can capture changes in MongoDB in real time.
+    
+2. **Stream Changes to Apache Kafka**: The CDC tool streams these changes to Apache Kafka, which acts as an event streaming platform.
+    
+3. **Ingest into Apache Iceberg**: A Kafka connector loads these CDC events into an Iceberg table. Each change (insert, update, delete) from MongoDB is applied directly to the corresponding data in Iceberg, ensuring consistency.
+    
+4. **Query Data in Iceberg**: Data scientists can now query the user interaction data in Iceberg using Apache Spark or Trino, benefiting from optimized queries and historical views of the data.
+    
+5. **Incremental Updates**: As users interact with the media platform, their preferences (e.g., liked content, watch history) are continuously updated in MongoDB and reflected in Iceberg with low latency via CDC.
+    
+
+This was the sneak peek into one of our upcoming articles, stay tuned for more. 
+
+## **Conclusion**
+
+Transferring data from MongoDB to a conventional data warehouse poses significant challenges due to the vast differences between the two systems. MongoDB often involves unstructured and non-relational data, including JSON file types, dynamic schemas, and deeply nested objects.
+
+These concepts may be unfamiliar to a traditional data warehouse like Redshift or Azure, or Data LakesHouses which typically requires structured and relational data.
+
+By following best practices, such as using CDC, batching, and data validation, companies can ensure efficient data transfers and high-quality, accurate data for downstream analytics. 
+
+**Sources**:
+
+*1\. MongoDB Documentation, "Schema Design and Data Modeling," MongoDB.*
+
+*2\. DB-Engines, "Popularity of MongoDB Over Time," DB-Engines.*
+
+*3\. Gartner, "Data Quality Market Survey 2020," Gartner.*
+
+*4\. MongoDB Documentation, "Working with Nested Data," MongoDB.*
+
+
+
+I’d love to hear your thoughts about this, so feel free to reach out to me on [LinkedIn](https://www.linkedin.com/in/zriyansh/) or respond in the comments below, that’d be great.

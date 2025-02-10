@@ -60,8 +60,13 @@ const config = {
         blog: false,
 
         googleTagManager: {
-          containerId: 'GTM-PKLK4T6T',
+          containerId: 'GTM-TFZ2GXJP',
         },
+        gtag: {
+          trackingID: 'G-GTNTGHDNZW',
+          anonymizeIP: true,
+        },
+
         sitemap: {
           lastmod: 'date',
           changefreq: 'weekly',
@@ -107,7 +112,7 @@ const config = {
           //   label: 'Docs',
           // },
 
-          { to: '/blog', label: 'Blog', position: 'left' },
+          { to: '/blog', label: 'Blog', position: 'right' },
           { to: '/docs', label: 'Docs', position: 'left' },
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
@@ -115,11 +120,11 @@ const config = {
             position: 'right',
           },
 
-          {
-            href: 'https://olake.io/#olake-product-form',
-            label: 'Join Waitlist',
-            position: 'left',
-          },
+          // {
+          //   href: 'https://olake.io/#olake-product-form',
+          //   label: 'Join Waitlist',
+          //   position: 'left',
+          // },
           {
             href: 'https://github.com/datazip-inc/olake',
             // label: 'GitHub',
@@ -332,7 +337,7 @@ const config = {
         path: 'blog',
         editLocalizedFiles: false,
         blogTitle: 'Blog',
-        blogDescription: 'OLake blogs ...',
+        blogDescription: 'Blogs on Database CDC, Debezium, CDC strategies, JSON Flattening ...',
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'List blog',
         routeBasePath: 'blog',

@@ -121,7 +121,7 @@ const OlakeProduct = () => {
           <img src='/img/olake/olake-logo.svg' alt='olake logo' className='w-24 md:w-32' />
         </div>
 
-        <div className='z-10 mt-36 bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-center text-[36px] leading-[80px] text-transparent md:text-[46px] lg:text-[66px]'>
+        <div className='z-10 mt-36 bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-center text-[36px] md:leading-[80px] leading-[48px] text-transparent md:text-[46px] lg:text-[66px]'>
           <span className='italic'>Fastest</span> way to Replicate your{' '}
           <span className='font-bold'>Database</span> data in Data Lake
         </div>
@@ -154,7 +154,7 @@ const OlakeProduct = () => {
         {/* Architecture Image */}
         {isMobile ? (
           <img
-            src='/img/olake/cta.svg'
+            src='/img/olake/cta-mobile.svg'
             alt='olake-architecture'
             className='z-10 my-4 mt-[46px] h-auto min-w-[220px] max-w-[520px]'
           />
