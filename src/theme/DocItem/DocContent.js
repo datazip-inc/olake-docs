@@ -1,6 +1,6 @@
 import React from "react";
 import Head from "@docusaurus/Head";
-import MDXComponents from "../MDXComponents";
+import MDXComponents from '../MDXComponents/Index';
 import { MDXProvider } from "@mdx-js/react";
 import {
   useDoc,
