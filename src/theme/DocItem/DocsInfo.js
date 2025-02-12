@@ -1,137 +1,83 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
 import useBaseUrl from "@docusaurus/useBaseUrl";
-import styles from "./styles.module.css";
 import ShareButton from "./ShareButton";
 
 function DocsInfo({ docsPluginId, ...props }) {
   const location = useLocation();
+
   const openDocIssueURL =
     "https://github.com/datazip-inc/olake-docs/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with olake.io" +
-    `${location.pathname}`;
-    const openOLakeIssueURL =
+    location.pathname;
+  const openOLakeIssueURL =
     "https://github.com/datazip-inc/olake/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with OLake, coming from the doc site at URL - olake.io" +
-    `${location.pathname}`;
+    location.pathname;
 
   const bugIconUrl = useBaseUrl("img/icon/bug-icon.svg");
-  const printIconUrl = useBaseUrl("img/icon/print-icon.svg");
 
   return (
-    <div className="margin-bottom--lg margin-top-md">
-      <div className="row margin-left--none navbar__inner">
-        {/* Last Updated at */}
-        <div className="user-options">
+    <div className="mt-2 mb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+        {/* Left group: Last updated info & Edit link */}
+        <div className="flex flex-col sm:flex-row items-start md:items-center space-x-0 md:space-x-4 space-y-2 md:space-y-0 text-sm text-gray-600 dark:text-gray-400">
           {(props.lastUpdatedAt || props.lastUpdatedBy) && (
-            <div className="text--left avatar">
-              <div className={styles.docLastUpdatedAt}>Last updated </div>
+            <div className="flex items-center space-x-2">
+              <span className="font-medium">Last updated</span>
               {props.lastUpdatedAt && (
                 <>
-                  :&nbsp;{" "}
+                  <span>:</span>
                   <time
-                    className="margin-right--sm"
-                    dateTime={new Date(
-                      props.lastUpdatedAt
-                    ).toISOString()}
+                    className="mr-2"
+                    dateTime={new Date(props.lastUpdatedAt).toISOString()}
                   >
                     {new Date(props.lastUpdatedAt).toLocaleDateString()}
                   </time>
-                  {props.lastUpdatedBy && " "}
                 </>
               )}
-              |
-              {/* TODO:(perf) Reading time renders once the content component is mounted, thus it takes some time to load*/}
-              <div className="margin-left--sm margin-right--sm">
-                {props.readingTimeInWords ? (
-                  <>{props.readingTimeInWords}</>
-                ) : (
-                  <>... min read</>
-                )}
-              </div>
-              |
-              {props.lastUpdatedBy && (
-                <>
-                  by <strong>{props.lastUpdatedBy}</strong>
-                </>
-              )}
+              <span>|</span>
+              <span>{props.readingTimeInWords || "... min read"}</span>
             </div>
           )}
-
-          {/* Edit URL */}
-          <div className="margin-left--sm edit-this-page">
-            {props.editUrl && (
-              <a href={props.editUrl} target="_blank" rel="noreferrer noopener">
+          {props.editUrl && (
+            <div>
+              <a
+                href={props.editUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-blue-500 hover:underline"
+              >
                 Edit this page
               </a>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="user-options">
-          {/* Print Button*/}
-          {/* <div className="margin-right--md pointer cursor-pointer display-flex">
-            {props.editUrl && (
-              <a
-                onClick={
-                  () => window.print()
-                }
-                target="_blank"
-              >
-                <img
-                  src={printIconUrl}
-                  style={{
-                    width: "16px",
-                    verticalAlign: "-0.125em",
-                  }}
-                ></img>
-                <span className="margin-left--sm">Print</span>
-              </a>
-            )}
-          </div> */}
+        {/* Right group: Issue buttons & Share button */}
+        <div className="flex items-center space-x-4">
+          {/* Open OLake Issue */}
+          <a
+            href={openOLakeIssueURL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
+          >
+            <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
+            <span className="text-gray-400">Open OLake issues</span>
+          </a>
 
-         
+          {/* Open Doc Issue */}
+          <a
+            href={openDocIssueURL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
+          >
+            <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
+            <span className="text-gray-400">Open OLake doc issue</span>
+          </a>
 
-          {/* Open Doc Issue Button*/}
-          <div className="margin-right--md display-flex">
-            {openOLakeIssueURL && (
-              <a
-                href={openOLakeIssueURL}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                <img
-                  src={bugIconUrl}
-                  style={{
-                    width: "16px",
-                    verticalAlign: "-0.125em",
-                  }}
-                ></img>
-                <span className="margin-left--sm">Open OLake issues</span>
-              </a>
-            )}
-          </div>
-
-           {/* Open Doc Issue Button*/}
-           <div className="margin-right--md display-flex">
-            {openDocIssueURL && (
-              <a
-                href={openDocIssueURL}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                <img
-                  src={bugIconUrl}
-                  style={{
-                    width: "16px",
-                    verticalAlign: "-0.125em",
-                  }}
-                ></img>
-                <span className="margin-left--sm">Open OLake doc issue</span>
-              </a>
-            )}
-          </div>
-
-          {/* Share Button*/}
-          <div className="display-flex">
+          {/* Share Button */}
+          <div>
             <ShareButton title={props.title} />
           </div>
         </div>

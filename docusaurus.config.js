@@ -47,13 +47,15 @@ const config = {
         docs: {
           routeBasePath: '/docs',
           sidebarPath: './sidebars.js',
+          showLastUpdateAuthor: true,
+          showLastUpdateTime: true,
 
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
             'https://github.com/datazip-inc/olake-docs/tree/master/',
-
         },
+
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -241,7 +243,7 @@ const config = {
       // },
 
       footer: {
-        style: 'dark',
+        // style: 'dark',
         links: [
           {
             title: 'Resources',
