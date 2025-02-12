@@ -46,7 +46,7 @@ const docSidebar = {
 
     {
       type: 'category',
-      label: 'Sources',
+      label: 'Sources (Connectors)',
       link: {
         type: 'generated-index',
         title: 'OLake Connectors',
