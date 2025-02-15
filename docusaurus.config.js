@@ -9,7 +9,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 const config = {
   title: 'OLake',
   tagline: 'Fastest way to replicate MongoDB data in Apache Iceberg',
-  favicon: 'img/logo/olake.png',
+  favicon: 'img/logo/olake-blue.svg',
 
   // Set the production url of your site here
   url: 'https://olake.io',
@@ -90,7 +90,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
-      image: 'img/logo/olake.png',
+      image: 'img/logo/olake-blue.svg',
 
       docs: {
         sidebar: {
@@ -105,7 +105,7 @@ const config = {
         title: 'OLake',
         logo: {
           alt: 'Olake Logo',
-          src: 'img/logo/olake.png',
+          src: 'img/logo/olake-blue.svg',
         },
         items: [
           // {
@@ -115,12 +115,13 @@ const config = {
           //   label: 'Docs',
           // },
 
-          { to: '/blog', label: 'Blog', position: 'right' },
+          { to: '/blog', label: 'Blogs', position: 'right' },
           { to: '/docs', label: 'Docs', position: 'left' },
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
-            label: 'Join Slack',
+            // label: 'Join Slack',
             position: 'right',
+            className: 'header-slack-link',
           },
 
           // {
@@ -174,7 +175,7 @@ const config = {
             '@type': 'Organization',
             name: 'Olake',
             url: 'https://olake.io/',
-            logo: 'https://olake.io/img/logo/olake.png',
+            logo: 'https://olake.io/img/logo/olake-blue.svg',
           }),
         },
       ],
@@ -246,6 +247,27 @@ const config = {
         // style: 'dark',
         links: [
           {
+            title: 'Socials',
+            items: [
+              {
+                label: 'LinkedIn',
+                href: 'https://www.linkedin.com/company/datazipio',
+              },
+              {
+                label: 'X (Twitter)',
+                href: 'https://x.com/_olake',
+              },
+              {
+                label: 'YouTube',
+                href: 'https://www.youtube.com/@olakeio',
+              },
+              {
+                label: 'Slack Community',
+                href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+              },
+            ],
+          },
+          {
             title: 'Resources',
             items: [
               {
@@ -254,7 +276,20 @@ const config = {
               },
               {
                 label: 'Blogs',
-                href: '/blog',
+                to: '/blog',
+              },
+            ],
+          },
+          {
+            title: 'Top Reads',
+            items: [
+              {
+                label: 'Issues with Debezium ',
+                to: '/blog/issues-debezium-kafka',
+              },
+              {
+                label: 'OLake Architecture',
+                to: '/blog/olake-architecture',
               },
             ],
           },
@@ -264,6 +299,10 @@ const config = {
               {
                 label: 'About us',
                 href: 'https://datazip.io/about-us',
+              },
+              {
+                label: 'Branding',
+                to: '/branding',
               },
             ],
           },

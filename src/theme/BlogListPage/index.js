@@ -33,7 +33,7 @@ function BlogHomepageBanner(props) {
     urlBannerBg:
       '/img/olake/olake-home.svg',
     urlAvatar:
-      '/img/logo/olake.png'
+      '/img/logo/olake-blue.svg'
   }
 
   return (

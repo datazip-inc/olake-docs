@@ -140,7 +140,7 @@ const OlakeProduct = () => {
             icon={<FaGithub />}
             iconPosition='left'
             size='medium'
-            href='https:github.com/datazip-inc/olake'
+            href='https://github.com/datazip-inc/olake'
             target='_blank'
           >
             Join us
