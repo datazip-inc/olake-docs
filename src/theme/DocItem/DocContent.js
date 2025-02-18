@@ -21,6 +21,7 @@ import {
 import DocsInfo from "./DocsInfo";
 import DocsRating from "./DocsRating";
 import DocBreadcrumbs from '@theme/DocBreadcrumbs';
+import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
 export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     const { siteConfig } = useDocusaurusContext();
@@ -121,7 +122,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
                             </MDXProvider>
                         </article>
 
-                      
+                        <DocsFooter/>
 
                         <div className="margin-left--none margin-top--md text--center">
                             <DocsRating label={unversionedId} />

@@ -3,6 +3,7 @@ import Badge from "./Badge";
 // import Image from "./Image";
 import Tpsr from "./Tpsr";
 // import img from "./ZoomedImage";
+import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -11,6 +12,7 @@ const MDXComponents = {
   Tpsr,
 //   img,
 //   Img: img,
+DocsFooter
 };
 
 export default MDXComponents;
