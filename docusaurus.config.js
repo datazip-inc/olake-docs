@@ -265,6 +265,10 @@ const config = {
                 label: 'Slack Community',
                 href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
               },
+              {
+                label: 'Instagram',
+                href: 'https://instagram.com/olake_io',
+              },
             ],
           },
           {
@@ -278,6 +282,15 @@ const config = {
                 label: 'Blogs',
                 to: '/blog',
               },
+              {
+                label: 'Search',
+                to: '/search',
+              },
+              {
+                label: 'Community',
+                to: '/docs/category/community',
+              },
+             
             ],
           },
           {
@@ -304,11 +317,6 @@ const config = {
                 label: 'Branding',
                 to: '/branding',
               },
-            ],
-          },
-          {
-            title: 'Legal',
-            items: [
               {
                 label: 'Terms of Use',
                 href: 'https://datazip.io/terms-of-use',
@@ -462,6 +470,7 @@ const config = {
         // },
       },
     ],
+    '@docusaurus/theme-live-codeblock',
   ],
 };
 
