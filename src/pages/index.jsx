@@ -28,7 +28,7 @@ const OlakeFaqs = [
       'OLake provides monitoring and alerts for schema evolution, helping you detect changes and prevent data loss and inaccuracies caused by transformation logic errors. Custom alerts can be set up to notify you of schema changes, ensuring continuous data accuracy.'
   },
   {
-    question: 'What data platforms and tools does OlOLakeake integrate with?',
+    question: 'What data platforms and tools does OLake integrate with?',
     answer:
       'As of now, we are integrating with Apache Iceberg as a destination. You can query this from most of the big data platform like Snowflake, Databricks, Redshift and BigQuery'
   },
