@@ -385,12 +385,41 @@ const config = {
       './src/plugins/blog-plugin',
       {
         path: 'blog',
+        id: 'olake-blog',
         editLocalizedFiles: false,
         blogTitle: 'Blog',
         blogDescription: 'Blogs on Database CDC, Debezium, CDC strategies, JSON Flattening ...',
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'List blog',
         routeBasePath: 'blog',
+        include: ['**/*.md', '**/*.mdx'],
+        exclude: [
+          '**/_*.{js,jsx,ts,tsx,md,mdx}',
+          '**/_*/**',
+          '**/*.test.{js,jsx,ts,tsx}',
+          '**/__tests__/**'
+        ],
+        postsPerPage: 6,
+        truncateMarker: /<!--\s*(truncate)\s*-->/,
+        showReadingTime: true,
+        onUntruncatedBlogPosts: 'ignore',
+        // Remove this to remove the "edit this page" links.
+        editUrl:
+          'https://github.com/datazip-inc/olake/tree/master/',
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]]
+      }
+    ],
+    [
+      './src/plugins/blog-plugin',
+      {
+        path: 'iceberg',
+        id: 'iceberg-blog',
+        editLocalizedFiles: false,
+        blogTitle: 'Blogs on Apache Iceberg',
+        blogDescription: 'Blogs on everything related to Apache Iceberg ...',
+        blogSidebarCount: 'ALL',
+        blogSidebarTitle: 'List Iceberg blog',
+        routeBasePath: 'iceberg',
         include: ['**/*.md', '**/*.mdx'],
         exclude: [
           '**/_*.{js,jsx,ts,tsx,md,mdx}',
@@ -451,6 +480,10 @@ const config = {
           {
             to: '/docs/category/resources',
             from: '/olake/resources/terminologies',
+          },
+          {
+            to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+            from: '/slack',
           },
           // Redirect from multiple old paths to the new path
           // {

@@ -225,7 +225,7 @@ const OlakeProduct = () => {
           title='Are you excited to join us in our amazing journey and fast forward your data pipeline, contact us on one of these options!'
           mailButtonText='Mail us'
           callButtonText='Get on a Call '
-          mail='@priyansh@datazip.io'
+          mail='hello@olake.io'
           phone='+917978307903'
           containerClassName='my-8 max-w-[1000px]'
         />

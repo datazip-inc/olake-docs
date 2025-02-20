@@ -58,7 +58,6 @@ export const BlogPagination = ({ metadata }) => {
     if (totalPages > 1) {
       pages.push(totalPages)
     }
-
     return pages
   }
 

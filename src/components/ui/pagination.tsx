@@ -22,7 +22,7 @@ const PaginationContent = React.forwardRef<HTMLUListElement, React.ComponentProp
 PaginationContent.displayName = 'PaginationContent'
 
 const PaginationItem = React.forwardRef<HTMLLIElement, React.ComponentProps<'li'>>(
-  ({ className, ...props }, ref) => <li ref={ref} className={cn('', className)} {...props} />
+  ({ className, ...props }, ref) => <li ref={ref} className={cn('list-none', className)} {...props} />
 )
 PaginationItem.displayName = 'PaginationItem'
 
