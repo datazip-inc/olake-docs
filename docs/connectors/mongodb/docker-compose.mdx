@@ -1,19 +1,21 @@
 ---
-title: Setup MongoDB via Docker Compose
+title: Setup MongoDB Replica Set via Docker Compose
 description: Setup MongoDB via Docker Compose
 sidebar_position: 3
 ---
 
-# To spawn mongo replica set for unit tests
+# Setup MongoDB Replica Set via Docker Compose
+This guide explains how to spawn a MongoDB replica set using Docker Compose for unit tests. It also covers instructions for ingesting sample data, running tests, and verifying the setup.
 
-Use the [/feat/test_framework](https://github.com/datazip-inc/olake/tree/feat/test_framework) branch for the following setup.
+The setup uses the [/feat/test_framework](https://github.com/datazip-inc/olake/tree/feat/test_framework) branch. Ensure you have checked out this branch as described below.
 
-Clone the branch using:
+Clone the `feat/test_framework` branch:
 
-```bash
+```sh
 git clone -b feat/test_framework https://github.com/datazip-inc/olake.git
 ```
-and then pull the latest changes using:
+
+To update your branch with the latest changes:
 
 ```bash
 git pull origin feat/test_framework
@@ -22,25 +24,43 @@ git pull origin feat/test_framework
 If you already have `master` olake branch, perform the following steps:
 
 ```bash
-git fetch --all # Fetch all the remote branches
-git branch -r   # Verify that feat/test_framework exists in the remote repo, press `q` to quit.
-git checkout -b feat/test_framework origin/feat/test_framework # This creates a local branch named feat/test_framework and tracks the remote branch origin/feat/test_framework.
-git branch # You should see feat/test_framework as the active branch (* feat/test_framework).
-git pull origin feat/test_framework # [optional] To ensure your local branch is up-to-date
+# Fetch all the remote branches
+git fetch --all 
+
+# Verify that feat/test_framework exists in the remote repo, press `q` to quit.
+git branch -r   
+
+# This creates a local branch named feat/test_framework and tracks the remote branch origin/feat/test_framework.
+git checkout -b feat/test_framework origin/feat/test_framework 
+
+# You should see feat/test_framework as the active branch (* feat/test_framework).
+git branch 
+
+# [optional] To ensure your local branch is up-to-date
+git pull origin feat/test_framework 
 ```
 
-### `docker-compose.yaml`
+### `docker-compose.yaml` Configuration
+
+This section describes the configuration required to start MongoDB as a replica set inside a Docker container.
 
 ```yaml title="drivers/mongodb/docker-compose.yaml"
-# To spawn mongo replica set for unit tests
 version: "3.7"
 
 services:
   db:
     image: 'mongo:latest'
-    environment: {"MONGO_INITDB_ROOT_USERNAME": "olake", "MONGO_INITDB_ROOT_PASSWORD": "olake"}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "olake"
+      MONGO_INITDB_ROOT_PASSWORD: "olake"
     command: "mongod --bind_ip_all --replSet rs0 --keyFile /etc/ssl/sample.key"
-    entrypoint: ["bash", "-c", "chmod 400 /etc/ssl/sample.key; chown 999:999 /etc/ssl/sample.key; exec docker-entrypoint.sh $@"]
+    entrypoint:
+      - "bash"
+      - "-c"
+      - |
+        chmod 400 /etc/ssl/sample.key;
+        chown 999:999 /etc/ssl/sample.key;
+        exec docker-entrypoint.sh "$@"
     ports:
       - "27017:27017"
     networks:
@@ -48,7 +68,7 @@ services:
     volumes:
       - ${PWD}/drivers/mongodb/test.key:/etc/ssl/sample.key
     healthcheck:
-      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -58,74 +78,90 @@ networks:
   olake-test:
     name: olake-test
     external: true
+
 ```
 
 ### `docker-compose-init.sh`
 ```sh title="drivers/mongodb/docker-compose-init.sh
+#!/bin/bash
 function mongosh() {
-	echo "$@" | docker exec -i mongodb-db-1 mongosh -u olake -p olake admin
+  echo "$@" | docker exec -i mongodb-db-1 mongosh -u olake -p olake admin
 }
 
+# Initialize the replica set as a single-node setup
 mongosh 'rs.initiate()'
 sleep 3
+
+# Update replica set configuration to use localhost:27017
 mongosh 'cfg = rs.conf(); cfg.members[0].host="localhost:27017"; rs.reconfig(cfg);'
 ```
 
-- This function **runs MongoDB shell (`mongosh`) commands inside the Docker container**.  
-- It executes commands on the `mongodb-db-1` container using `docker exec`.  
+This function **runs MongoDB shell (`mongosh`) commands inside the Docker container**. It executes commands on the `mongodb-db-1` container using `docker exec`.  
+
 - The `-u olake -p olake admin` flags mean it connects to the **MongoDB admin database** using the username `olake` and password `olake`.
-- `mongosh 'rs.initiate()'` - **initializes a new MongoDB replica set**.  
-- A replica set allows MongoDB to support **failover and high availability**.  
-- By default, `rs.initiate()` configures the instance as a **single-node replica set**.
-- `sleep 3` - This **pauses execution for 3 seconds** to ensure MongoDB completes the initialization before reconfiguring the replica set.
-- **`rs.conf()`** → Fetches the current replica set configuration.  
-- **`cfg.members[0].host="localhost:27017"`** → Updates the hostname of the first (and only) replica set member to `localhost:27017`.  
-- **`rs.reconfig(cfg)`** → Applies the new replica set configuration.  
+- `mongosh 'rs.initiate()'` → **initializes a new MongoDB replica set**.  By default, `rs.initiate()` configures the instance as a **single-node replica set**. A replica set allows MongoDB to support **failover and high availability**.  
+- `sleep 3` → This **pauses execution for 3 seconds** to ensure MongoDB completes the initialization before reconfiguring the replica set.
+- `rs.conf()` → Fetches the current replica set configuration.  
+- `cfg.members[0].host="localhost:27017"` → Updates the hostname of the first (and only) replica set member to `localhost:27017`.  
+- `rs.reconfig(cfg)` → Applies the new replica set configuration.  
 
 After running the script, your MongoDB instance inside Docker:
-✅ **Becomes a single-node replica set**  
-✅ **Uses "localhost:27017" as its hostname**  
-✅ **Is ready for connections as a replica set-enabled database**  
 
+- Becomes a single-node replica set
+- Uses `localhost:27017` as its hostname
+- Is ready for connections as a replica set-enabled database
 
-### How to Run MongoDB Unit Tests 
+## Running the Replica Set
+### 1. Create the Docker Network
 To run Mongo Unit tests, start the docker compose and initiate it:
 
-Create Network `olake-test`:
+Before starting the containers, create the external network:
 ```bash
 docker network create olake-test    
 ```
 
 Sample output:
 ```bash
-docker network create olake-test
 ef0000000x0x0253141909abff6744fcf4c26d8f0e56865cc364690a97289b0f
-
 ```
-Run docker container:
+
+### 2. Start the Docker Container
+Run the following command to start MongoDB:
+
 ```bash
 docker compose -f ./drivers/mongodb/docker-compose.yaml up -d  
 ```
+
+Sample Output:
 ![docker compose 1](/img/docs/docker/docker-compose-1.png)
+
+### 3. Initialize the Replica Set
+Execute the initialization script:
 
 ```bash
 bash ./drivers/mongodb/docker-compose-init.sh  
 ```
 
+Expected outputs: Initialization confirmation (sample images):
+
 ![docker compose 2](/img/docs/docker/docker-compose-2.png)
+
 ![docker compose 3](/img/docs/docker/docker-compose-3.png)
 
-Then you can run mongo tests:
+
+## MongoDB Unit Tests
+Once the replica set is running, you can execute MongoDB unit tests. For example:
+
 ```bash
 go test -tags -v ./drivers/mongodb/internal                  
 ```
 
-Stop the mongodb instance:
+To stop the MongoDB instance, run:
 ```bash
 docker compose -f ./drivers/mongodb/docker-compose.yaml down
 ```
 
-Now your source configuration becomes:
+Updated Source Configuration Example (`config.json`):
 
 ```json title="config.json"
 {
@@ -144,7 +180,53 @@ Now your source configuration becomes:
 }
 ```
 
-## Exec into the replica set and see dbs
+
+## Ingest / Load sample JSON Data into MongoDB 
+
+### Importing Sample JSON Data Directly from an API
+We have provided some [sample datasets](../../resources/dataset) for you to test OLake. You can fetch the JSON from the URL and insert it into MongoDB **without saving it as a file**:  
+
+### Run This One-Liner in Your Terminal
+```sh
+curl -s "https://www.reddit.com/r/funny.json" | \
+jq '.data.children | map(.data)' | \
+docker exec -i mongodb-db-1 mongoimport -u olake -p olake --authenticationDatabase admin --db reddit --collection funny --jsonArray
+```
+
+### What This Does?
+- `curl -s "https://www.reddit.com/r/funny.json"` → Fetches the Reddit JSON data.  
+- `jq '.data.children | map(.data)'` → Extracts only the `children` array and keeps only the `data` field.
+- `docker exec -i mongodb-db-1 mongoimport ...` → Runs `mongoimport` inside the container.  
+- `--db reddit` → Inserts data into the **`reddit`** database.  
+- `--authenticationDatabase admin` → Ensures authentication happens in the admin database.
+- `--collection funny` → Stores the data in the **`funny`** collection.  
+- `--jsonArray` → Assumes the JSON is an **array of objects** (useful if the API returns one).  
+
+
+### Verify the Data in MongoDB
+
+
+#### Exec into the MongoDB Shell
+```sh
+docker exec -it mongodb-db-1 mongosh -u olake -p olake
+```
+
+#### Switch to the Database
+```js
+use reddit
+```
+
+#### Check the Collection
+```js
+db.funny.find().limit(5).pretty()
+```
+
+This will show a **formatted output** of the first 5 documents.
+
+
+
+## Verifying Your Setup
+
 Use the following command:
 ```bash
 docker exec -it mongodb-db-1 mongosh -u olake -p olake --eval "show dbs"
@@ -153,8 +235,9 @@ docker exec -it mongodb-db-1 mongosh -u olake -p olake --eval "show dbs"
 Remove `--eval "show dbs"` if you just want to exec into the container.
 
 You would see something like:
+
 ```bash
-Current Mongosh Log ID:	67b701a825ed4f7925a00aa0
+Current Mongosh Log ID:	67b701a82xxxxf7925a00aa0
 Connecting to:		mongodb://<credentials>@127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.3.8
 Using MongoDB:		8.0.4
 Using Mongosh:		2.3.8
@@ -168,54 +251,48 @@ local   436.00 KiB
 ```
 
 
-### How to Ingest JSON Data into MongoDB (From URL or Local File)
+## OLake Integration
+After verifying MongoDB’s configuration, proceed with OLake’s integration steps.
 
-## ✅ **Ingest JSON Directly from the an API**  
-We have provided some [sample datasets](../../resources/dataset) for you to test OLake. You can fetch the JSON from the URL and insert it into MongoDB **without saving it as a file**:  
-
-### **Run This One-Liner in Your Terminal**  
-```sh
-curl -s "https://www.reddit.com/r/funny.json" | \
-jq '.data.children | map(.data)' | \
-docker exec -i mongodb-db-1 mongoimport -u olake -p olake --authenticationDatabase admin --db reddit --collection funny --jsonArray
-```
-
-### **What This Does?**  
-- `curl -s "https://www.reddit.com/r/funny.json"` → Fetches the Reddit JSON data.  
-- `jq '.data.children | map(.data)'` → Extracts only the `children` array and keeps only the `data` field.
-- `docker exec -i mongodb-db-1 mongoimport ...` → Runs `mongoimport` inside the container.  
-- `--db reddit` → Inserts data into the **`reddit`** database.  
-- `--authenticationDatabase admin` → Ensures authentication happens in the admin database.
-- `--collection funny` → Stores the data in the **`funny`** collection.  
-- `--jsonArray` → Assumes the JSON is an **array of objects** (useful if the API returns one).  
-
-
-## ✅ **Verify the Data in MongoDB**
-After importing, check if the data is inside MongoDB:  
-
-### **Exec into the MongoDB Shell**
-```sh
-docker exec -it mongodb-db-1 mongosh -u olake -p olake
-```
-
-### **Switch to the Database**
-```js
-use reddit
-```
-
-### **Check the Collection**
-```js
-db.funny.find().limit(5).pretty()
-```
-
-This will show a **formatted output** of the first 5 documents.
-
-You can then proceed to [getting started guide](../../getting-started) to setup OLake.
+:::info
+You can then proceed to [getting started guide](../../getting-started) for more information.
+:::
 
 Below are sample commands you can use:
 
+:::info
+Refer the following docs to verify your configurations.
+1. [`config.json`](../../configs/source)
+2. [`catalog.json`](../../configs/catalog)
+3. [`writer.json`](../../configs/writer)
+4. [`state.json`](../../configs/state)
+:::
+
 ### 1. Discover
 
+```bash
+./build.sh driver-mongodb discover --config /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/config.json
 ```
 
+### 2. Sync
+```bash
+./build.sh driver-mongodb sync --config /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/config.json --catalog /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/catalog.json --destination /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/writer.json
 ```
+
+Sample output syncing our sample reddit data and writing locally in parquet format:
+
+![docker compose 4](/img/docs/docker/docker-compose-4.png)
+
+### 3. Sync with state
+
+```bash
+./build.sh driver-mongodb sync --config /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/config.json --catalog /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/catalog.json --destination /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/writer.json --state /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/state.json
+```
+
+
+### Troubleshooting:
+If you encounter any issues:
+
+- Verify the Docker network `olake-test` exists.
+- Check container logs using `docker logs mongodb-db-1`.
+- Ensure that the MongoDB key file permissions are correctly set by the entrypoint script.
