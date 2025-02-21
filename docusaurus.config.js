@@ -115,8 +115,10 @@ const config = {
           //   label: 'Docs',
           // },
 
-          { to: '/blog', label: 'Blogs', position: 'right' },
+          
           { to: '/docs', label: 'Docs', position: 'left' },
+          { to: '/iceberg', label: 'Iceberg', position: 'right' },
+          { to: '/blog', label: 'Blogs', position: 'right' },
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             // label: 'Join Slack',
@@ -418,7 +420,7 @@ const config = {
         id: 'iceberg-blog',
         editLocalizedFiles: false,
         blogTitle: 'Blogs on Apache Iceberg',
-        blogDescription: 'Blogs on everything related to Apache Iceberg ...',
+        blogDescription: 'Blogs on everything related to Apache Iceberg',
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'List Iceberg blog',
         routeBasePath: 'iceberg',

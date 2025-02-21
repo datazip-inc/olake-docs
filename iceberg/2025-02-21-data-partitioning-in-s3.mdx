@@ -1,0 +1,295 @@
+---
+slug: data-partitioning-in-s3
+title: 'Apache Iceberg: What It Is and Why It Matters'
+description: Data management has come a long way since the early days of Hadoop. If you’re running queries on petabyte-scale data lakes or managing real-time...
+image: /img/blog/cover/data-partitioning-in-s3-cover.png
+authors: [priyansh]
+tags: [s3]
+---
+
+![data-partitioning-in-s3-cover](/img/blog/cover/data-partitioning-in-s3-cover.png)
+
+Can you make sense of the data when it's just dumped in a big storage house? I guess not. Data is of little use if it's not structured. [OLake as an open source](https://github.com/datazip-inc/olake) [(GitHub](https://github.com/datazip-inc/olake)) project started 4 months back and since then we shipped many features (notably at least 2 each week from past 1 month) and [data partitioning in S3](https://github.com/datazip-inc/olake/pull/85) is one of the recent, along with:
+
+
+
+1. Log storage feature - [Related PR](https://github.com/datazip-inc/olake/pull/76/files)
+2. Resumable full load for mongoDB - [Related PR](https://github.com/datazip-inc/olake/pull/99)
+3. Exponential Backoff retry if sync fails - [Related PR](https://github.com/datazip-inc/olake/pull/74)
+
+Oh and did I forget to tell you that OLake just got its first community contributor PR merged? [Check this out.](https://github.com/datazip-inc/olake/pull/59)
+
+Why? We realized that how we organized our data in S3 was just as important as the data itself. In this post, I want to share our journey and reasoning behind the decisions we made to implement data partitioning, how it benefits our workflow, why we chose this method over traditional data engineering tools, and a dive into our current approach with practical examples.
+
+
+## **Why We Chose Data Partitioning**
+
+Our team had seen firsthand how overwhelming it can be to work with large, monolithic datasets. We knew that by partitioning our data, we could:
+
+* **Boost Query Performance:** We could limit the scope of our queries to only the relevant data segments (limit the use of `WHERE` clause), significantly cutting down on processing time. Less data scanning, more quicker query results.
+* **Cut Down on Costs:** By scanning smaller subsets of data instead of entire datasets, we were able to reduce our S3 read costs.
+* **Keep Our Data Organized:** A well-structured folder hierarchy made it easier for us to locate and manage files.
+* **Scale Seamlessly:** As our data grew, the partitioned structure ensured that performance remained predictable and manageable.
+
+
+## **The Benefits of Our Approach**
+
+We decided on OLake’s schema-driven partitioning approach because it gave us the flexibility we needed without the overhead of a full-blown data warehouse. Here’s why we love it:
+
+
+* **Stream-Level Customization: **Each data stream (or table) can have its own partitioning strategy defined in our `catalog.json`. This level of granularity lets us have a better approach based on the specific characteristics of each dataset. 
+
+
+Examples below. Read more on [S3 partitioning](https://olake.io/docs/writers/s3#s3-data-partitioning).
+
+
+
+* **Dynamic Partition Generation: **Our partitioning leverages a simple yet powerful regex pattern. For example, using: 
+ 
+    `"partition_regex": "/{column_name, default_value, granularity}"`
+
+    We can dynamically generate partition folders based on the value of a column or even the current date using `now()`. This means that the destination folder structures adapt on the fly, making it easier to manage time-series data. 
+
+    In the above syntax:
+
+* `column_name`: (Required) The name of the column whose value will determine the partition folder. You can also use the now() function to represent the current date.
+* `default_value`: (Optional) If the column value is null or unparseable, a default value (prefixed with `default_`) will be used. Default value is a fallback value.
+* `granularity`: (Optional) For time-based columns, you can specify the granularity. Supported values include HH (hour), DD (day), WW (week), MM (month), and YY (year). granularity is not needed if the column_name is not a timestamp field and can be left empty.
+
+
+## **Why We Chose This Approach Over Other Tools**
+
+We did consider alternatives like BigQuery and Hive strategies. However, here’s why we decided to roll our own solution with OLake:
+
+* **Lightweight Integration with S3:** BigQuery and Hive are powerful, but they bring a lot of extra baggage. Our solution directly integrates with S3, giving us a leaner, more focused tool that fits our exact needs without the additional complexity. 
+
+* **Straightforward Configuration:** Configuring partitioning in OLake is as simple as editing a JSON file. With tools like Hive, you often have to deal with a complex metadata layer and additional setup that we just didn’t need. 
+
+* **Flexibility:** Our regex-based partitioning lets us easily combine dynamic values (like current timestamps) with static column values. This flexibility allows us to create precise folder structures that align with our business logic.
+
+**Athena does it in a similar fashion:**
+
+If your data is partitioned per day, every day you have a single file, such as the following:
+
+
+```bash
+s3://my_bucket/logs/year=2023/month=06/day=01/file1_example.json
+s3://my_bucket/logs/year=2023/month=06/day=02/file2_example.json
+s3://my_bucket/logs/year=2023/month=06/day=03/file3_example.json
+```
+
+We can use a WHERE clause to query the data as follows:
+
+
+```sql
+SELECT * FROM table WHERE year=2023 AND month=06 AND day=01
+```
+
+
+Where partition is set by:
+
+
+```sql
+PARTITIONED BY (dt string) OR 
+PARTITIONED BY (year int, month int)
+```
+
+
+But they lack the flexibility OLake provides (Hint: default values and ability to set granularity in such simple ways).
+
+Some other approaches that devs on reddit suggested to do something like: 
+
+
+
+```bash
+Approach 1: s3://{bucketname}/{API_source}/{dataobject or tablename}/{yyyy-mm-dd}
+```
+
+
+or
+
+
+```bash
+Approach 2: s3://{bucketname}/{API_source}/{yyyy-mm-dd}/{dataobject or tablename}
+```
+
+
+Comparing the above approaches, it would make sense to go with the former one as it can be expanded to go deep into the timestamp based partitioning like below:
+
+
+```bash
+s3://{bucketname}/{API_source}/{dataobject or tablename}/{yyyy}/{mm}/{dd}/{yyyy-mm-dd HH:MM:SS}
+```
+
+
+
+## Using Glue
+
+You can do something like: 
+
+
+```py
+glue.create_partition(
+    DatabaseName='your_database',
+    TableName='your_table',
+    PartitionInput={
+        'Values': ['2024-02-15'],  # Example partition value
+        'StorageDescriptor': { ... }  # Table schema info
+    }
+)
+```
+
+
+If you are interested in how HIve partitions data and the problems with Hive partitioning, [refer to this guide](https://iceberg.apache.org/docs/1.4.0/partitioning/#problems-with-hive-partitioning).
+
+
+## Time based partitioning best practises
+
+We initially thought to partition our S3 data by year, month, and day—creating folders like 
+
+```bash
+s3://some_bucket/some_key/year=2020/month=12/day=01
+```
+
+At first glance, this seemed neat and natural. However, when it came time to run date range queries, we quickly discovered the downsides. 
+
+Imagine wanting to pull records between 2020‑11‑20 and 2020‑12‑20. Instead of a simple range condition, we were forced to build a massive WHERE clause listing every single date or trying to group them by month and day. 
+
+Not only did this result in error-prone and overly complex SQL, but we also ran into practical limits, like Athena’s query length restriction.
+
+The breakthrough came when we switched our approach to partition by the full date in `ISO8601` format. By using a partition like `s3://some_bucket/some_key/dt=2020-12-01`, our folder structure directly reflected the complete date. 
+
+This allowed us to execute range queries with a straightforward predicate:
+
+
+```sql
+WHERE dt >= '2020-11-20' AND dt <= '2020-12-20'
+```
+
+
+This method uses the natural alphabetical order of ISO8601 dates, making our queries cleaner, simpler, and less bug-prone—even though it might be a bit longer than using three separate partitions. Ultimately, this change saved us time and reduced the complexity in our daily operations.
+
+Although if you look closely, you can implement both of the above partitioning strategies using the `partition_regex` but it's my duty to educate you to follow the best practices.
+
+
+## **Explaining Our Current Approach with Examples**
+
+Let me walk you through our setup. In our [`catalog.json`](https://olake.io/docs/configs/catalog), we define partitioning on a per-stream basis. Here’s a simplified example:
+
+
+```json
+{
+  "selected_streams": {
+    "namespace": [
+      {
+        "stream_name": "table1",
+        "partition_regex": "/{column_name, default_value, granularity}"
+      },
+      {
+        "stream_name": "table2",
+        "partition_regex": ""
+      }
+    ]
+  },
+  "streams": [
+    {
+      "stream": {
+        "name": "table1",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    },
+    {
+      "stream": {
+        "name": "table2",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    }
+  ]
+}
+```
+
+
+In this setup, `table1` has partitioning enabled via a regex that tells OLake to use a specific column value (and optionally a **default** value and granularity) to structure the data. `table2`, on the other hand, isn’t partitioned, which shows that our approach is very flexible.
+
+
+### **A More Advanced Example**
+
+For one of our projects using a namespace called `otter_db`, we needed to partition data by both a column and the current date. Our configuration looked like this:
+
+
+```json
+{
+  "selected_streams": {
+    "otter_db": [
+      {
+        "stream_name": "stream_8",
+        "partition_regex": "{title,,}/{now(),2025,YY}-{now(),2025,MM}-{now(),2025,DD}/{latest_revision,,}"
+      },
+      {
+        "stream_name": "stream_0",
+        "partition_regex": "{now(),2025,YY}-{now(),2025,MM}-{now(),2025,DD}/{string_change_language,,}"
+      }
+    ]
+  }
+  // Additional configuration...
+}
+```
+
+
+Here’s what happens:
+
+
+
+* **Dynamic Column Extraction:** For `stream_8`, `{title,,}` pulls the value from the `title` column. If that value isn’t present, a default can be used. 
+
+* **Date Partitioning:** The `{now(),2025,YY}`, `{now(),2025,MM}`, and `{now(),2025,DD}` segments dynamically extract the current year, month, and day. This creates a date-based folder structure like `2025-02-13`. 
+
+
+**Resulting Folder Structure:** For a table named `table1` in the database `test_db`, our S3 path might look something like this: 
+
+```bash
+olake-s3-test/data-s3/test_db/table1/&lt;column_value>/YY-MM-DD/&lt;latest_revision_value>
+```
+
+### **Handling Special Characters**
+
+We also had to deal with scenarios where column values might contain special characters. For instance, if the `title` column contains:
+
+Hi/my name is / priyansh
+
+OLake treats the `/` as a directory separator, leading to a nested folder structure like:
+
+olake-s3-test
+
+└── data-s3
+
+    └── test_db
+
+        └── table1
+
+            └── Hi
+
+                └── my name is 
+
+                    └── priyansh
+
+                        └── &lt;file>.parquet
+
+This behavior is intentional, but it means you need to sanitize your data if you want the value to be treated as a single folder name.
+
+
+## **Wrapping Up**
+
+Looking back, our decision to implement S3 data partitioning with OLake was driven by the need for performance, cost efficiency, and simplicity. Our regex-based approach gives us the dynamic flexibility to handle both column values and timestamps, while remaining lightweight and directly integrated with S3. 
+
+Although other tools like BigQuery and Hive are robust, our solution hits the sweet spot for our specific needs by offering a focused, efficient, and easily configurable method for data partitioning.
+
+I hope this deep dive into our implementation gives you a clearer picture of how we tackled our data challenges. If you’re considering a similar approach, I’d love to hear your thoughts or questions.
+
+Reach out to us at [hello@olake.io](mailto:hello@olake.io) or head over to [Join Waitlist](https://olake.io/#olake-form-product) and our team will be happy to get in touch with you.
+
+
+
+If you have any questions or want to learn more, drop us a line at [**hello@olake.io**](mailto:hello@olake.io) or book a [**quick demo meeting**](https://calendly.com/d/ckr6-g82-p9y/olake_discussion) with us.
