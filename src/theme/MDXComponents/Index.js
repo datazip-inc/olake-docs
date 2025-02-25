@@ -4,6 +4,9 @@ import Badge from "./Badge";
 import Tpsr from "./Tpsr";
 // import img from "./ZoomedImage";
 import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 
 const MDXComponents = {
   ...InitialComponents,
@@ -12,7 +15,9 @@ const MDXComponents = {
   Tpsr,
 //   img,
 //   Img: img,
-DocsFooter
+DocsFooter,
+Tabs,
+TabItem
 };
 
 export default MDXComponents;
