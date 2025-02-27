@@ -18,113 +18,137 @@ git clone git@github.com:datazip-inc/olake.git
 :::
 
 
-Navigate to `./drivers/mongodb/config` OR just create a directory (say `olake-docker`) anywhere in your system if you want to use Dockerzied OLake and create these files:
+Navigate to `./drivers/mongodb/config` (if building locally) OR just create a directory (say `olake-docker`) anywhere in your system if you want to use Dockerzied OLake and create these files:
 1. `docker-compose.yaml`
-2. `setup.sh`
-3. `config.json`
-4. `writer.json` -> Refer the [additional-references](#additional-references) for details on writer file config.
+2. `config.json`
+3. `writer.json` -> Refer the [additional-references](#additional-references) for details on writer file config.
 
 
 <Tabs>
 
 <TabItem value="docker" label="Using Dockerized OLake" default>
 
-## 1. Initialization Script
+## 1. `docker-compose.yaml`
 
-The following bash script automates the process of creating and starting the Docker Compose stack, initiating the replica set, and ingesting sample Reddit data. Save this as a shell script (for example, `setup.sh`).
 
-### File: `setup.sh`
-
-```sh title="setup.sh"
-#!/bin/bash
-set -e
-
-# --- Prerequisite Checks ---
-if ! command -v docker &> /dev/null; then
-    echo "Docker is required but not installed. Aborting."
-    exit 1
-fi
-
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    echo "Docker Compose is required but not installed. Aborting."
-    exit 1
-fi
-
-# --- Prepare Key File ---
-KEY_FILE="./test.key"
-if [ ! -f "$KEY_FILE" ]; then
-    echo "Key file not found at $KEY_FILE. Generating a new key file..."
-    mkdir -p "$(dirname "$KEY_FILE")"
-    openssl rand -base64 756 > "$KEY_FILE"
-fi
-chmod 400 "$KEY_FILE"
-
-# --- Write docker-compose.yaml ---
-cat > docker-compose.yaml <<'EOF'
-version: "3.8"
-
+```yaml title="docker-compose.yaml"
 services:
-  mongo:
-    image: mongo
-    container_name: mongo
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    command: ["mongod", "--bind_ip_all", "--replSet", "rs0", "--keyFile", "/etc/ssl/mongo-keyfile", "--auth", "--port", "27017"]
-    entrypoint:
-      - "bash"
-      - "-c"
-      - |
-        chmod 400 /etc/ssl/mongo-keyfile;
-        chown 999:999 /etc/ssl/mongo-keyfile;
-        exec docker-entrypoint.sh "$@"
+  init-keyfile:
+    image: mongo:8.0
+    container_name: init_keyfile
+    command: >
+      sh -c "
+      if [ ! -f /etc/mongodb/pki/keyfile ]; then
+        echo 'Generating keyfile...';
+        openssl rand -base64 756 > /etc/mongodb/pki/keyfile && chmod 400 /etc/mongodb/pki/keyfile;
+      else
+        echo 'Keyfile already exists.';
+      fi
+      "
     volumes:
-      - mongo-data:/data/db
-      - ./test.key:/etc/ssl/mongo-keyfile:ro
+      - mongo-keyfile-vol:/etc/mongodb/pki
+    networks:
+      - mongo-cluster
+    restart: "no"
+
+  primary:
+    container_name: primary
+    image: mongo:8.0
+    hostname: primary
     ports:
       - "27017:27017"
+    depends_on:
+      - init-keyfile
+    volumes:
+      - mongo-data:/data/db
+      - mongo-keyfile-vol:/etc/mongodb/pki
+    command: |
+      bash -c '
+      echo "Waiting for keyfile..."
+      while [ ! -f /etc/mongodb/pki/keyfile ]; do sleep 1; done
+      
+      echo "Keyfile found, starting mongod without authentication first..."
+      mongod --replSet rs0 --bind_ip_all --port 27017 &
+      
+      # Store the PID of mongod
+      MONGO_PID=$!
+      
+      # Wait for MongoDB to start
+      echo "Waiting for MongoDB to start..."
+      until mongosh --port 27017 --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; do
+        sleep 2
+      done
+      
+      # Initialize replica set
+      echo "Initializing replica set..."
+      mongosh --port 27017 --eval "rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"host.docker.internal:27017\"}]})"
+      
+      # Wait for replica set to initialize
+      echo "Waiting for replica set to initialize..."
+      sleep 5
+      
+      # Create admin user
+      echo "Creating admin user..."
+      mongosh --port 27017 --eval "
+        db = db.getSiblingDB(\"admin\");
+        db.createUser({
+          user: \"admin\",
+          pwd: \"password\",
+          roles: [{ role: \"root\", db: \"admin\" }]
+        });
+      "
+    
+      # Stop the MongoDB instance
+      echo "Stopping MongoDB to restart with authentication..."
+      kill $MONGO_PID
+      wait $MONGO_PID
+      
+      # Start MongoDB with authentication
+      echo "Starting MongoDB with authentication..."
+      exec mongod --replSet rs0 --bind_ip_all --port 27017 --keyFile /etc/mongodb/pki/keyfile
+      '
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - mongo-cluster
+
+  data-loader:
+    image: mongo:8.0
+    container_name: sample_data_loader
+    depends_on:
+      primary:
+        condition: service_healthy
+    entrypoint: |
+      bash -c '
+      echo "Waiting for MongoDB admin user to be ready..."
+      until mongosh --host primary --username "admin" --password "password" --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; do
+        echo "Waiting for admin authentication to be ready..."
+        sleep 2
+      done
+      
+      apt-get update && apt-get install -y curl wget jq
+      
+      echo "Downloading Sample Reddit data..."
+      curl -s "https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/static/reddit.json" >> /tmp/reddit.json
+      
+      echo "Importing Sample Reddit data into the reddit database, funny collection..."
+      mongoimport --host primary --username "admin" --password "password" --authenticationDatabase admin --db reddit --collection funny --file /tmp/reddit.json --jsonArray
+      
+      echo "Sample Reddit data import complete!"
+      '
+    restart: "no"
+    networks:
+      - mongo-cluster
+
+networks:
+  mongo-cluster:
 
 volumes:
+  mongo-keyfile-vol:
   mongo-data:
-EOF
-
-# --- Start Docker Compose ---
-echo "Starting docker-compose..."
-docker compose up -d
-
-# --- Wait for MongoDB to be Ready ---
-echo "Waiting for MongoDB to be ready..."
-until docker exec mongo mongosh -u admin -p password --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
-    echo "Waiting for MongoDB..."
-    sleep 2
-done
-
-# --- Initiate Replica Set ---
-echo "Initiating replica set..."
-docker exec mongo mongosh -u admin -p password --eval "rs.initiate({_id:'rs0', members:[{_id:0, host:'mongo:27017'}]})" || echo "Replica set may already be initiated."
-
-echo "Waiting for primary election..."
-sleep 5
-
-echo "Reconfiguring replica set to advertise mongo:27017..."
-docker exec mongo mongosh -u admin -p password --eval "cfg = rs.conf(); cfg.members[0].host = 'mongo:27017'; rs.reconfig(cfg, {force: true});"
-
-# --- Install curl and jq inside the Mongo container ---
-echo "Installing curl and jq inside the Mongo container..."
-docker exec mongo bash -c "apt-get update && apt-get install -y curl jq"
-
-# --- Download and Import Reddit Data ---
-echo "Downloading Reddit data inside the container..."
-docker exec mongo bash -c "curl -s 'https://www.reddit.com/r/funny.json' | jq '.data.children | map(.data)' > /tmp/reddit.json"
-
-echo "Importing Reddit data into the 'reddit' database, 'funny' collection..."
-docker exec mongo mongoimport --username admin --password password --authenticationDatabase admin --db reddit --collection funny --file /tmp/reddit.json --jsonArray --quiet
-
-echo "All tasks completed."
-echo "You can connect with: docker exec -it mongo mongosh -u admin -p password --port 27017"
-echo "Then in the Mongo shell, run:"
-echo "  use reddit"
-echo "  db.funny.find().pretty()"
 ```
 
 
@@ -138,7 +162,7 @@ Update your source configuration file (`config.json`) to connect to MongoDB as f
 
 ```json title="config.json"
 {
-  "hosts": ["mongo:27017"],
+  "hosts": ["host.docker.internal:27017"],
   "username": "admin",
   "password": "password",
   "authdb": "admin",
@@ -159,7 +183,7 @@ Update your source configuration file (`config.json`) to connect to MongoDB as f
 To start the MongoDB container, run the following command from your project directory:
 
 ```bash
-bash ./setup.sh
+docker compose up -d
 ```
 
 ## 4. Start replicating you Data
@@ -168,29 +192,92 @@ bash ./setup.sh
 Run `docker network ls` to get a list of all networks being created. By default Compose sets up a single network for your app. Change the `--network=<your_network_name>` in the commands below. Usually a default network is created of the syntax `YOUR_DIRECTORY_NAME_default`
 :::
 
-### 4.1. Discover
+### 4.1. Discover Collection Schema
+
+<Tabs groupId="docker">
+<TabItem value="macos-linux" label="macOS / Linux" default>
 
 ```bash
 docker run \
-  --network=olake-docker_default \
-  -v /Users/priyansh_dz/Desktop/projects/olake-docker:/mnt/config \
+  -v "$HOME/Desktop/projects/olake-docker:/mnt/config" \
   olakego/source-mongodb:latest \
   discover \
   --config /mnt/config/config.json
-
 ```
 
-### 4.2. Sync
+</TabItem>
+
+<TabItem value="cmd" label="CMD">
+
+```bash
+docker run ^
+  -v "%USERPROFILE%\Desktop\projects\olake-docker:/mnt/config" ^
+  olakego/source-mongodb:latest ^
+  discover ^
+  --config /mnt/config/config.json
+```
+
+</TabItem>
+
+
+<TabItem value="powershell" label="Powershell">
+
+```bash
+docker run `
+  -v "$env:USERPROFILE\Desktop\projects\olake-docker:/mnt/config" `
+  olakego/source-mongodb:latest `
+  discover `
+  --config /mnt/config/config.json
+```
+
+</TabItem>
+
+
+</Tabs>
+
+### 4.2. Sync Data
+<Tabs groupId="docker">
+
+<TabItem value="macos-linux" label="macOS / Linux" default>
+
 ```bash
 docker run \
-  --network=olake-docker_default \
-  -v /Users/priyansh_dz/Desktop/projects/olake-docker:/mnt/config \
+  -v "$HOME/Desktop/projects/olake-docker:/mnt/config" \
   olakego/source-mongodb:latest \
   sync \
   --config /mnt/config/config.json \
   --catalog /mnt/config/catalog.json \
   --destination /mnt/config/writer.json
 ```
+</TabItem>
+
+<TabItem value="cmd" label="CMD">
+
+```bash
+docker run ^
+  -v "%USERPROFILE%\Desktop\projects\olake-docker:/mnt/config" ^
+  olakego/source-mongodb:latest ^
+  sync ^
+  --config /mnt/config/config.json ^
+  --catalog /mnt/config/catalog.json ^
+  --destination /mnt/config/writer.json
+```
+</TabItem>
+
+<TabItem value="powershell" label="Powershell">
+
+```bash
+docker run `
+  -v "$env:USERPROFILE\Desktop\projects\olake-docker:/mnt/config" `
+  olakego/source-mongodb:latest `
+  sync `
+  --config /mnt/config/config.json `
+  --catalog /mnt/config/catalog.json `
+  --destination /mnt/config/writer.json
+```
+
+</TabItem>
+</Tabs>
 
 Sample output syncing our sample reddit data and writing locally in parquet format:
 
@@ -199,10 +286,13 @@ Sample output syncing our sample reddit data and writing locally in parquet form
 
 ### 4.3. Sync with state
 
-```bash
+<Tabs groupId="docker">
+
+<TabItem value="macos-linux" label="macOS / Linux" default>
+
+```bash 
 docker run \
-  --network=olake-docker_default \
-  -v /Users/priyansh_dz/Desktop/projects/olake-docker:/mnt/config \
+  -v /Users/user_name/Desktop/projects/olake-docker:/mnt/config \
   olakego/source-mongodb:latest \
   sync \
   --config /mnt/config/config.json \
@@ -213,110 +303,169 @@ docker run \
 
 </TabItem>
 
+<TabItem value="cmd" label="CMD">
+
+```bash 
+docker run ^
+  -v "%USERPROFILE%\Desktop\projects\olake-docker:/mnt/config" ^
+  olakego/source-mongodb:latest ^
+  sync ^
+  --config /mnt/config/config.json ^
+  --catalog /mnt/config/catalog.json ^
+  --destination /mnt/config/writer.json ^
+  --state /mnt/config/state.json
+```
+
+
+</TabItem>
+
+
+<TabItem value="powershell" label="Powershell">
+
+```bash 
+docker run `
+  -v "$env:USERPROFILE\Desktop\projects\olake-docker:/mnt/config" `
+  olakego/source-mongodb:latest `
+  sync `
+  --config /mnt/config/config.json `
+  --catalog /mnt/config/catalog.json `
+  --destination /mnt/config/writer.json `
+  --state /mnt/config/state.json
+```
+
+</TabItem>
+</Tabs>
+
+
+
+</TabItem>
+
 
 
 <TabItem value="build" label="Using Local build OLake" default>
 
 
+## 1. `docker-compose.yaml`
 
-## 1. Initialization Script
 
-The following bash script automates the process of starting the Docker Compose stack, initiating the replica set, and ingesting sample Reddit data. Save this as a shell script (for example, `setup.sh`).
-
-### File: `setup.sh`
-
-```sh title="setup.sh"
-#!/bin/bash
-set -e
-
-# --- Prerequisite Checks ---
-if ! command -v docker &> /dev/null; then
-    echo "Docker is required but not installed. Aborting."
-    exit 1
-fi
-
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    echo "docker-compose is required but not installed. Aborting."
-    exit 1
-fi
-
-# --- Ensure Key File Exists with Proper Permissions ---
-KEY_FILE="./drivers/mongodb/test.key"
-if [ ! -f "$KEY_FILE" ]; then
-    echo "Key file not found at $KEY_FILE. Generating a new key file..."
-    mkdir -p "$(dirname "$KEY_FILE")"
-    openssl rand -base64 756 > "$KEY_FILE"
-fi
-chmod 400 "$KEY_FILE"
-
-# --- Write docker-compose.yaml ---
-cat > docker-compose.yaml <<'EOF'
-version: "3.8"
-
+```yaml title="docker-compose.yaml"
 services:
-  mongo:
-    image: mongo
-    container_name: mongo
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    command: ["mongod", "--bind_ip_all", "--replSet", "rs0", "--keyFile", "/etc/ssl/mongo-keyfile", "--auth", "--port", "27017"]
-    entrypoint:
-      - "bash"
-      - "-c"
-      - |
-        chmod 400 /etc/ssl/mongo-keyfile;
-        chown 999:999 /etc/ssl/mongo-keyfile;
-        exec docker-entrypoint.sh "$@"
+  init-keyfile:
+    image: mongo:8.0
+    container_name: init_keyfile
+    command: >
+      sh -c "
+      if [ ! -f /etc/mongodb/pki/keyfile ]; then
+        echo 'Generating keyfile...';
+        openssl rand -base64 756 > /etc/mongodb/pki/keyfile && chmod 400 /etc/mongodb/pki/keyfile;
+      else
+        echo 'Keyfile already exists.';
+      fi
+      "
     volumes:
-      - mongo-data:/data/db
-      - ./drivers/mongodb/test.key:/etc/ssl/mongo-keyfile:ro
+      - mongo-keyfile-vol:/etc/mongodb/pki
+    networks:
+      - mongo-cluster
+    restart: "no"
+
+  primary:
+    container_name: primary
+    image: mongo:8.0
+    hostname: primary
     ports:
       - "27017:27017"
+    depends_on:
+      - init-keyfile
+    volumes:
+      - mongo-data:/data/db
+      - mongo-keyfile-vol:/etc/mongodb/pki
+    command: |
+      bash -c '
+      echo "Waiting for keyfile..."
+      while [ ! -f /etc/mongodb/pki/keyfile ]; do sleep 1; done
+      
+      echo "Keyfile found, starting mongod without authentication first..."
+      mongod --replSet rs0 --bind_ip_all --port 27017 &
+      
+      # Store the PID of mongod
+      MONGO_PID=$!
+      
+      # Wait for MongoDB to start
+      echo "Waiting for MongoDB to start..."
+      until mongosh --port 27017 --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; do
+        sleep 2
+      done
+      
+      # Initialize replica set
+      echo "Initializing replica set..."
+      mongosh --port 27017 --eval "rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"localhost:27017\"}]})"
+      
+      # Wait for replica set to initialize
+      echo "Waiting for replica set to initialize..."
+      sleep 5
+      
+      # Create admin user
+      echo "Creating admin user..."
+      mongosh --port 27017 --eval "
+        db = db.getSiblingDB(\"admin\");
+        db.createUser({
+          user: \"admin\",
+          pwd: \"password\",
+          roles: [{ role: \"root\", db: \"admin\" }]
+        });
+      "
+    
+      # Stop the MongoDB instance
+      echo "Stopping MongoDB to restart with authentication..."
+      kill $MONGO_PID
+      wait $MONGO_PID
+      
+      # Start MongoDB with authentication
+      echo "Starting MongoDB with authentication..."
+      exec mongod --replSet rs0 --bind_ip_all --port 27017 --keyFile /etc/mongodb/pki/keyfile
+      '
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - mongo-cluster
+
+  data-loader:
+    image: mongo:8.0
+    container_name: sample_data_loader
+    depends_on:
+      primary:
+        condition: service_healthy
+    entrypoint: |
+      bash -c '
+      echo "Waiting for MongoDB admin user to be ready..."
+      until mongosh --host primary --username "admin" --password "password" --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; do
+        echo "Waiting for admin authentication to be ready..."
+        sleep 2
+      done
+      
+      apt-get update && apt-get install -y curl wget jq
+      
+      echo "Downloading Sample Reddit data..."
+      curl -s "https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/static/reddit.json" >> /tmp/reddit.json
+      
+      echo "Importing Sample Reddit data into the reddit database, funny collection..."
+      mongoimport --host primary --username "admin" --password "password" --authenticationDatabase admin --db reddit --collection funny --file /tmp/reddit.json --jsonArray
+      
+      echo "Sample Reddit data import complete!"
+      '
+    restart: "no"
+    networks:
+      - mongo-cluster
+
+networks:
+  mongo-cluster:
 
 volumes:
+  mongo-keyfile-vol:
   mongo-data:
-EOF
-
-# --- Start Docker Compose ---
-echo "Starting docker-compose..."
-docker compose up -d
-
-# --- Wait for MongoDB to be Ready ---
-echo "Waiting for MongoDB to be ready..."
-until docker exec mongo mongosh -u admin -p password --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
-    echo "Waiting for MongoDB..."
-    sleep 2
-done
-
-# --- Initiate Replica Set ---
-echo "Initiating replica set..."
-docker exec mongo mongosh -u admin -p password --eval "rs.initiate({_id:'rs0', members:[{_id:0, host:'mongo:27017'}]})" || echo "Replica set may already be initiated."
-
-echo "Waiting for primary election..."
-sleep 5
-
-# --- Reconfigure Replica Set ---
-echo "Reconfiguring replica set to advertise mongo:27017..."
-docker exec mongo mongosh -u admin -p password --eval "cfg = rs.conf(); cfg.members[0].host = 'localhost:27017'; rs.reconfig(cfg, {force: true});"
-
-# --- Install curl and jq Inside the Mongo Container ---
-echo "Installing curl and jq inside the Mongo container..."
-docker exec mongo bash -c "apt-get update && apt-get install -y curl jq"
-
-# --- Download Reddit Data ---
-echo "Downloading Reddit data inside the container..."
-docker exec mongo bash -c "curl -s 'https://www.reddit.com/r/funny.json' | jq '.data.children | map(.data)' > /tmp/reddit.json"
-
-# --- Import Reddit Data ---
-echo "Importing Reddit data into the 'reddit' database, 'funny' collection..."
-docker exec mongo mongoimport --username admin --password password --authenticationDatabase admin --db reddit --collection funny --file /tmp/reddit.json --jsonArray
-
-echo "All tasks completed."
-echo "You can connect with: docker exec -it mongo mongosh -u admin -p password --port 27017"
-echo "Then in the Mongo shell, run:"
-echo "  use reddit"
-echo "  db.funny.find().pretty()"
 ```
 
 
@@ -349,38 +498,135 @@ Update your source configuration file (`config.json`) to connect to MongoDB as f
 To start the MongoDB container, run the following command from your project directory:
 
 ```bash
-bash ./drivers/mongodb/config/setup.sh
+docker compose -f ./drivers/mongodb/config/docker-compose.yaml up -d
 ```
 
 ## 4. Start replicating you Data
 
-### 4.1. Discover
+### 4.1. Discover Collection Schema
+<Tabs groupId="build-locally">
+
+<TabItem value="macos-linux" label="macOS / Linux" default>
 
 ```bash
-./build.sh driver-mongodb discover --config /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/config.json
+OLAKE_BASE_PATH="$HOME/Desktop/projects/olake/drivers/mongodb/config" && \
+./build.sh driver-mongodb discover \
+  --config "$OLAKE_BASE_PATH/config.json"
 ```
 
-### 4.2. Sync
+</TabItem> 
+
+<TabItem value="cmd" label="CMD">
+
 ```bash
-./build.sh driver-mongodb sync --config /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/config.json --catalog /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/catalog.json --destination /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/writer.json
+set "OLAKE_BASE_PATH=%USERPROFILE%\Desktop\projects\olake\drivers\mongodb\config" && ^
+./build.sh driver-mongodb discover ^
+  --config "%OLAKE_BASE_PATH%\config.json"
 ```
+</TabItem> 
+
+<TabItem value="powershell" label="Powershell">
+
+```bash
+$OLAKE_BASE_PATH = "$env:USERPROFILE\Desktop\projects\olake\drivers\mongodb\config"; `
+./build.sh driver-mongodb discover `
+  --config "$OLAKE_BASE_PATH\config.json"
+```
+
+</TabItem> 
+</Tabs>
+
+### 4.2. Sync Data Command
+
+<Tabs groupId="build-locally">
+
+<TabItem value="macos-linux" label="macOS / Linux" default>
+
+```bash
+OLAKE_BASE_PATH="$HOME/Desktop/projects/olake/drivers/mongodb/config" && \
+./build.sh driver-mongodb sync \
+  --config "$OLAKE_BASE_PATH/config.json" \
+  --catalog "$OLAKE_BASE_PATH/catalog.json" \
+  --destination "$OLAKE_BASE_PATH/writer.json"
+```
+
+</TabItem> 
+
+<TabItem value="cmd" label="CMD">
+
+```bash
+set "OLAKE_BASE_PATH=%USERPROFILE%\Desktop\projects\olake\drivers\mongodb\config" && ^
+./build.sh driver-mongodb sync ^
+  --config "%OLAKE_BASE_PATH%\config.json" ^
+  --catalog "%OLAKE_BASE_PATH%\catalog.json" ^
+  --destination "%OLAKE_BASE_PATH%\writer.json"
+```
+
+</TabItem> 
+
+<TabItem value="powershell" label="Powershell">
+
+```bash
+$OLAKE_BASE_PATH = "$env:USERPROFILE\Desktop\projects\olake\drivers\mongodb\config"; `
+./build.sh driver-mongodb sync `
+  --config "$OLAKE_BASE_PATH\config.json" `
+  --catalog "$OLAKE_BASE_PATH\catalog.json" `
+  --destination "$OLAKE_BASE_PATH\writer.json"
+```
+</TabItem> 
+
+</Tabs>
 
 Sample output syncing our sample reddit data and writing locally in parquet format:
 
 ![docker compose 4](/img/docs/docker/docker-compose-4.png)
 
 
-### 4.3. Sync with state
+### 4.3. Sync with State
+
+<Tabs groupId="build-locally">
+
+<TabItem value="macos-linux" label="macOS / Linux" default>
 
 ```bash
-./build.sh driver-mongodb sync --config /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/config.json --catalog /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/catalog.json --destination /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/writer.json --state /Users/user_name/Desktop/projects/olake/drivers/mongodb/config/state.json
+OLAKE_BASE_PATH="$HOME/Desktop/projects/olake/drivers/mongodb/config" && \
+./build.sh driver-mongodb sync \
+  --config "$OLAKE_BASE_PATH/config.json" \
+  --catalog "$OLAKE_BASE_PATH/catalog.json" \
+  --destination "$OLAKE_BASE_PATH/writer.json" \
+  --state "$OLAKE_BASE_PATH/state.json"
 ```
 
+</TabItem> 
+
+<TabItem value="cmd" label="CMD">
+
+```bash
+set "OLAKE_BASE_PATH=%USERPROFILE%\Desktop\projects\olake\drivers\mongodb\config" && ^
+./build.sh driver-mongodb sync ^
+  --config "%OLAKE_BASE_PATH%\config.json" ^
+  --catalog "%OLAKE_BASE_PATH%\catalog.json" ^
+  --destination "%OLAKE_BASE_PATH%\writer.json" ^
+  --state "%OLAKE_BASE_PATH%\state.json"
+```
+
+</TabItem> 
+
+<TabItem value="powershell" label="Powershell">
+
+```bash
+$OLAKE_BASE_PATH = "$env:USERPROFILE\Desktop\projects\olake\drivers\mongodb\config"; `
+./build.sh driver-mongodb sync `
+  --config "$OLAKE_BASE_PATH\config.json" `
+  --catalog "$OLAKE_BASE_PATH\catalog.json" `
+  --destination "$OLAKE_BASE_PATH\writer.json" `
+  --state "$OLAKE_BASE_PATH\state.json"
+```
+</TabItem> 
+
+</Tabs>
 
 </TabItem>
-
-
-
 </Tabs>
 
 
@@ -401,23 +647,9 @@ Sample output syncing our sample reddit data and writing locally in parquet form
 
 If you encounter any issues, consider the following:
 
-- **Network Verification:**  
-  Ensure the Docker network (e.g., `olake_default`) exists. Although Docker Compose creates this by default, verify with:
-  
-  ```bash
-  docker network ls
-  ```
-
 - **Container Logs:**  
   Check container logs for MongoDB using:
   
   ```bash
-  docker logs mongo
-  ```
-
-- **Key File Permissions:**  
-  Verify that the MongoDB key file has the correct permissions. The entrypoint script attempts to fix this, but ensure your host file has been set with:
-  
-  ```bash
-  chmod 400 ./drivers/mongodb/test.key
+  docker logs CONTAINER_ID
   ```
