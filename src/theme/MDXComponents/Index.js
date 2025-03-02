@@ -13,7 +13,7 @@ import DockerSyncWithState from '../../../docs/shared/commands/DockerSyncWithSta
 import LocalDiscover from '../../../docs/shared/commands/LocalDiscover.mdx'
 import LocalSync from '../../../docs/shared/commands/LocalSync.mdx'
 import LocalSyncWithState from '../../../docs/shared/commands/LocalSyncWithState.mdx'
-
+import Hr from '@site/src/components/Hr'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -30,7 +30,8 @@ DockerSync,
 DockerSyncWithState,
 LocalDiscover,
 LocalSync,
-LocalSyncWithState
+LocalSyncWithState,
+Hr
 };
 
 export default MDXComponents;

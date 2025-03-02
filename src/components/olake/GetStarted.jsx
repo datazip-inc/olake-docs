@@ -1,5 +1,5 @@
 import React from "react";
-import { outerLink } from "../../../utils/functions";
+// import { outerLink } from "../../../utils/functions";
 import AwesomeButton from "../AwesomeButton";
 import SectionHeader from "../SectionHeader";
 import { FaHourglassStart, FaGithub, FaClock } from "react-icons/fa";

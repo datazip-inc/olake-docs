@@ -119,6 +119,7 @@ const config = {
           { to: '/docs', label: 'Docs', position: 'left' },
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
+          { to: '/webinar', label: 'Webinars & Events', position: 'right' },
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             // label: 'Join Slack',
