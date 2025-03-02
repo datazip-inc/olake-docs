@@ -39,7 +39,7 @@ const Webinar1Page = () => {
       description='Learn how to set up OLAP system/platform for analysis from NoSQL Databases (MongoDB & DynamoDB) using Apache Iceberg.'
     >
 
-      <main className="container mx-auto px-36 md:px-36 py-12">
+      <main className="container mx-auto lg:px-36 py-12">
 
         <WebinarTitle
           title="A Journey into Data Lake: Introducing Apache Iceberg"

@@ -49,7 +49,7 @@ const Webinar2Page = () => {
     >
 
 
-      <main className="container mx-auto px-16 md:px-36 py-12">
+      <main className="container mx-auto lg:px-36 py-12">
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"

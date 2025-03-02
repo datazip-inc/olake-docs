@@ -47,28 +47,28 @@ const Webinar2Page = () => {
       title='Best Practices for Migrating to Apache Iceberg'
       description='Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.'
     >
-    
-      <main className="container mx-auto px-16 md:px-36 py-12">
+
+      <main className="container mx-auto lg:px-36 py-12">
         <WebinarTitle
           title="Best Practices for Migrating to Apache Iceberg"
           tag="Webinar"
         />
 
-       
+
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-          <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
           </div>
 
           <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
-          <WebinarForm
+            <WebinarForm
               source="w2-best-practices-iceberg"
               nexturl="w-2-best-practices-iceberg-confirmation"
             />
           </div>
         </div>
-        
+
         <Hr />
         <br />
 

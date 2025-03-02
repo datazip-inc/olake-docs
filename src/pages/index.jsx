@@ -6,12 +6,13 @@ import GetStarted from '@site/src/components/olake/GetStarted'
 import Benchmarks from '@site/src/components/olake/Benchmarks'
 import OlakeBlogList from '@site/src/components/olake/Blog'
 import Faq from '@site/src/components/olake/Faq'
-import useIsMobile from '@site/utils/hooks/useMobile'
+// import useIsMobile from '@site/utils/hooks/useMobile'
 import Layout from '@theme/Layout'
 import AwesomeButton from '../components/AwesomeButton'
 import { FaGithub } from 'react-icons/fa'
 import AlternatingRows from '../components/AlternatingRows'
 import SectionHeader from '../components/SectionHeader'
+import HeroHeading from '../components/HeroHeading'
 import CTAComponent from '../components/CTA'
 import { FaWalkieTalkie } from 'react-icons/fa6'
 import ArchitectureImage from '../components/olake/ArchitectureImage'
@@ -66,7 +67,7 @@ const sampleItems = [
   {
     title: 'Efficient Incremental Sync',
     description:
-      "Using Databases change stream logs (binglogs for MySQL, oplogs for mongoDB, WAL logs for Postgres), OLake enables parallel updates for each collection. This method facilitates rapid synchronisation and ensures that data is consistently updated with near real-time updates.",
+      'Using Databases change stream logs (binglogs for MySQL, oplogs for mongoDB, WAL logs for Postgres), OLake enables parallel updates for each collection. This method facilitates rapid synchronisation and ensures that data is consistently updated with near real-time updates.',
     image: '/img/olake/why-us-4.svg'
   }
 ]
@@ -75,7 +76,7 @@ const OlakeProduct = () => {
   const childRef = useRef()
   const formRef = useRef(null)
   const history = useHistory()
-  const isMobile = useIsMobile()
+  // const isMobile = useIsMobile()
 
   useEffect(() => {
     if (childRef.current && childRef.current.init) {
@@ -113,26 +114,14 @@ const OlakeProduct = () => {
       description='Fastest Database to Data Lakehouse data replication tool, open sourced'
     >
       <HelmetWrapper {...olakeProductData} />
-      
+
       <div className='mx-auto flex w-full max-w-[1440px] flex-col items-center p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12'>
-        {/* Your content goes here */}
-
         {/* Olake Brand */}
-        <div className='flex justify-center'>
+        {/* <div className='flex justify-center'>
           <img src='/img/olake/olake-logo.svg' alt='olake logo' className='w-24 md:w-32' />
-        </div>
+        </div> */}
 
-        <div className='z-10 mt-24 md:mt-36 bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-center text-[36px] md:leading-[80px] leading-[36px] text-transparent md:text-[46px] lg:text-[66px]'>
-          <span className='italic'>Fastest</span> way to Replicate your{' '}
-          <span className='font-bold'>Database</span> data in Data Lake
-        </div>
-
-        <div className='mx-auto mt-5 max-w-[800px] text-center text-gray-400'>
-          <p>
-            OLake makes data replication faster by parallelizing full loads, leveraging change
-            streams for real-time sync, and pulling data in database native (e.g BSON format) for efficient ingestion.
-          </p>
-        </div>
+        <HeroHeading containerClassName='px-4' headingClassName='mb-2' subheadingClassName='mb-6' />
 
         <div className='column mt-10 flex gap-8'>
           <AwesomeButton
@@ -146,7 +135,7 @@ const OlakeProduct = () => {
             Join us
           </AwesomeButton>
 
-          <AwesomeButton href='#olake-form-product' icon={<FaWalkieTalkie/>} size='medium'>
+          <AwesomeButton href='#olake-form-product' icon={<FaWalkieTalkie />} size='medium'>
             Talk to us
           </AwesomeButton>
         </div>
@@ -155,7 +144,7 @@ const OlakeProduct = () => {
         {/* Architecture Image */}
 
         <ArchitectureImage />
-        
+
         {/* {isMobile ? (
           <img
             src='/img/olake/cta-mobile.svg'
@@ -184,25 +173,36 @@ const OlakeProduct = () => {
         <div
           id='olake-form-product'
           ref={formRef}
-          className='md:my-8 flex w-full md:max-w-[90%] flex-col md:flex-row'
+          className='flex w-full flex-col md:my-8 md:max-w-[90%] md:flex-row'
         >
           <div className='flex-1 shrink-0 pl-[50px] pt-[50px] md:w-1/2'>
+            {/* Logo and Title Row */}
             <div className='flex items-center gap-2 text-[24px] font-semibold text-gray-900 dark:text-white'>
+              {/* Light Mode Logo */}
               <img
-                src='/img/olake/olake-logo-vector.svg'
-                alt='olake logo vector'
-                className='h-auto w-12'
+                src='/img/logo/olake-black.svg'
+                alt='OLake logo (light)'
+                className='h-auto w-12 dark:hidden'
               />
+
+              {/* Dark Mode Logo */}
+              <img
+                src='/img/logo/olake-white.svg'
+                alt='OLake logo (dark)'
+                className='h-auto w-12 dark:block hidden'
+              />
+
               <span>OLake</span>
             </div>
 
+            {/* Headline */}
             <div className='mt-4 text-4xl font-normal text-gray-900 dark:text-white'>
               Interested?
               <br /> Get Early Access.
             </div>
           </div>
 
-          <div className='m-8 min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-5 md:p-10 dark:bg-white md:w-1/2'>
+          <div className='m-8 min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-5 dark:bg-white md:w-1/2 md:p-10'>
             <div id='olake-product-form'></div>
           </div>
         </div>

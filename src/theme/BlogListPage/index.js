@@ -48,7 +48,7 @@ function BlogHomepageBanner(props) {
         <Image
           img={useBaseUrl(imageDefault.urlAvatar)}
           alt='avatar blog'
-          className='absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 transform rounded-full bg-white p-2'
+          className='absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 transform rounded-full p-2'
           width={100}
           height={100}
           loading='lazy'

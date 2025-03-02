@@ -1,12 +1,11 @@
 import React from "react";
-// import { outerLink } from "../../../utils/functions";
+import { FaHourglassStart, FaGithub, FaClock } from "react-icons/fa";
 import AwesomeButton from "../AwesomeButton";
 import SectionHeader from "../SectionHeader";
-import { FaHourglassStart, FaGithub, FaClock } from "react-icons/fa";
 
 const GetStarted = () => {
   return (
-    <div className="mx-auto flex flex-col items-center w-full md:max-w-[90%] px-4">
+    <div className="mx-auto w-full md:max-w-[90%] px-4 py-8">
       <SectionHeader
         heading={
           <>
@@ -14,12 +13,20 @@ const GetStarted = () => {
           </>
         }
         subheading="Choose a plan that suits your organisation’s needs."
+        containerClassName="text-gray-900 dark:text-white"
+        headingClassName="
+          bg-gradient-to-r 
+          from-gray-900 to-black 
+          dark:from-gray-100 dark:to-gray-300
+          bg-clip-text 
+          text-transparent
+        "
       />
 
       {/* List container */}
       <div className="relative mt-12 flex flex-col md:flex-row gap-4 md:gap-[27px]">
         {/* First Item */}
-        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[24px]  md:py-[40px]">
+        <div className="z-10 w-full md:flex-1 flex flex-col items-center rounded-[16px] bg-gray-100 dark:bg-[#171717] px-[24px] py-[24px] md:py-[40px]">
           <img
             src="/img/olake/olake-github.svg"
             alt="get-started-item"
@@ -29,10 +36,20 @@ const GetStarted = () => {
             <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
             Quick Results
           </div>
-          <div className="mt-[16px] bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-[28px] text-transparent">
+          <div
+            className="
+              mt-[16px] 
+              bg-gradient-to-r 
+              from-gray-900 to-black 
+              dark:from-gray-100 dark:to-gray-300
+              bg-clip-text 
+              text-[28px] 
+              text-transparent
+            "
+          >
             O<span className="font-semibold">Lake Github</span>
           </div>
-          <div className="mt-[8px] text-center text-[14px] font-normal text-[#c7c7c7]">
+          <div className="mt-[8px] text-center text-[14px] font-normal text-gray-700 dark:text-gray-300">
             Use the free &amp; open OLake for the fastest MongoDB Replication to
             Apache Iceberg
           </div>
@@ -48,7 +65,7 @@ const GetStarted = () => {
         </div>
 
         {/* Second Item */}
-        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[24px]  md:py-[40px]">
+        <div className="z-10 w-full md:flex-1 flex flex-col items-center rounded-[16px] bg-gray-100 dark:bg-[#171717] px-[24px] py-[24px] md:py-[40px]">
           <img
             src="/img/olake/olake-saas.svg"
             alt="get-started-item"
@@ -58,11 +75,21 @@ const GetStarted = () => {
             <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
             For Enterprise solutions
           </div>
-          <div className="mt-[16px] bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-[28px] text-transparent">
+          <div
+            className="
+              mt-[16px]
+              bg-gradient-to-r
+              from-gray-900 to-black 
+              dark:from-gray-100 dark:to-gray-300
+              bg-clip-text
+              text-[28px]
+              text-transparent
+            "
+          >
             O<span className="font-semibold">Lake SaaS</span>
           </div>
-          <div className="mt-[8px] text-center text-[14px] font-normal text-[#c7c7c7]">
-          A complete replication service for large organisations which handle huge data
+          <div className="mt-[8px] text-center text-[14px] font-normal text-gray-700 dark:text-gray-300">
+            A complete replication service for large organisations which handle huge data
           </div>
           <AwesomeButton
             href="#olake-form-product"
@@ -75,7 +102,7 @@ const GetStarted = () => {
         </div>
 
         {/* Third Item */}
-        <div className="w-full md:flex-1 z-10 flex flex-col items-center rounded-[16px] bg-[#171717] px-[24px] py-[24px]  md:py-[40px]">
+        <div className="z-10 w-full md:flex-1 flex flex-col items-center rounded-[16px] bg-gray-100 dark:bg-[#171717] px-[24px] py-[24px] md:py-[40px]">
           <img
             src="/img/olake/olake-byoc.svg"
             alt="get-started-item"
@@ -85,11 +112,21 @@ const GetStarted = () => {
             <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
             Control your cloud
           </div>
-          <div className="mt-[16px] bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-[28px] text-transparent">
+          <div
+            className="
+              mt-[16px]
+              bg-gradient-to-r
+              from-gray-900 to-black 
+              dark:from-gray-100 dark:to-gray-300
+              bg-clip-text
+              text-[28px]
+              text-transparent
+            "
+          >
             O<span className="font-semibold">Lake BYOC</span>
           </div>
-          <div className="mt-[8px] text-center text-[14px] font-normal text-[#c7c7c7]">
-          Bring the OLake powerhouse to your own cloud services for a seamless experience
+          <div className="mt-[8px] text-center text-[14px] font-normal text-gray-700 dark:text-gray-300">
+            Bring the OLake powerhouse to your own cloud services for a seamless experience
           </div>
           <AwesomeButton
             variant="dark"

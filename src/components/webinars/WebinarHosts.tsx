@@ -27,7 +27,7 @@ const WebinarHosts: React.FC<WebinarHostsProps> = ({ hosts }) => {
         {hosts.map((host, index) => (
           <div
             key={index}
-            className="flex flex-col items-center bg-gray-100 dark:bg-slate-800 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 w-72"
+            className="flex flex-col items-center bg-gray-100 dark:bg-slate-800 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 w-96"
           >
 
 

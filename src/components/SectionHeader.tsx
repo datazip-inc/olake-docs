@@ -27,16 +27,49 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
   subheadingClassName = "",
   hrClassName = "",
 }) => {
-  // Default container styles: center content, margin at the top, max width, and vertical stacking.
-  const defaultContainerClasses = "mx-auto flex max-w-[90%] flex-col";
-  // Default heading: a gradient text with responsive font sizes and transparent fill (to reveal the gradient)
-  const defaultHeadingClasses =
-    "z-10 bg-gradient-to-r from-white to-[#bdbdbd] bg-clip-text text-center text-[36px] md:text-[46px] lg:text-[56px] md:leading-[80px] text-transparent";
-  // Default horizontal rule: no border, fixed height, and vertical margin
-  const defaultHrClasses = "border-0 bg-gray-800 h-px my-4";
-  // Default subheading: centered text with responsive font size and blue color
-  const defaultSubheadingClasses =
-    "text-center text-[16px] md:text-[18px] font-normal leading-normal text-blue-600";
+  // Container: center content, set a max width, and stack them vertically
+  const defaultContainerClasses =
+    "mx-auto flex max-w-[90%] flex-col";
+
+  // Heading:
+  // - Light mode gradient: gray-900 → black
+  // - Dark mode gradient: gray-100 → gray-300
+  // - text-transparent with bg-clip-text ensures the gradient is visible through the text
+  const defaultHeadingClasses = `
+    z-10
+    bg-gradient-to-r
+    from-gray-900
+    to-black
+    dark:from-gray-100
+    dark:to-gray-300
+    bg-clip-text
+    text-center
+    text-transparent
+    text-[36px]
+    md:text-[46px]
+    lg:text-[56px]
+    md:leading-[80px]
+  `;
+
+  // Horizontal rule: subtle background color, with a dark mode variant
+  const defaultHrClasses = `
+    border-0
+    bg-gray-800
+    dark:bg-gray-600
+    h-px
+    my-4
+  `;
+
+  // Subheading: centered text, toggles color in dark mode
+  const defaultSubheadingClasses = `
+    text-center
+    text-[16px]
+    md:text-[18px]
+    font-normal
+    leading-normal
+    text-blue-600
+    dark:text-blue-400
+  `;
 
   return (
     <div className={`${defaultContainerClasses} ${containerClassName}`}>

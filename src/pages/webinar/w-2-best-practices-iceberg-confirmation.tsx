@@ -43,13 +43,13 @@ const Webinar1Page = () => {
   return (
 
     <Layout
-         title='Best Practices for Migrating to Apache Iceberg'
-         description='Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.'
-       >
-     
+      title='Best Practices for Migrating to Apache Iceberg'
+      description='Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.'
+    >
 
 
-      <main className="container mx-auto px-16 md:px-36 py-12">
+
+      <main className="container mx-auto lg:px-36 py-12">
 
         <WebinarTitle
           title="Best Practices for Migrating to Apache Iceberg"

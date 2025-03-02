@@ -46,7 +46,7 @@ const Webinar2Page = () => {
       description='Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming.'
     >
 
-      <main className="container mx-auto px-16 md:px-36 py-12">
+      <main className="container mx-auto lg:px-36 py-12">
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"

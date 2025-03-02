@@ -29,7 +29,7 @@ const WebinarCTA: React.FC<WebinarCTAProps> = ({ CTAText }) => {
         icon={FaVideo}
         href= '/webinar'
         variant="outline"
-        className="mx-auto text-white"
+        className="mx-auto text-white text-sm"
       />
     </div>
   );

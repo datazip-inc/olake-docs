@@ -101,7 +101,7 @@ const config = {
 
       navbar: {
         hideOnScroll: true,
-        style: 'dark',
+        // style: 'dark',
         title: 'OLake',
         logo: {
           alt: 'Olake Logo',
@@ -192,11 +192,11 @@ const config = {
       // },
 
 
-      colorMode: {
-        defaultMode: "dark",
-        disableSwitch: true,
-        respectPrefersColorScheme: false,
-      },
+      // colorMode: {
+      //   defaultMode: "dark",
+      //   disableSwitch: true,
+      //   respectPrefersColorScheme: false,
+      // },
 
 
       imageZoom: {
@@ -247,7 +247,7 @@ const config = {
       // },
 
       footer: {
-        // style: 'dark',
+        style: 'dark',
         links: [
           {
             title: 'Socials',

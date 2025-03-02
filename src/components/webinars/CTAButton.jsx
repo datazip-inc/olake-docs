@@ -22,7 +22,7 @@ const CTAButton = ({
       secondary:
         'bg-green-600 text-white hover:bg-green-800 border-none dark:bg-green-700 dark:hover:bg-green-800 focus:ring-green-800',
       outline:
-        'text-blue-600 hover:bg-blue-300 border-2 dark:text-blue-400 dark:border-blue-400 dark:hover:bg-blue-900 focus:ring-blue-500',
+        'text-blue-600 hover:bg-blue-300 border-2 bg-blue-600 hover:bg-blue-800 dark:bg-blue-800 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-900 focus:ring-blue-500',
     };
     
 

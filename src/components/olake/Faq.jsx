@@ -5,7 +5,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
 
   return (
-    <div className='border-b border-gray-200 py-4 dark:border-gray-700'>
+    <div className='border-b py-4 '>
       <div
         className='flex cursor-pointer items-center justify-between rounded p-2 transition-colors '
         onClick={() => setExpanded(!expanded)}
@@ -34,7 +34,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
 
 const Faq = ({ data, showHeading }) => {
   return (
-    <div className='flex w-full flex-col rounded-lg md:p-6 font-sans shadow-lg'>
+    <div className='flex w-full flex-col rounded-lg md:p-6 font-sans'>
       {showHeading && (
         
         <SectionHeader
