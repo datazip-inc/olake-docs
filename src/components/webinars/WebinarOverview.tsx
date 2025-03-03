@@ -27,7 +27,7 @@ const WebinarOverview: React.FC<WebinarOverviewProps> = ({
         {/* Webinar Details */}
         <div>
           <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
-            Webinar Details
+            Details
           </h2>
           <ul className="flex flex-col">
             <li className="flex">

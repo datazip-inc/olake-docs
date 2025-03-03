@@ -32,19 +32,29 @@ function BlogHomepageBanner(props) {
   const imageDefault = {
     urlBannerBg:
       '/img/olake/olake-home.svg',
+    urlBannerBgWhite:
+      '/img/olake/olake-home-white.svg',
     urlAvatar:
       '/img/logo/olake-blue.svg'
   }
-
+  // Hero_Visual
   return (
     <div className='blog'>
       <div className='relative'>
         <Image
           img={useBaseUrl(imageDefault.urlBannerBg)}
           alt='Blog banner'
-          className='rounded-lg'
+          className='rounded-lg dark:block hidden'
           loading='lazy'
         />
+
+        <Image
+          img={useBaseUrl(imageDefault.urlBannerBgWhite)}
+          alt='Blog banner'
+          className='rounded-lg dark:hidden block'
+          loading='lazy'
+        />
+
         <Image
           img={useBaseUrl(imageDefault.urlAvatar)}
           alt='avatar blog'

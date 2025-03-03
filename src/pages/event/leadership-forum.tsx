@@ -64,11 +64,6 @@ const Webinar1Page = () => {
               />
             </div>
 
-
-            {/* <WebinarForm 
-              source="w-1-intro-iceberg"
-              nexturl="w-1-intro-iceberg-confirmation"
-            /> */}
           </div>
         </div>
 

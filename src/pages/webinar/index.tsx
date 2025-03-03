@@ -3,23 +3,39 @@ import WebinarGrid from '../../components/webinars/WebinarGrid';
 import React = require('react');
 import Layout from '@theme/Layout';
 
+import { FaFileVideo, FaVideo } from 'react-icons/fa';
 // Define the webinar type directly here if not using a separate types file
-type Webinar = {
-  title: string;
-  subtitle: string;
-  route: string;
-  img: string;
-  alt: string;
-  status: string;
-  button: string;
-  CTA: string;
-  date: string;
-};
-
 
 const WebinarsPage = () => {
+
+  const communityMeets = [
+    {
+      title: 'OLake 4th Community Meetup',
+      subtitle: 'Join us ',
+      route: '/community/4th-community-meetup',
+      img: `/img/community/4th-community-meetup-cover.png`,
+      alt: 'OLake 3rd Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 February 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 3rd Community Meetup',
+      subtitle: 'Join us ',
+      route: '/community/3rd-community-meetup',
+      img: `/img/community/3rd-community-meetup-cover.png`,
+      alt: 'OLake 3rd Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '13 February 2025',
+      icon: FaVideo
+    },
+  ]
   // Define webinars data directly
-  const webinars: Webinar[] = [
+  const webinars = [
     {
       title: 'CDC Unplugged - Modern Data Integration with Real World Insights',
       subtitle: 'Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming. We will trace CDCs evolution from traditional methods to its role in modern data lakehouses, while introducing key tools to help you get started. Expect actionable best practices and insightful case studies to tie everything together',
@@ -30,6 +46,7 @@ const WebinarsPage = () => {
       button: 'secondary',
       CTA: 'Watch Now',
       date: '09 January 2025',
+      icon: FaVideo
     },
     {
       title: 'A Leadership Forum for Data Engineers and MLOps',
@@ -41,6 +58,7 @@ const WebinarsPage = () => {
       button: 'outline',
       CTA: 'Registrations Over',
       date: '21 December 2024',
+
     },
 
     {
@@ -54,6 +72,7 @@ const WebinarsPage = () => {
       button: 'secondary',
       CTA: 'Watch Now',
       date: '15 December 2024',
+      icon: FaVideo
     },
     {
       title: 'A Journey into Data Lake: Introducing Apache Iceberg',
@@ -66,6 +85,7 @@ const WebinarsPage = () => {
       button: 'secondary',
       CTA: 'Watch Now',
       date: '03 October 2024',
+      icon: FaVideo
     },
   ];
 
@@ -76,6 +96,9 @@ const WebinarsPage = () => {
     >
 
       <div className="container items-center mx-auto py-12 px-12">
+        <h1 className="text-4xl font-bold mb-8">Community Meetups</h1>
+        <WebinarGrid webinars={communityMeets} />
+        <br />
         <h1 className="text-4xl font-bold mb-8">Events & Webinars</h1>
         <WebinarGrid webinars={webinars} />
 
