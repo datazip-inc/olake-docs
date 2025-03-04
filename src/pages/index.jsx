@@ -129,13 +129,13 @@ const OlakeProduct = () => {
             icon={<FaGithub />}
             iconPosition='left'
             size='medium'
-            href='https://github.com/datazip-inc/olake'
+            href='/github?utm_source=hero_join_us_btn'
             target='_blank'
           >
             Join us
           </AwesomeButton>
 
-          <AwesomeButton href='#olake-form-product' icon={<FaWalkieTalkie />} size='medium'>
+          <AwesomeButton href='?utm_source=hero_talk_to_us#olake-form-product' icon={<FaWalkieTalkie />} size='medium'>
             Talk to us
           </AwesomeButton>
         </div>

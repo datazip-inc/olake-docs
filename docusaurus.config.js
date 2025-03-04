@@ -23,7 +23,7 @@ const config = {
   projectName: 'olake-docs', // Usually your repo name.
   deploymentBranch: 'master',
 
-  onBrokenLinks: 'ignore',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
   trailingSlash: false,
 
@@ -474,10 +474,10 @@ const config = {
             to: '/docs/connectors/mongodb/benchmarks',
             from: '/olake/mongodb/benchmark',
           },
-          {
-            to: '/docs/getting-started',
-            from: '/olake/mongodb/how-to-start-contributing-on-olake',
-          },
+          // {
+          //   to: '/docs/getting-started',
+          //   from: '/olake/mongodb/how-to-start-contributing-on-olake',
+          // },
           {
             to: '/docs/category/mongodb',
             from: '/olake/drivers/mongodb-poc',
@@ -489,6 +489,10 @@ const config = {
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
+          },
+          {
+            to: 'https://github.com/datazip-inc/olake',
+            from: '/github',
           },
           // Redirect from multiple old paths to the new path
           // {

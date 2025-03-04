@@ -55,7 +55,7 @@ const GetStarted = () => {
           </div>
           <AwesomeButton
             variant="dark"
-            href="https://github.com/datazip-inc/olake"
+            href="/github?utm_source=cards_github"
             className="mt-6"
             icon={<FaGithub />}
             size="medium"

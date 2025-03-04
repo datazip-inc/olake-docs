@@ -4,24 +4,271 @@ description: OLake Features description
 sidebar_position: 1
 ---
 
-# Features Overview (for mongoDB connector)
 
-### Native BSON Extraction: 
-We pull data in its raw BSON form from MongoDB, decoding it on the ETL side. This approach maintains fidelity and boosts speed.
+# OLake Features Overview
 
-### Parallel Chunking: 
-Instead of serial reads, we split big collections into smaller virtual chunks to parallelize the process.
+OLake is an open-source, high-performance data pipeline designed to extract data from Databses (like MongoDB, MySQL, Postgres) and load it into modern data lakehouse formats like Apache Iceberg and Parquet. 
 
-### CDC Cursor Preservation: 
-We never lose track of CDC offsets; even if a new large collection is added later, we do a full snapshot for it without interrupting ongoing incremental sync.
+Its modular architecture is built around fast, parallelized data ingestion, real-time change data capture (CDC), and native support for schema evolution and S3 data partitioning. 
 
-### Custom Alerts: 
-Configurable alerts for schema changes let you address issues quickly, preventing data corruptions or silent failures.
+OLake minimizes vendor lock-in while offering extensive configurability—from full snapshot loads to incremental syncs and stateful resumption—making it an ideal solution for modern data engineering challenges.
 
-### Open Format for Freedom: 
-By embracing Parquet and Iceberg, we side-step vendor lock-in and enable multi-engine querying.
 
-Both full snapshot and CDC are resumable as and when required by the customer.
+## 1. Connector Features
 
-Estimated time duration for the initial snapshot to be completed so you have a better insight on what’s going on inside the hood.
+OLake’s connector includes several  features that ensure efficient and reliable data replication:
+
+### Native BSON Extraction [for mongodb]
+- **What it does:** Extracts data in its raw `BSON` form directly from MongoDB.
+- **Benefit:** Maintains data fidelity while boosting speed by decoding on the ETL side.
+
+### Parallel Chunking
+- **What it does:** Splits large collections into smaller virtual chunks.
+- **Benefit:** Enables parallel reads, significantly reducing the time required for full collection snapshots.
+
+### CDC Cursor Preservation
+- **What it does:** Keeps track of CDC (Change Data Capture) offsets throughout the data ingestion process.
+- **Benefit:** Supports the addition of new large collections without interrupting ongoing incremental syncs.
+
+### Open Format for Freedom
+- **What it does:** Uses open formats like Parquet and table formats like Apache Iceberg.
+- **Benefit:** Sidesteps vendor lock-in and allows multi-engine querying.
+
+### Resumable Full Load & Incremental Sync
+- Both full snapshots and incremental (CDC) syncs are designed to be resumable. If a sync is interrupted, OLake uses state files to resume progress seamlessly.
+
+### S3 Data Partition
+- **What it does:** Supports partitioning data when writing to S3.
+- **Benefit:** Improves query performance by organizing data into directories based on user-defined partitioning logic.
+
+### Schema Evolution
+- **What it does:** Detects changes in source document structures and handles non-breaking changes.
+- **Benefit:** Minimizes disruptions when the underlying schema evolves; separate Parquet files are created if schema evolution is detected (currently in S3).
+
+### Normalization vs. Denormalization
+- **What it does:** Offers an option to choose between normalization and level-1 denormalization (flattening).
+- **Benefit:** Gives flexibility in data transformation depending on downstream requirements.
+
+### Supported Data Types
+OLake supports a variety of data types. The table below summarizes the supported types along with descriptions and sample values:
+
+| Data Type       | Description                                               | Sample Value                                   |
+|-----------------|-----------------------------------------------------------|------------------------------------------------|
+| **Null**        | Represents a null or missing value                        | `null`                                         |
+| **Int64**       | 64-bit integer value                                      | `42`                                           |
+| **Float64**     | 64-bit floating point number                              | `3.14159`                                      |
+| **String**      | Text string                                               | `"Hello, world!"`                              |
+| **Bool**        | Boolean value                                             | `true`                                         |
+| **Object**      | JSON object (key-value pairs)                             | `{ "name": "Alice", "age": 30 }`               |
+| **Array**       | Array of values                                           | `[1, 2, 3]`                                    |
+| **Unknown**     | Unspecified or unrecognized type                          | `"unknown"`                                    |
+| **Timestamp**   | Timestamp with default precision                          | `"2025-02-18T10:00:00Z"`                        |
+| **TimestampMilli** | Timestamp with millisecond precision (3 decimal places) | `"2025-02-18T10:00:00.123Z"`                     |
+| **TimestampMicro** | Timestamp with microsecond precision (6 decimal places) | `"2025-02-18T10:00:00.123456Z"`                  |
+| **TimestampNano**  | Timestamp with nanosecond precision (9 decimal places)  | `"2025-02-18T10:00:00.123456789Z"`               |
+
+### Synchronization Modes
+The catalog defines how streams are synchronized:
+- **`supported_sync_modes`:** Lists the supported modes (e.g., `full_refresh`, `cdc`).
+- **`sync_mode`:** Indicates the active sync mode for a stream.
+
+### Backoff Retry Count
+- **What it does:** Implements an exponential backoff (1, 2, 4, 8, 16 minutes…) for retrying sync operations.
+- **Default:** Set to 3 (or takes the default value if set to -1).
+
+### Sync with State of Last Synced Cursor
+- **What it does:** Saves progress in a state file (e.g., `state.json`) so that an interrupted sync can resume from the last known checkpoint.
+
+
+## 2. Data Flow in OLake
+
+OLake’s data flow is designed for high throughput and resiliency:
+
+### Initial Snapshot
+- **Process:** Executes a full collection read by firing queries.
+- **Parallelism:** Divides the collection into chunks that are processed in parallel.
+- **Insight:** Provides an estimated remaining time along with real-time stats (e.g., memory usage, running threads, records per second).
+
+```json
+{
+    "Estimated Remaining Time": "340.85 s",
+    "Memory": "92329 mb",
+    "Running Threads": 10,
+    "Seconds Elapsed": "148.00",
+    "Speed": "5773.03 rps",
+    "Synced Records": 854411
+}
+```
+
+### Change Data Capture (CDC)
+- **Process:** Sets up MongoDB change streams based on oplogs to capture near real-time updates.
+- **Resilience:** Ensures that any changes during the snapshot are also captured, and subsequent updates are continuously synced.
+
+### Parallel Processing
+- **Configuration:** Users can set the number of parallel threads to balance speed with the load on the MongoDB cluster.
+
+### Transformation & Normalization
+- **What it does:** Flattens complex, semi-structured fields into relational streams.
+- **Current Support:** Level-0 flattening is available, with more advanced nested JSON support coming soon.
+
+### Integrated Writes
+- **What it does:** Pushes transformed data directly to target destinations (e.g., local Parquet files, S3 Iceberg Parquet) without intermediary buffering.
+- **Benefit:** Minimizes latency and avoids blocking reads during writes.
+
+### Logs & Testing
+- **Logging:** Detailed logs using Zerolog and Lumberjack help monitor the process, we create a logs.txt file that saves all your logs during the sync process.
+
+## 3. Architecture and Components
+
+OLake is built with a modular design to separate responsibilities across different components:
+
+### Drivers (Connectors)
+- **Function:** Embed the logic necessary to interact with the source system (starting with MongoDB, with plans for Kafka, Postgres, MySQL, and DynamoDB).
+- **Responsibilities:** 
+  - **Full Load:** Efficiently fetch complete collections by processing them in parallel.
+  - **CDC Management:** Configure change streams to capture and sync incremental changes.
+
+### Writers
+- **Function:** Tightly integrated with drivers to directly push records to destinations.
+- **Supported Destinations:** 
+  - Local Parquet files
+  - S3 Simple Parquet
+  - S3 Iceberg Parquet
+
+### Core Functionality
+- **CLI & Commands:** 
+  - `spec` returns a JSON Schema for frontend configuration.
+  - `check` validates configuration, catalog, state files, and credentials.
+  - `discover` lists streams and their schemas.
+  - `sync` orchestrates the ETL process.
+- **State Management:** Ensures that CDC streams can resume after interruptions.
+- **Configuration & Logging:** Manages concurrency levels, connection credentials, and provides real-time monitoring of progress and throughput.
+
+
+## 4. S3 Data Partitioning
+
+OLake provides robust support for S3 data partitioning, enabling efficient data organization and faster query performance.
+
+### Overview
+- **How It Works:** After schema discovery, you can define a `partition_regex` in the `catalog.json` file for each stream. This regex dynamically partitions data into folders in your S3 bucket.
+- **Resulting Structure:** The generated S3 path typically includes the database name, table/collection name, and partition values (e.g., date components or key-value pairs).
+
+### Sample Configuration
+```json
+{
+  "selected_streams": {
+    "namespace": [
+      {
+        "stream_name": "table1",
+        "partition_regex": "/{column_name, default_value, granularity}"
+      },
+      {
+        "stream_name": "table2",
+        "partition_regex": ""
+      }
+    ]
+  },
+  "streams": [
+    {
+      "stream": {
+        "name": "table1",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    },
+    {
+      "stream": {
+        "name": "table2",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    }
+  ]
+}
+```
+
+### Partition Regex Attributes
+- **Structure:**  
+  `"partition_regex": "/{column_name, default_value, granularity}"`
+- **Components:**
+  - **column_name:** (Required) Specifies which column’s value determines the partition.
+  - **default_value:** (Optional) A fallback if the column is null or unparseable.
+  - **granularity:** (Optional) For time-based columns, define granularity (e.g., HH, DD, MM, YY).
+
+### Supported Patterns
+- **now():** Uses the current local timestamp.
+- **default:** Uses a constant fallback value.
+- **`{col_name}`:** Inserts the specified column value.
+- **Combined patterns:**  
+  - `{now(),2025,YY}` yields the year (e.g., `2025`).
+  - `{now(),2025,YY}-{now(),06,MM}-{now(),13,DD}` combines year, month, and day.
+
+### Examples
+- **Date-based Partition:**  
+  ```json
+  "partition_regex": "/{title,,}/{now(),2025,DD}/{latest_version,,}"
+  ```
+- **Key-Value Style Partitioning:**  
+  ```json
+  "partition_regex": "/age={age_column, default_age,}/city={city_column, default_city,}/type={type_column, default_type,}"
+  ```
+  For a record:
+  ```json
+  { "age": "30", "city": "mumbai", "type": "existing" }
+  ```
+  The resulting S3 path would be:  
+  `s3://your_bucket/age=30/location=city-mumbai/type=existing/<filename>.parquet`
+
+- **Composite Partitions Including Date:**  
+  ```json
+  "partition_regex": "/dt={now(),2025,YY}-{now(),06,MM}-{now(),13,DD}/country={country,default_country,}/city={city,default_city,}"
+  ```
+  This produces a path such as:  
+  `s3://your_bucket/dt=2025-02-18/country=USA/city=NewYork/<filename>.parquet`
+
+### Supported Timestamp Formats
+OLake supports a wide range of timestamp formats, including:
+- `"2006-01-02"`
+- `"2006-01-02 15:04:05"`
+- `"2006-01-02T15:04:05"`
+- `"2020-08-17T05:50:22.895Z"`
+- _and several others_
+
+For custom timestamp columns, replace `now()` with the column name and specify the desired format extraction.
+
+
+
+### Test Image Releaser
+- **What it does:** Adds support for building test images via a “test_mode” option in the GitHub workflow.
+- **Benefits and changes:**
+  - **Test Mode Active:** Tags are prefixed with `testing-` (e.g., `testing-dev-123`).
+  - **Validation:** Bypasses semantic version validation for test images, while production images must follow strict versioning.
+  - **Output Examples:**  
+    ```
+    Test mode: true
+    ✅ Test mode active - skipping semantic version validation for version: dev-123
+    **** Releasing olakego/source-mongodb for platforms [linux/amd64,linux/arm64] with version [testing-dev-123] ****
+    Release successful for olakego/source-mongodb version testing-dev-123
+    ```
+
+
+## 5. Concluding Remarks and Future Roadmap
+
+OLake is designed to be fast, flexible, and future-proof:
+- **Future Enhancements:**
+  - Advanced nested JSON flattening (beyond level-0).
+  - Effortless deployment with a single self-contained binary.
+  - BYOC (Bring Your Own Cloud) support for both cloud and on-prem deployments.
+  - Enterprise-grade security with no data leaving your infrastructure.
+  - Kafka integration as a destination and expanded connector support.
+  - A unified UI to manage drivers, writers, and all configuration details.
+- **Performance Focus:**  
+  Extensive benchmarks show OLake completing massive full loads (e.g., 230 million rows in 46 minutes) and incremental syncs at record speeds (~35,694 records/second).
+- **Ecosystem Integration:**  
+  By leveraging open formats and avoiding vendor lock-in, OLake seamlessly integrates with Spark, Trino, Flink, Snowflake, and other analytical engines.
+
+OLake’s modular, open-source architecture is a modern solution to the challenges of high-volume, real-time data ingestion, transformation, and loading. It empowers data engineers to build robust, scalable, and efficient data pipelines with minimal operational overhead.
+
+
+For more detailed information, examples, and the latest updates, please refer to our [GitHub repository](https://github.com/datazip-inc/olake) and the corresponding documentation sections.
 
