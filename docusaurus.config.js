@@ -185,7 +185,7 @@ const config = {
 
       announcementBar: {
         content:
-          'If you love ❤️ OLake, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/datazip-inc/olake">GitHub</a>! ⭐️',
+          'Support us by giving us a ⭐️ on <a target="_blank" rel="noopener noreferrer" href="https://github.com/datazip-inc/olake">GitHub</a>! ',
         backgroundColor: 'white',
         textColor: 'black',
         isCloseable: false,
