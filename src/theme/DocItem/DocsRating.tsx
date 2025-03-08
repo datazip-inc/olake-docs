@@ -16,7 +16,7 @@ const DocsRating: React.FC<DocsRatingProps> = ({ label }) => {
 
   // Slack Invite, open GitHub issue, enhancement request
   const slackInviteURL =
-    "https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag";
+    "https://olake.io/slack";
   const openDocIssueURL =
     "https://github.com/datazip-inc/olake-docs/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with olake.io" +
     location.pathname;
