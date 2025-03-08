@@ -104,7 +104,7 @@ const config = {
         // style: 'dark',
         title: 'OLake',
         logo: {
-          alt: 'Olake Logo',
+          alt: 'OLake Logo',
           src: 'img/logo/olake-blue.svg',
         },
         items: [
@@ -115,7 +115,7 @@ const config = {
           //   label: 'Docs',
           // },
 
-          
+
           { to: '/docs', label: 'Docs', position: 'left' },
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
@@ -176,7 +176,7 @@ const config = {
           innerHTML: JSON.stringify({
             '@context': 'https://schema.org/',
             '@type': 'Organization',
-            name: 'Olake',
+            name: 'OLake',
             url: 'https://olake.io/',
             logo: 'https://olake.io/img/logo/olake-blue.svg',
           }),
@@ -190,7 +190,6 @@ const config = {
         textColor: 'black',
         isCloseable: false,
       },
-
 
       // colorMode: {
       //   defaultMode: "dark",
@@ -290,10 +289,9 @@ const config = {
                 to: '/search',
               },
               {
-                label: 'Community',
-                to: '/docs/category/community',
+                label: 'Slack Archive',
+                href: 'https://meetwaves.com/library/olake',
               },
-             
             ],
           },
           {

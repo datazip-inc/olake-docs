@@ -8,42 +8,48 @@ const logos = [
     name: 'Logo White',
     description: 'The primary horizontal logo for OLake, available in high resolution.',
     image: '/img/logo/olake-white.svg',
-    downloadLink: '/img/logo/olake-white.svg',
+    downloadLinkSVG: '/img/logo/olake-white.svg',
+    downloadLinkPNG: '/img/logo/olake-white.png'
   },
   {
     id: 2,
     name: 'Logo Blue',
     description: 'A stacked version for tight vertical spaces.',
     image: '/img/logo/olake-blue.svg',
-    downloadLink: '/img/logo/olake-blue.svg',
+    downloadLinkSVG: '/img/logo/olake-blue.svg',
+    downloadLinkPNG: '/img/logo/olake-blue.png'
   },
   {
     id: 3,
     name: 'Logo Black',
     description: 'A stacked version for tight vertical spaces.',
     image: '/img/logo/olake-black.svg',
-    downloadLink: '/img/logo/olake-black.svg',
+    downloadLinkSVG: '/img/logo/olake-black.svg',
+    downloadLinkPNG: '/img/logo/olake-black.png'
   },
   {
     id: 4,
     name: 'Logo with Text (White)',
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-white-with-text.svg',
-    downloadLink: '/img/logo/olake-white-with-text.svg',
+    downloadLinkSVG: '/img/logo/olake-white-with-text.svg',
+    downloadLinkPNG: '/img/logo/olake-white-with-text.png'
   },
   {
     id: 5,
-    name: 'Logo with Text (Bluw)',
+    name: 'Logo with Text (Blue)',
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-blue-with-text.svg',
-    downloadLink: '/img/logo/olake-blue-with-text.svg',
+    downloadLinkSVG: '/img/logo/olake-blue-with-text.svg',
+    downloadLinkPNG: '/img/logo/olake-blue-with-text.png'
   },
   {
     id: 6,
     name: 'Logo with Text (Black)',
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-black-with-text.svg',
-    downloadLink: '/img/logo/olake-black-with-text.svg',
+    downloadLinkSVG: '/img/logo/olake-black-with-text.svg',
+    downloadLinkPNG: '/img/logo/olake-black-with-text.png'
   }
 ]
 
@@ -62,17 +68,32 @@ const LogoCard = ({ logo }) => {
         <h3 className='text-xl font-bold text-gray-800 dark:text-gray-100'>{logo.name}</h3>
         <p className='mt-2 text-gray-600 dark:text-gray-300'>{logo.description}</p>
         <div className='mt-4 flex flex-wrap items-center gap-2'>
+         
           <a
-            href={logo.downloadLink}
+            href={logo.downloadLinkSVG}
             download
-            className='flex items-center rounded bg-[#193AE6]  px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700'
+            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-blue-700'
           >
-            <FaDownload className='mr-2' /> Download
+            <FaDownload className='mr-2' />
+            Download
+            <span className='ml-2 rounded-full border border-slate-300 px-2 py-1 text-xs text-gray-800 dark:text-gray-200'>
+              SVG
+            </span>
           </a>
 
-          <span className='rounded-full bg-gray-200 px-2 py-1 text-sm text-gray-800 dark:bg-gray-700 dark:text-gray-200'>
-            SVG
-          </span>
+          <a
+            href={logo.downloadLinkPNG}
+            download
+            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-blue-700'
+          >
+            <FaDownload className='mr-2' />
+            Download
+            <span className='ml-2 rounded-full border border-slate-300 px-2 py-1 text-xs text-gray-800 dark:text-gray-200'>
+              PNG
+            </span>
+          </a>
+
+         
         </div>
       </div>
       {/* Right side: logo preview */}
@@ -101,7 +122,7 @@ const ColorSwatch = ({ color }) => {
           <p className='font-mono text-gray-800 dark:text-gray-100'>{color.hex}</p>
           <button
             onClick={copyToClipboard}
-            className='mt-1 flex items-center text-white rounded border-none  transition-colors hover:text-blue-800'
+            className='mt-1 flex items-center rounded border-none text-white transition-colors hover:text-blue-800'
           >
             <FaCopy className='mr-1' /> Copy
           </button>

@@ -21,9 +21,9 @@ const BlogList = [
   }
 ]
 
-const OlakeBlogList = () => {
+const OLakeBlogList = () => {
   return (
-    <div className='mx-auto flex w-full md:max-w-[90%] flex-col items-center md:px-4 md:py-8'>
+    <div className='mx-auto flex w-full flex-col items-center md:max-w-[90%] md:px-4 md:py-8'>
       <SectionHeader heading={<>Read more from our blogs</>} />
 
       {/* Blog list container using grid for responsive layout */}
@@ -68,4 +68,4 @@ const OlakeBlogList = () => {
   )
 }
 
-export default OlakeBlogList
+export default OLakeBlogList

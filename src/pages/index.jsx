@@ -4,7 +4,7 @@ import HelmetWrapper from '@site/src/components/olake/HelmetWrapper'
 import { olakeProductData } from '@site/src/components/olake/metaDeta'
 import GetStarted from '@site/src/components/olake/GetStarted'
 import Benchmarks from '@site/src/components/olake/Benchmarks'
-import OlakeBlogList from '@site/src/components/olake/Blog'
+import OLakeBlogList from '@site/src/components/olake/Blog'
 import Faq from '@site/src/components/olake/Faq'
 // import useIsMobile from '@site/utils/hooks/useMobile'
 import Layout from '@theme/Layout'
@@ -17,7 +17,7 @@ import CTAComponent from '../components/CTA'
 import { FaWalkieTalkie } from 'react-icons/fa6'
 import ArchitectureImage from '../components/olake/ArchitectureImage'
 
-const OlakeFaqs = [
+const OLakeFaqs = [
   {
     question: 'What is OLake, and how does it handle MongoDB data?',
     answer:
@@ -72,7 +72,7 @@ const sampleItems = [
   }
 ]
 
-const OlakeProduct = () => {
+const OLakeProduct = () => {
   const childRef = useRef()
   const formRef = useRef(null)
   const history = useHistory()
@@ -116,7 +116,7 @@ const OlakeProduct = () => {
       <HelmetWrapper {...olakeProductData} />
 
       <div className='mx-auto flex w-full max-w-[1440px] flex-col items-center p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12'>
-        {/* Olake Brand */}
+        {/* OLake Brand */}
         {/* <div className='flex justify-center'>
           <img src='/img/olake/olake-logo.svg' alt='olake logo' className='w-24 md:w-32' />
         </div> */}
@@ -135,7 +135,11 @@ const OlakeProduct = () => {
             Join us
           </AwesomeButton>
 
-          <AwesomeButton href='?utm_source=hero_talk_to_us#olake-form-product' icon={<FaWalkieTalkie />} size='medium'>
+          <AwesomeButton
+            href='?utm_source=hero_talk_to_us#olake-form-product'
+            icon={<FaWalkieTalkie />}
+            size='medium'
+          >
             Talk to us
           </AwesomeButton>
         </div>
@@ -189,7 +193,7 @@ const OlakeProduct = () => {
               <img
                 src='/img/logo/olake-white.svg'
                 alt='OLake logo (dark)'
-                className='h-auto w-12 dark:block hidden'
+                className='hidden h-auto w-12 dark:block'
               />
 
               <span>OLake</span>
@@ -213,11 +217,11 @@ const OlakeProduct = () => {
 
         {/* Blog List */}
         <div className='my-8 w-full'>
-          <OlakeBlogList />
+          <OLakeBlogList />
         </div>
         {/* FAQ */}
         <div className='my-8 w-full max-w-[90%]'>
-          <Faq data={OlakeFaqs} showHeading={true} />
+          <Faq data={OLakeFaqs} showHeading={true} />
         </div>
 
         {/* final cta  */}
@@ -234,4 +238,4 @@ const OlakeProduct = () => {
   )
 }
 
-export default OlakeProduct
+export default OLakeProduct
