@@ -1,0 +1,341 @@
+---
+title: Setup Replica Set
+description: Setup MySQL via Docker Compose
+sidebar_position: 4
+---
+
+# Setup MySQL Replica Set via Docker Compose
+This guide explains how to spawn a MySQL replica set using Docker Compose for unit tests. It also covers instructions for ingesting sample data, and verifying the setup.
+
+
+:::info
+Clone the OLake repository if you want to build OLake locally, or skip to the part to use Dockerized OLake.
+
+GitHub repository
+```sh
+git clone git@github.com:datazip-inc/olake.git
+```
+:::
+
+
+Navigate to `./drivers/mysql/config` (if building locally) OR just create a directory (say `olake-docker`) anywhere in your system if you want to use Dockerzied OLake and create these files:
+1. `docker-compose.yaml`
+2. `config.json`
+3. `writer.json` -> Refer the [additional-references](#additional-references) for details on writer file config.
+
+![discover-sync](/img/docs/docker-compoes-low.gif)
+
+<Tabs>
+
+<TabItem value="docker" label="Using Dockerized OLake" default>
+
+## 1. `docker-compose.yaml` for syncing Data with Dockerized OLake
+
+
+```yaml title="docker-compose.yaml"
+version: "3.9"
+services:
+  init-config:
+    container_name: init_config
+    image: mysql:8.0
+    command: >
+      sh -c "echo 'No special config logic here, but you could add your own if needed...';"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: "no"
+
+  primary_mysql:
+    container_name: primary_mysql
+    image: mysql:8.0
+    hostname: primary_mysql
+    ports:
+      - "3306:3306"
+    depends_on:
+      - init-config
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: main
+    # Enable CDC by activating binary logging with row-based format.
+    command: >
+      --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --local-infile=1
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  data-loader:
+    image: ubuntu:20.04
+    container_name: sample_data_loader
+    depends_on:
+      primary_mysql:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "apt-get update -qq && apt-get install -y mysql-client && \
+      echo 'Waiting for MySQL to be ready...'; \
+      until mysqladmin ping -h primary_mysql -P 3306 -u root -ppassword; do echo 'Waiting...'; sleep 2; done; \
+      echo 'Creating table sample_table...'; \
+      mysql -h primary_mysql -P 3306 -u root -ppassword main -e 'CREATE TABLE IF NOT EXISTS sample_table (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255));'; \
+      echo 'Inserting sample data...'; \
+      mysql -h primary_mysql -P 3306 -u root -ppassword main -e 'INSERT INTO sample_table (name) VALUES (\"sample_data\");'; \
+      echo 'Data insertion complete!'"
+    restart: "no"
+    networks:
+      - mysql-cluster
+
+networks:
+  mysql-cluster:
+
+volumes:
+  mysql-data:
+```
+
+
+
+## 2. OLake Integration
+
+After verifying MySQL’s configuration, proceed with OLake’s integration steps. Refer to the [getting started guide](../../category/getting-started) for more details.
+
+
+Update your source configuration file (`config.json`) to connect to MySQL as follows:
+
+```json title="config.json"
+{
+    "hosts": ["localhost"],
+    "username": "root",
+    "password": "password",
+    "database": "main",
+    "port": 3306,
+    "tls_skip_verify": true,
+    "default_mode": "cdc",
+    "max_threads": 10,
+    "backoff_retry_count": 2
+}
+```
+
+
+## 3. Starting MySQL
+
+To start the MySQL container, run the following command from your project directory:
+
+```bash
+docker compose up -d
+```
+
+## 4. Start replicating you Data
+
+:::info
+`PATH_TO_OLAKE_DIRECTORY` is the absolute path where you have created the directory [as discussed above].
+`-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \` maps to `-v /Users/JOHN_DOE_USERNAME/Desktop/projects/olake-docker:/mnt/config \` in macOS and Linux systems. Follow the same pattern in other systems.
+:::
+
+### 4.1. Discover Collection Schema
+
+<DockerDiscoverMySQL/>
+
+### 4.2. Sync Data
+
+<DockerSyncMySQL/>
+
+Sample output syncing our sample reddit data and writing locally in parquet format:
+
+![docker compose 4](/img/docs/docker/docker-compose-4.png)
+
+
+### 4.3. Sync with state
+
+<DockerSyncWithStateMySQL/>
+
+</TabItem>
+
+<TabItem value="build" label="Using Local build OLake" default>
+
+
+## 1. `docker-compose.yaml` for syncing Data with OLake built locally
+
+
+```yaml title="docker-compose.yaml"
+version: "3.9"
+services:
+  init-config:
+    container_name: init_config
+    image: mysql:8.0
+    command: >
+      sh -c "echo 'No special config logic here, but you could add your own if needed...';"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: "no"
+
+  primary_mysql:
+    container_name: primary_mysql
+    image: mysql:8.0
+    hostname: primary_mysql
+    ports:
+      - "3306:3306"
+    depends_on:
+      - init-config
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: main
+    # Enable CDC by activating binary logging with row-based format.
+    command: >
+      --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --local-infile=1
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  data-loader:
+    image: ubuntu:20.04
+    container_name: sample_data_loader
+    depends_on:
+      primary_mysql:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "apt-get update -qq && apt-get install -y mysql-client && \
+      echo 'Waiting for MySQL to be ready...'; \
+      until mysqladmin ping -h primary_mysql -P 3306 -u root -ppassword; do echo 'Waiting...'; sleep 2; done; \
+      echo 'Creating table sample_table...'; \
+      mysql -h primary_mysql -P 3306 -u root -ppassword main -e 'CREATE TABLE IF NOT EXISTS sample_table (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255));'; \
+      echo 'Inserting sample data...'; \
+      mysql -h primary_mysql -P 3306 -u root -ppassword main -e 'INSERT INTO sample_table (name) VALUES (\"sample_data\");'; \
+      echo 'Data insertion complete!'"
+    restart: "no"
+    networks:
+      - mysql-cluster
+
+networks:
+  mysql-cluster:
+
+volumes:
+  mysql-data:
+```
+
+
+## 2. OLake Integration
+
+After verifying MySQL’s configuration, proceed with OLake’s integration steps. Refer to the [getting started guide](../../category/getting-started) for more details.
+
+
+Update your source configuration file (`config.json`) to connect to MySQL as follows:
+
+```json title="config.json"
+{
+    "hosts": ["localhost"],
+    "username": "root",
+    "password": "password",
+    "database": "main",
+    "port": 3306,
+    "tls_skip_verify": true,
+    "default_mode": "cdc",
+    "max_threads": 10,
+    "backoff_retry_count": 2
+}
+```
+
+## 3. Starting MySQL
+
+To start the MySQL container, run the following command from your project directory:
+
+```bash
+docker compose -f ./drivers/mysql/config/docker-compose.yaml up -d
+```
+
+## 4. Start replicating you Data
+
+:::info
+`PATH_TO_OLAKE_DIRECTORY` is the absolute path where you have created the directory [as discussed above].
+
+`OLAKE_BASE_PATH="$HOME/PATH_TO_OLAKE_DIRECTORY/olake/drivers/mysql/config" && \` maps to 
+`OLAKE_BASE_PATH="/Users/JOHN_DOE_USERNAME/Desktop/projects/olake/drivers/mysql/config" && \` in macOS and Linux systems. Follow the same pattern in other systems.
+:::
+
+
+### 4.1. Discover Collection Schema
+
+<LocalDiscoverMySQL/>
+
+### 4.2. Sync Data Command
+
+<LocalSyncMySQL/>
+
+
+Sample output syncing our sample reddit data and writing locally in parquet format:
+
+![docker compose 4](/img/docs/docker/docker-compose-4.png)
+
+
+### 4.3. Sync with State
+
+<LocalSyncWithStateMySQL/>
+
+</TabItem>
+</Tabs>
+
+
+## Additional References
+
+- **Configuration Files:**  
+  Refer to the following documentation for configuration details:
+  1. [`config.json`](../../core/configs/source)
+  2. [`catalog.json`](../../core/configs/catalog)
+  3. [`writer.json`](../../core/configs/writer)
+  4. [`state.json`](../../core/configs/state)
+
+- **Viewing Parquet Files:**  
+  Use the [VS Code extension - Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) to view Parquet files in your editor.
+
+
+## Troubleshooting
+
+If you encounter any issues, consider the following:
+
+- **Container Logs:**  
+  Check container logs for MySQL using:
+  
+  ```bash
+  docker logs CONTAINER_ID 
+  ```
+
+- **To stop the container, perform**:
+
+  ```bash
+  docker compose -f docker-compose-mysql.yml down --remove-orphans -v
+  ```
+
+- **To bash into the MySQL container, perform**:
+  ```bash
+  docker exec -it 05238e1d0674 /bin/bash
+  ```
+
+
+  ```bash
+  mysql -u root -p 
+  ```
+
+Enter the password when prompted, in this case, its `password`
+
+and then you can use any of the below commands to interract.
+
+```
+SHOW DATABASES; // to list all databases
+USE database_name; // to use a particular database
+SHOW TABLES; // to see all the tables of selected database
+DESCRIBE table_name; // discover schema of a table
+SELECT * FROM table_name; // to view all the data of a particular table
+EXIT; // to quit the mysql session
+```
+
