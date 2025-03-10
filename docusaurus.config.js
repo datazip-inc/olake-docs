@@ -3,6 +3,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 // import type * as Preset from '@docusaurus/preset-classic';
 // import tailwindPlugin from "./plugins/tailwind-config.cjs"; 
 
+// const CustomSolutionsNavbarItem = require('./src/components/CustomSolutionsNavbarItem').default;
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 /** @type {import('@docusaurus/types').Config} */
@@ -120,6 +121,16 @@ const config = {
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
           { to: '/webinar', label: 'Webinars & Events', position: 'right' },
+
+          // {
+          //   type: 'html',
+          //   position: 'right',
+          //   component: CustomSolutionsNavbarItem,
+
+          //   // label: 'Dropdown'
+          // },
+
+
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             // label: 'Join Slack',
@@ -312,7 +323,7 @@ const config = {
             items: [
               {
                 label: 'About us',
-                href: 'https://datazip.io/about-us',
+                to: '/about-us',
               },
               {
                 label: 'Branding',

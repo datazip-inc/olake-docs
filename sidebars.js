@@ -14,7 +14,7 @@
 
 
  */
- const sectionHeader = (title) => ({
+const sectionHeader = (title) => ({
   type: "html",
   value: title,
   className: "navbar__category",
