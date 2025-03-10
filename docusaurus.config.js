@@ -483,10 +483,14 @@ const config = {
             to: '/docs/connectors/mongodb/benchmarks',
             from: '/olake/mongodb/benchmark',
           },
-          // {
-          //   to: '/docs/getting-started',
-          //   from: '/olake/mongodb/how-to-start-contributing-on-olake',
-          // },
+          {
+            to: '/docs/community/contributing',
+            from: '/olake/mongodb/how-to-start-contributing-on-olake',
+          },
+          {
+            to: '/docs/community/contributing',
+            from: '/docs/olake/mongodb/how-to-start-contributing-on-olake',
+          },
           {
             to: '/docs/category/mongodb',
             from: '/olake/drivers/mongodb-poc',
