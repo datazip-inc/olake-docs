@@ -168,14 +168,17 @@ const config = {
       metadata: [
         // { name: 'robots', content: 'noindex, nofollow' },
         { name: 'OLake', content: 'ETL tool, ELT tool, open source' },
-        { name: 'twitter:card', content: 'ETL tool, ELT tool, open source' },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:site", content: "@olake.io" },
       ],
       headTags: [
         {
           tagName: 'link',
           attributes: {
             rel: 'preconnect',
+            sizes: "any",
             href: 'https://olake.io',
+            href: "/img/logo/olake-blue.svg",
           },
         },
         // Declare some json-ld structured data
@@ -199,7 +202,7 @@ const config = {
           'Support us by giving us a ⭐️ on <a target="_blank" rel="noopener noreferrer" href="https://github.com/datazip-inc/olake">GitHub</a>! ',
         backgroundColor: 'white',
         textColor: 'black',
-        isCloseable: false,
+        isCloseable: true,
       },
 
       // colorMode: {
