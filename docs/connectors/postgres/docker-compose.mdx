@@ -1,0 +1,310 @@
+---
+title: Setup Replica Set
+description: Setup Postgres via Docker Compose
+sidebar_position: 4
+---
+
+# Setup Postgres Replica Set via Docker Compose
+This guide explains how to spawn a Postgres replica set using Docker Compose for unit tests. It also covers instructions for ingesting sample data, and verifying the setup.
+
+
+:::info
+Clone the OLake repository if you want to build OLake locally, or skip to the part to use Dockerized OLake.
+
+GitHub repository
+```sh
+git clone git@github.com:datazip-inc/olake.git
+```
+:::
+
+
+Navigate to `./drivers/postgres/config` (if building locally) OR just create a directory (say `olake-docker`) anywhere in your system if you want to use Dockerzied OLake and create these files:
+1. `docker-compose.yaml`
+2. `config.json`
+3. `writer.json` -> Refer the [additional-references](#additional-references) for details on writer file config.
+
+![discover-sync](/img/docs/docker-compoes-low.gif)
+
+<Tabs>
+
+<TabItem value="docker" label="Using Dockerized OLake" default>
+
+## 1. `docker-compose.yaml` for syncing Data with Dockerized OLake
+
+
+```yaml title="docker-compose.yaml"
+version: "3.9"
+services:
+  primary:
+    container_name: primary
+    image: postgres:15
+    hostname: primary
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: main
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: main
+    # Install wal2json and then start Postgres via the official entrypoint script
+    command: >
+      bash -c "apt-get update && apt-get install -y postgresql-15-wal2json && exec docker-entrypoint.sh postgres -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - pg-cluster
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "main", "-d", "main"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  data-loader:
+    image: postgres:15
+    container_name: sample_data_loader
+    environment:
+      PGUSER: main
+      PGPASSWORD: password
+      PGDATABASE: main
+    depends_on:
+      primary:
+        condition: service_healthy
+    entrypoint: >
+      bash -c " 
+        echo \"Waiting for Postgres to be ready...\"; 
+        until pg_isready -h primary -p 5432 -U main -d main; do 
+          echo \"Waiting...\"; 
+          sleep 2; 
+        done; 
+        echo \"Creating test table sample_data...\"; 
+        psql -h primary -U main -d main -c \"CREATE TABLE IF NOT EXISTS sample_data (id SERIAL PRIMARY KEY, str_col TEXT, num_col INT);\"; 
+        echo \"Inserting one test row...\"; 
+        psql -h primary -U main -d main -c \"INSERT INTO sample_data (str_col, num_col) VALUES ('Hello world', 123);\"; 
+        echo \"Creating logical replication slot...\"; 
+        psql -h primary -U main -d main -c \"SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'wal2json');\"; 
+        echo \"Done. Data and replication slot should now exist.\" 
+      "
+    restart: "no"
+    networks:
+      - pg-cluster
+
+networks:
+  pg-cluster:
+
+volumes:
+  pg-data:
+```
+
+
+
+## 2. OLake Integration
+
+After verifying Postgres’s configuration, proceed with OLake’s integration steps. Refer to the [getting started guide](../../category/getting-started) for more details.
+
+
+Update your source configuration file (`config.json`) to connect to Postgres as follows:
+
+<PostgresSourceConfig/>
+
+
+## 3. Starting Postgres
+
+To start the Postgres container, run the following command from your project directory:
+
+```bash
+docker compose up -d
+```
+
+## 4. Start replicating you Data
+
+:::info
+`PATH_TO_OLAKE_DIRECTORY` is the absolute path where you have created the directory [as discussed above].
+`-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \` maps to `-v /Users/JOHN_DOE_USERNAME/Desktop/projects/olake-docker:/mnt/config \` in macOS and Linux systems. Follow the same pattern in other systems.
+:::
+
+### 4.1. Discover Collection Schema
+
+<DockerDiscoverPostgres/>
+
+### 4.2. Sync Data
+
+<DockerSyncPostgres/>
+
+Sample output syncing our sample reddit data and writing locally in parquet format:
+
+![docker compose 4](/img/docs/docker/docker-compose-4.png)
+
+
+### 4.3. Sync with state
+
+<DockerSyncWithStatePostgres/>
+
+</TabItem>
+
+<TabItem value="build" label="Using Local build OLake" default>
+
+
+## 1. `docker-compose.yaml` for syncing Data with OLake built locally
+
+
+```yaml title="docker-compose.yaml"
+version: "3.9"
+services:
+  primary:
+    container_name: primary
+    image: postgres:15
+    hostname: primary
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: main
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: main
+    # Install wal2json and then start Postgres via the official entrypoint script
+    command: >
+      bash -c "apt-get update && apt-get install -y postgresql-15-wal2json && exec docker-entrypoint.sh postgres -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - pg-cluster
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "main", "-d", "main"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  data-loader:
+    image: postgres:15
+    container_name: sample_data_loader
+    environment:
+      PGUSER: main
+      PGPASSWORD: password
+      PGDATABASE: main
+    depends_on:
+      primary:
+        condition: service_healthy
+    entrypoint: >
+      bash -c " 
+        echo \"Waiting for Postgres to be ready...\"; 
+        until pg_isready -h primary -p 5432 -U main -d main; do 
+          echo \"Waiting...\"; 
+          sleep 2; 
+        done; 
+        echo \"Creating test table sample_data...\"; 
+        psql -h primary -U main -d main -c \"CREATE TABLE IF NOT EXISTS sample_data (id SERIAL PRIMARY KEY, str_col TEXT, num_col INT);\"; 
+        echo \"Inserting one test row...\"; 
+        psql -h primary -U main -d main -c \"INSERT INTO sample_data (str_col, num_col) VALUES ('Hello world', 123);\"; 
+        echo \"Creating logical replication slot...\"; 
+        psql -h primary -U main -d main -c \"SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'wal2json');\"; 
+        echo \"Done. Data and replication slot should now exist.\" 
+      "
+    restart: "no"
+    networks:
+      - pg-cluster
+
+networks:
+  pg-cluster:
+
+volumes:
+  pg-data:
+```
+
+
+## 2. OLake Integration
+
+After verifying Postgres’s configuration, proceed with OLake’s integration steps. Refer to the [getting started guide](../../category/getting-started) for more details.
+
+
+Update your source configuration file (`config.json`) to connect to Postgres as follows:
+
+<PostgresSourceConfig/>
+
+## 3. Starting Postgres
+
+To start the Postgres container, run the following command from your project directory:
+
+```bash
+docker compose -f ./drivers/postgres/config/docker-compose.yaml up -d
+```
+
+## 4. Start replicating you Data
+
+:::info
+`PATH_TO_OLAKE_DIRECTORY` is the absolute path where you have created the directory [as discussed above].
+
+`OLAKE_BASE_PATH="$HOME/PATH_TO_OLAKE_DIRECTORY/olake/drivers/postgres/config" && \` maps to 
+`OLAKE_BASE_PATH="/Users/JOHN_DOE_USERNAME/Desktop/projects/olake/drivers/postgres/config" && \` in macOS and Linux systems. Follow the same pattern in other systems.
+:::
+
+
+### 4.1. Discover Collection Schema
+
+<LocalDiscoverPostgres/>
+
+### 4.2. Sync Data Command
+
+<LocalSyncPostgres/>
+
+
+Sample output syncing our sample reddit data and writing locally in parquet format:
+
+![docker compose 4](/img/docs/docker/docker-compose-4.png)
+
+
+### 4.3. Sync with State
+
+<LocalSyncWithStatePostgres/>
+
+</TabItem>
+</Tabs>
+
+
+## Additional References
+
+- **Configuration Files:**  
+  Refer to the following documentation for configuration details:
+  1. [`config.json`](../../core/configs/source)
+  2. [`catalog.json`](../../core/configs/catalog)
+  3. [`writer.json`](../../core/configs/writer)
+  4. [`state.json`](../../core/configs/state)
+
+- **Viewing Parquet Files:**  
+  Use the [VS Code extension - Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) to view Parquet files in your editor.
+
+
+## Troubleshooting
+
+If you encounter any issues, consider the following:
+
+- **Container Logs:**  
+  Check container logs for Postgres using:
+  
+  ```bash
+  docker logs CONTAINER_ID 
+  ```
+
+- **To stop the container, perform**:
+
+  ```bash
+  docker compose down --remove-orphans -v
+  ```
+
+- **To bash into the Postgres container, perform**:
+  ```bash
+  docker exec -it CONTAINER_ID /bin/bash
+  ```
+
+  ```bash
+  psql -h localhost -U main
+  ```
+
+Enter the password when prompted, in this case, its `password`
+
+and then you can use any of the below commands to interract.
+
+```
+\l; // to list all databases
+\c <db_name> // to switch to other database
+\dt // // to see and list all the tables of selected database
+\d <table-name> // describe the table schema
+\du // to list users and their roles
+```

@@ -23,6 +23,8 @@ import DocsRating from "./DocsRating";
 import DocBreadcrumbs from '@theme/DocBreadcrumbs';
 import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
+import TryCloudCard from "@site/src/components/TryCloudCard";
+
 export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     const { siteConfig } = useDocusaurusContext();
     const { pluginId } = useActivePlugin({ failfast: true });
@@ -98,7 +100,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
                                     </span>
                                 </div>
                             )}
-                            
+
                             {/* {!hideTitle && (
                                 <header>
                                     <h1 className={styles.docTitle}>{title}</h1>
@@ -122,7 +124,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
                             </MDXProvider>
                         </article>
 
-                        <DocsFooter/>
+                        <DocsFooter />
 
                         <div className="margin-left--none margin-top--md text--center">
                             <DocsRating label={unversionedId} />
@@ -134,7 +136,12 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
                 </div>
                 {!hideTableOfContents && toc && (
                     <div className="col col--3">
-                        <TOC toc={toc} />
+                        <div className="sticky top-[76px] flex flex-col">
+                            <TOC toc={toc} />
+                            <div className="mt-4">
+                                <TryCloudCard />
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

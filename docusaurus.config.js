@@ -205,12 +205,11 @@ const config = {
         isCloseable: true,
       },
 
-      // colorMode: {
-      //   defaultMode: "dark",
-      //   disableSwitch: true,
-      //   respectPrefersColorScheme: false,
-      // },
-
+      colorMode: {
+        defaultMode: "dark",
+        disableSwitch: false,
+        respectPrefersColorScheme: true,
+      },
 
       imageZoom: {
         // CSS selector to apply the plugin to, defaults to '.markdown img'
