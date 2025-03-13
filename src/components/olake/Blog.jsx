@@ -16,7 +16,7 @@ const BlogList = [
     heading: 'Troubleshooting Common Issues and Solutions to MongoDB ETL Errors',
     content:
       'Explore practical solutions to common MongoDB ETL errors in our troubleshooting guide. Learn how to address issues like schema mismatches, data type conflicts, and performance bottlenecks to streamline your ETL processes and ensure smooth data integration.',
-    link: 'https://olake.io/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors/',
+    link: 'https://olake.io/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors',
     image: '/img/olake/blog-image-2.svg'
   }
 ]

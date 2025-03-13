@@ -49,7 +49,7 @@ export default function DocPaginator(props) {
               "rounded-md border border-gray-200 dark:border-gray-700",
               "bg-white dark:bg-gray-800",
               "text-gray-800 dark:text-gray-100",
-              "hover:bg-gray-100 hover:text-gray-900",
+              "hover:bg-gray-50 hover:text-gray-900",
               "dark:hover:bg-gray-700 dark:hover:text-gray-50",
               "transition-colors"
             )}

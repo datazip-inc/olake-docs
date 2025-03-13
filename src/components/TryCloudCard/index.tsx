@@ -25,7 +25,6 @@ const TryCloudCard: FC = (): ReactElement => {
 
   const features = [
     $t("Low-cost"),
-    $t("Fast Analytics"),
     $t("Easy Data Ingestion"),
     $t("Elastic Scaling"),
   ];
@@ -57,7 +56,7 @@ const TryCloudCard: FC = (): ReactElement => {
             role="button"
             className="inline-block border-0 rounded px-3 h-8 leading-8 bg-blue-600 dark:bg-blue-700 text-white hover:text-white hover:opacity-90"
           >
-            Try it today
+            Join Waitlist
           </a>
         </div>
       )}
