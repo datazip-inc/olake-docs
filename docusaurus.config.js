@@ -139,7 +139,7 @@ const config = {
           },
 
           // {
-          //   href: 'https://olake.io/#olake-product-form',
+          //   href: 'https://olake.io#olake-product-form',
           //   label: 'Join Waitlist',
           //   position: 'left',
           // },

@@ -48,14 +48,14 @@ const JoinCommunity: FC<TProps> = ({
       link: "https://x.com/_olake",
     },
     {
-      icon: <YouTube />,
-      title: "YouTube",
-      link: "https://www.youtube.com/@olakeio",
-    },
-    {
       icon: <LinkedIn />,
       title: "LinkedIn",
       link: "https://www.linkedin.com/company/datazipio",
+    },
+    {
+      icon: <YouTube />,
+      title: "YouTube",
+      link: "https://www.youtube.com/@olakeio",
     },
     {
       icon: <LinkedIn />,
