@@ -328,6 +328,10 @@ const config = {
                 to: '/about-us',
               },
               {
+                label: 'Contact us',
+                to: '/contact',
+              },
+              {
                 label: 'Branding',
                 to: '/branding',
               },
