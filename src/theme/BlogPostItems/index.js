@@ -87,6 +87,8 @@ export default function BlogPostItems({
                 </div>
               </CardContent>
 
+
+
               {/* Tags Footer */}
               {tags.length > 0 && (
                 <CardFooter className="px-4 pb-4">

@@ -4,6 +4,8 @@ import Tpsr from "./Tpsr";
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
+import BlogCTA from '@site/src/components/BlogCTA'
+
 import DocCardList from '@theme/DocCardList';
 import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
@@ -62,6 +64,7 @@ const MDXComponents = {
   Tabs,
   TabItem,
   Hr,
+  BlogCTA,
   DocCardList,
 
   DockerDiscover,
