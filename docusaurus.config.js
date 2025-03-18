@@ -225,38 +225,38 @@ const config = {
         },
       },
 
-      // algolia: {
-      //   // The application ID provided by Algolia
-      //   appId: '7WDJ7VSHHG',
+      algolia: {
+        // The application ID provided by Algolia
+        appId: '2NPN846U9Q',
 
-      //   // Public API key: it is safe to commit it
-      //   apiKey: '64650072b9b1c25cb21b6cd0e10a5a87',
+        // Public API key: it is safe to commit it
+        apiKey: 'c82907c39d6f6ae42b943635097839c5',
 
-      //   indexName: 'datazip',
+        indexName: 'olake',
 
-      //   // Optional: see doc section below
-      //   contextualSearch: true,
+        // Optional: see doc section below
+        contextualSearch: true,
 
-      //   // Optional: Specify domains where the navigation should occur through window.location instead on history.push. Useful when our Algolia config crawls multiple documentation sites and we want to navigate with window.location.href to them.
-      //   externalUrlRegex: 'external\\.com|domain\\.com',
+        //   // Optional: Specify domains where the navigation should occur through window.location instead on history.push. Useful when our Algolia config crawls multiple documentation sites and we want to navigate with window.location.href to them.
+        //   externalUrlRegex: 'external\\.com|domain\\.com',
 
-      //   // Optional: Replace parts of the item URLs from Algolia. Useful when using the same search index for multiple deployments using a different baseUrl. You can use regexp or string in the `from` param. For example: localhost:3000 vs myCompany.com/docs
-      //   // replaceSearchResultPathname: {
-      //   //   from: '/docs/', // or as RegExp: /\/docs\//
-      //   //   to: '/',
-      //   // },
+        //   // Optional: Replace parts of the item URLs from Algolia. Useful when using the same search index for multiple deployments using a different baseUrl. You can use regexp or string in the `from` param. For example: localhost:3000 vs myCompany.com/docs
+        //   // replaceSearchResultPathname: {
+        //   //   from: '/docs/', // or as RegExp: /\/docs\//
+        //   //   to: '/',
+        //   // },
 
-      //   // Optional: Algolia search parameters
-      //   searchParameters: {},
+        //   // Optional: Algolia search parameters
+        //   searchParameters: {},
 
-      //   // Optional: path for search page that enabled by default (`false` to disable it)
-      //   searchPagePath: 'search',
+        // Optional: path for search page that enabled by default (`false` to disable it)
+        searchPagePath: 'search',
 
-      //   // Optional: whether the insights feature is enabled or not on Docsearch (`false` by default)
-      //   insights: true,
+        // Optional: whether the insights feature is enabled or not on Docsearch (`false` by default)
+        insights: true,
 
-      //   //... other Algolia params
-      // },
+        //   //... other Algolia params
+      },
 
       footer: {
         style: 'dark',
@@ -367,22 +367,22 @@ const config = {
     }),
   // satisfies Preset.ThemeConfig,
 
-  themes: [
-    [
-      require.resolve('@easyops-cn/docusaurus-search-local'),
-      {
-        indexPages: true,
-        docsRouteBasePath: '/docs',
-        hashed: true,
-        language: ['en'],
-        highlightSearchTermsOnTargetPage: false,
-        searchResultContextMaxLength: 50,
-        searchResultLimits: 8,
-        searchBarShortcut: true,
-        searchBarShortcutHint: true
-      }
-    ]
-  ],
+  // themes: [
+  //   [
+  //     require.resolve('@easyops-cn/docusaurus-search-local'),
+  //     {
+  //       indexPages: true,
+  //       docsRouteBasePath: '/docs',
+  //       hashed: true,
+  //       language: ['en'],
+  //       highlightSearchTermsOnTargetPage: false,
+  //       searchResultContextMaxLength: 50,
+  //       searchResultLimits: 8,
+  //       searchBarShortcut: true,
+  //       searchBarShortcutHint: true
+  //     }
+  //   ]
+  // ],
 
   plugins: [
     'plugin-image-zoom',
