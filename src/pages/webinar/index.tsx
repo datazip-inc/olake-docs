@@ -37,6 +37,18 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Pratical Session on Apache Iceberg by Sachin Tripathi',
+      subtitle: 'Join us on Friday, March 28th at 4 PM IST for a technical session on Apache Iceberg with Sachin Tripathi, Senior Data Engineer at EarnIn. The session will examine Icebergs ACID-like transaction model, time travel capabilities, schema evolution mechanisms, hidden partitioning system, and catalog architecture',
+      route: '/webinar/w-4-pratical-session-on-apache-iceberg',
+      img: `/img/webinars/w-4-pratical-session-on-apache-iceberg-cover.webp`,
+      alt: 'Pratical Session on Apache Iceberg by Sachin Tripathi Webinar',
+      status: 'upcoming',
+      button: 'primary',
+      CTA: 'Register Now',
+      date: '28 March 2025',
+      // icon: FaVideo
+    },
+    {
       title: 'CDC Unplugged - Modern Data Integration with Real World Insights',
       subtitle: 'Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming. We will trace CDCs evolution from traditional methods to its role in modern data lakehouses, while introducing key tools to help you get started. Expect actionable best practices and insightful case studies to tie everything together',
       route: '/webinar/w-3-cdc-unplugged',

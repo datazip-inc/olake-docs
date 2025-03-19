@@ -35,12 +35,12 @@ const hosts = [
     role: " [Moderator] GTM & Founding Member @ Datazip ",
     bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
     image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia//",
+    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
   },
 ];
 
 
-const Webinar2Page = () => {
+const WebinarPage = () => {
   return (
 
     <Layout
@@ -102,4 +102,4 @@ const Webinar2Page = () => {
 };
 
 
-export default Webinar2Page;
+export default WebinarPage;

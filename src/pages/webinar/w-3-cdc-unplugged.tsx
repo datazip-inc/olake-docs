@@ -16,7 +16,7 @@ const hosts = [
     role: "[Guest] Lead Data Engineer @ Kipi",
     bio: ".",
     image: "/img/authors/rajesh.webp",
-    linkedin: "https://www.linkedin.com/in/rajeshrout97//",
+    linkedin: "https://www.linkedin.com/in/rajeshrout97/",
   },
   {
     name: "Varun Saraogi",
@@ -30,12 +30,12 @@ const hosts = [
     role: " [Moderator] GTM & Founding Member @ Datazip ",
     bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
     image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia//",
+    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
   },
 ];
 
 
-const Webinar2Page = () => {
+const WebinarPage = () => {
   const webinarData = {
     title: 'CDC Unplugged: Modern Data Integration with Real-World Insights',
     summary: 'Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming. We will trace CDCs evolution from traditional methods to its role in modern data lakehouses, while introducing key tools to help you get started. Through real-world examples, we will offer practical guidance on implementing CDC pipelines, overcoming common challenges, and ensuring robust data governance in todays cloud-native and hybrid environments. Expect actionable best practices and insightful case studies to tie everything together.',
@@ -44,7 +44,7 @@ const Webinar2Page = () => {
   return (
 
     <Layout
-      title='CDC Unplugged: Modern Data Integration with Real-World Insights'
+      title={webinarData.title}
       description='Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming.'
     >
 
@@ -114,4 +114,4 @@ const Webinar2Page = () => {
 };
 
 
-export default Webinar2Page;
+export default WebinarPage;

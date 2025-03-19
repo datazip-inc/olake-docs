@@ -31,7 +31,7 @@ const hosts = [
   },
 ];
 
-const Webinar1Page = () => {
+const WebinarPage = () => {
 
   return (
     <Layout
@@ -84,4 +84,4 @@ const Webinar1Page = () => {
   );
 };
 
-export default Webinar1Page;
+export default WebinarPage;
