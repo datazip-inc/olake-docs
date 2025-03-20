@@ -1,0 +1,215 @@
+---
+title: Docker Compose 
+description: Setup Docker Compose 
+sidebar_position: 4
+---
+
+# Docker Compose to local setup and testing
+
+This page explains how to set up your local test environment using Docker Compose. Below is the `docker-compose.yml` file used for local setup and testing.
+
+
+## Prerequisites Installation
+
+This section covers the installation steps for Java 17, Docker & Docker Compose, and Maven for macOS (M1 & Intel), Linux, and Windows.
+
+### Java 17
+
+| Platform       | Command/Link                                                | Verification Command                                  |
+|----------------|-------------------------------------------------------------|-------------------------------------------------------|
+| **macOS (M1 & Intel)** | Install via Homebrew: <br/> ```brew install openjdk@17``` <br/> Follow [Adoptium Installation](https://adoptium.net/) if preferred. | Check with: <br/> ```java -version``` <br/> Ensure output mentions version 17. |
+| **Linux (Ubuntu/Debian)** | Install via APT: <br/> ```sudo apt update && sudo apt install openjdk-17-jdk``` | Check with: <br/> ```java -version```                |
+| **Windows**    | Download installer from [Oracle](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html) or [Adoptium](https://adoptium.net/). <br/> Run the installer and follow the setup steps. | Open Command Prompt and run: <br/> ```java -version``` |
+
+> **Note:** After installation, ensure that the Java binary is added to your system’s PATH. For macOS and Linux, you might need to add lines to your `~/.bashrc` or `~/.zshrc`.
+
+### Docker & Docker Compose
+
+| Platform       | Command/Link                                                 | Verification Command                   |
+|----------------|--------------------------------------------------------------|----------------------------------------|
+| **macOS (M1 & Intel)** | Install Docker Desktop from [Docker Hub](https://www.docker.com/products/docker-desktop). <br/> Alternatively, use Homebrew: <br/> ```brew install --cask docker``` | Check with: <br/> ```docker --version``` |
+| **Linux**      | Follow instructions for your distro from [Docker Docs](https://docs.docker.com/engine/install/ubuntu/) <br/> Example for Ubuntu: <br/> ```sudo apt update && sudo apt install docker.io docker-compose``` | Check with: <br/> ```docker --version``` |
+| **Windows**    | Download Docker Desktop from [Docker Hub](https://www.docker.com/products/docker-desktop) and follow the installer instructions. | Check with: <br/> Open Command Prompt and run: <br/> ```docker --version``` |
+
+### Maven
+
+| Platform       | Command/Link                                                      | Verification Command                   |
+|----------------|-------------------------------------------------------------------|----------------------------------------|
+| **macOS (M1 & Intel)** | Install via Homebrew: <br/> ```brew install maven``` <br/> Or download from [Apache Maven](https://maven.apache.org/download.cgi) and follow installation instructions. | Check with: <br/> ```mvn -version```     |
+| **Linux**      | Install via APT (Ubuntu/Debian): <br/> ```sudo apt update && sudo apt install maven``` | Check with: <br/> ```mvn -version```     |
+| **Windows**    | Download Maven from [Apache Maven](https://maven.apache.org/download.cgi) and follow the installation guide. <br/> Make sure to add Maven’s `bin` directory to your PATH. | Check with: <br/> Open Command Prompt and run: <br/> ```mvn -version``` |
+
+
+### Local Minio + JDBC (Local Test Setup)
+
+**Steps to run:**
+
+1. **Prerequisite:** Ensure Docker is installed (instructions in the Prerequisites section above).
+2. **Clone OLake and Navigate to the local test directory:**
+   ```shell
+   git clone git@github.com:datazip-inc/olake.git
+   cd writers/iceberg/local-test
+   ```
+3. **Start the docker-compose services:**
+   ```shell
+   docker compose up
+   ```
+   > This command starts the following services:  
+   > - **Postgres:** Acts as the JDBC catalog.  
+   > - **Minio:** Provides an AWS S3-like filesystem for storing Iceberg data.  
+   > - **Spark:** For querying the Iceberg data.
+
+4. **Create the writer configuration file:**  
+   Create a file named `writer.json` in your working directory (where you have created `config.json` for the source database. Get the source configs of all Databases [here](../../core/configs/source)) with the following content:
+   ```json
+   {
+     "type": "ICEBERG",
+     "writer": {
+       "catalog_type": "jdbc",
+       "jdbc_url": "jdbc:postgresql://localhost:5432/iceberg",
+       "jdbc_username": "iceberg",
+       "jdbc_password": "password",
+       "normalization": false,
+       "iceberg_s3_path": "s3a://warehouse",
+       "s3_endpoint": "http://localhost:9000",
+       "s3_use_ssl": false,
+       "s3_path_style": true,
+       "aws_access_key": "admin",
+       "aws_secret_key": "password",
+       "iceberg_db": "olake_iceberg"
+     }
+   }
+   ```
+
+5. **Run the Sync Process:**  
+   - **Discover Command:** _`<DISCOVER_COMMAND>`_  
+   - **Sync Command:** _`<SYNC_COMMAND>`_  
+   - **Sync with State Command:** _`<SYNC_WITH_STATE_COMMAND>`_  
+
+
+Refer to respective Database docs to use the command for discover schema and sync the data.
+- [MongoDB Discover and sync command](../../connectors/mongodb/overview#sync-command)
+- [Postgres Discover and sync command](../../connectors/postgres/overview#sync-command)
+- [MySQL Discover and sync command](../../connectors/mysql/overview#sync-command)
+
+
+6. **Verify Data Population:**
+
+   Connect to the `spark-iceberg` container:
+   ```sh
+   docker exec -it spark-iceberg bash
+   ```
+   Start Spark SQL:
+   ```sh
+   spark-sql
+   ```
+   Run a query to inspect your data:
+   ```sql
+   select * from olake_iceberg.olake_iceberg.table_name;
+   ```
+
+
+```yaml title="docker-compose.yml"
+version: "3"
+
+services:
+  # Spark container running a preconfigured Spark environment with Iceberg support.
+  spark-iceberg:
+    image: tabulario/spark-iceberg   # Prebuilt image with Spark and Iceberg
+    container_name: spark-iceberg
+    build: spark/                     # Build context for custom Spark configurations
+    networks:
+      iceberg_net:
+    depends_on:
+      - minio                        # Wait for Minio service to start
+      - postgres                     # Wait for PostgreSQL service to start
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf  # Custom Spark configuration file
+      - ./data/ivy-cache:/root/.ivy2  # Local cache for dependencies
+    environment:
+      - AWS_ACCESS_KEY_ID=admin      # AWS key (used by Spark to access S3/Minio)
+      - AWS_SECRET_ACCESS_KEY=password  # AWS secret key
+      - AWS_REGION=us-east-1         # AWS region configuration
+    ports:
+      - 8888:8888                  # Spark UI/Jupyter port mapping
+      - 8088:8080                  # Spark web UI port mapping
+      - 10000:10000                # JDBC/Thrift server port mapping
+      - 10001:10001                # Additional port if needed
+
+  # Minio container acting as a local S3-like storage service.
+  minio:
+    image: minio/minio
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=admin        # Minio admin username
+      - MINIO_ROOT_PASSWORD=password # Minio admin password
+      - MINIO_DOMAIN=minio           # Domain alias configuration
+    networks:
+      iceberg_net:
+        aliases:
+          - warehouse.minio         # Alias used for referencing the storage bucket
+    ports:
+      - 9001:9001                  # Minio console port
+      - 9000:9000                  # S3 API port
+    volumes:
+      - ./data/minio-data:/data     # Persist Minio data locally
+    command: ["server", "/data", "--console-address", ":9001"]  # Command to start Minio server with console
+
+  # Minio Client container to manage bucket setup and policies.
+  mc:
+    depends_on:
+      - minio
+    image: minio/mc
+    container_name: mc
+    networks:
+      iceberg_net:
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    entrypoint: |
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+      if ! /usr/bin/mc ls minio/warehouse > /dev/null 2>&1; then
+        /usr/bin/mc mb minio/warehouse;
+        /usr/bin/mc policy set public minio/warehouse;
+      fi;
+      tail -f /dev/null
+      "
+
+  # PostgreSQL container serving as the JDBC catalog for Iceberg.
+  postgres:
+    image: postgres:13
+    container_name: iceberg-postgres
+    networks:
+      iceberg_net:
+    environment:
+      - POSTGRES_USER=iceberg    # PostgreSQL username for the catalog
+      - POSTGRES_PASSWORD=password  # PostgreSQL password for the catalog
+      - POSTGRES_DB=iceberg       # Database name used by Iceberg
+    ports:
+      - 5432:5432                # PostgreSQL port mapping
+    volumes:
+      - ./data/postgres-data:/var/lib/postgresql/data  # Persist PostgreSQL data locally
+
+networks:
+  iceberg_net:                   # Custom network for all services
+
+volumes:
+  postgres-data:
+  minio-data:
+```
+
+### Services Overview
+
+- **spark-iceberg:**  
+  Runs Spark with Iceberg support to query and verify the data. It depends on both Minio (for S3-like storage) and PostgreSQL (as the metadata catalog).
+
+- **minio:**  
+  Simulates an AWS S3 environment locally. Iceberg stores its data and metadata here.
+
+- **mc (Minio Client):**  
+  Automates the creation of the storage bucket (`warehouse`) in Minio and sets the appropriate access policies.
+
+- **postgres:**  
+  Provides a PostgreSQL-based JDBC catalog to manage Iceberg metadata.

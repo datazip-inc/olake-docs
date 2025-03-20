@@ -87,6 +87,21 @@ const config = {
     ],
   ],
 
+  scripts: [
+    {
+      id: "runllm-widget-script",
+      type: "module",
+      src: "https://widget.runllm.com",
+      crossorigin: "true",
+      "runllm-name": "olake",
+      "runllm-assistant-id": "364",
+      "runllm-position": "BOTTOM_RIGHT",
+      "runllm-keyboard-shortcut": "Mod+j",
+      "runllm-preset": "docusaurus",
+      async: true,
+    },
+  ],
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({

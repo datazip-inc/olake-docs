@@ -9,9 +9,9 @@ import BlogCTA from '@site/src/components/BlogCTA'
 import DocCardList from '@theme/DocCardList';
 import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
-import DockerDiscover from '../../../docs/shared/commands/DockerDiscover.mdx'
-import DockerSync from '../../../docs/shared/commands/DockerSync.mdx'
-import DockerSyncWithState from '../../../docs/shared/commands/DockerSyncWithState.mdx'
+import DockerDiscoverMongoDB from '../../../docs/shared/commands/DockerDiscoverMongoDB.mdx'
+import DockerSyncMongoDB from '../../../docs/shared/commands/DockerSyncMongoDB.mdx'
+import DockerSyncWithStateMongoDB from '../../../docs/shared/commands/DockerSyncWithStateMongoDB.mdx'
 
 import DockerDiscoverMySQL from '../../../docs/shared/commands/DockerDiscoverMySQL.mdx'
 import DockerSyncMySQL from '../../../docs/shared/commands/DockerSyncMySQL.mdx'
@@ -21,9 +21,9 @@ import DockerDiscoverPostgres from '../../../docs/shared/commands/DockerDiscover
 import DockerSyncPostgres from '../../../docs/shared/commands/DockerSyncPostgres.mdx'
 import DockerSyncWithStatePostgres from '../../../docs/shared/commands/DockerSyncWithStatePostgres.mdx'
 
-import LocalDiscover from '../../../docs/shared/commands/LocalDiscover.mdx'
-import LocalSync from '../../../docs/shared/commands/LocalSync.mdx'
-import LocalSyncWithState from '../../../docs/shared/commands/LocalSyncWithState.mdx'
+import LocalDiscoverMongoDB from '../../../docs/shared/commands/LocalDiscoverMongoDB.mdx'
+import LocalSyncMongoDB from '../../../docs/shared/commands/LocalSyncMongoDB.mdx'
+import LocalSyncWithStateMongoDB from '../../../docs/shared/commands/LocalSyncWithStateMongoDB.mdx'
 
 import LocalDiscoverMySQL from '../../../docs/shared/commands/LocalDiscoverMySQL.mdx'
 import LocalSyncMySQL from '../../../docs/shared/commands/LocalSyncMySQL.mdx'
@@ -52,6 +52,10 @@ import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.m
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 
+import IcebergWriterConfig from '../../../docs/shared/config/IcebergWriterConfig.mdx'
+import IcebergWriterConfigLocal from '../../../docs/shared/config/IcebergWriterConfigLocal.mdx'
+import IcebergWriterConfigDetails from '../../../docs/shared/config/IcebergWriterConfigDetails.mdx'
+import IcebergWriterConfigLocalDetails from '../../../docs/shared/config/IcebergWriterConfigLocalDetails.mdx'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -67,9 +71,9 @@ const MDXComponents = {
   BlogCTA,
   DocCardList,
 
-  DockerDiscover,
-  DockerSync,
-  DockerSyncWithState,
+  DockerDiscoverMongoDB,
+  DockerSyncMongoDB,
+  DockerSyncWithStateMongoDB,
 
   DockerDiscoverMySQL,
   DockerSyncMySQL,
@@ -79,9 +83,9 @@ const MDXComponents = {
   DockerSyncPostgres,
   DockerSyncWithStatePostgres,
 
-  LocalDiscover,
-  LocalSync,
-  LocalSyncWithState,
+  LocalDiscoverMongoDB,
+  LocalSyncMongoDB,
+  LocalSyncWithStateMongoDB,
 
   LocalDiscoverMySQL,
   LocalSyncMySQL,
@@ -100,7 +104,7 @@ const MDXComponents = {
   MySQLSourceConfigDetails,
   MySQLStateConfig,
   MySQLStateConfigDetails,
-  
+
   PostgresSourceConfig,
   PostgresSourceConfigDetails,
   PostgresStateConfig,
@@ -109,6 +113,11 @@ const MDXComponents = {
   S3Config,
   S3ConfigDetails,
   LocalParquetConfig,
+
+  IcebergWriterConfig,
+  IcebergWriterConfigLocal,
+  IcebergWriterConfigDetails,
+  IcebergWriterConfigLocalDetails
 };
 
 export default MDXComponents;
