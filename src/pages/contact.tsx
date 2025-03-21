@@ -62,6 +62,12 @@ const ContactPage = () => {
                                 </li>
                                 <li className="flex items-center space-x-4">
                                     <FaLinkedin className="text-2xl" />
+                                    <a href="https://www.linkedin.com/in/hashcode-ankit/" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                        Ankit
+                                    </a>
+                                </li>
+                                <li className="flex items-center space-x-4">
+                                    <FaLinkedin className="text-2xl" />
                                     <a href="https://www.linkedin.com/in/sandeepdevarapalli/" target="_blank" rel="noopener noreferrer" className="hover:underline">
                                         Sandeep
                                     </a>
