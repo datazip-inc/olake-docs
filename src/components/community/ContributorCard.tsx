@@ -1,6 +1,6 @@
 import React from 'react'
-import { Card } from '../../components/ui/card'
-import { CircularProgress } from '../../components/ui/CircularProgress'
+import { Card } from '../ui/card'
+import { CircularProgress } from '../ui/CircularProgress'
 
 export interface ContributorProps {
   id: number
