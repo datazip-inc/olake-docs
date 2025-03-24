@@ -92,9 +92,8 @@ const config = {
       id: "runllm-widget-script",
       type: "module",
       src: "https://widget.runllm.com",
-      "runllm-name": "OLake AI Assistant",
       crossorigin: "true",
-      "runllm-name": "olake",
+      "runllm-name": "OLake AI Assistant",
       "runllm-assistant-id": "654",
       "runllm-position": "BOTTOM_RIGHT",
       "runllm-keyboard-shortcut": "Mod+j",
@@ -103,6 +102,12 @@ const config = {
       "runllm-support-email": "hello@olake.io",
       "runllm-community-url": "https://olake.io/slack",
       "runllm-community-type": "slack",
+      "runllm-brand-logo": "https://olake.io/img/logo/olake-blue.svg",
+      "runllm-floating-button-text": "Ask OLake",
+      "runllm-per-user-usage-limit": "20",
+      "runllm-algolia-api-key": "e33125f9089a304cef5331a186931e48",
+      "runllm-algolia-application-id": "1E406NO1AX",
+      "runllm-algolia-index-name": "olake"
     },
   ],
 
