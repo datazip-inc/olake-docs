@@ -3,9 +3,9 @@ import SectionLayout from './SectionLayout'
 
 const ProjectDisciption = () => {
   return (
-    <SectionLayout  className='md:mx-80 items-center justify-center'>
+    <SectionLayout className='items-center justify-center  md:mx-80'>
       <div className='flex flex-col'>
-        <h1 className='text-center'>Program description</h1>
+        <h1 className='text-center md:text-[42px] text-[36px]'>Program description</h1>
 
         <h2 className='text-blue-500'>Overview</h2>
         <p>

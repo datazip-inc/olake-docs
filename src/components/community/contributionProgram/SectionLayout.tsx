@@ -17,11 +17,11 @@ interface SectionProps {
 const Section = ({
   children,
   className = '',
-  backgroundColor = 'bg-white',
+  backgroundColor = '',
   containerClassName = '',
   size = 'medium',
   id,
-  centered = true,
+  centered = true
 }: SectionProps) => {
   const sizeClasses = {
     small: 'max-w-4xl',

@@ -1,7 +1,8 @@
 import React from 'react'
-import image1 from './image1.svg'
 import { Card } from '../../../components/ui/card'
 import SectionLayout from './SectionLayout'
+import { LuUnplug } from 'react-icons/lu'
+import { FaFeather,FaMagnifyingGlass } from 'react-icons/fa6'
 const HeroSection = () => {
   return (
     <SectionLayout backgroundColor='bg-blue-950' className='py-10 text-center'>
@@ -12,19 +13,19 @@ const HeroSection = () => {
         <ContributeWayCard
           title={'Build New Connectors'}
           subtitle={"We welcome connectors built by the community. It's easy to get started"}
-          image={image1}
+          icon={<LuUnplug className="w-16 h-16 text-blue-500" />}
         />
         <ContributeWayCard
           title={'Write Docs'}
           subtitle={
             'Write tutorials, improve getting started guides, and clarify connector features.'
           }
-          image={image1}
+          icon={<FaFeather className="w-16 h-16 text-blue-500" />}
         />
         <ContributeWayCard
           title={'Make Improvements'}
           subtitle={'Complete feature requests, squash bugs, and improve connector performance.'}
-          image={image1}
+          icon={<FaMagnifyingGlass className="w-16 h-16 text-blue-500" />}
         />
       </div>
     </SectionLayout>
@@ -32,10 +33,10 @@ const HeroSection = () => {
 }
 export default HeroSection
 
-const ContributeWayCard = ({ title, subtitle, image }) => {
+const ContributeWayCard = ({ title, subtitle, icon }) => {
   return (
-    <Card className='flex flex-col items-center bg-white p-8 text-center text-black'>
-      {image && <img src={image} alt={title} />}
+    <Card className='flex flex-col space-y-3 items-center bg-white p-8 text-center text-black'>
+       <div>{icon}</div>
       <h2>{title}</h2>
       <div>{subtitle}</div>
     </Card>
