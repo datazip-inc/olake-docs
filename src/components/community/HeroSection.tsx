@@ -1,5 +1,5 @@
 import React from 'react'
-import image1 from './image.png'
+
 import SectionLayout from './SectionLayout'
 const HeroSection = () => {
   return (

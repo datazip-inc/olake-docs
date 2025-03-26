@@ -1,6 +1,6 @@
 import React from 'react'
-import { Card } from '../ui/card'
-import { CircularProgress } from '../ui/CircularProgress'
+import { Card } from './ui/card'
+import { CircularProgress } from './ui/CircularProgress'
 import { useState } from 'react'
 export interface ContributorProps {
   id: number
@@ -84,11 +84,13 @@ const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contribu
         {contributor.contributions === 1 ? 'contribution' : 'contributions'}
       </p>
       {showPRs && prs.length > 0 && (
-        <div className='absolute top-40 mb-2 w-64 p-3  shadow-lg rounded-lg text-sm z-1000'>
-          <h4 className='font-bold mb-2'>Pull Requests</h4>
+        <div className='z-1000 absolute top-40 mb-2 w-64 rounded-lg p-3 text-sm shadow-lg'>
+          <h4 className='mb-2 font-bold'>Pull Requests</h4>
           <ul className='list-disc pl-4'>
             {prs.slice(0, 5).map((pr, index) => (
-              <li key={index} className='truncate'>{pr}</li>
+              <li key={index} className='truncate'>
+                {pr}
+              </li>
             ))}
           </ul>
         </div>

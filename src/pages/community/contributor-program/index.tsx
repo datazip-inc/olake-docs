@@ -1,12 +1,11 @@
 import React = require('react')
 import Layout from '@theme/Layout'
 import { useEffect, useState } from 'react'
-import HeroSection from '../../../components/community/contributionProgram/HeroSection'
-import Contributeinmultipleways from '../../../components/community/contributionProgram/Contributeinmultipleways'
-import ProjectDisciption from '../../../components/community/contributionProgram/projectDiscription'
-import Whyjointheprogram from '../../../components/community/contributionProgram/Why-join-the-program'
-import ActiveContributors from '../../../components/community/contributionProgram/activeContributors'
-
+import HeroSection from '../../../components/community/HeroSection'
+import Contributeinmultipleways from '../../../components/community/Contributeinmultipleways'
+import ProjectDisciption from '../../../components/community/projectDiscription'
+import Whyjointheprogram from '../../../components/community/Why-join-the-program'
+import ActiveContributors from '../../../components/community/activeContributors'
 
 const ContributorsProgramPage = () => {
   return (

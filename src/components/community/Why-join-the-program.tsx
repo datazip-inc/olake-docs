@@ -1,6 +1,6 @@
 import React from 'react'
 import SectionLayout from './SectionLayout'
-import { Card } from '../../../components/ui/card'
+import { Card } from '../ui/card'
 import { AiOutlineDollarCircle } from 'react-icons/ai'
 import { LiaCodeBranchSolid } from 'react-icons/lia'
 import { BsStars } from 'react-icons/bs'

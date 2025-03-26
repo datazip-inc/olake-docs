@@ -1,7 +1,7 @@
 import React = require('react')
 import Layout from '@theme/Layout'
 import { useEffect, useState } from 'react'
-import ContributorCard from '../../../components/community/ContributorCard'
+import ContributorCard from '../../../components/ContributorCard'
 
 interface Contributor {
   id: number
