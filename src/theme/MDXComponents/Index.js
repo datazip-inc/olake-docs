@@ -52,10 +52,10 @@ import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.m
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 
-import IcebergWriterConfig from '../../../docs/shared/config/IcebergWriterConfig.mdx'
-import IcebergWriterConfigLocal from '../../../docs/shared/config/IcebergWriterConfigLocal.mdx'
-import IcebergWriterConfigDetails from '../../../docs/shared/config/IcebergWriterConfigDetails.mdx'
-import IcebergWriterConfigLocalDetails from '../../../docs/shared/config/IcebergWriterConfigLocalDetails.mdx'
+import GlueIcebergWriterConfig from '../../../docs/shared/config/GlueIcebergWriterConfig.mdx'
+import MinioJDBCIcebergWriterConfigLocal from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocal.mdx'
+import GlueIcebergWriterConfigDetails from '../../../docs/shared/config/GlueIcebergWriterConfigDetails.mdx'
+import MinioJDBCIcebergWriterConfigLocalDetails from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocalDetails.mdx'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -114,10 +114,10 @@ const MDXComponents = {
   S3ConfigDetails,
   LocalParquetConfig,
 
-  IcebergWriterConfig,
-  IcebergWriterConfigLocal,
-  IcebergWriterConfigDetails,
-  IcebergWriterConfigLocalDetails
+  GlueIcebergWriterConfig,
+  MinioJDBCIcebergWriterConfigLocal,
+  GlueIcebergWriterConfigDetails,
+  MinioJDBCIcebergWriterConfigLocalDetails
 };
 
 export default MDXComponents;
