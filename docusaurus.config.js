@@ -530,6 +530,38 @@ const config = {
             from: '/olake/resources/terminologies',
           },
           {
+            to: '/blog',
+            from: '/blog/top-mongodb-etl-tools-a-comprehensive-guide-to-syncing-your-nosql-data',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/getting-started/',
+          },
+          {
+            to: '/docs',
+            from: '/docs/',
+          },
+          {
+            to: '/',
+            from: '/iceberg/olake.io',
+          },
+          {
+            to: '/',
+            from: '/img/blog/2024/09/mongodb-etl-challenges-cover.webp',
+          },
+          {
+            to: '/',
+            from: '/img/blog/2024/11/issues-debezium-kafka-cover.webp',
+          },
+          {
+            to: '/docs/writers/s3/config',
+            from: '/docs/configs/s3',
+          },
+          {
+            to: '/docs',
+            from: '/docs/category/tutorials/',
+          },
+          {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
           },
@@ -543,16 +575,6 @@ const config = {
           //   from: ['/docs/oldDocFrom2019', '/docs/legacyDocFrom2016'],
           // },
         ],
-        // createRedirects(existingPath) {
-        //   if (existingPath.includes('/community')) {
-        //     // Redirect from /docs/team/X to /community/X and /docs/support/X to /community/X
-        //     return [
-        //       existingPath.replace('/community', '/docs/team'),
-        //       existingPath.replace('/community', '/docs/support'),
-        //     ];
-        //   }
-        //   return undefined; // Return a falsy value: no redirect created
-        // },
       },
     ],
     '@docusaurus/theme-live-codeblock',
