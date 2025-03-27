@@ -1,7 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Card } from './ui/card'
-import { CircularProgress } from './ui/CircularProgress'
-import { useState } from 'react'
+import { AvatarWithProgress } from './avatar-with-progress'
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuTrigger 
+} from './ui/dropdown-menu'
+
 export interface ContributorProps {
   id: number
   login: string
@@ -11,18 +16,28 @@ export interface ContributorProps {
 }
 
 const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contributor }) => {
-  // Calculate the percentage for the progress bar
-  const size = 80
-  const strokeWidth = 4
-  const progressColor = '#0582f6'
+  // State
+  const [prs, setPrs] = useState<string[]>([])
+  const [showPRs, setShowPRs] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  // Constants
   const maxContributions = 10
   const percentage = Math.min((contributor.contributions / maxContributions) * 100, 100)
 
-  const [prs, setPrs] = useState<string[]>([])
-  const [showPRs, setShowPRs] = useState(false)
+  // Handlers
+  const handleMouseEnter = () => {
+    setShowPRs(true)
+    fetchPRs()
+  }
 
+  const handleMouseLeave = () => {
+    setShowPRs(false)
+  }
+
+  // API calls
   const fetchPRs = async () => {
     if (prs.length > 0) return // Avoid refetching
+    setIsLoading(true)
     try {
       const response = await fetch(
         `https://api.github.com/search/issues?q=is:pr+repo:datazip-inc/olake+author:${contributor.login}`
@@ -32,38 +47,23 @@ const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contribu
       setPrs(prTitles)
     } catch (error) {
       console.error('Error fetching PRs:', error)
+    }finally {
+      setIsLoading(false)
     }
   }
-  console.log(prs)
+
   return (
     <Card className='flex flex-col items-center p-4 transition-transform hover:scale-105 hover:shadow-xl'>
-      <div className='relative mb-3' style={{ width: size, height: size }}>
-        {/* SVG for the circular progress */}
-        <CircularProgress
-          percentage={percentage}
-          size={size}
-          strokeWidth={strokeWidth}
-          progressColor={progressColor}
-          useGradient={true}
-          gradientColors={['#0582f6', '#00b3ff']}
-        />
+      <AvatarWithProgress
+        percentage={percentage}
+        size={100}
+        strokeWidth={6}
+        useGradient={true}
+        gradientColors={['#0582f6', '#00b3ff']}
+        avatarUrl={contributor.avatar_url || '/placeholder.svg'}
+        altText={`${contributor.login}'s avatar`}
+      />
 
-        {/* Avatar image */}
-        <div className='absolute inset-0 flex items-center justify-center'>
-          <div
-            className='overflow-hidden rounded-full'
-            style={{ width: size - strokeWidth * 2, height: size - strokeWidth * 2 }}
-          >
-            <img
-              src={contributor.avatar_url || '/placeholder.svg'}
-              alt={`${contributor.login}'s avatar`}
-              width={size - strokeWidth * 2}
-              height={size - strokeWidth * 2}
-              className='object-cover'
-            />
-          </div>
-        </div>
-      </div>
       <a
         href={contributor.html_url}
         target='_blank'
@@ -72,29 +72,39 @@ const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contribu
       >
         {contributor.login}
       </a>
-      <p
-        className='text-sm text-gray-600'
-        onMouseEnter={() => {
-          setShowPRs(true)
-          fetchPRs()
-        }}
-        onMouseLeave={() => setShowPRs(false)}
-      >
-        {contributor.contributions}{' '}
-        {contributor.contributions === 1 ? 'contribution' : 'contributions'}
-      </p>
-      {showPRs && prs.length > 0 && (
-        <div className='z-1000 absolute top-40 mb-2 w-64 rounded-lg p-3 text-sm shadow-lg'>
-          <h4 className='mb-2 font-bold'>Pull Requests</h4>
-          <ul className='list-disc pl-4'>
-            {prs.slice(0, 5).map((pr, index) => (
+
+      <DropdownMenu open={showPRs}>
+        <DropdownMenuTrigger asChild>
+          <p
+            className='text-sm text-gray-600'
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            {contributor.contributions}{' '}
+            {contributor.contributions === 1 ? 'contribution' : 'contributions'}
+          </p>
+        </DropdownMenuTrigger>
+        
+        <DropdownMenuContent 
+          align="end" 
+          className="w-48"  
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        > <Card>
+           <h4 className='mb-2 font-bold'>Pull Requests</h4>
+           <ul className='list-disc pl-4'>
+          {isLoading ? (
+            <li className="text-gray-500">Loading PRs...</li>
+          ) : (
+            prs.slice(0, 5).map((pr, index) => (
               <li key={index} className='truncate'>
                 {pr}
               </li>
-            ))}
-          </ul>
-        </div>
-      )}
+            ))
+          )}
+        </ul></Card>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </Card>
   )
 }
