@@ -41,20 +41,22 @@ const hosts = [
 
 
 const WebinarPage = () => {
-  return (
+  const webinarData = {
+    title: 'Best Practices for Migrating to Apache Iceberg',
+    summary: 'Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.',
+  };
 
+  return (
     <Layout
-      title='Best Practices for Migrating to Apache Iceberg'
-      description='Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.'
+      title={webinarData.title}
+      description={webinarData.summary}
     >
 
       <main className="container mx-auto lg:px-36 py-12">
         <WebinarTitle
-          title="Best Practices for Migrating to Apache Iceberg"
+          title={webinarData.title}
           tag="Webinar"
         />
-
-
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
@@ -76,7 +78,7 @@ const WebinarPage = () => {
           date="December 15, 2024"
           time="10:00 AM - 11:30 AM"
           duration="1.5 hours"
-          summary="Join us for an in-depth session on planning your Iceberg project. We'll cover the best practices, tools, and strategies to ensure a smooth and efficient migration."
+          summary={webinarData.summary}
           bulletPoints={[
             "Understanding Apache Iceberg",
             "Migration strategies and best practices",

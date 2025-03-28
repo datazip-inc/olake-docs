@@ -32,17 +32,20 @@ const hosts = [
 ];
 
 const WebinarPage = () => {
-
+  const webinarData = {
+    title: 'A Journey into Data Lake: Introducing Apache Iceberg',
+    summary: 'Learn how to set up OLAP system/platform for analysis from NoSQL Databases (MongoDB & DynamoDB) using Apache Iceberg.',
+  };
   return (
     <Layout
-      title='A Journey into Data Lake: Introducing Apache Iceberg'
-      description='Learn how to set up OLAP system/platform for analysis from NoSQL Databases (MongoDB & DynamoDB) using Apache Iceberg.'
+      title={webinarData.title}
+      description={webinarData.summary}
     >
 
       <main className="container mx-auto lg:px-36 py-12">
 
         <WebinarTitle
-          title="A Journey into Data Lake: Introducing Apache Iceberg"
+          title={webinarData.title}
           tag="Webinar"
         />
 
@@ -61,7 +64,7 @@ const WebinarPage = () => {
           date="October 03, 2024"
           time="08:30 PM - 09:30 PM IST"
           duration="1 hours"
-          summary="Learn how to set up OLAP system/platform for analysis from NoSQL Databases (MongoDB & DynamoDB) using Apache Iceberg."
+          summary={webinarData.summary}
           bulletPoints={[
             "The Data Landscape - OLTP -> ETL -> OLAP",
             "Traditional ETL Process",

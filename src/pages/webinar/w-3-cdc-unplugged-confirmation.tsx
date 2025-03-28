@@ -43,7 +43,7 @@ const WebinarPage = () => {
 
     <Layout
       title={webinarData.title}
-      description='Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming.'
+      description={webinarData.summary}
     >
 
       <main className="container mx-auto lg:px-36 py-12">

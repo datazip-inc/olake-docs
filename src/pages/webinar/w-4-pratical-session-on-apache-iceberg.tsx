@@ -29,7 +29,6 @@ const hosts = [
   },
 ];
 
-
 const WebinarPage = () => {
   const webinarData = {
     title: 'Pratical Session on Apache Iceberg by Sachin Tripathi',
