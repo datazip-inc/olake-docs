@@ -22,7 +22,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   const strokeDashoffset = circumference - (percentage / 100) * circumference
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className='absolute'>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} >
       {/* Background circle */}
       <circle
         cx={radius}

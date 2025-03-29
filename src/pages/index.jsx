@@ -133,7 +133,7 @@ const OLakeProduct = () => {
             target='_blank'
           >
             Join us
-          </AwesomeButton>
+          </AwesomeButton>  
 
           <AwesomeButton
             href='?utm_source=hero_talk_to_us#olake-form-product'
