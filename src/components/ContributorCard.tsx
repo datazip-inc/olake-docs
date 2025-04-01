@@ -36,8 +36,8 @@ const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contribu
   }
   console.log(prs)
   return (
-    <Card className='flex flex-col items-center p-4 transition-transform hover:scale-105 hover:shadow-xl'>
-      <div className='relative mb-3' style={{ width: size, height: size }}>
+    <Card className='flex flex-col bg-card items-center p-4 space-y-4 transition-transform hover:scale-105 hover:shadow-xl'>
+      <div className='relative' style={{ width: size, height: size }}>
         {/* SVG for the circular progress */}
         <CircularProgress
           percentage={percentage}
