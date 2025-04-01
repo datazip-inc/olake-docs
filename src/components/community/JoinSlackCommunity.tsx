@@ -6,28 +6,28 @@ const JoinSlack = () => {
   
 const SlackChannels = [
     {
-        name: 'good-reads',
-        description: 'Share articles and resources that youve found helpful.'
+        name: 'contributing-to-olake',
+        description: 'Get support on starting to contribute to OLake.'
       },
       {
-        name: 'help-connection-issues',
-        description: 'Get support from the community on your connection issues'
+        name: 'discussions',
+        description: 'Share articles and resources that youve found helpful'
       },
       {
-        name: 'help-infrastructure-deployment',
-        description: 'Discuss best practices with the community on Airbyte deployment.'
+        name: 'general',
+        description: 'All major things related to community members gets shared here by community members.'
       },
       {
-        name: 'events-and-conferences',
-        description: 'Hype talks, promote your favorite local conferences, see CFPs.'
+        name: 'help',
+        description: 'Stuck somewhere? Just ask us on this channel.'
       },
       {
-        name: 'help-connector-development',
-        description: 'Discuss about the best way to leverage Airbytes Connector Development Kit.'
+        name: 'introduce-yourself',
+        description: 'Best way to say that you have joined this community.'
       },
       {
-        name: 'help-api-cli-orchestration',
-        description: 'Share best practices on how to leverage Airbyte API, CLI and more.'
+        name: 'social-an-events',
+        description: 'Everything related to socials about OLake goes here.'
       }
 ]
   return (
@@ -46,7 +46,7 @@ const SlackChannels = [
             </div>
           ))}
         </div>
-        <Link legacyBehavior href={"https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag"} className='p-4 bg-blue-600 w-fit text-center  rounded-full text-white '> Join Olake community Slack</Link>
+        <Link legacyBehavior href={"https://olake.io/slack"} className='p-4 bg-blue-600 w-fit text-center  rounded-full text-white '> Join OLake community Slack</Link>
         <div>Need direct access to our team and SLAs for support?
               <span className='text-blue-500 font-semibold cursor-pointer'> Talk to our team</span></div>
       </div>  

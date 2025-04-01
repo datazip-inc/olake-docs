@@ -7,8 +7,8 @@ const CommunityContribute = () => {
     return (
         <SectionLayout className='flex flex-row items-center justify-cente'>
             <div className='flex flex-col items-center justify-center space-y-6 text-center'>
-                <h1 >How to contribute to Olake</h1>
-                <h6 className='text-[20px]'>Are you ready to make your mark on Airbyte?
+                <h1 >How to contribute to OLake</h1>
+                <h6 className='text-[20px]'>Are you ready to make your mark on OLake?
                 We welcome contributions from everyone, whether you're a seasoned developer or not.</h6>
                 <Card className='p-4 justify-center'>
                     <div className='flex flex-col space-y-4 justify-center items-center'>

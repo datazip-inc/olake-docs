@@ -11,7 +11,7 @@ const HeroSection = () => {
           </h1>
           <div>
             Give back to the community and receive benefits and rewards for helping contribute to
-            Olake’s connector ecosystem. We can't wait to have you join us.
+            OLake’s connector ecosystem. We can't wait to have you join us.
           </div>
           <div className='w-fit rounded bg-blue-500 p-2 font-bold text-white hover:shadow-sm'>
             Apply here

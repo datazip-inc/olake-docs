@@ -17,7 +17,7 @@ const CommunityForum = () => {
           },
           {
             name: 'Kind Words',
-            description: 'Show off something you love about Olake, to foster positive culture   '
+            description: 'Show off something you love about OLake, to foster positive culture   '
           },
           {
             name: 'General',
@@ -30,7 +30,7 @@ const CommunityForum = () => {
             <div className='flex flex-col items-center justify-center space-y-6 text-center' >
                 <h1 className='text-white'>Find the community's questions  questions and ideas</h1>
                 <h6  className='text-white font-semibold text-[20px]'>Interested in sharing tips, ideas and asking questions? Want to see what the community built?
-                Find everything from guides, troubleshooting resolutions, data stack advice, feature requests in Airbyte's GitHub Discussions.</h6>
+                Find everything from guides, troubleshooting resolutions, data stack advice, feature requests in OLake's GitHub Discussions.</h6>
                 <div className="grid grid-cols-3 gap-4 mt-8">
                     {Channels.map((channel, index) => (
                         <div key={index} className="p-4 border bg-white rounded-lg shadow-lg hover:shadow-2xl">
@@ -39,7 +39,7 @@ const CommunityForum = () => {
                         </div>  
                     ))}
                 </div>
-                <div className='p-4 bg-blue-600 w-fit text-center  rounded-full text-white font-bold'> Explore  Olake community Forum</div>
+                <div className='p-4 bg-blue-600 w-fit text-center  rounded-full text-white font-bold'> Explore  OLake community Forum</div>
             </div>
         </SectionLayout>
     )
