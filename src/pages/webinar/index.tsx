@@ -10,11 +10,23 @@ const WebinarsPage = () => {
 
   const communityMeets = [
     {
+      title: 'OLake 5th Community Meetup',
+      subtitle: 'Join us ',
+      route: '/community/5th-community-meetup',
+      img: `/img/community/5th-community-meetup-cover.png`,
+      alt: 'OLake 5th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '27 March 2025',
+      icon: FaVideo
+    },
+    {
       title: 'OLake 4th Community Meetup',
       subtitle: 'Join us ',
       route: '/community/4th-community-meetup',
       img: `/img/community/4th-community-meetup-cover.png`,
-      alt: 'OLake 3rd Community Meetup',
+      alt: 'OLake 4th Community Meetup',
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',

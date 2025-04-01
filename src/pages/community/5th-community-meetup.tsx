@@ -8,7 +8,7 @@ import React = require('react');
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
-import meetupData from '../../data/meetup/3rd-meetup.json'
+import meetupData from '../../data/meetup/5th-meetup.json'
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 const hosts = [
@@ -26,19 +26,13 @@ const hosts = [
     image: "/img/authors/shubham.jpg",
     linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
   },
-  {
-    name: "Ankit Kumar",
-    role: "Senior backend dev and OLake Maintainer",
-    bio: "",
-    image: "/img/authors/ankit.jpg",
-    linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
-  },
 ];
 
 const CommunityPage = () => {
+
   const communityData = {
-    title: 'OLake 3rd Community Meetup',
-    summary: 'OLake 3rd Community Meetup',
+    title: 'OLake 5th Community Meetup',
+    summary: 'OLake 5th Community Meetup',
   };
   return (
     <Layout
@@ -52,33 +46,16 @@ const CommunityPage = () => {
           tag="Community Meetup"
         />
 
-        <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
-
-          {/* <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/community/3rd-community-meetup-cover.png" alt="Meetup Cover Image" />
-          </div> */}
-
-
-
-          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
-            <WebinarForm
-              source="w-1-intro-iceberg"
-              nexturl="w-1-intro-iceberg-confirmation"
-            />
-          </div> */}
-        </div>
-
         <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="V2ouyKSjxzg" className="max-w-6xl" />
+          <YouTubeEmbed videoId="dgxEBp9qWOQ" className="max-w-6xl" />
         </section>
 
         <Hr />
-
         <br />
 
         <WebinarOverview
-          date="February 13, 2025"
-          time="04:30 PM - 05:30 PM IST"
+          date="March 27, 2025"
+          time="09:00 PM - 10:00 PM IST"
           duration="1 hours"
           summary={communityData.summary}
           bulletPoints={[
