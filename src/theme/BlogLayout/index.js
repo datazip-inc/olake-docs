@@ -2,7 +2,7 @@ import React from 'react'
 import clsx from 'clsx'
 import Layout from '@theme/Layout'
 import BlogSidebar from '@theme/BlogSidebar'
-import TryCloudCard from "@site/src/components/TryCloudCard";
+// import TryCloudCard from "@site/src/components/TryCloudCard";
 
 export default function BlogLayout(props) {
   const { sidebar, toc, children, ...layoutProps } = props
@@ -28,7 +28,7 @@ export default function BlogLayout(props) {
               <div className="sticky" style={{ top: '2rem' }}>
                 {toc}
                 <div className='mt-12'>
-                <TryCloudCard />
+                {/* <TryCloudCard /> */}
                 </div>
               </div>
             </div>

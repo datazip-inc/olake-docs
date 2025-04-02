@@ -23,7 +23,7 @@ import DocsRating from "./DocsRating";
 import DocBreadcrumbs from '@theme/DocBreadcrumbs';
 import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
-import TryCloudCard from "@site/src/components/TryCloudCard";
+// import TryCloudCard from "@site/src/components/TryCloudCard";
 
 export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     const { siteConfig } = useDocusaurusContext();
@@ -139,7 +139,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
                         <div className="sticky top-[76px] flex flex-col">
                             <TOC toc={toc} />
                             <div className="mt-4">
-                                <TryCloudCard />
+                                {/* <TryCloudCard /> */}
                             </div>
                         </div>
                     </div>
