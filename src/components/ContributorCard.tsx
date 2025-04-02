@@ -84,7 +84,7 @@ const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contribu
         {contributor.contributions === 1 ? 'contribution' : 'contributions'}
       </p>
       {showPRs && prs.length > 0 && (
-        <div className='z-1000 absolute top-40 mb-2 w-64 rounded-lg p-3 text-sm shadow-lg'>
+        <div className='z-1000 absolute top-40 mb-2 w-64 rounded-lg p-3 text-sm shadow-lg '>
           <h4 className='mb-2 font-bold'>Pull Requests</h4>
           <ul className='list-disc pl-4'>
             {prs.slice(0, 5).map((pr, index) => (
