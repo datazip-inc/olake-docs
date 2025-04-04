@@ -562,6 +562,18 @@ const config = {
             from: '/docs/category/tutorials/',
           },
           {
+            to: '/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors',
+            from: '/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors/',
+          },
+          {
+            to: '/',
+            from: '/docs/community/sheet',
+          },
+          {
+            to: '/docs/faqs',
+            from: '/docs/faqs/',
+          },
+          {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
           },
