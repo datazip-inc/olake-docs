@@ -80,7 +80,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
                 {permalink && <link rel="canonical" href={siteUrl + permalink} />}
             </Head>
 
-            <div className="row">
+            <div className="row md:ml-8">
                 <div
                     className={clsx("col", {
                         [styles.docItemCol]: !hideTableOfContents,

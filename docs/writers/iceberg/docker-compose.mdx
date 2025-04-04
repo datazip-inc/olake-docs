@@ -6,13 +6,13 @@ sidebar_position: 4
 
 # Docker Compose to local setup and testing
 
-This page explains how to set up your local test environment using Docker Compose. Below is the `docker-compose.yml` file used for local setup and testing.
+This page explains how to set up your local test environment using Docker Compose. Here's is the [`docker-compose.yml`](https://github.com/datazip-inc/olake/blob/master/writers/iceberg/local-test/docker-compose.yml) file used for local setup and testing.
 
 The setup is simple:
 
 **Step 1.** Clone the OLake repository and navigate to the local test directory.
 
-**Step 2.** Start the [Docker Compose services](#docker-compose-file).
+**Step 2.** Start the Docker Compose services.
 
 **Step 3.** Create the source configuration file (`config.json`) in any directory of your choosing. Just make sure to reference its file path it in the sync command.
 
@@ -24,12 +24,11 @@ The setup is simple:
 
 **Step 7.** Verify the data population via `spark-sql`.
 
-Congratulations! You have successfully synced your data to Iceberg.
+Now lets move on to detailed setup instructions.
 
 ## Prerequisites Installation
 
 This section covers the installation steps for Java 17, Docker & Docker Compose, and Maven for macOS (M1 & Intel), Linux, and Windows.
-
 
 ### Java 17
 
@@ -189,7 +188,7 @@ This section covers the installation steps for Java 17, Docker & Docker Compose,
   </Tabs>
 
 
-### Local Minio + JDBC (Local Test Setup)
+### Local Minio + JDBC / REST catalog (Local Test Setup)
 
 **Steps to run:**
 
@@ -204,7 +203,8 @@ This section covers the installation steps for Java 17, Docker & Docker Compose,
    docker compose up
    ```
    > This command starts the following services:  
-   > - **Postgres:** Acts as the JDBC catalog.  
+   > - **Postgres:** Acts as the JDBC catalog.
+   > - **Lakekeeper:** Acts as the Iceberg catalog.  
    > - **Minio:** Provides an AWS S3-like filesystem for storing Iceberg data.  
    > - **Spark:** For querying the Iceberg data.
 
@@ -233,6 +233,8 @@ This section covers the installation steps for Java 17, Docker & Docker Compose,
      }
    }
    ```
+
+Refer [here](../iceberg/catalog/overview) for other catalog configs.
 
 5. **Run the Sync Process:**  
    - **Discover Command:** _`<DISCOVER_COMMAND>`_  
@@ -272,125 +274,16 @@ the data is synced successfully to the Iceberg table.
    ```
 
 
+:::info
+The `__op` column values will have `r`, `c`, `u` that stands for - "r" for read/backfill, "c" for create, "u" for update.
+:::
+
+
 Now you can run queries on your Iceberg data using Spark SQL. Some useful commands are:
 - `show databases;`
 - `use <database_name>`
 - `show tables from olake_iceberg.olake_iceberg;`
 - `describe formatted olake_iceberg.olake_iceberg.table_name;`
-
-:::info
-The `__op` column values will have `r`, `c`, `u` that stands for - "r" for read/backfill, "c" for create, "u" for update.
-:::
-
-### Docker Compose file
-
-Here is the `docker-compose.yml` file used for the local setup:
-
-```yaml title="docker-compose.yml"
-version: "3"
-
-services:
-  # Spark container running a preconfigured Spark environment with Iceberg support.
-  spark-iceberg:
-    image: tabulario/spark-iceberg   # Prebuilt image with Spark and Iceberg
-    container_name: spark-iceberg
-    build: spark/                     # Build context for custom Spark configurations
-    networks:
-      iceberg_net:
-    depends_on:
-      - minio                        # Wait for Minio service to start
-      - postgres                     # Wait for PostgreSQL service to start
-    volumes:
-      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf  # Custom Spark configuration file
-      - ./data/ivy-cache:/root/.ivy2  # Local cache for dependencies
-    environment:
-      - AWS_ACCESS_KEY_ID=admin      # AWS key (used by Spark to access S3/Minio)
-      - AWS_SECRET_ACCESS_KEY=password  # AWS secret key
-      - AWS_REGION=us-east-1         # AWS region configuration
-    ports:
-      - 8888:8888                  # Spark UI/Jupyter port mapping
-      - 8088:8080                  # Spark web UI port mapping
-      - 10000:10000                # JDBC/Thrift server port mapping
-      - 10001:10001                # Additional port if needed
-
-  # Minio container acting as a local S3-like storage service.
-  minio:
-    image: minio/minio
-    container_name: minio
-    environment:
-      - MINIO_ROOT_USER=admin        # Minio admin username
-      - MINIO_ROOT_PASSWORD=password # Minio admin password
-      - MINIO_DOMAIN=minio           # Domain alias configuration
-    networks:
-      iceberg_net:
-        aliases:
-          - warehouse.minio         # Alias used for referencing the storage bucket
-    ports:
-      - 9001:9001                  # Minio console port
-      - 9000:9000                  # S3 API port
-    volumes:
-      - ./data/minio-data:/data     # Persist Minio data locally
-    command: ["server", "/data", "--console-address", ":9001"]  # Command to start Minio server with console
-
-  # Minio Client container to manage bucket setup and policies.
-  mc:
-    depends_on:
-      - minio
-    image: minio/mc
-    container_name: mc
-    networks:
-      iceberg_net:
-    environment:
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=password
-      - AWS_REGION=us-east-1
-    entrypoint: |
-      /bin/sh -c "
-      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
-      if ! /usr/bin/mc ls minio/warehouse > /dev/null 2>&1; then
-        /usr/bin/mc mb minio/warehouse;
-        /usr/bin/mc policy set public minio/warehouse;
-      fi;
-      tail -f /dev/null
-      "
-
-  # PostgreSQL container serving as the JDBC catalog for Iceberg.
-  postgres:
-    image: postgres:13
-    container_name: iceberg-postgres
-    networks:
-      iceberg_net:
-    environment:
-      - POSTGRES_USER=iceberg    # PostgreSQL username for the catalog
-      - POSTGRES_PASSWORD=password  # PostgreSQL password for the catalog
-      - POSTGRES_DB=iceberg       # Database name used by Iceberg
-    ports:
-      - 5432:5432                # PostgreSQL port mapping
-    volumes:
-      - ./data/postgres-data:/var/lib/postgresql/data  # Persist PostgreSQL data locally
-
-networks:
-  iceberg_net:                   # Custom network for all services
-
-volumes:
-  postgres-data:
-  minio-data:
-```
-
-### Services Overview
-
-- **spark-iceberg:**  
-  Runs Spark with Iceberg support to query and verify the data. It depends on both Minio (for S3-like storage) and PostgreSQL (as the metadata catalog).
-
-- **minio:**  
-  Simulates an AWS S3 environment locally. Iceberg stores its data and metadata here.
-
-- **mc (Minio Client):**  
-  Automates the creation of the storage bucket (`warehouse`) in Minio and sets the appropriate access policies.
-
-- **postgres:**  
-  Provides a PostgreSQL-based JDBC catalog to manage Iceberg metadata.
-
 
 :::info
 Refer to [spark-defaults.conf](https://github.com/datazip-inc/olake/blob/feat/iceberg-writer/writers/iceberg/local-test/spark-defaults.conf) for more information about the values set for catalog configurations.

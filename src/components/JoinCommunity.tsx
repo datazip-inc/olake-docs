@@ -56,12 +56,7 @@ const JoinCommunity: FC<TProps> = ({
       icon: <YouTube />,
       title: "YouTube",
       link: "https://www.youtube.com/@olakeio",
-    },
-    {
-      icon: <LinkedIn />,
-      title: "LinkedIn",
-      link: "https://www.linkedin.com/company/datazipio",
-    },
+    }
   ];
 
   return (

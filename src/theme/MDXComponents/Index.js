@@ -57,6 +57,9 @@ import MinioJDBCIcebergWriterConfigLocal from '../../../docs/shared/config/Minio
 import GlueIcebergWriterConfigDetails from '../../../docs/shared/config/GlueIcebergWriterConfigDetails.mdx'
 import MinioJDBCIcebergWriterConfigLocalDetails from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocalDetails.mdx'
 
+import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWriterConfig.mdx'
+import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
+
 const MDXComponents = {
   ...InitialComponents,
   Badge,
@@ -117,7 +120,10 @@ const MDXComponents = {
   GlueIcebergWriterConfig,
   MinioJDBCIcebergWriterConfigLocal,
   GlueIcebergWriterConfigDetails,
-  MinioJDBCIcebergWriterConfigLocalDetails
+  MinioJDBCIcebergWriterConfigLocalDetails,
+
+  RESTIcebergWriterConfig,
+  RESTIcebergWriterConfigDetails
 };
 
 export default MDXComponents;

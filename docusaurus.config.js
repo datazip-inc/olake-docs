@@ -574,6 +574,10 @@ const config = {
             from: '/docs/faqs/',
           },
           {
+            to: '/docs/writers/iceberg/catalog/overview',
+            from: '/docs/writers/iceberg/config',
+          },
+          {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
           },
