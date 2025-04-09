@@ -40,31 +40,26 @@ Navigate to `./drivers/mysql/config` (if building locally) OR just create a dire
 ```yaml title="docker-compose.yaml"
 version: "3.9"
 services:
-  init-config:
-    container_name: init_config
-    image: mysql:8.0
-    command: >
-      sh -c "echo 'No special config logic here, but you could add your own if needed...';"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - mysql-cluster
-    restart: "no"
-
   primary_mysql:
     container_name: primary_mysql
     image: mysql:8.0
     hostname: primary_mysql
     ports:
       - "3306:3306"
-    depends_on:
-      - init-config
     environment:
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: main
-    # Enable CDC by activating binary logging with row-based format.
+    # Enable CDC: binary logging in ROW mode with GTID enabled.
     command: >
-      --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --local-infile=1
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
+      --local-infile=1
+      --binlog_expire_logs_seconds=604800
+      --skip-host-cache
+      --skip-name-resolve
     volumes:
       - mysql-data:/var/lib/mysql
     networks:
@@ -74,6 +69,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  init-cdc-user:
+    image: mysql:8.0
+    container_name: init_cdc_user
+    depends_on:
+      - primary_mysql
+    entrypoint: >
+      bash -c "echo 'Creating replication user...';
+               sleep 10;
+               mysql -h primary_mysql -P 3306 -u root -ppassword -e \"
+                 CREATE USER IF NOT EXISTS 'cdc_user'@'%' IDENTIFIED BY 'cdc_password';
+                 GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+                 FLUSH PRIVILEGES;\";
+               echo 'Replication user created.'"
+    networks:
+      - mysql-cluster
+    restart: "no"
 
   data-loader:
     image: ubuntu:20.04
@@ -93,6 +105,27 @@ services:
     restart: "no"
     networks:
       - mysql-cluster
+
+  binlog-checker:
+    image: ubuntu:20.04
+    container_name: binlog_checker
+    depends_on:
+      - primary_mysql
+    entrypoint: >
+      bash -c "export DEBIAN_FRONTEND=noninteractive && \
+               apt-get update -qq && \
+               apt-get install -y mysql-server-core-8.0 && \
+               # Stop any automatically started mysqld (if any)
+               pkill mysqld || true && \
+               sleep 10 && \
+               echo 'Listing MySQL binaries in /usr/bin:' && ls -l /usr/bin/mysql* && \
+               echo 'Attempting to run mysqlbinlog:' && \
+               /usr/bin/mysqlbinlog /var/lib/mysql/mysql-bin.000001 || echo 'mysqlbinlog not found!'"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: "no"
 
 networks:
   mysql-cluster:
@@ -145,31 +178,26 @@ docker compose up -d
 ```yaml title="docker-compose.yaml"
 version: "3.9"
 services:
-  init-config:
-    container_name: init_config
-    image: mysql:8.0
-    command: >
-      sh -c "echo 'No special config logic here, but you could add your own if needed...';"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - mysql-cluster
-    restart: "no"
-
   primary_mysql:
     container_name: primary_mysql
     image: mysql:8.0
     hostname: primary_mysql
     ports:
       - "3306:3306"
-    depends_on:
-      - init-config
     environment:
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: main
-    # Enable CDC by activating binary logging with row-based format.
+    # Enable CDC: binary logging in ROW mode with GTID enabled.
     command: >
-      --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --local-infile=1
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
+      --local-infile=1
+      --binlog_expire_logs_seconds=604800
+      --skip-host-cache
+      --skip-name-resolve
     volumes:
       - mysql-data:/var/lib/mysql
     networks:
@@ -179,6 +207,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  init-cdc-user:
+    image: mysql:8.0
+    container_name: init_cdc_user
+    depends_on:
+      - primary_mysql
+    entrypoint: >
+      bash -c "echo 'Creating replication user...';
+               sleep 10;
+               mysql -h primary_mysql -P 3306 -u root -ppassword -e \"
+                 CREATE USER IF NOT EXISTS 'cdc_user'@'%' IDENTIFIED BY 'cdc_password';
+                 GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+                 FLUSH PRIVILEGES;\";
+               echo 'Replication user created.'"
+    networks:
+      - mysql-cluster
+    restart: "no"
 
   data-loader:
     image: ubuntu:20.04
@@ -198,6 +243,27 @@ services:
     restart: "no"
     networks:
       - mysql-cluster
+
+  binlog-checker:
+    image: ubuntu:20.04
+    container_name: binlog_checker
+    depends_on:
+      - primary_mysql
+    entrypoint: >
+      bash -c "export DEBIAN_FRONTEND=noninteractive && \
+               apt-get update -qq && \
+               apt-get install -y mysql-server-core-8.0 && \
+               # Stop any automatically started mysqld (if any)
+               pkill mysqld || true && \
+               sleep 10 && \
+               echo 'Listing MySQL binaries in /usr/bin:' && ls -l /usr/bin/mysql* && \
+               echo 'Attempting to run mysqlbinlog:' && \
+               /usr/bin/mysqlbinlog /var/lib/mysql/mysql-bin.000001 || echo 'mysqlbinlog not found!'"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: "no"
 
 networks:
   mysql-cluster:
@@ -284,14 +350,65 @@ If you encounter any issues, consider the following:
 
 Enter the password when prompted, in this case, its `password`
 
-and then you can use any of the below commands to interract.
+and then you can use any of the below commands to interract and sync data with again to see if updates, deletes, and inserts are working as expected.
 
-```
+```sql
 SHOW DATABASES; // to list all databases
 USE database_name; // to use a particular database
 SHOW TABLES; // to see all the tables of selected database
 DESCRIBE table_name; // discover schema of a table
 SELECT * FROM table_name; // to view all the data of a particular table
+INSERT INTO sample_table (name) VALUES ("sample_data_2"); // to insert data into a table
 EXIT; // to quit the mysql session
 ```
 
+
+## Check if binlogs are enabled
+
+### Binary Logging Status:
+
+```sql
+SHOW VARIABLES LIKE 'log_bin';
+```
+
+Expect the value to be ON. If it’s OFF, binary logging is disabled.
+
+### Binlog Format:
+
+```sql
+SHOW VARIABLES LIKE 'binlog_format';
+```
+
+You should see ROW if CDC is configured correctly.
+
+### GTID Mode:
+```sql
+SHOW VARIABLES LIKE 'gtid_mode';
+```
+
+This should return ON.
+
+### Inspect a Binary Log
+
+If you want to see the events written to the binlog, exit the MySQL shell and run the following command from your host (or inside the container):
+
+```bash
+docker exec -it primary_mysql mysqlbinlog /var/lib/mysql/mysql-bin.000001
+```
+
+This will print the contents of the first binary log file. Look for recent DML operations (like your INSERT statements) to confirm that changes are being logged.
+
+### Check for Replication User and Permissions
+If you’re using a CDC tool, ensure that the replication user was created properly. Back in the MySQL shell, run:
+
+```sql
+SELECT user, host FROM mysql.user WHERE user = 'cdc_user';
+```
+
+Then check its privileges with:
+
+```sql
+SHOW GRANTS FOR 'cdc_user'@'%';
+```
+
+The replication user should have the REPLICATION SLAVE and REPLICATION CLIENT privileges.
