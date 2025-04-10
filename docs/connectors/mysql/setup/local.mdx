@@ -1,0 +1,335 @@
+---
+title: Local Replica Set
+description: Setup MySQL via Docker Compose
+sidebar_position: 4
+---
+
+# Setup MySQL Replica Set via Docker Compose (local)
+This guide explains how to spawn a MySQL replica set using Docker Compose. It also covers instructions for ingesting sample data, and verifying the setup.
+
+
+:::note
+This compose file is not for production use. It is meant for local development and testing purposes only. It spawns a single MySQL instance with a replica set configuration. For production use, consider using a more robust setup with multiple nodes and proper replication configurations.
+:::
+
+
+:::info
+Clone the OLake repository if you want to build OLake locally, or skip to the part to use Dockerized OLake.
+
+GitHub repository
+```sh
+git clone git@github.com:datazip-inc/olake.git
+```
+:::
+
+
+Navigate to `./drivers/mysql/config` (if building locally) OR just create a directory (say `olake-docker`) anywhere in your system if you want to use Dockerzied OLake and create these files:
+1. `docker-compose.yaml`
+2. `config.json`
+3. `writer.json` -> Refer the [additional-references](#additional-references) for details on writer file config.
+
+![discover-sync](/img/docs/docker-compoes-low.gif)
+
+
+
+## 1. `docker-compose.yaml` 
+
+```yaml title="docker-compose.yaml"
+version: "3.9"  # Specify the Compose file format version.
+
+services:
+  # Primary MySQL service which acts as the main database server.
+  primary_mysql:
+    container_name: primary_mysql         # Name the container "primary_mysql" for easy reference.
+    image: mysql:8.0                      # Use the MySQL 8.0 image.
+    hostname: primary_mysql               # Set the container hostname to "primary_mysql".
+    ports:
+      - "3306:3306"                      # Expose port 3306 on both host and container.
+    environment:
+      MYSQL_ROOT_PASSWORD: password       # Root password for MySQL.
+      MYSQL_DATABASE: main                # Create a default database named "main" at startup.
+    # Enable Change Data Capture (CDC) by setting necessary MySQL replication options.
+    command: >
+      --server-id=1                       # Set a unique server identifier for replication.
+      --log-bin=mysql-bin                 # Enable binary logging, which is needed for replication and CDC.
+      --binlog-format=ROW                 # Use ROW format for binary logs to track every change in each row.
+      --gtid-mode=ON                      # Enable Global Transaction Identifiers (GTIDs).
+      --enforce-gtid-consistency=ON        # Ensure that all transactions are GTID compliant.
+      --local-infile=1                    # Enable local data loading for importing files.
+      --binlog_expire_logs_seconds=604800  # Set the binary log expiration time to 7 days (604800 seconds).
+      --skip-host-cache                   # Disable host cache for DNS resolution.
+      --skip-name-resolve                 # Disable DNS host name resolution to improve performance.
+    volumes:
+      - mysql-data:/var/lib/mysql          # Mount persistent storage volume for MySQL data.
+    networks:
+      - mysql-cluster                      # Connect the container to the custom network "mysql-cluster".
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]  # Healthcheck command to ensure MySQL is responsive.
+      interval: 10s                        # Check health every 10 seconds.
+      timeout: 5s                          # Each health check attempt must complete within 5 seconds.
+      retries: 10                          # Allow up to 10 retries before marking the container as unhealthy.
+
+  # Service to initialize the replication (CDC) user.
+  init-cdc-user:
+    image: mysql:8.0                      # Use the same MySQL 8.0 image for consistency.
+    container_name: init_cdc_user         # Name the container "init_cdc_user" for identification.
+    depends_on:
+      - primary_mysql                     # Ensure the primary MySQL service starts before creating the user.
+    entrypoint: >
+      bash -c "echo 'Creating replication user...';
+               sleep 10;               # Wait for MySQL to finish initial setup.
+               mysql -h primary_mysql -P 3306 -u root -ppassword -e \"
+                 CREATE USER IF NOT EXISTS 'cdc_user'@'%' IDENTIFIED BY 'cdc_password';
+                 GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+                 FLUSH PRIVILEGES;\";
+               echo 'Replication user created.'"  # Output message to indicate success.
+    networks:
+      - mysql-cluster                      # Connect to the same MySQL network.
+    restart: "no"                          # Do not restart this container automatically.
+
+  # Service to load sample data into the main database.
+  data-loader:
+    image: ubuntu:20.04                   # Use Ubuntu 20.04 for running the data loading commands.
+    container_name: sample_data_loader    # Name the container for clarity.
+    depends_on:
+      primary_mysql:
+        condition: service_healthy        # Wait until the primary MySQL container passes its healthcheck.
+    entrypoint: >
+      bash -c "apt-get update -qq && apt-get install -y mysql-client && \
+      echo 'Waiting for MySQL to be ready...'; \
+      # Poll MySQL server until it responds to ping.
+      until mysqladmin ping -h primary_mysql -P 3306 -u root -ppassword; do echo 'Waiting...'; sleep 2; done; \
+      echo 'Creating table sample_table...'; \
+      # Create a sample table in the "main" database if it doesn't exist.
+      mysql -h primary_mysql -P 3306 -u root -ppassword main -e 'CREATE TABLE IF NOT EXISTS sample_table (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255));'; \
+      echo 'Inserting sample data...'; \
+      # Insert a sample record into the sample_table.
+      mysql -h primary_mysql -P 3306 -u root -ppassword main -e 'INSERT INTO sample_table (name) VALUES (\"sample_data\");'; \
+      echo 'Data insertion complete!'"  # Inform that data loading is done.
+    restart: "no"                        # Do not restart this container after execution.
+    networks:
+      - mysql-cluster                     # Use the same network for connectivity.
+
+  # Service to check for the existence and functionality of MySQL binary logs.
+  binlog-checker:
+    image: ubuntu:20.04                   # Use Ubuntu 20.04 to run the binary log checking commands.
+    container_name: binlog_checker        # Name this container for identification.
+    depends_on:
+      - primary_mysql                     # Ensure primary MySQL is running before checking binlogs.
+    entrypoint: >
+      bash -c "export DEBIAN_FRONTEND=noninteractive && \
+               apt-get update -qq && \
+               apt-get install -y mysql-server-core-8.0 && \
+               # Terminate any automatically started mysqld process in this container (if present).
+               pkill mysqld || true && \
+               sleep 10 && \
+               echo 'Listing MySQL binaries in /usr/bin:' && ls -l /usr/bin/mysql* && \
+               echo 'Attempting to run mysqlbinlog:' && \
+               # Attempt to execute mysqlbinlog command on the first binary log file.
+               /usr/bin/mysqlbinlog /var/lib/mysql/mysql-bin.000001 || echo 'mysqlbinlog not found!'"  # If mysqlbinlog is unavailable, print a message.
+    volumes:
+      - mysql-data:/var/lib/mysql         # Mount the MySQL data volume to access binary logs.
+    networks:
+      - mysql-cluster                     # Connect to the same custom network.
+    restart: "no"                         # Do not restart this container automatically.
+
+# Define the custom network for MySQL services.
+networks:
+  mysql-cluster:
+
+# Define persistent volumes to store MySQL data.
+volumes:
+  mysql-data:
+```
+
+<Tabs>
+
+<TabItem value="docker" label="Using Dockerized OLake" default>
+
+## 2. Starting MySQL
+
+To start the MySQL container, run the following command from your project directory:
+
+```bash
+docker compose up -d
+```
+
+## 3. OLake Integration
+
+Update your source configuration file (`config.json`) to connect to MySQL as follows:
+
+```json title="config.json"
+{
+    "hosts": "host.docker.internal",
+    "username": "root",
+    "password": "password",
+    "database": "main",
+    "port": 3306,
+    "update_method": {
+      "intial_wait_time": 10
+    },
+    "tls_skip_verify": true,
+    "default_mode": "cdc",
+    "max_threads": 10,
+    "backoff_retry_count": 2
+}
+```
+
+
+</TabItem>
+
+<TabItem value="build" label="Using Local build OLake" default>
+
+## 2. Starting MySQL
+
+To start the MySQL container, run the following command from your project directory:
+
+```bash
+docker compose -f ./drivers/mysql/config/docker-compose.yaml up -d
+```
+
+## 3. OLake Integration
+
+Update your source configuration file (`config.json`) to connect to MySQL as follows:
+
+```json title="config.json"
+{
+    "hosts": "localhost",
+    "username": "root",
+    "password": "password",
+    "database": "main",
+    "port": 3306,
+    "update_method": {
+      "intial_wait_time": 10
+    },
+    "tls_skip_verify": true,
+    "default_mode": "cdc",
+    "max_threads": 10,
+    "backoff_retry_count": 2
+}
+```
+
+</TabItem>
+</Tabs>
+
+Now that you are setup with a local database setup, head over to the [getting started guide](../../../getting-started/mysql#step-2-generate-a-catalog-file) to start syncing data with OLake.
+
+
+- **To stop the container, perform**:
+
+  ```bash
+  docker compose down --remove-orphans -v
+  ```
+
+## Additional References
+
+- **Configuration Files:**  
+  Refer to the following documentation for configuration details:
+  1. [`config.json`](../../../core/configs/source)
+  2. [`catalog.json`](../../../core/configs/catalog)
+  3. [`writer.json`](../../../core/configs/writer)
+  4. [`state.json`](../../../core/configs/state)
+
+- **Viewing Parquet Files:**  
+  Use the [VS Code extension - Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) to view Parquet files in your editor.
+
+
+## Troubleshooting
+
+If you encounter any issues, consider the following:
+
+- **Container Logs:**  
+  Check container logs for MySQL using:
+  
+  ```bash
+  docker logs CONTAINER_ID 
+  ```
+
+- **To bash into the MySQL container, perform**:
+  ```bash
+  docker exec -it CONTAINER_ID /bin/bash
+  ```
+
+
+  ```bash
+  mysql -u root -p 
+  ```
+
+Enter the password when prompted, in this case, its `password`
+
+and then you can use any of the below commands to interract and sync data with again to see if updates, deletes, and inserts are working as expected.
+
+```sql
+SHOW DATABASES; // to list all databases
+USE main; // to use a particular database
+SHOW TABLES; // to see all the tables of selected database
+DESCRIBE sample_table; // discover schema of a table
+SELECT * FROM sample_table; // to view all the data of a particular table
+INSERT INTO sample_table (name) VALUES ("sample_data_2"); // to insert data into a table
+EXIT; // to quit the mysql session
+```
+
+
+## Check if binlogs are enabled
+
+### Binary Logging Status:
+
+```sql
+SHOW VARIABLES LIKE 'log_bin';
+```
+
+Expect the value to be ON. If it’s OFF, binary logging is disabled.
+
+### Binlog Format:
+
+```sql
+SHOW VARIABLES LIKE 'binlog_format';
+```
+
+You should see ROW if CDC is configured correctly.
+
+### GTID Mode:
+```sql
+SHOW VARIABLES LIKE 'gtid_mode';
+```
+
+This should return ON.
+
+### Inspect a Binary Log
+
+If you want to see the events written to the binlog, exit the MySQL shell and run the following command from your host (or inside the container):
+
+```bash
+docker exec -it primary_mysql mysqlbinlog /var/lib/mysql/mysql-bin.000001
+```
+
+This will print the contents of the first binary log file. Look for recent DML operations (like your INSERT statements) to confirm that changes are being logged.
+
+### Check for Replication User and Permissions
+If you’re using a CDC tool, ensure that the replication user was created properly. Back in the MySQL shell, run:
+
+```sql
+SELECT user, host FROM mysql.user WHERE user = 'cdc_user';
+```
+
+Then check its privileges with:
+
+```sql
+SHOW GRANTS FOR 'cdc_user'@'%';
+```
+
+The replication user should have the REPLICATION SLAVE and REPLICATION CLIENT privileges.
+
+In some edge cases you might need to pass in the below command.
+
+```sql
+SET GLOBAL binlog_row_metadata = 'FULL';
+```
+
+It controls the amount of metadata written to the binary log when using row-based replication (--binlog-format=ROW). After you change these settings, you may need to restart the docker container. 
+
+Check if it got enabled or not:
+
+```sql
+SHOW VARIABLES LIKE 'binlog_row_metadata';
+```

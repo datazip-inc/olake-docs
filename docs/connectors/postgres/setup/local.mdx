@@ -1,0 +1,299 @@
+---
+title: Local Replica Set
+description: Setup Postgres via Docker Compose
+sidebar_position: 4
+---
+
+# Setup Postgres Replica Set via Docker Compose (local)
+This guide explains how to spawn a Postgres replica set using Docker Compose. It also covers instructions for ingesting sample data, and verifying the setup.
+
+
+:::note
+This compose file is not for production use. It is meant for local development and testing purposes only. It spawns a single Postgres instance with a replica set configuration. For production use, consider using a more robust setup with multiple nodes and proper replication configurations.
+:::
+
+:::info
+Clone the OLake repository if you want to build OLake locally, or skip to the part to use Dockerized OLake.
+
+GitHub repository
+```sh
+git clone git@github.com:datazip-inc/olake.git
+```
+:::
+
+
+:::tip
+### Enable wal2json
+
+To enable the `wal2json` plugin, you need to add the following line to the `postgresql.conf` file:
+
+```conf
+wal_level = logical
+max_wal_senders = 10
+max_replication_slots = 10
+```
+:::
+
+
+Navigate to `./drivers/postgres/config` (if building locally) OR just create a directory (say `olake-docker`) anywhere in your system if you want to use Dockerzied OLake and create these files:
+1. `docker-compose.yaml`
+2. `config.json`
+3. `writer.json` -> Refer the [additional-references](#additional-references) for details on writer file config.
+
+![discover-sync](/img/docs/docker-compoes-low.gif)
+
+## 1. `docker-compose.yaml` 
+
+
+```yaml title="docker-compose.yaml"
+version: "3.9"  # Specify the Compose file format version.
+
+services:
+  # Primary Postgres service acting as the main database server.
+  primary_postgres:
+    container_name: primary_postgres               # Set an explicit name for the container.
+    image: postgres:15                             # Use the official Postgres version 15 image.
+    hostname: primary_postgres                     # Define the hostname within the network.
+    ports:
+      - "5431:5432"                               # Map port 5432 inside the container to 5431 on the host.
+    environment:
+      POSTGRES_USER: main                          # Set the default Postgres username.
+      POSTGRES_PASSWORD: password                  # Set the password for the Postgres user.
+      POSTGRES_DB: main                            # Create a default database named "main".
+    # Custom command to install the wal2json plugin for logical decoding and then start Postgres.
+    command: >
+      bash -c "apt-get update && apt-get install -y postgresql-15-wal2json && exec docker-entrypoint.sh postgres -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10"
+      # Explanation of the command:
+      # 1. Update the package list.
+      # 2. Install the postgresql-15-wal2json package, which is used to convert WAL (Write-Ahead Logging)
+      #    into JSON format for logical replication.
+      # 3. Use exec to run the default docker-entrypoint script provided by the Postgres image.
+      # 4. Start Postgres with additional configuration parameters:
+      #    - wal_level=logical: Enable logical replication.
+      #    - max_wal_senders=10: Allow up to 10 concurrent WAL sender processes.
+      #    - max_replication_slots=10: Allow up to 10 replication slots for logical decoding.
+    volumes:
+      - pg-data:/var/lib/postgresql/data          # Use a named volume (pg-data) to persist Postgres data.
+    networks:
+      - pg-cluster                                 # Connect the container to the custom network "pg-cluster".
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "main", "-d", "main"]  # Healthcheck command to check if Postgres is ready.
+      interval: 10s                                # Run the healthcheck every 10 seconds.
+      timeout: 5s                                  # Set a timeout of 5 seconds for the healthcheck command.
+      retries: 10                                  # Retry the healthcheck up to 10 times before declaring unhealthy.
+
+  # Data loader service to perform operations against the Postgres database.
+  data-loader:
+    image: postgres:15                             # Use the same version of Postgres to ensure compatible client tools.
+    container_name: sample_data_loader             # Set a custom name for clarity.
+    environment:
+      PGUSER: main                                 # Set the default Postgres user for the client.
+      PGPASSWORD: password                         # Set the password for the Postgres user.
+      PGDATABASE: main                             # Connect to the "main" database.
+    depends_on:
+      primary_postgres:
+        condition: service_healthy               # Wait until the primary_postgres service passes its health check.
+    entrypoint: >
+      bash -c " 
+        echo \"Waiting for Postgres to be ready...\"; 
+        # Poll until Postgres is reachable.
+        until pg_isready -h primary_postgres -p 5432 -U main -d main; do 
+          echo \"Waiting...\"; 
+          sleep 2; 
+        done; 
+        echo \"Creating test table sample_data...\"; 
+        # Execute a SQL command to create a table if it doesn't exist.
+        psql -h primary_postgres -U main -d main -c \"CREATE TABLE IF NOT EXISTS sample_data (id SERIAL PRIMARY KEY, str_col TEXT, num_col INT);\"; 
+        echo \"Inserting one test row...\"; 
+        # Insert a sample row into the table.
+        psql -h primary_postgres -U main -d main -c \"INSERT INTO sample_data (str_col, num_col) VALUES ('Hello world', 123);\"; 
+        echo \"Creating logical replication slot...\"; 
+        # Create a logical replication slot using the wal2json output plugin.
+        psql -h primary_postgres -U main -d main -c \"SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'wal2json');\"; 
+        echo \"Done. Data and replication slot should now exist.\" 
+      "
+      # Explanation of the entrypoint:
+      # - Wait until Postgres is ready to accept connections using pg_isready.
+      # - Create a table named "sample_data" with three columns: id, str_col, and num_col.
+      # - Insert a sample row into the table.
+      # - Create a logical replication slot named "postgres_slot" using the wal2json plugin.
+    restart: "no"                                  # Do not automatically restart the container after completion.
+    networks:
+      - pg-cluster                                # Connect to the same custom network "pg-cluster".
+
+# Define a custom network for Postgres services.
+networks:
+  pg-cluster:
+
+# Define a volume to persist Postgres data.
+volumes:
+  pg-data:
+```
+
+<Tabs>
+
+<TabItem value="docker" label="Using Dockerized OLake" default>
+
+## 2. Starting Postgres
+
+To start the Postgres container, run the following command from your project directory:
+
+```bash
+docker compose up -d
+```
+
+## 3. OLake Integration
+
+Update your source configuration file (`config.json`) to connect to Postgres as follows:
+
+```json title="config.json"
+{
+    "host": "host.docker.internal",
+    "port": 5431,
+    "database": "main",
+    "username": "main",
+    "password": "password",
+    "jdbc_url_params": {},
+    "ssl": {
+        "mode": "disable"
+    },
+    "update_method": {
+        "replication_slot": "postgres_slot",
+        "intial_wait_time": 10
+    },
+    "reader_batch_size": 100000,
+    "default_mode": "cdc",
+    "max_threads": 50
+}
+```
+
+</TabItem>
+
+<TabItem value="build" label="Using Local build OLake" default>
+
+
+## 2. Starting Postgres
+
+To start the Postgres container, run the following command from your project directory:
+
+```bash
+docker compose -f ./drivers/postgres/config/docker-compose.yaml up -d
+```
+
+## 3. OLake Integration
+
+
+Update your source configuration file (`config.json`) to connect to Postgres as follows:
+
+```json title="config.json"
+{
+    "host": "localhost",
+    "port": 5431,
+    "database": "main",
+    "username": "main",
+    "password": "password",
+    "jdbc_url_params": {},
+    "ssl": {
+        "mode": "disable"
+    },
+    "update_method": {
+        "replication_slot": "postgres_slot",
+        "intial_wait_time": 10
+    },
+    "reader_batch_size": 100000,
+    "default_mode": "cdc",
+    "max_threads": 50
+}
+```
+
+</TabItem>
+</Tabs>
+
+Now that you are setup with a local database setup, head over to the [getting started guide](../../../getting-started/postgres#step-2-generate-a-catalog-file) to start syncing data with OLake.
+
+- **To stop the container, perform**:
+
+  ```bash
+  docker compose down --remove-orphans -v
+  ```
+
+## Additional References
+
+- **Configuration Files:**  
+  Refer to the following documentation for configuration details:
+  1. [`config.json`](../../../core/configs/source)
+  2. [`catalog.json`](../../../core/configs/catalog)
+  3. [`writer.json`](../../../core/configs/writer)
+  4. [`state.json`](../../../core/configs/state)
+
+- **Viewing Parquet Files:**  
+  Use the [VS Code extension - Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) to view Parquet files in your editor.
+
+
+## Troubleshooting
+
+If you encounter any issues, consider the following:
+
+- **Container Logs:**  
+  Check container logs for Postgres using:
+  
+  ```bash
+  docker logs CONTAINER_ID 
+  ```
+
+- **To bash into the Postgres container, perform**:
+  ```bash
+  docker exec -it CONTAINER_ID /bin/bash
+  ```
+
+  ```bash
+  psql -h localhost -U main
+  ```
+
+Enter the password when prompted, in this case, its `password`
+
+and then you can use any of the below commands to interract.
+
+```
+\l; // to list all databases
+\c <db_name> // to switch to other database
+\dt // // to see and list all the tables of selected database
+\d <table-name> // describe the table schema
+\du // to list users and their roles
+```
+
+## Enable Logical Replication Settings via SQL
+
+Instead of modifying postgresql.conf, use SQL commands to apply runtime settings (if your Postgres setup allows it):
+
+```sql
+-- Enable logical WAL level 
+ALTER SYSTEM SET wal_level = 'logical';  
+-- Set max replication slots and senders 
+ALTER SYSTEM SET max_replication_slots = 4; 
+ALTER SYSTEM SET max_wal_senders = 4;  
+-- Apply the changes 
+SELECT pg_reload_conf(); 
+```
+
+Note: Some cloud-hosted databases (like RDS or Cloud SQL) require you to modify these settings via the provider’s console or parameter groups.
+
+### Grant Replication Permissions
+
+If you are using separate role for OLake with name “olake_user”,  ensure this user has the required privileges:
+
+```sql
+ALTER ROLE olake_user WITH REPLICATION; 
+```
+
+Or you can use any other Superuser or role with Replication permissions. 
+
+### Create a Logical Replication Slot
+
+OLake reads changes via a logical replication slot. Create one using:
+
+```sql
+SELECT * FROM pg_create_logical_replication_slot('olake_slot', 'wal2json'); 
+```
+
+This slot starts tracking changes from the current WAL position, allowing OLake to stream inserts, updates, and deletes.

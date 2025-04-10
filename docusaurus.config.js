@@ -578,6 +578,18 @@ const config = {
             from: '/docs/writers/iceberg/config',
           },
           {
+            to: '/docs/connectors/mongodb/setup/local',
+            from: '/docs/connectors/mongodb/docker-compose',
+          },
+          {
+            to: '/docs/connectors/postgres/setup/local',
+            from: '/docs/connectors/postgres/docker-compose',
+          },
+          {
+            to: '/docs/connectors/mysql/setup/local',
+            from: '/docs/connectors/mysql/docker-compose',
+          },
+          {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
           },
