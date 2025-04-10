@@ -60,6 +60,8 @@ import MinioJDBCIcebergWriterConfigLocalDetails from '../../../docs/shared/confi
 import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWriterConfig.mdx'
 import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
 
+import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
+
 const MDXComponents = {
   ...InitialComponents,
   Badge,
@@ -123,7 +125,9 @@ const MDXComponents = {
   MinioJDBCIcebergWriterConfigLocalDetails,
 
   RESTIcebergWriterConfig,
-  RESTIcebergWriterConfigDetails
+  RESTIcebergWriterConfigDetails,
+
+  AdditionalReferences
 };
 
 export default MDXComponents;
