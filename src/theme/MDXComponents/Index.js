@@ -60,6 +60,9 @@ import MinioJDBCIcebergWriterConfigLocalDetails from '../../../docs/shared/confi
 import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWriterConfig.mdx'
 import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
 
+import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWriterConfig.mdx'
+import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
+
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 
 const MDXComponents = {
@@ -126,6 +129,9 @@ const MDXComponents = {
 
   RESTIcebergWriterConfig,
   RESTIcebergWriterConfigDetails,
+
+  HiveIcebergWriterConfig,
+  HiveIcebergWriterConfigDetails,
 
   AdditionalReferences
 };

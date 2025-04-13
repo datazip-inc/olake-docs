@@ -1,0 +1,313 @@
+---
+slug: postgres-to-iceberg-using-glue
+title: Postgres to Apache Iceberg using AWS Glue - Step by Step guide using OLake
+description: Ever wanted to run analytics on your Postgres data without overloading your production database or blowing your budget? Replicating...
+image: /img/blog/cover/why-iceberg-cover.png
+authors: [priyansh]
+tags: [iceberg, postgres, glue]
+---
+
+![postgres-to-iceberg-using-glue](/img/blog/cover/why-iceberg-cover.png)
+
+
+## 1. Introduction
+
+Ever wanted to run analytics on your Postgres data without overloading your production database or blowing your budget? Replicating PostgreSQL to Apache Iceberg is quickly emerging as the go-to solution for savvy tech teams.
+
+Iceberg isn’t your average table format—it's built for large-scale, cost-effective analytics. With native support for ACID transactions, seamless schema evolution, and compatibility with engines like Trino, Spark, and DuckDB, it’s tailor-made for modern data lakehouses.
+
+That said, setting up Postgres-to-Iceberg replication isn’t without its challenges. You have to deal with change data capture (CDC), manage evolving schemas, ensure consistency, and fine-tune performance.
+
+In this blog, we’ll dive into:
+
+- The rising traction of Postgres-to-Iceberg replication
+- Common pitfalls and strategies to avoid them
+- A step-by-step guide using OLake for a smooth setup
+
+Whether you’re exploring replication, building a data lakehouse, or optimizing analytics at scale, this guide has you covered.
+
+## 2. Why Replicate Postgres to Iceberg?
+
+Replicating PostgreSQL to Apache Iceberg unlocks scalable, real-time analytics while streamlining costs and complexity. Here’s why it’s so appealing:
+
+- **Analytics & BI**: Run efficient, cost-effective queries on live operational data without burdening your production Postgres.
+
+- **Real-Time Reporting**: Keep dashboards and reports fresh with near real-time syncs.
+
+- **Data Lakehouse Architecture**: Embrace open, cloud-agnostic formats like Iceberg to future-proof your data stack.
+
+Traditional CDC pipelines feeding cloud data warehouses can be clunky, expensive, and rigid when it comes to schema changes. With Postgres-to-Iceberg replication, you can decouple storage from compute:
+
+- Pick the best compute engine for your needs (Trino, Spark, DuckDB, etc.)
+- Store your data once and access it anywhere
+- Sidestep vendor lock-in and trim down warehouse expenses
+
+If you’re after a modern, flexible alternative to rigid warehouse pipelines, this replication strategy is a smart move toward an open, efficient data platform.
+
+## 3. Key Challenges in Postgres to Iceberg Replication
+
+While the benefits are clear, achieving reliable Postgres-to-Iceberg replication comes with its own set of hurdles:
+
+- **Change Data Capture (CDC)**: Real-time vs. batch replication affects data freshness and infrastructure complexity. Real-time offers low latency at the cost of added complexity, whereas batch replication might simplify management but lag behind on updates.
+
+- **Schema Evolution**: PostgreSQL’s flexible data types can clash with Iceberg’s stricter type system. Careful mapping and backward compatibility are crucial.
+
+- **Performance and Cost**: Frequent, small writes—especially with real-time CDC—can lead to metadata bloat and higher storage costs. Optimizing compaction and write strategies is essential.
+
+- **Consistency and Ordering**: Getting a reliable pipeline, especially during the initial full load, is a challenge. Missing or duplicate events can compromise data quality. Tools like OLake that offer at-least-once delivery guarantees help ensure reliability, while deduplication and idempotent writes are must-have safeguards.
+
+- **Metadata Management & Partitioning**: Iceberg relies on robust metadata for fast queries. Poor partitioning, missing statistics, or lack of proper compaction can degrade performance and ramp up costs.
+
+Overcoming these challenges isn’t just about setting up connectors—it’s about building a pipeline that’s smart, resilient, and in tune with the nuances of your underlying storage engine.
+
+## Step By Step Guide 
+
+Prerequisites:
+
+- Docker, Postgres, AWS S3 credentials, Apache Iceberg and Catalog configuration credentials
+
+For this guide we will be using AWS Glue catalog for Apache Iceberg and S3 as the object store. 
+
+### Step 1:  Setting up Postgres and Enable Logical Replication
+
+Before OLake can start replicating data from PostgreSQL to Apache Iceberg, you need to configure the database for logical replication. Here’s how to do it using simple SQL commands.
+
+#### ✅ Prerequisites
+
+- PostgreSQL 9.4 or higher (logical replication with wal2json is supported natively)
+- Superuser or a role with replication privileges
+
+### 🔧 Enable Logical Replication Settings via SQL
+
+Instead of modifying postgresql.conf, use SQL commands to apply runtime settings (if your Postgres setup allows it):
+
+```sql
+-- Enable logical WAL level 
+ALTER SYSTEM SET wal_level = 'logical';  
+
+-- Set max replication slots and senders 
+ALTER SYSTEM SET max_replication_slots = 4; 
+ALTER SYSTEM SET max_wal_senders = 4;  
+
+-- Apply the changes 
+SELECT pg_reload_conf(); 
+```
+
+:::note
+Some cloud-hosted databases (like RDS or Cloud SQL) require you to modify these settings via the provider’s console or parameter groups.
+:::
+
+#### 🔓 Grant Replication Permissions
+
+If you are using separate role for OLake with name “olake_user”,  ensure this user has the required privileges:
+
+```sql
+ALTER ROLE olake_user WITH REPLICATION; 
+```
+
+Or you can use any other Superuser or role with Replication permissions. 
+
+#### 🎯 Create a Logical Replication Slot
+
+OLake reads changes via a logical replication slot. Create one using:
+```sql
+SELECT * FROM pg_create_logical_replication_slot('olake_slot', 'wal2json'); 
+```
+
+This slot starts tracking changes from the current WAL position, allowing OLake to stream inserts, updates, and deletes.
+
+
+### Step 2: Set Up the OLake Configuration Directory
+
+Next, you’ll set up a working directory for OLake to manage your replication config. This directory will contain all the necessary files to connect to your Postgres database and define your target Iceberg destination.
+
+#### 📁 Create the OLake Working Directory
+
+In your terminal, run:
+
+```bash
+mkdir olake_directory 
+cd olake_directory 
+
+touch writer.json 
+touch config.json 
+```
+
+This creates a folder to house OLake’s configuration files:
+
+```
+olake_directory/   
+├─ writer.json     # Destination settings (e.g., local filesystem, S3)   
+└─ config.json     # Source database connection config (e.g., Postgres) 
+```
+
+#### 🛠️ What Each File Does
+
+- `writer.json` – Defines where OLake will write the replicated data (e.g., a local Iceberg table or a cloud storage path like S3).
+
+- `config.json` – Contains your source database connection details, including the replication slot name and user credentials.
+
+We’ll populate these files in the next steps. For now, you’re all set to proceed!
+
+### Step 3: Configure Connection and Destination Settings
+
+Now that your olake_directory is ready, let’s configure the two essential files OLake uses: config.json and writer.json.
+
+#### 🔌 config.json – Define Your Postgres Source
+
+This file contains the connection settings to your PostgreSQL database, along with table-level CDC configurations.
+
+Here’s a sample config.json:
+
+<PostgresSourceConfig/>
+
+Refer the following document for detailed understanding: [Postgres Config.](../docs/connectors/postgres/config)
+
+#### 📤 writer.json – Define Your Iceberg Output
+
+This file tells OLake where to write the data—whether locally or to a remote object store like S3.
+
+#### Example writer.json for writing in Glue
+
+<GlueIcebergWriterConfig/>
+
+Refer the following document for detailed understanding: [Glue Config](../docs/writers/iceberg/catalog/glue )
+
+In this guide we are using Glue catalog to configure other catalogs like Rest (Lakekeeper, Polaris and more) you can check out the following documentations:
+[Catalogs config](../docs/category/catalogs)
+
+Disable the normalisation in writer.json to get  the entire row stored as json in destination. 
+
+### Step 4: Discover Source Tables and Generate the Catalog 
+
+With your config.json and writer.json ready, the next step is to run OLake’s discovery process. This generates a catalog.json file that tells OLake how to map your source tables (from Postgres) into Iceberg-compatible datasets.
+
+#### 🧠 What is `catalog.json`?
+
+It’s an auto-generated file that:
+
+- Scans your configured Postgres tables
+- Extracts column metadata and types
+- Prepares the mapping needed for Iceberg ingestion
+
+#### ▶️ Run the Discovery Command
+
+Run from the same directory which we set up in step 2. ie olake_directory
+
+<DockerDiscoverPostgres/>
+
+Once you run this discovery command you will find a file named catalog.json in the OLake directory. This file has following 2 sections:
+
+- `selected_streams`: The streams / tables / collections OLake will replicate. You can Exclude Stream collections by editing selected_streams directly and removing the streams you want to remove from this file. This also has section to define the partition regex where you can define how you want to partition the selected stream. 
+- `streams`: Metadata for each discovered collection, including schemas and sync modes (e.g., `cdc`, `full_refresh`). 
+
+### Step 5: Run Your First Full Load Sync
+
+With the `catalog.json` in place, it’s time to run your first sync. This will perform a full load of the source tables from Postgres into your Iceberg destination.
+
+#### 🚀 Run the Full Load
+
+From within your `olake_directory`, execute:
+
+<DockerSyncPostgres/>
+
+This command will:
+
+- Read from your configured source tables
+- Load the entire data (snapshot) into Iceberg
+- Create a `state.json` file that tracks replication progress
+
+#### 🧭 What Is `state.json`?
+
+This file acts as a CDC cursor, storing the latest replication slot position for each table. On subsequent runs, OLake will:
+
+- Skip already-synced data
+- Fetch only the new changes (incremental CDC)
+- Ensure data is not reloaded or duplicated
+
+#### 📁 Folder After First Sync
+
+```
+olake_directory/   
+├─ config.json   
+├─ writer.json   
+├─ catalog.json   
+└─ state.json     
+# checkpoint for incremental syncs 
+```
+
+:::info
+Ordering during this initial full load is not guaranteed. If ordering is important for your use case, consider handling it during downstream consumption.
+:::
+
+
+### Step 6: Run Your First Full Load Sync
+
+Now that your initial full load is complete and state.json has been generated, you can start syncing ongoing changes from PostgreSQL to Apache Iceberg using OLake’s incremental CDC mode.
+
+#### 🔁 Start Incremental Sync
+
+To begin consuming new inserts, updates, and deletes from your Postgres tables, simply re-run:
+
+OLake will:
+
+- Read the latest position from state.json
+- Stream only the new changes since the last sync
+- Append them to the corresponding Iceberg tables
+
+This allows you to maintain near real-time data freshness without reloading the entire dataset.
+
+#### 🔄 Recommended: Schedule Periodic Syncs
+
+While OLake doesn’t yet offer a long-running daemon mode, you can run this command on a schedule (e.g., using cron, Airflow, or any orchestration tool) to keep your data lake in sync.
+
+With this, you now have a fully functional Postgres-to-Iceberg pipeline running with CDC support — ready for analytics, lakehouse querying, or whatever your downstream needs require.
+
+### Final Tips & Best Practices for Postgres to Iceberg Replication
+
+Before you ship this pipeline to production, here are a few tips to help you run it reliably and cost-effectively:
+
+✅ 1. Use Primary Keys Wherever Possible
+
+Primary keys are essential for deduplication and ensuring accurate CDC. OLake uses them to detect updates vs inserts—especially important if out-of-order events occur.
+
+✅ 2. Partition Iceberg Tables Wisely
+
+Choose partition columns based on query patterns and data volume. Common patterns include:
+
+- `created_at` or `updated_at` for event tables
+- `customer_id` or `region` for lookup or dimensional data
+
+Poor partitioning = slow queries and high file scan costs.
+
+✅ 3. Automate Compaction
+
+Frequent small CDC writes can create many tiny files (small file problem). Set up periodic compaction jobs to:
+
+- Merge small files
+- Optimize metadata
+- Reduce read overhead in Iceberg engines like Trino or DuckDB
+
+✅ 4. Monitor Replication Lag
+
+Track replication slot lag and sync timestamps to catch delays early. Large lag may indicate backpressure or Postgres WAL bloat.
+
+✅ 5. Keep State Backups
+
+`state.json` is the single source of truth for where replication left off. Back it up periodically to avoid accidental resets or data loss during recovery.
+
+### 🔚 Wrapping Up
+
+Replicating Postgres to Apache Iceberg gives you the flexibility of a modern, open lakehouse without the costs and limits of traditional warehouse pipelines.
+
+With OLake, you get:
+
+- Full + incremental sync with minimal setup
+- Support for schema evolution and multiple tables
+- Open file formats that play nicely with your favorite query engines
+
+Give it a try, explore the internals, and feel free to contribute or share feedback on how we can make it even better.
+
+Happy syncing! 🧊🐘
+
+<BlogCTA/>
