@@ -64,6 +64,7 @@ import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWrit
 import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
+import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -133,7 +134,8 @@ const MDXComponents = {
   HiveIcebergWriterConfig,
   HiveIcebergWriterConfigDetails,
 
-  AdditionalReferences
+  AdditionalReferences,
+  CatalogQuery
 };
 
 export default MDXComponents;

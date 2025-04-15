@@ -109,6 +109,10 @@ const config = {
       "runllm-algolia-application-id": "1E406NO1AX",
       "runllm-algolia-index-name": "olake"
     },
+    {
+      src: '/message-listener.js', // path relative to the static directory
+      async: false, // if the script must be executed in order, set async to false
+    },
   ],
 
   themeConfig:
