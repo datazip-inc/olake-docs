@@ -1,0 +1,106 @@
+---
+title: 3. CDC in Replica Mode 
+description: CDC in Replica Mode
+sidebar_position: 3
+---
+
+# MySQL Connector – Enabling CDC for Replica Mode
+
+Using a MySQL **replica** (slave) for CDC can offload the primary. The idea is the CDC connector connects to a MySQL read replica, which is continuously receiving changes from the primary, and reads the binlog from that replica. To do this safely, the replica must also have binary logging enabled and be configured to log the updates it receives (this is controlled by `log_slave_updates`). We’ll outline how to set this up.
+
+**Prerequisites:**
+
+- A MySQL replication setup (Primary and at least one Replica) already configured and running.
+- The replica is ideally a dedicated or at least not heavily-loaded server, since CDC reading binlogs will add some I/O overhead.
+- Access to configure the my.cnf on the replica and restart it. Also ability to create users on the replica.
+- Primary’s binary logging is enabled (since that's required to have a replica at all).
+- Ensure the primary’s binlog_format is ROW for best results (it can be MIXED or STATEMENT, but then the replica will log statement-based events which is not ideal for CDC).
+
+**Steps:**
+
+1. **Enable Binlog and Log Slave Updates on Replica:** On the MySQL replica server’s my.cnf, ensure:
+   - `server-id` is unique and different from the primary (already the case if replication is working; e.g., primary 1, replica 2).
+   - `log_bin = mysql-bin` on the replica as well. (Some replication setups turn off binlog on replicas to reduce I/O, but we need it on to capture changes on the replica.)
+   - `binlog_format = ROW` on the replica. If the primary is ROW, the events it sends are row events, and the replica will write those to its own binlog as row events (assuming log_slave_updates).
+   - `log_slave_updates = ON`. This is crucial – it tells the replica to write the events it receives from the primary into its own binary log (otherwise the replica’s binlog would only have changes made directly on the replica, which usually there are none).
+   - `binlog_row_image = FULL` on the replica, to maintain completeness.
+   - Same `expire_logs_days` or `binlog_expire_logs_seconds` setup on the replica to manage retention.
+
+   Save and restart the replica MySQL server. After restart:
+   ```sql
+   SHOW VARIABLES LIKE 'log_slave_updates';
+   ```
+   should be ON. Also:
+   ```sql
+   SHOW MASTER STATUS;
+   ```
+   on the replica should now show its own binlog file/position (even if just blank position or one event). If the replica just started, it might not have any of its own binlog yet until it applies an event from primary.
+
+   - *Screenshot:* my.cnf of replica highlighting `log_slave_updates` and binlog settings.
+
+2. **Create a CDC User on the Replica:** On the replica, create the user that CDC will use:
+   ```sql
+   CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'strongpassword';
+   GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+   GRANT SELECT ON *.* TO 'cdc_user'@'%';
+   FLUSH PRIVILEGES;
+   ```
+   This is similar to before. Even though this is a replica, we create the user locally (users are not replicated automatically from primary unless you set up RBR for mysql schema, which is not default). If you want to manage users centrally, create the user on primary and let it replicate (MySQL can replicate CREATE USER if using row-based for mysql database, but by default it might not). Easiest is to create on each, or ensure the privileges exist on the replica.
+
+   Actually, since the CDC connector will connect to the replica and not the primary, the user must exist on the replica with required privileges. It doesn't necessarily need REPLICATION SLAVE on the replica to read the binlog, but REPLICATION CLIENT it does (to show master status). But granting both is fine.
+
+3. **Point CDC Connector to Replica:** Configure your CDC tool to connect to the replica’s host/IP instead of primary. Use the `cdc_user` credentials that you set up on the replica.
+   - The connector will connect and likely issue a `SHOW MASTER STATUS` on the replica to know where to start (or it might start from beginning of replica’s logs depending on snapshot settings).
+   - It will then start a binlog dump on the replica’s binary log.
+   - Because `log_slave_updates` is ON, the replica’s binary log contains all the changes that came from the primary. So the CDC should see the same changes as if it were reading the primary’s binlog.
+   - Confirm this by doing a test insert on primary and see if the CDC pipeline (connected to replica) receives it.
+
+   Note: There is some replication lag typically. The CDC from replica will be at least as latent as the replica apply lag. Usually small (ms to sec). But if the replica falls behind significantly, your CDC is that much behind too.
+
+   - *Screenshot:* Possibly a network diagram image: primary -> replica -> CDC connector, illustrating the flow (if documentation wants a conceptual image).
+
+4. **Monitor Consistency:** 
+   - Ensure the replica is healthy. Use `SHOW SLAVE STATUS\G` on the replica. Key fields: `Seconds_Behind_Master` (should ideally be 0 or small), and check `Slave_IO_Running` and `Slave_SQL_Running` are Yes.
+   - If the replica has issues (e.g., replication stopped due to an error), then CDC will obviously stop getting new events since no new events in replica binlog. Monitor for replication errors and fix them (the CDC might not notice, as it just sees no new events).
+   - If a failover or promotion happens (replica becomes new master), see below in troubleshooting.
+
+**Troubleshooting:**
+
+- **Replica not writing to binlog:** If after enabling `log_slave_updates`, you still see nothing in `SHOW BINARY LOGS` on the replica:
+  - Make sure the replica is actively receiving updates from primary (i.e., data is changing).
+  - Confirm `log_bin` and `log_slave_updates` are indeed ON (check variables).
+  - Possibly the replica was started with `--skip-log-bin` or something, ensure no such override.
+  - If the replica has super_read_only or similar (like some environments to avoid stray writes), that shouldn't affect logging of slave updates.
+  
+- **CDC Missed events due to replica lag purge:** Consider if the replica fell far behind and then caught up: the primary might have purged binlogs that the replica hadn’t applied yet, causing a replication break. This is a typical replication issue, but if it happens, replication stops and CDC stops receiving events. You’d have to resync the replica. So ensure binlog retention on primary is enough for worst-case replica lag. Setting a long expire_logs_days on primary and monitoring replica lag is important in heavy load scenarios.
+
+- **Failover (Replica promotion):** If you decide to switch to reading from a different replica or the primary (due to topology change), Debezium currently doesn’t automatically follow topology changes. You would need to reconfigure or possibly have multiple connectors.
+  - Suppose your primary goes down and you promote the replica (which CDC was reading from) to become primary. In that case, that replica (now primary) will still have its binlog (with log_slave_updates enabled it was up to date). The CDC connector connected to it might not even notice anything except maybe a brief pause if any. It can continue to read as the DB continues generating binlog (now from new writes).
+  - However, if the primary goes down and the replica takes over, you might now have a new replica or none. If later a new replica is added or old primary recovers as replica, you might choose to keep CDC on the current server (which is now primary). That is fine as long as load is okay.
+  - Or if you had multiple replicas and you want to move CDC to a different one for load reasons, you’d stop the connector and start it on another, possibly having to tell it what binlog position to continue from. This can get complicated. Ideally, stick to one stable replica for CDC, or use GTID to move between servers seamlessly if needed (Debezium with GTID can allow hopping to another server if that server has the same GTID events).
+  
+- **Data consistency:** In theory, reading from a replica could expose some edge cases:
+  - If the replica is slightly behind, CDC events are slightly delayed. Usually not an issue.
+  - If the replica has any data divergence (shouldn’t if replication is correct), then CDC might see things slightly differently than reading primary.
+  - If the replica goes out of sync or has a replication error, it might skip events (if you set replica to IGNORE errors and continue, then CDC would miss those events too). Best to not set such ignores, or monitor carefully.
+
+- **Resource usage on replica:** The CDC reading will consume some CPU on the replica to read and process binlog events. If the replica is only for CDC, great. If it also serves read queries, monitor for any performance impact. The binlog I/O thread for CDC is generally lightweight (just reading sequentially). But if CDC is slow in processing, the replica’s binlog dump thread will wait; not a big deal unless it somehow back-pressures the replica (shouldn't, as replica will still apply changes regardless of how fast CDC reads its binlog).
+
+- **Network between primary and replica:** ensure it's reliable. If replica disconnects from primary often, your CDC will also get intermittent data flow. Not directly a CDC issue, but underlying replication reliability.
+
+- **Testing cutover:** Good to test by writing some changes to primary and verifying the CDC pipeline gets them via replica. Also test shutting off replication (STOP SLAVE) for a bit, then START SLAVE, and see that CDC gets a burst of events (it should, once the replica catches up, those events get written to replica binlog and then CDC reads them). This tests the scenario of brief replication lag.
+
+Using a replica for CDC is beneficial for offloading but adds complexity in topology management. As long as replication is stable, the CDC pipeline should be as reliable as on primary. Always ensure your replication is tuned (e.g., the replica has enough I/O to keep up with primary, proper buffer sizes, etc.) to avoid it becoming a bottleneck in CDC.
+
+**Common Troubleshooting Summary for All:**
+
+- If you see **no data flowing**, check the connection, replication (if applicable), and that new data is actually being produced.
+- For any **error messages**, refer to them specifically. For example:
+  - *“ERROR: permission denied for schema”* on Postgres – fix with grants.
+  - *“ERROR: could not access file "wal2json": No such file or directory”* – enable logical replication plugin.
+  - *“The MySQL server is not configured to serve binlog”* – means log_bin is off or user doesn’t have rights.
+  - *“Client requested master to start replication from position > file size”* – means the connector’s saved binlog position is past current end (maybe logs purged) – likely need to snapshot again.
+  - *“All replication slots are in use”* (Postgres) – increase `max_replication_slots` or drop unused slots.
+  - *“Transaction log is unavailable”* (in an output or connector log) – for Postgres likely means slot fell behind and required WAL was removed; for MySQL, binlog got purged. In both cases, reinitialization needed or restore from backup if possible.
+
+- **Screenshot placeholders:** In a real guide, at points where complex UI steps occur (like parameter group editing, Azure portal changes, etc.), include relevant screenshots as noted to aid understanding. Example: *"Screenshot: AWS RDS Parameter Groups showing rds.logical_replication=1"* or *"Screenshot: Azure portal server parameters for binlog settings"*.

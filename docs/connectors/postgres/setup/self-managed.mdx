@@ -1,0 +1,131 @@
+---
+title: 5. CDC in Standalone Mode 
+description: CDC in Standalone Mode
+sidebar_position: 5
+---
+
+
+# PostgreSQL Connector – CDC in Standalone Mode (Self-Managed PostgreSQL)
+
+Enabling CDC on a standalone (on-premises or self-hosted) PostgreSQL server involves configuring the server for logical decoding and using an output plugin (wal2json) to capture changes. Unlike RDS/Aurora, you have full control of the PostgreSQL configuration, so you must manually adjust the config file and ensure the plugin is installed.
+
+**Prerequisites:**
+
+- PostgreSQL 9.6 or above (logical decoding was introduced in 9.4, but it’s matured in later versions; ideally use 10+).
+- Access to the PostgreSQL server's configuration (`postgresql.conf`) and restart privileges.
+- Superuser access on the database to install extensions and create replication slots.
+- The `wal2json` plugin installed on the PostgreSQL server. (Many package distributions include wal2json as an extension. If not, you may need to compile it from [the wal2json source] ([Change data capture in Postgres: How to use logical decoding and wal2json | Microsoft Community Hub](https://techcommunity.microsoft.com/blog/adforpostgresql/change-data-capture-in-postgres-how-to-use-logical-decoding-and-wal2json/1396421#:~:text=Logical%20decoding%20is%20the%20official,supports%20logical%20decoding%20and%20wal2json)).)
+
+**Steps:**
+
+1. **Configure WAL for Logical Decoding:** Edit **`postgresql.conf`** on the server to enable logical decoding:
+   - Set `wal_level = logical`. This ensures the WAL (write-ahead log) contains the information needed for logical decoding ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=1)).
+   - Set `max_replication_slots` to at least the number of CDC clients/slots you plan to use (e.g., `max_replication_slots = 5` for up to 5 slots). If this is 0, you won’t be able to create logical slots.
+   - Set `max_wal_senders` to a number of concurrent replication connections (each slot or physical replication uses one). For example, `max_wal_senders = 5` (or higher, matching `max_replication_slots`).
+   - (Optional) If using physical replicas as well, ensure these numbers accommodate both physical and logical replication connections.
+   - Save the configuration and **restart PostgreSQL** for these changes to take effect.
+
+   After restart, you can verify:
+   ```sql
+   SHOW wal_level;
+   SHOW max_replication_slots;
+   ```
+   They should report "logical" and your set value, respectively.
+
+   - *Screenshot:* A snippet of `postgresql.conf` highlighting `wal_level = logical`, `max_replication_slots`, and `max_wal_senders`.
+
+2. **Install wal2json Plugin (if not already installed):** Check if wal2json is available:
+   - In psql, run: `SELECT * FROM pg_available_plugins;` (This is a hypothetical function; alternatively list files in the Postgres lib directory). 
+   - Often, you can simply attempt to create a slot with wal2json (next step) to see if it’s recognized.
+   - If not installed, install it:
+     - If your Postgres is from a package manager, there may be an accompanying package (e.g., `postgresql-contrib` or a package named `wal2json`). On Debian/Ubuntu for Postgres 14, for example: `apt-get install postgresql-14-wal2json`.
+     - Or compile from source: clone the wal2json GitHub repository and compile the `.so` against your PostgreSQL (then copy it into the Postgres library directory).
+     - Once installed, you might need to add `wal2json` to `shared_preload_libraries` in `postgresql.conf` **if** required by your version (most logical decoding plugins do **not** need preloading, and wal2json typically doesn’t require it, unlike pglogical which does).
+   - You do **not** need to run `CREATE EXTENSION wal2json;` in the database, because wal2json is a logical decoding plugin (not a traditional SQL extension). It will be invoked when creating a slot. (Some distro packages do provide it as an extension though – if so, you can create it for convenience.)
+
+3. **Create a Replication Role:** The connecting user for CDC should have replication privileges. As a superuser, execute:
+   ```sql
+   CREATE ROLE cdc_rep WITH LOGIN PASSWORD 'strongpassword' REPLICATION;
+   ```
+   This creates a user who can initiate replication connections and create slots. By default, superusers can do this too, but it's safer to use a dedicated role with REPLICATION privilege. Make sure this user has login permission (as given) and a strong password. 
+
+   Next, configure **pg_hba.conf** to allow the replication connection:
+   - Open **pg_hba.conf** and add an entry like:  
+     ```
+     host    replication    cdc_rep    <connector_ip/hostname>    md5
+     ``` 
+     This line permits the user `cdc_rep` to connect for the replication stream from the specified address. If your CDC tool runs on various hosts or unknown IPs, you might use `0.0.0.0/0` (all addresses) temporarily or a specific subnet, but that is less secure. Adjust to your environment.
+   - You might also need to allow the user regular access to the database if it will do snapshots. For example:  
+     ```
+     host    all    cdc_rep    <connector_ip>    md5
+     ``` 
+     so it can select data for an initial load.
+
+   - After editing pg_hba.conf, reload PostgreSQL (`SELECT pg_reload_conf();` or `sudo systemctl reload postgresql`) to apply the new authentication rules.
+
+4. **Create a Logical Replication Slot using wal2json:** Now, connect to the database (as `cdc_rep` or a superuser) and create a replication slot for CDC:
+   ```sql
+   SELECT * 
+   FROM pg_create_logical_replication_slot('my_slot', 'wal2json');
+   ```
+   If successful, this returns a slot name and an LSN position. This confirms that `wal2json` is recognized and WAL level is correct. If you encounter errors:
+   - *“wal2json not found”* – the plugin isn’t installed or not in the library path. Revisit step 2.
+   - *“permission denied”* – you might be connected as a user without REPLICATION privilege. Connect as a superuser or the replication role you created with REPLICATION attribute ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=7,replication%20permissions)).
+   - *“max replication slots exceeded”* – you need to increase `max_replication_slots` and restart (step 1).
+   - *“wal_level”* error – the server isn’t actually in logical mode; double-check `postgresql.conf` and restart.
+
+   Keep this slot name for your CDC connector configuration (or the connector can create its own; you can skip manual creation in that case).
+
+5. **Test Logical Decoding Output (optional):** You can test that changes are being captured:
+   - Insert or update some data in a table:
+     ```sql
+     INSERT INTO test_table(col) VALUES ('hello logical');
+     UPDATE test_table SET col='updated logical' WHERE col='hello logical';
+     ```
+   - Then, to see the decoded changes via wal2json, run:
+     ```sql
+     SELECT data 
+     FROM pg_logical_slot_get_changes('my_slot', NULL, NULL, 'pretty-print', '1');
+     ```
+     This will output JSON for each change (in a pretty format) ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=%7B%20,a_table)) ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=,%7D)). You should see the insert and update represented in JSON (with fields like `"kind": "insert"` or `"kind": "update"` and the column data). If nothing appears, ensure you passed NULL for both LSN arguments to get all new changes, and that you are using the same slot and it hasn’t been consumed elsewhere.
+
+   - *Screenshot:* A psql terminal showing the JSON output of `pg_logical_slot_get_changes` for some test changes (demonstrating wal2json working).
+
+6. **Configure the CDC Connector:** In your Debezium/streaming app configuration for PostgreSQL:
+   - Provide the **host**, **port**, **database**, **user** (`cdc_rep`), and **password**.
+   - Ensure the connector is set to use logical replication (Debezium does this by default when you configure a slot name).
+   - Provide the **slot name** (`my_slot`) and **plugin** (`wal2json`). For Debezium, for example: `slot.name=my_slot`, `plugin.name=wal2json`.
+   - If you didn’t manually create a slot, Debezium can create one if you supply a slot name that doesn’t exist (the user needs permission to do so). We already created one, so it will use it.
+   - Start the CDC connector. It should connect and start streaming changes from the slot. The first thing it may do is take a snapshot of current data (depending on connector settings). Ensure `cdc_rep` has SELECT on the tables if a snapshot is done.
+
+**Troubleshooting:**
+
+- **Cannot Create Slot / “replication slot XYZ is active”:** If the slot creation fails or indicates it's already active, perhaps a previous attempt left a slot. List existing slots with `SELECT * FROM pg_replication_slots;`. If a slot exists from a prior test and is not needed, drop it with `pg_drop_replication_slot`. Ensure you do this only when the slot is not actively used.
+
+- **Decoding Stopped / Slot Not Advancing:** If you notice the replication slot’s `restart_lsn` isn’t moving or the connector appears stuck:
+  - Check the connector logs for errors.
+  - It could be waiting on a long transaction to finish. Logical decoding will hold up on a transaction that is open. Ensure no extremely long-running transactions on the source, otherwise WAL won’t be released.
+  - Also ensure the connector is still connected (it might have crashed or been paused).
+
+- **“Permission denied for schema …” errors:** Logical decoding will include changes for all tables in the database by default (since wal2json outputs all WAL changes for that DB). The replication role does not need SELECT privileges on tables to get the WAL changes. However, some logical decoding use-cases (or the initial snapshot) require reading tables. If your CDC tool does an initial consistent snapshot by reading tables, the `cdc_rep` user must have SELECT on those tables or at least on the schemas in question. For example, to avoid `permission denied for schema public`, grant usage on schema public to the user ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=7,replication%20permissions)).
+
+- **Missing “wal2json” Library:** If you get an error like:
+  ```
+  ERROR: could not load library ".../wal2json.so": XX
+  ```
+  it means the wal2json plugin library is not found by Postgres. Ensure the `.so` file is in the PostgreSQL library directory (e.g., `/usr/lib/postgresql/<version>/lib/`). Reinstall or correct the path. Also verify you’re creating the slot on the correct database instance (if you have multiple Postgres installations).
+
+- **WAL Volume and Checkpoints:** Monitor the disk space for WAL files. If the slot is not being consumed (connector down), WAL files will accumulate. Use `pg_replication_slots` view to see `pg_size_mb` of each slot’s retained WAL. If the connector is down for maintenance, consider dropping the slot or moving it. Also, watch for `txid` wraparound warnings – an inactive logical slot can hold oldest xmin and prevent VACUUM from cleaning up very old transactions ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=You%20must%20monitor%20logical%20decoding,longer%20used%2C%20drop%20it%20immediately)). If you see warnings about *“remaining XIDs”* or *“wraparound”*, ensure slots are actively consumed or drop them.
+
+- **pg_hba and Connection Issues:** If your connector cannot connect to Postgres:
+  - Verify the host, port, and that the PG server is listening on an interface accessible to the client (check `listen_addresses` in `postgresql.conf` – e.g., it should be `'*''` for all interfaces if connecting remotely).
+  - Check `pg_hba.conf` rules. For a replication connection, the database field in pg_hba should be "replication" (not a database name) for WAL streaming. We added such a line. If you see authentication failures, adjust the pg_hba entry or ensure the connector is using MD5/Password if that’s what pg_hba expects.
+  - You can test connectivity by running `pg_recvlogical` from the connector machine:
+    ```bash
+    pg_recvlogical -h <host> -d <database> -U cdc_rep --slot=test_slot --start -o pretty-print=1 -f -
+    ```
+    This uses the logical replication stream. If it connects and streams JSON, the connectivity and privileges are fine (terminate after a few messages).
+
+- **Replica Identity / Missing OLD data:** As mentioned for Aurora, if you see that updates or deletes on tables without primary keys result in no key data (wal2json will show `"oldkeys": null` or similar), consider setting `REPLICA IDENTITY FULL` on those tables so that the old row is logged ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=In%20our%20warehouse%20reporting%20PostgreSQL,have%20a%20REPLICA%20IDENTITY%20set)) ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=,replication%20slots%20after%20a%20failover)). Otherwise, downstream consumers might not know which row was deleted or updated (only new values without a key). This is a trade-off (logging full rows can increase WAL volume).
+
+Once configured, a standalone PostgreSQL server with logical decoding and wal2json can stream changes to any external system. This is essentially how Debezium and similar connectors tap into Postgres for CDC on self-managed environments.

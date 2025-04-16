@@ -137,6 +137,11 @@ const docSidebar = {
                   "Let's learn about setting up Postgres flavors",
               },
               items: [
+                'connectors/postgres/setup/aurora',
+                'connectors/postgres/setup/azure',
+                'connectors/postgres/setup/cdc-in-replica-mode',
+                'connectors/postgres/setup/rds',
+                'connectors/postgres/setup/self-managed',
                 'connectors/postgres/setup/local',
               ],
             },
@@ -167,6 +172,11 @@ const docSidebar = {
                   "Let's learn about setting up MySQL flavors",
               },
               items: [
+                'connectors/mysql/setup/aurora',
+                'connectors/mysql/setup/azure',
+                'connectors/mysql/setup/cdc-in-replica-mode',
+                'connectors/mysql/setup/rds',
+                'connectors/mysql/setup/self-managed',
                 'connectors/mysql/setup/local',
               ],
             },
