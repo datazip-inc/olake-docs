@@ -49,6 +49,8 @@ import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
+import LocalParquetConfigDetails from '../../../docs/shared/config/LocalParquetConfigDetails.mdx'
+
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 
@@ -121,7 +123,9 @@ const MDXComponents = {
 
   S3Config,
   S3ConfigDetails,
+
   LocalParquetConfig,
+  LocalParquetConfigDetails,
 
   GlueIcebergWriterConfig,
   MinioJDBCIcebergWriterConfigLocal,

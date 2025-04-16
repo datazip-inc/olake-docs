@@ -1,0 +1,133 @@
+---
+title: 4. AWS RDS MySQL 
+description: Aurora MySQL
+sidebar_position: 4
+---
+
+# Amazon RDS MySQL CDC Setup Guide
+
+Setting up CDC on Amazon RDS for MySQL is similar to Aurora MySQL, with a few differences in how parameters are applied (RDS MySQL uses a DB Parameter Group for a single instance) and considerations for retention.
+
+**Prerequisites:**
+
+- An Amazon RDS MySQL instance (MySQL 5.7 or 8.0). Ensure it's not in “detached” mode (binlog off) – RDS MySQL typically has binlog on if backups or replication are enabled, but format may be MIXED by default.
+- A custom **DB Parameter Group** for MySQL (since default groups can’t be edited).
+- Automated backups enabled (backup retention > 0) – this is needed for long-term binlog retention on RDS ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=Enable%20automated%20backups)).
+- Master user access to apply settings and create the replication user.
+
+**Steps:**
+
+1. **Enable Automated Backups (if not already):** In the RDS console, check your MySQL instance’s backup retention setting. If “Backup retention period” is 0 (no backups), set it to at least 1 day ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=Enable%20automated%20backups)). This ensures binary logs are retained between snapshots and also allows using the retention configuration SP. RDS often ties the ability to retain binlogs to having backups turned on (for point-in-time recovery purposes).
+
+2. **Create and Attach a Parameter Group:** Go to *Parameter Groups* in AWS console, create a new **DB Parameter Group** for your MySQL version (e.g., “default.mysql8.0” as family if you need the name as a base). Name it e.g. “mysql8-cdc”. 
+   - Edit the parameters:
+     - Set `binlog_format = ROW` ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=Configure%20)) ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=actions%2C%20and%20then%20choose%20Edit)).
+     - Set `binlog_row_image = FULL`.
+     - If MySQL version >= 8.0.26, you might see `binlog_expire_logs_seconds` (for older MySQL 5.7, it’s `expire_logs_days`). We will handle retention via a stored proc, so you can leave this default (or set to a high value as a precaution).
+     - Ensure `log_bin` is ON (RDS may not show this as editable; it’s managed. If it’s a read-replica or multi-AZ, log_bin is automatically on).
+     - If GTIDs are desired: set `gtid_mode = ON`, `enforce_gtid_consistency = ON`, and `@@global.server_id` should have a value (RDS usually sets a server_id automatically).
+   - Save the changes. Now go to your RDS MySQL instance and modify it to use this new DB parameter group. Apply changes and reboot the instance.
+
+   - *Screenshot:* RDS console Parameter Group editor showing `binlog_format` changed to ROW for the custom group.
+
+3. **Reboot and Verify Settings:** After the instance reboots, verify:
+   ```sql
+   SHOW VARIABLES LIKE 'binlog_format';
+   SHOW VARIABLES LIKE 'binlog_row_image';
+   ```
+   They should be `ROW` and `FULL` ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=Verify%20CDC%20is%20enabled)) ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=mysql,)). Also:
+   ```sql
+   SHOW VARIABLES LIKE 'log_bin';
+   ```
+   should be "ON". If `log_bin` is OFF, RDS might not allow enabling it (this would be unusual, as RDS MySQL always has it on if backups or replicas are enabled). If it’s off, ensure you enabled backups and try reboot again.
+
+4. **Set Binlog Retention Period:** Use the RDS stored procedure on the RDS MySQL instance to set retention:
+   ```sql
+   CALL mysql.rds_set_configuration('binlog retention hours', 24);
+   ```
+   This example sets 24 hours retention. You can set up to 168 hours (7 days) ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=The%20maximum%20retention%20time%20is,03%20sec)). The ideal value depends on how long you expect the CDC connector might be down or how much lag you can tolerate. Check with:
+   ```sql
+   CALL mysql.rds_show_configuration();
+   ```
+   to confirm the new setting ([How To: Set up a MySQL CDC connection on Amazon RDS](https://docs.decodable.co/howto/how-to-set-up-an-aws-aurora-mysql-cdc-connection.html#:~:text=The%20maximum%20retention%20time%20is,03%20sec)). This setting ensures RDS doesn’t purge binlog entries for the specified hours (unless storage is under pressure). Note: By default, RDS MySQL might purge binlogs shortly after a daily automated backup; this retention overrides that behavior to keep them longer.
+
+   - *Screenshot:* MySQL client output from `rds_show_configuration` showing `binlog retention hours: 24`.
+
+5. **Create a Replication User:** Similar to Aurora:
+   ```sql
+   CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'strongpassword';
+   GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+   GRANT SELECT ON *.* TO 'cdc_user'@'%';
+   GRANT LOCK TABLES, RELOAD ON *.* TO 'cdc_user'@'%';
+   FLUSH PRIVILEGES;
+   ```
+   We add `LOCK TABLES, RELOAD` in case a snapshot method requires table locks (though in RDS, global locks requiring SUPER are not allowed; Debezium will avoid global lock and do per-table if needed, which `LOCK TABLES` covers). `SELECT` is for initial snapshot queries. This user now has the necessary replication permissions ([Add MySQL Database CDC source to an eventstream - Microsoft Fabric | Microsoft Learn](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/add-source-mysql-database-change-data-capture#:~:text=mysql%3E%20CREATE%20USER%20%27user%27%40%27,BY%20%27password)) ([Add MySQL Database CDC source to an eventstream - Microsoft Fabric | Microsoft Learn](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/add-source-mysql-database-change-data-capture#:~:text=When%20a%20global%20read%20lock,privileges)). 
+
+   Note: On RDS, users cannot be granted SUPER, so some operations (like `FLUSH LOGS`) cannot be done by this user – but our privileges are enough for CDC tasks.
+
+6. **Test Binary Logging:** On the RDS MySQL, run:
+   ```sql
+   SHOW MASTER STATUS;
+   ```
+   You should get a binlog file name and position (e.g., `mysql-bin-changelog.000123`, Position X). If you get an empty result or an error, something’s wrong with binlog config. Also try:
+   ```sql
+   SHOW BINARY LOGS;
+   ```
+   to list available log files. This requires `REPLICATION CLIENT` (our `cdc_user` has that) or use the master user. It should list at least one binlog file.
+
+   Optionally, generate a test event:
+   ```sql
+   CREATE TABLE test_cdc (id INT PRIMARY KEY, val VARCHAR(10));
+   INSERT INTO test_cdc VALUES (1, 'rds');
+   SHOW BINLOG EVENTS IN '<current-binlog-file>';
+   ```
+   You might not easily guess the current binlog file name; using `MASTER STATUS` to get it is easiest. But this is just a sanity check. If you see the INSERT event in `SHOW BINLOG EVENTS`, you know row logging is working.
+
+7. **Connect CDC Tool:** Configure Debezium or your CDC consumer to connect to the RDS MySQL endpoint with `cdc_user`. Provide the database or include/exclude list of schemas if needed. If using Debezium MySQL Connector:
+   - `database.hostname=<rds endpoint>`
+   - `database.user=cdc_user`, `database.password=...`
+   - `database.include.list=<your databases>` (or `table.include.list` etc, to limit scope).
+   - Debezium by default will use the `SHOW MASTER STATUS` / binlog to start reading from the current end or from start of available logs depending on `snapshot.mode`.
+   - If you want it to capture from the beginning of history, Debezium would need a historical position which is typically not how it's configured; usually it snapshots current state then continues from binlog current position.
+
+   Since we extended retention to e.g. 24 hours, if the connector is down, as long as it reconnects within 24h, it can resume from where it left off without missing events.
+
+   The connector will appear as a replication client thread on MySQL. You can run:
+   ```sql
+   SHOW PROCESSLIST;
+   ```
+   and look for a process like `Binlog Dump` or similar executed by `cdc_user`. This indicates it's streaming the binlog.
+
+**Troubleshooting:**
+
+- **Parameter Application Issues:** If `binlog_format` didn’t change:
+  - Check that the parameter group is the one attached to the instance (on RDS console, under configuration, see “Parameter group”).
+  - If the instance is a read replica, you need to set the parameter group on the source (actually for CDC, you’d typically use the source anyway).
+  - Ensure you rebooted **after** attaching the new param group (a common oversight is creating the group but not rebooting to apply static params).
+
+- **Retention Issues:** If RDS still purges binlogs too quickly:
+  - Remember that RDS will still purge logs after the set hours or if storage is under pressure. If you set 24 hours but see them gone in 6, perhaps automated backups/snapshot happened and cleared anything older than latest backup, *and* maybe the retention SP was not set correctly. Re-run `rds_show_configuration` to confirm. 
+  - Also note: RDS for MySQL prior to 5.7 didn’t have `rds_set_configuration` – but since we are focusing on modern versions, that’s fine.
+  - If you see in `rds_show_configuration` something like `binlog retention hours | NULL`, it means it’s not set (NULL means default behavior, which is to purge after a snapshot). Run the `rds_set_configuration` again as the master user. Only master user can run it, not the rds_superuser role if you created one, as far as I know.
+  
+- **CDC User Privileges:** If your CDC connector reports errors like *"The MySQL server replied with an error: ACCESS DENIED"*:
+  - Make sure the user host matches. For example, if the connector is running on an EC2 within the same VPC, connecting through the instance endpoint, `'%'` works. If you set a specific host in the user (like `'cdc_user'@'198.51.100.10'`), and your connector’s IP changed, it would be denied. 
+  - Check `SHOW GRANTS FOR 'cdc_user'@'%'`; you should see REPLICATION SLAVE, etc ([Add MySQL Database CDC source to an eventstream - Microsoft Fabric | Microsoft Learn](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/add-source-mysql-database-change-data-capture#:~:text=mysql%3E%20CREATE%20USER%20%27user%27%40%27,BY%20%27password)).
+  - Ensure the connector isn’t trying to perform disallowed operations. For instance, some tools might try to flush logs or set variables – those would fail. Debezium is known to avoid such commands on RDS.
+  - If initial snapshot fails because of lack of privileges, consider temporarily using the master user for the snapshot then switch to the replication user for CDC. (Debezium allows a separate snapshot user config if needed.)
+
+- **Locked Queries / Long Locks:** In RDS, global locks for backup or schema changes might interfere with CDC if they pause transactions. If Debezium is using consistent snapshot (which it does by default with REPEATABLE READ), it won’t lock tables. But if you configured a snapshot mode that uses locks, the lack of SUPER means it will lock each table one by one, which could still be invasive. If you see issues with that, consider snapshot.mode = consistent (the default, which doesn’t lock all tables at once).
+
+- **Replication Delay / Lag:** If the CDC connector falls behind and your retention is, say, 24h, and it exceeds that, it will error out with something like *"Encountered change event for table X whose binlog position is no longer available"* or MySQL will give an error *"Could not find first log file name in binary log index file"* – meaning the binlog the connector last saw has been purged. In such a case, you must re-snapshot or recover the lost events via other means. The solution is to either reduce downtime of connector or increase retention hours (up to 168). Always err on side of more retention if you can afford the storage.
+
+- **GTID vs File Position:** If you enabled GTID on RDS (which is possible on RDS MySQL 5.7+), you can configure Debezium to use GTID. This helps with failover or replica reading scenarios. If not using GTID, Debezium will use filename + position. On RDS, after a restore or some maintenance, the binlog filename sequence might reset. But since our connector holds state, it should detect if the binlog file no longer exists and fail gracefully, prompting a re-snapshot. Using GTID can avoid some of these edge cases because GTIDs are global across restarts.
+
+- **Multi-AZ Failover:** If your RDS MySQL is Multi-AZ and a failover happens, the binlog file name might change (the replica that takes over will continue with perhaps a different file naming, but GTIDs would remain consistent if enabled). Debezium connector can handle a failover to some extent – it will attempt to continue from the same binlog file/position on the new primary. In AWS’s implementation, the standby (now primary) will have the same binlog file series (since it's effectively a promoted replica). Typically, you won’t lose events, but you might have a brief pause. Monitor the connector after any failover.
+
+- **Using Read Replica for CDC:** Sometimes people consider connecting the CDC to a read replica to offload overhead. On RDS MySQL, you *can* connect Debezium to a read replica endpoint, but you must ensure that replica has `log_bin` and especially `log_slave_updates` enabled (so it writes replicated events to its own binlog). RDS read replicas by default have `log_slave_updates=ON` and maintain their own binlogs (especially so you can promote them). You would have to create the replication user on the replica as well. Debezium does not officially support reading from a replica unless it’s basically treated as a master (with its own binlog of updates). But it can work. The caveat is if replica falls behind or fails, it complicates things. 
+  - This is advanced; if you attempted it, ensure retention on replica as well (you can call `rds_set_configuration` on the replica too).
+  - However, note that Debezium doesn’t have built-in capability to follow a replication topology change (like if replica becomes primary). That would be manual.
+
+- **Other CDC tools (AWS DMS)**: If instead of Debezium you were using AWS DMS for CDC, the same MySQL config applies (DMS also needs ROW binlog and privileges). DMS in CDC mode will also call `rds_set_configuration` automatically if you choose certain settings (but better to do it yourself). DMS can read from a replica by setting the task source as the replica and setting `TargetDBHostname` accordingly.
+
+After completing these steps, RDS MySQL will produce a continuous stream of binlog events capturing every change, which your CDC solution will read and process. This allows near-real-time replication of MySQL data out of RDS into other systems, fulfilling the CDC use case.

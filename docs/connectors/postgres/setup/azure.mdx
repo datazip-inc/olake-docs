@@ -1,0 +1,103 @@
+---
+title: 2. Azure Postgres 
+description: Azure Postgres
+sidebar_position: 2
+---
+
+# PostgreSQL Connector – CDC in Azure (Azure Database for PostgreSQL)
+
+Azure Database for PostgreSQL (a managed service) supports logical decoding, but enabling it requires configuration via the Azure portal and some considerations unique to the platform. Azure offers **Flexible Server** (the newer deployment model) and formerly **Single Server** (legacy). The Flexible Server model allows configuration of parameters needed for CDC.
+
+**Prerequisites:**
+
+- **Azure Database for PostgreSQL – Flexible Server** instance. (The Single Server model has limited support for logical decoding; if you are on Single Server, you may need to create a read replica to get binary logging enabled, as described below.)
+- Owner/Contributor access to configure server parameters in the Azure Portal.
+- The `azure_pg_admin` admin login or an admin-equivalent user to alter settings and roles.
+- Ensure the server is in a pricing tier that supports replication (General Purpose or Memory Optimized in most cases; Basic tier might not support replication or replicas).
+
+**Steps (Flexible Server):**
+
+1. **Enable Logical Replication in Server Parameters:** Go to the Azure Portal, open your PostgreSQL Flexible Server instance. Under **Settings**, click **Server parameters**. Find and set the following:
+   - **`wal_level` = logical** ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=1,parameters%20page%20on%20the%20portal)). By default, it might be "replica"; change it to "logical" to allow logical decoding.
+   - **`max_replication_slots`** – increase if you plan to have multiple slots (Flexible Server default might be 10; if unsure, set to e.g. 5 or 10).
+   - **`max_wal_senders`** – ensure it's at least as many as replication slots (often defaults to 10 as well).
+   - **`shared_preload_libraries`** – if you plan to use the `pglogical` extension or `pg_failover_slots`, you would add them here. For wal2json, this is not required.
+   - **`azure.extensions`** – Not needed for wal2json, but Azure sometimes requires listing allowed extensions. Wal2json is a supported plugin in Azure (no need to add to azure.extensions for decoding plugins; this parameter is mainly for certain extensions like pg_cron, pglogical etc.).
+   - **`max_worker_processes`** – if you plan on using `pglogical` or lots of parallel decode, set to at least 16 as Azure docs suggest ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=,box)). Wal2json itself is lightweight, but if using logical replication (publisher/subscriber) concurrently, those use worker processes.
+   - Save these changes. Most of these (including wal_level) are static; you will be prompted to restart the server.
+
+   - *Screenshot:* Azure Portal – Server Parameters page showing `wal_level` set to logical and other parameters (max_replication_slots, etc.) configured.
+
+2. **Restart the Azure Postgres Server:** Trigger a restart of the Flexible Server to apply the static parameter changes (the portal typically shows a notification that a restart is required when you change wal_level). After the server comes back up, verify the settings:
+   ```sql
+   SHOW wal_level;
+   SELECT name, setting FROM pg_settings WHERE name IN ('max_replication_slots','max_wal_senders');
+   ```
+   It should show "logical" and the new values.
+
+3. **Create a Replication User:** Azure Database for PostgreSQL comes with an admin user (e.g., `myadmin@servername`). This admin is essentially a role with superuser-like capabilities, except some restrictions. That admin can be given replication privileges. On Azure, to use logical decoding, your user must have the `REPLICATION` attribute. You can either use the admin user or create a new user:
+   - Using the admin: By default, the server admin user is a member of the `azure_pg_admin` role. You still need to explicitly grant it replication permission. Connect as admin and run:
+     ```sql
+     ALTER ROLE myadmin WITH REPLICATION;
+     ```
+     This allows the admin account to create/use logical slots ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=7,replication%20permissions)).
+   - Creating a new user: Connect as admin and run:
+     ```sql
+     CREATE ROLE cdc_user WITH LOGIN PASSWORD 'strongpassword';
+     GRANT azure_pg_admin TO cdc_user;
+     ALTER ROLE cdc_user WITH REPLICATION;
+     ```
+     The `azure_pg_admin` membership grants the user elevated permissions to create extensions, etc., and the REPLICATION attribute lets it create logical slots ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=2,See%20pglogical%20documentation%20for%20details)). Azure requires the user to be in azure_pg_admin to have sufficient rights for these operations.
+   - Ensure the user has adequate privileges on the database you want to capture. If you plan to decode all changes, being an admin role is usually enough. If using a non-admin for decoding, that user at least needs usage on schemas (or make it a member of azure_pg_admin as above).
+
+4. **Verify wal2json is Available:** Azure Flexible Server supports wal2json (it’s installed by default as a plugin). You don't need to install it. You can verify by trying to create a slot:
+   ```sql
+   SELECT * FROM pg_create_logical_replication_slot('azure_slot', 'wal2json');
+   ```
+   This should succeed and return a slot. If it fails:
+   - Check if `wal_level` is truly logical (maybe the restart didn't happen or the portal changes didn’t stick).
+   - Check user permissions (are you using a user with REPLICATION? If not, you’ll get a permission error).
+   - If you get an error about missing plugin (unlikely on Azure PG), confirm if wal2json is indeed supported for your Postgres version on Azure. (Azure generally supports wal2json for PG 11 and above.)
+
+5. **Configure and Run the CDC Tool:** Use the server’s hostname (e.g. `yourserver.postgres.database.azure.com`), database name, and the replication-enabled user (`cdc_user` or admin) in your CDC connector configuration. Key points:
+   - Azure requires SSL by default. Make sure to enable SSL in the connection string (Debezium and others allow a parameter like `sslmode=require`).
+   - The user name might need the server suffix when connecting (e.g., in some clients you login as `cdc_user@yourserver` as the username).
+   - The port is the standard 5432 (unless you changed it).
+   - Provide the slot name (`azure_slot`) and plugin `wal2json` in the config. Alternatively, let the connector create its own slot (ensure the user can do so). Note that Azure will retain slots until dropped or the server is dropped.
+   - Start the CDC task. If initial snapshot is part of the process, the user should have privileges to SELECT from tables (azure_pg_admin effectively does).
+   - Monitor the connector as it begins streaming changes.
+
+   - *Screenshot:* (Potentially) Azure Data Studio or psql output showing the created slot in `pg_replication_slots`, or the Azure Portal metrics indicating WAL usage, etc., after enabling.
+
+6. **Monitor and Maintain:**
+   - Azure Portal provides metrics. Set up alerts on **Storage** and **Xact ID consumption**. Unconsumed logical slots can cause storage to fill up with WAL, and transaction ID wraparound risk if slots are stale ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=You%20must%20monitor%20logical%20decoding,longer%20used%2C%20drop%20it%20immediately)). Azure’s guidance is to monitor “Maximum used storage” and “Maximum transaction ID” metrics, and drop unused slots promptly.
+   - The slot we created (`azure_slot`) will not be automatically dropped by Azure. If you stop using it, drop it:
+     ```sql
+     SELECT pg_drop_replication_slot('azure_slot');
+     ```
+   - If your Azure PG is configured with high availability (zone redundant HA), **be aware:** on a failover, logical replication slots are **not** preserved (as of the current Azure implementation) ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=,please%20refer%20to%20the%20documentation)). This means if a failover happens, you will lose the slot and need to re-create it on the new primary. (Azure’s documentation suggests using the *pg_failover_slots* extension to persist slots on failover ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=,please%20refer%20to%20the%20documentation)), but confirm if Azure allows that extension; it might not as of now.)
+   - Test that CDC works by making some data changes and verifying the downstream. E.g., insert a row in a table, see it appear in the consumer (or use `pg_logical_slot_peek_changes('azure_slot', NULL, NULL)` on the server to inspect without consuming).
+
+**Troubleshooting:**
+
+- **“Permission denied for schema” in output:** If you see errors in the decoding stream about permission denied on a schema, it likely means the role used for decoding doesn’t have rights to that schema. Even though logical decoding should bypass ACLs for the changes, Azure might enforce some permission. To be safe, grant the user usage on all schemas or make sure it’s an admin role ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=7,replication%20permissions)).
+
+- **User Connection Issues:** On Azure, the username must include the server name when connecting (e.g. `cdc_user@yourserver`). If you omit that, authentication can fail. Also ensure the firewall settings on the Azure server allow the IP of your CDC client. If not, you’ll get a connection timeout or error. Configure the **Azure Database for PostgreSQL Firewall** to add the client IP or set "Allow Azure services" if the connector is within Azure.
+
+- **Slot Creation Fails:** If `pg_create_logical_replication_slot` gives `ERROR: must be superuser or replication role to use replication slots`, it means your user isn’t recognized as having replication permissions. Double-check the `ALTER ROLE ... REPLICATION` was applied. Sometimes on Azure, after granting replication to a user, you might need to reconnect for it to take effect. Also verify the user is in `azure_pg_admin` (non-admin users might not be allowed to do some operations even with REPLICATION attribute).
+
+- **wal2json output issues:** If wal2json is working but you notice the format is not what you expect (there are two versions of wal2json: format version 1 and 2). Azure likely has wal2json v2 by default, which streams each change as separate JSON by default. If needed, you can pass options in `pg_logical_slot_get_changes` like `'pretty-print', '1'` or `'format-version', '1'` to adjust output. Most CDC tools handle this automatically or provide config for wal2json format. Ensure your connector expects the correct wal2json format (Debezium, for example, defaults to format 2 if I recall correctly).
+
+- **Single Server Azure PostgreSQL:** If you are using the older Single Server:
+  - That service does not allow `wal_level` changes or creating logical slots outright. The known workaround to get logical decoding was to create a read replica (which turns on `wal_level=logical` on the primary for the purpose of replication). When you create a replica in Single Server, the primary’s `log_bin` (and thus logical decoding) is enabled ([enable binary logging Azure mysql server - Stack Overflow](https://stackoverflow.com/questions/54494717/enable-binary-logging-azure-mysql-server#:~:text=0)). You could then use the primary for CDC. However, Single Server is being deprecated and had limitations. It’s strongly recommended to migrate to Flexible Server for a straightforward CDC setup.
+  - In Single Server if a read replica is created, you might connect your CDC either to the primary (with logical decoding now enabled) or possibly to the replica (though I’m not certain Azure allowed logical slots on the replica in Single Server). Likely, you would still connect to primary.
+  - Given the complexities, ensure you’re using Flexible Server.
+
+- **Extensions and Versions:** Azure might not always run the latest minor version of Postgres. If you run into any Azure-specific errors (like known bugs in logical decoding for that PG version), check Azure’s release notes. For instance, early PG13 had an issue with logical decoding on standby which was fixed later. Azure will roll out fixes in their service updates.
+
+- **Failover scenario:** As mentioned, if your Flexible Server has HA, after a failover the slot is gone. Your CDC tool will likely throw an error like *"replication slot ... does not exist"* or *"could not start replication: ERROR: replication slot ... was not found"*. In this case, you need to:
+  - Re-create the slot on the new primary (which is the HA secondary that got promoted).
+  - Potentially tell your CDC connector to start from the last known LSN. If using Debezium with wal2json, Debezium tracks the LSN in its offsets. Since the slot was lost, you’d either let Debezium recreate the slot at the current LSN (which means you'll miss the gap during failover), or restore from a backup if possible. This is a tricky situation – using a cloud-managed Postgres that doesn’t preserve slots requires a careful DR plan. If continuous CDC is mission-critical, consider using Azure’s logical **publication** feature (native logical replication to a self-hosted Postgres or another) as an alternative, or running a Postgres in a VM where you have full control.
+  - Azure is working on features to address this, but as of the last update, manual intervention is needed after failovers for CDC slots.
+
+Azure’s managed Postgres can indeed perform CDC similarly to a self-hosted instance after these configurations. By focusing on wal2json and logical decoding, you avoid needing any Azure-specific CDC service and can integrate with open-source tools.
