@@ -1,7 +1,3 @@
----
-sidebar_label: 'Kubernetes CronJob Setup'
----
-
 # Setup Olake Sync as a Kubernetes CronJob
 
 This guide details the process for deploying and managing an Olake data synchronization task as a scheduled Kubernetes CronJob. This configuration is suitable for automating recurring sync operations, particularly when using a static or pre-generated Olake catalog.
@@ -193,7 +189,5 @@ To remove the deployed resources:
 For further assistance or inquiries:
 
 *   **Email:** `hello@olake.io`
-*   **Slack Community:** ([Link to Slack Community - *Add Link Here*])
-*   **Schedule a Call:** ([Link to Schedule Call - *Add Link Here*])
-
----
+*   [Join Slack Community](https://olake.io/slack/)
+*   [Schedule a Call:](https://calendly.com/d/ckr6-g82-p9y/olake_discussion) 
