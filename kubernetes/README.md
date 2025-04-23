@@ -47,27 +47,27 @@ This setup requires several Kubernetes manifest files. You'll need to download t
 Use the links below to download the necessary YAML files. You can right-click the link and choose "Save Link As..." or use the provided `curl` commands in your terminal.
 
 *   **Source ConfigMap:** Holds MongoDB connection details.
-    *   [Download `cm_olake-source-config.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cm_olake-source-config.yaml)
+    *   [Download `cm_olake-source-config.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-source-config.yaml)
         ```bash
-        curl -Lo cm_olake-source-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cm_olake-source-config.yaml
+        curl -Lo cm_olake-source-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-source-config.yaml
         ```
 
 *   **Writer ConfigMap:** Holds destination (e.g., Iceberg/S3) configuration.
-    *   [Download `cm_olake-writer-config.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cm_olake-writer-config.yaml)
+    *   [Download `cm_olake-writer-config.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-writer-config.yaml)
         ```bash
-        curl -Lo cm_olake-writer-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cm_olake-writer-config.yaml
+        curl -Lo cm_olake-writer-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-writer-config.yaml
         ```
 
 *   **Catalog ConfigMap:** Holds the pre-generated Olake catalog.
-    *   [Download `cm_olake-catalog-config.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cm_olake-catalog-config.yaml)
+    *   [Download `cm_olake-catalog-config.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-catalog-config.yaml)
         ```bash
-        curl -Lo cm_olake-catalog-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cm_olake-catalog-config.yaml
+        curl -Lo cm_olake-catalog-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-catalog-config.yaml
         ```
 
 *   **CronJob & PVC Manifest:** Defines the scheduled job and persistent storage.
-    *   [Download `cronjob_olake.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cronjob_olake.yaml)
+    *   [Download `cronjob_olake.yaml`](https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cronjob_olake.yaml)
         ```bash
-        curl -Lo cronjob_olake.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/master/path/to/manifests/cronjob_olake.yaml
+        curl -Lo cronjob_olake.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cronjob_olake.yaml
         ```
 
 *(**Note:** Please replace `/path/to/manifests/` in the URLs above with the actual path where these files will reside within the `datazip-inc/olake-docs` repository on the `master` branch).*
