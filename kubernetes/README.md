@@ -113,7 +113,7 @@ Apply the configured manifests to your Kubernetes cluster:
 
 4.  **Verify CronJob Status**:
     ```bash
-    kubectl get cronjob olake-mongodb-sync -n olake
+    kubectl get cronjob olake-sync -n olake
     ```
 
 ## Monitoring and Operations
@@ -122,7 +122,7 @@ Monitor the CronJob and its associated Jobs/Pods:
 
 1.  **List Jobs**: View jobs created by the CronJob.
     ```bash
-    kubectl get jobs -l cronjob-name=olake-mongodb-sync -n olake
+    kubectl get jobs -l cronjob-name=olake-sync -n olake
     ```
 
 2.  **List Pods for a Job**: Identify pods associated with a specific job instance.
@@ -149,17 +149,17 @@ Monitor the CronJob and its associated Jobs/Pods:
 
 *   **Trigger Manually**: Create a Job instance immediately from the CronJob template.
     ```bash
-    kubectl create job --from=cronjob/olake-mongodb-sync manual-olake-sync-$(date +%s) -n olake
+    kubectl create job --from=cronjob/olake-sync manual-olake-sync-$(date +%s) -n olake
     ```
 
 *   **Suspend CronJob**: Prevent the CronJob from creating new jobs based on the schedule.
     ```bash
-    kubectl patch cronjob olake-mongodb-sync -n olake -p '{"spec":{"suspend":true}}'
+    kubectl patch cronjob olake-sync -n olake -p '{"spec":{"suspend":true}}'
     ```
 
 *   **Unsuspend CronJob**: Re-enable the CronJob's schedule.
     ```bash
-    kubectl patch cronjob olake-mongodb-sync -n olake -p '{"spec":{"suspend":false}}'
+    kubectl patch cronjob olake-sync -n olake -p '{"spec":{"suspend":false}}'
     ```
 
 ## Cleanup
@@ -168,7 +168,7 @@ To remove the deployed resources:
 
 1.  **Delete CronJob**: Stops future scheduled jobs.
     ```bash
-    kubectl delete cronjob olake-mongodb-sync -n olake
+    kubectl delete cronjob olake-sync -n olake
     ```
 
 2.  **Delete PersistentVolumeClaim**: **Caution:** This action permanently deletes the underlying persistent volume and all data stored within it (copied configurations, state files, logs).
