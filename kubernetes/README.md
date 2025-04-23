@@ -19,13 +19,13 @@ This setup utilizes several Kubernetes resources to manage configuration, state,
 
 Ensure the following requirements are met before proceeding:
 
-1.  **Kubernetes Cluster Access**: Administrative access to a Kubernetes cluster.
-2.  **`kubectl`**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
-3.  **`ReadWriteMany` StorageClass**: A Kubernetes StorageClass supporting `ReadWriteMany` access mode must be available and correctly specified in `cronjob_olake.yaml` (replacing `${STORAGE_CLASS}`). Common examples include:
+1. **Kubernetes Cluster Access**: Administrative access to a Kubernetes cluster.
+2. **`kubectl`**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
+3. **`ReadWriteMany` StorageClass**: A Kubernetes StorageClass supporting `ReadWriteMany` access mode must be available and correctly specified in `cronjob_olake.yaml` (replacing `${STORAGE_CLASS}`). Common examples include:
     *   AKS: `azurefile`
     *   GKE: `standard-rwx` (Filestore) or equivalent.
     *   EKS: An EFS CSI driver storage class.
-4.  **Pre-generated Olake Catalog (`catalog.json`)**: This configuration runs the `sync` command directly and requires a `catalog.json` generated beforehand using the Olake `discover` command against your source.
+4. **Pre-generated Olake Catalog (`catalog.json`)**: This configuration runs the `sync` command directly and requires a `catalog.json` generated beforehand using the Olake `discover` command against your source.
     *   Catalog Generation Guides:
         *   [MongoDB](https://olake.io/docs/getting-started/mongodb#step-2-generate-a-catalog-file)
         *   [MySQL](https://olake.io/docs/getting-started/mysql#step-2-generate-a-catalog-file)
@@ -65,28 +65,27 @@ Use the links below to download the necessary YAML files. You can right-click th
         ```bash
         curl -Lo cronjob_olake.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cronjob_olake.yaml
         ```
-
-*(**Note:** Please replace `/path/to/manifests/` in the URLs above with the actual path where these files will reside within the `datazip-inc/olake-docs` repository on the `master` branch).*
-
 **2. Customize Downloaded Files**
 
 After downloading the files, you **must edit them** to match your environment:
 
 *   **`cm_olake-source-config.yaml`**:
-    *   Edit the multi-line string under `config.json:` with your accurate MongoDB source connection parameters.
+    *   Edit the multi-line string under `config.json:` with your accurate source connection parameters (e.g., for MongoDB).
 *   **`cm_olake-writer-config.yaml`**:
     *   Edit the multi-line string under `writer.json:` with your correct destination configuration (e.g., Iceberg settings, S3 path, AWS region).
     *   **Security Recommendation**: Manage sensitive credentials (like AWS keys) using Kubernetes Secrets instead of embedding them here.
 *   **`cm_olake-catalog-config.yaml`**:
-    *   Edit the multi-line string under `catalog.json:` and replace its content with your complete, pre-generated Olake catalog JSON.
-*   **`cronjob_olake.yaml`**:
-    *   `metadata.namespace` / `spec.jobTemplate.metadata.namespace` / PVC `metadata.namespace`: Change `olake` if using a different namespace.
-    *   `spec.schedule`: Set the desired cron schedule.
-    *   `spec.suspend`: Set to `false` to enable scheduling.
-    *   `spec.jobTemplate.spec.template.spec.affinity`: If used, replace `${LABEL:Key}` and `${LABEL:Value}`. Otherwise, remove the `affinity` block.
-    *   `spec.jobTemplate.spec.template.spec.containers[0].image`: Verify/update the Olake image tag.
-    *   `spec.jobTemplate.spec.template.spec.containers[0].resources`: Adjust CPU/memory `requests` and `limits`.
-    *   `PersistentVolumeClaim` section (at the end): **Crucially, replace `${STORAGE_CLASS}` with the name of your `ReadWriteMany`-capable StorageClass.**
+    *   Edit the multi-line string under `catalog.json:` and replace its content with your complete, pre-generated Olake catalog JSON relevant to your source.
+*   **`cronjob_olake.yaml`**: This file requires several customizations:
+    *   **Namespace:** Ensure `metadata.namespace`, `spec.jobTemplate.metadata.namespace`, and PVC `metadata.namespace` are set to `olake` or your target namespace.
+    *   **Schedule:** Set the desired cron expression in `spec.schedule`.
+    *   **Suspend State:** Set `spec.suspend` to `false` to enable the schedule.
+    *   **Olake Image:** Locate the `spec.jobTemplate.spec.template.spec.containers[0].image` field. You **must** replace the placeholder `${IMAGE}` (or the default value) with the correct Olake Docker image for your specific source database. Find the official images on Docker Hub:
+        *   **[Olake Docker Hub Images](https://hub.docker.com/u/olakego)**
+        *   Examples: `olakego/source-mongodb:latest`, `olakego/source-mysql:latest`, `olakego/source-postgres:latest`. Use the image corresponding to the source configured in `cm_olake-source-config.yaml`.
+    *   **Node Affinity (Optional):** If used, replace `${LABEL:Key}` and `${LABEL:Value}` in the `affinity` block. Otherwise, remove the `affinity` section.
+    *   **Resources:** Adjust CPU/memory `requests` and `limits` under `spec.jobTemplate.spec.template.spec.containers[0].resources` based on your expected workload.
+    *   **Storage Class:** In the `PersistentVolumeClaim` definition at the end of the file, **crucially replace `${STORAGE_CLASS}` with the name of your cluster's `ReadWriteMany`-capable StorageClass.**
 
 Once you have customized these four files locally, proceed to the deployment steps.
 
@@ -190,4 +189,4 @@ For further assistance or inquiries:
 
 *   **Email:** `hello@olake.io`
 *   [Join Slack Community](https://olake.io/slack/)
-*   [Schedule a Call:](https://calendly.com/d/ckr6-g82-p9y/olake_discussion) 
+*   [Schedule a Call](https://calendly.com/d/ckr6-g82-p9y/olake_discussion)
