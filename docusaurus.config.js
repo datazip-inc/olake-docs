@@ -395,6 +395,11 @@ const config = {
     }),
   // satisfies Preset.ThemeConfig,
 
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+
   // themes: [
   //   [
   //     require.resolve('@easyops-cn/docusaurus-search-local'),

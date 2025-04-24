@@ -217,6 +217,7 @@ const docSidebar = {
                 },
               ],
             },
+            'writers/iceberg/partitioning',
             'writers/iceberg/docker-compose',
             'writers/iceberg/troubleshooting',
           ],
