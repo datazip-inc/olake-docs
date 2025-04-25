@@ -526,12 +526,8 @@ const config = {
             from: '/docs/olake/mongodb/how-to-start-contributing-on-olake',
           },
           {
-            to: '/docs/category/mongodb',
+            to: '/docs/connectors/mongodb/overview',
             from: '/olake/drivers/mongodb-poc',
-          },
-          {
-            to: '/docs/category/resources',
-            from: '/olake/resources/terminologies',
           },
           {
             to: '/blog',
