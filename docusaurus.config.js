@@ -98,7 +98,8 @@ const config = {
       "runllm-position": "BOTTOM_RIGHT",
       "runllm-keyboard-shortcut": "Mod+j",
       "runllm-preset": "docusaurus",
-      async: true,
+      // async: true,
+      defer: true,
       "runllm-support-email": "hello@olake.io",
       "runllm-community-url": "https://olake.io/slack",
       "runllm-community-type": "slack",
@@ -111,7 +112,8 @@ const config = {
     },
     {
       src: '/message-listener.js', // path relative to the static directory
-      async: false, // if the script must be executed in order, set async to false
+      // async: false,
+      defer: true, // if the script must be executed in order, set async to false
     },
   ],
 
