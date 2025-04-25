@@ -134,7 +134,7 @@ const config = {
       },
 
       navbar: {
-        hideOnScroll: true,
+        hideOnScroll: false,
         // style: 'dark',
         title: 'OLake',
         logo: {
