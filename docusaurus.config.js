@@ -3,6 +3,8 @@ import { themes as prismThemes } from 'prism-react-renderer';
 // import type * as Preset from '@docusaurus/preset-classic';
 // import tailwindPlugin from "./plugins/tailwind-config.cjs"; 
 
+const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriority-rehype-plugin');
+
 // const CustomSolutionsNavbarItem = require('./src/components/CustomSolutionsNavbarItem').default;
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
@@ -50,6 +52,7 @@ const config = {
           sidebarPath: './sidebars.js',
           showLastUpdateAuthor: true,
           showLastUpdateTime: true,
+          rehypePlugins: [imageFetchPriorityRehypePlugin],
 
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
@@ -456,7 +459,9 @@ const config = {
         // Remove this to remove the "edit this page" links.
         editUrl:
           'https://github.com/datazip-inc/olake/tree/master/',
-        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]]
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
+
       }
     ],
     [
@@ -484,7 +489,9 @@ const config = {
         // Remove this to remove the "edit this page" links.
         editUrl:
           'https://github.com/datazip-inc/olake/tree/master/',
-        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]]
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
+
       }
     ],
     // '@gracefullight/docusaurus-plugin-tailwind',
