@@ -59,7 +59,7 @@ Edit the downloaded files with your specific configurations:
 *   **`cm_olake-catalog-config.yaml`**: Replace the content under `catalog.json` with your complete, pre-generated Olake catalog JSON.
 *   **`cronjob_olake.yaml`**:
     *   Set `metadata.namespace` / `spec.jobTemplate.metadata.namespace` / PVC `metadata.namespace` (default `olake`).
-    *   Configure `spec.schedule`.
+    *   Configure `spec.schedule`. Refer for schedule syntax: **[CronTab Guru](https://crontab.guru/)**
     *   Set `spec.suspend` to `false` to enable the schedule.
     *   Update `spec.jobTemplate.spec.template.spec.containers[0].image` with the correct Olake source image (e.g., `olakego/source-mongodb:latest`). See **[Olake Docker Hub Images](https://hub.docker.com/u/olakego)**.
     *   Configure `nodeAffinity` (optional) under `spec.jobTemplate.spec.template.spec.affinity`.
@@ -110,38 +110,7 @@ Apply the configured manifests to your Kubernetes cluster:
     ```bash
     kubectl patch cronjob olake-mongodb-sync -n olake -p '{"spec":{"suspend":false}}'
     ```
-
-## Monitoring and Operations
-
-Use standard `kubectl` commands for monitoring the CronJob and the Jobs/Pods it creates:
-
-*   **List Jobs**: View jobs created by the CronJob (or manually).
-    ```bash
-    kubectl get jobs -l cronjob-name=olake-mongodb-sync -n olake
-    # Or for manually created jobs: kubectl get jobs -n olake
-    ```
-
-*   **List Pods for a Job**: Identify pods associated with a specific job instance.
-    ```bash
-    kubectl get pods -l job-name=<job-name> -n olake
-    ```
-
-*   **View Pod Logs**: Access logs from the main Olake container or the init container.
-    ```bash
-    # Main container logs
-    kubectl logs <pod-name> -n olake
-
-    # Init container logs
-    kubectl logs <pod-name> -c init-config -n olake
-    ```
-
-*   **Inspect Resources**: Use `describe` for detailed status and events, useful for troubleshooting.
-    ```bash
-    kubectl describe pod <pod-name> -n olake
-    kubectl describe job <job-name> -n olake
-    kubectl describe cronjob olake-mongodb-sync -n olake # See schedule status/events
-    ```
-
+    
 ## Cleanup
 
 To remove the deployed resources:
