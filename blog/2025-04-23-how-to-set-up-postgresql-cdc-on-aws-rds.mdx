@@ -1,0 +1,216 @@
+---
+slug: how-to-set-up-postgresql-cdc-on-aws-rds
+title: How to Set Up PostgreSQL CDC on AWS RDS - A Step-by-Step Guide
+description: 'We have observed a large number of people not setting up their databases with CDC or having to set up CDC after they start ingesting and finding it complex...'
+image: /img/blog/cover/how-to-set-up-postgresql-cdc-on-aws-rds-cover.png
+authors: [pavan]
+tags: [cdc]
+---
+
+We have observed a large number of people not setting up their databases with CDC or having to set up CDC after they start ingesting and finding it complex. As a result, we have decided to begin writing about how to configure popular databases with CDC to make your data journey smoother and faster.
+
+Let’s explore how to configure AWS RDS Postgres along with **PostgreSQL CDC**.
+
+As the first part of this series, let's explore how to set up and configure a Postgres database on Amazon RDS for PostgreSQL CDC, so you can emit data change streams to tools like:
+
+* Airbyte
+    
+* Debezium
+    
+* Managed stream processing platforms such as Jitsu and Decodable
+
+
+### **What and Why’s of CDC?**
+
+Change Data Capture (CDC) is a method used in databases to track and record changes made to data. Recent trends in the data engineering industry point towards the increasing importance of real-time data processing and the integration of artificial intelligence (AI) in data architecture.
+
+This led to an enormous increase in data along with the need for faster processing and decision-making based on this data. **PostgreSQL CDC** enables organizations to:
+
+* Adapt to relentless growth of data
+    
+* Implement real-time data updates by enabling real-time data replication
+
+This document is intended for both those who are setting up a new database and users who need to modify their existing database for CDC.
+
+
+
+### **Prerequisites**
+
+Before you create a database, you must set up:
+
+* A database parameter group
+    
+* A VPC security group
+    
+
+The parameter group specifies the type of database you want and how that database should be configured. The VPC security group is used to connect to your database running on RDS securely.
+
+If you already have the database, you can just check and make the changes needed in the parameter groups and VPC security groups that are attached with the database. Jump to Step &lt;`Modify Database Parameter Group`&gt;
+
+### **Create Database Parameter Group**
+
+AWS RDS already has a default RDS parameter group as given in the below picture, and you won’t be able to edit the parameters from this group.
+
+
+![how-to-set-up-postgresql-cdc-on-aws-rds-1](/img/blog/2025/04/how-to-set-up-postgresql-cdc-on-aws-rds-1.webp)
+
+Hence it is advised to create a new parameter group as suggested below.
+
+1. Navigate to RDS and then to Parameter groups and the click on *Create parameter group*
+    
+2. Enter details such as Name, Description and Database details.
+    
+    1. In Engine type, choose Postgres (different from Aurora Postgres)
+        
+    2. Choose the required postgres version
+        
+
+![how-to-set-up-postgresql-cdc-on-aws-rds-1](/img/blog/2025/04/how-to-set-up-postgresql-cdc-on-aws-rds-2.webp)
+
+3. Click on Create and parameter group will be created.
+
+## **Modify Database Parameter Group**
+
+Some of the parameters need to be changed to configure this database for PostgreSQL CDC.
+
+All of the mentioned parameters can be modified even in an existing parameter group if you are not using a default one.
+
+(Tip: Even in the parameter group, there are a few Non Modifiable types. You can check the Value Type in the details of the parameter group for this information.)
+
+![how-to-set-up-postgresql-cdc-on-aws-rds-1](/img/blog/2025/04/how-to-set-up-postgresql-cdc-on-aws-rds-3.webp)
+
+Click edit on the created parameter group and set the following parameters:
+
+* Set *rds.logical_replication* to 1 in the parameter group.
+    
+* Set *max_replication_slots* to at least 5 (default is 20) so that the internal replication by RDS is not affected. Best practice is to set this to the number of concurrent replication streams you expect for PostgreSQL CDC.
+    
+* Set `max_wal_senders` to at least 7 (default is 20). It’s best to set this value greater than `max_replication_slots`. A common practice is to set it to max_replication_slots + 2.
+    
+* Set `wal_sender_timeout` to 0 (default is 30000).
+    
+
+Save these changes. Restart the database instance for the changes to be effective.
+
+If you are wondering what you have done, let’s get into details:
+
+* `rds.logical_replication`: This parameter enables or disables logical replication for a PostgreSQL DB instance. Logical replication is a method used to replicate changes made to a database at a logical level, capturing changes to the data itself, such as inserts, updates, and deletes, and then replicating those changes to another database in near real-time. Note that logical replication is a kind of technique used for PostgreSQL CDC.
+    
+* `max_replication_slots`: This parameter specifies the maximum number of replication slots to be used for WAL replication in PostgreSQL CDC.
+    
+* `max_wal_senders`: This parameter specifies the maximum number of WAL senders or processes that can be connected to the server for streaming replication.
+    
+* `wal_sender_timeout`: This parameter specifies the time (in milliseconds) that the server allows for the WAL sender processes to send data without receiving an acknowledgment before the connection is closed.
+    
+
+## **Create VPC Security Group**
+
+Everything on RDS runs within virtual private networks, which means we need to configure accessibility to those resources such as our Postgres database. Navigate to VPC settings and create a new security group. Then configure inbound and outbound access routes for this security group to ensure proper security for PostgreSQL CDC.
+
+## **Create the Database**
+
+* Navigate to RDS → Databases
+    
+* Choose "Create database" and then "Standard Create."
+    
+* Choose the Engine version the same as the family mentioned in the parameter group.
+    
+* Make sure to mention the same VPC security group you have created.
+    
+* In Additional configuration, specify the DB parameter group to use the group we just created for PostgreSQL CDC.
+    
+* Also, choose a backup retention period of at least 7 days.
+    
+* Create the database.
+    
+
+In case you have edited the parameter group or changed backup retention, restart the database so that the changes are effective for PostgreSQL CDC.
+
+
+## **Check Connectivity**
+
+To check if it is properly configured, connect to your database and run this command.
+
+`select * from pg_settings` where name in ('`wal_level`', '`rds.logical_replication`')
+
+You should see results like below ( settings , on and logical )
+
+![how-to-set-up-postgresql-cdc-on-aws-rds-1](/img/blog/2025/04/how-to-set-up-postgresql-cdc-on-aws-rds-4.png)
+
+Now we could connect to this database using our Postgres root user. However, best practices are to use a dedicated account which has the minimal set of required privileges for CDC. Use this user credentials to connect to the Postgres sourcen
+
+Create a user and grant replication access[​](https://docs.airbyte.com/integrations/sources/postgres#step-1-create-a-dedicated-read-only-postgres-user)
+
+The following commands will create a new user:
+
+```sql
+CREATE USER <user_name> PASSWORD 'your_password_here';
+```
+
+Now, provide this user with read-only access to relevant schemas and tables. Re-run this command for each schema you expect to replicate data from:
+
+```json
+GRANT USAGE ON SCHEMA <schema_name> TO <user_name>;
+```
+
+```json
+GRANT SELECT ON ALL TABLES IN SCHEMA <schema_name> TO <user_name>;
+```
+
+```json
+ALTER DEFAULT PRIVILEGES IN SCHEMA <schema_name> GRANT SELECT ON TABLES TO <user_name>;
+```
+
+User also need `rds_replication` role, run the below command for the same:
+
+grant `rds_replication` to &lt;`user_name`&gt;;
+
+### **Bonus Tips and Tricks**
+
+```sql
+# To check all the replication slot
+SELECT * FROM pg_replication_slots;
+
+# To create a replication slot
+SELECT pg_create_logical_replication_slot('<slot_name>','pgoutput'); --> Replace <slot_name> with the name of the slot that you would like to create
+
+# If you want to delete a replication slot
+select pg_drop_replication_slot('<slot_name>');
+---
+# To check all the publications
+SELECT * from pg_publication_tables;
+
+# To create a publication for all the tables in the database 
+CREATE PUBLICATION <publi_name> FOR ALL TABLES; 
+
+# To create a publication for a particular table in the database
+CREATE PUBLICATION <publi_name> FOR TABLE table_name;
+
+# To delete a publication
+DROP PUBLICATION IF EXISTS <publi_name>;
+```
+
+## **Common FAQs**
+
+
+### **What are the common challenges when setting up PostgreSQL CDC on AWS RDS, and how can they be mitigated?**
+
+Common challenges include misconfiguring `rds.logical_replication` and handling `max_replication_slots` under load. To avoid issues like replication lag, ensure proper parameter settings. For example, set max_wal_senders higher than `max_replication_slots` + 2 to prevent bottlenecks.
+
+Regularly check system metrics to stay ahead of potential problems.
+
+### **How does PostgreSQL CDC impact the performance of an AWS RDS instance, and what can be done to optimize it?**
+
+PostgreSQL CDC can increase CPU and I/O usage, impacting performance. To optimize, adjust parameters like `max_wal_senders` and `wal_sender_timeout`. Setting wal_sender_timeout to 0 can help maintain stable connections, improving performance under heavy loads. Monitor RDS metrics to fine-tune these settings as needed.
+
+### **Can PostgreSQL CDC be integrated with other AWS services for advanced analytics and monitoring?**
+
+Yes, PostgreSQL CDC works well with AWS services like Kinesis, Lambda, and CloudWatch. You can stream CDC data to Kinesis for real-time analysis or trigger Lambda functions based on changes. Use CloudWatch to monitor metrics like `pg_replication_slots` to ensure your setup runs smoothly without exceeding limits.
+
+### **What are the best practices for maintaining data consistency and integrity when using PostgreSQL CDC on AWS RDS?**
+
+To maintain consistency, enable `rds.logical_replication` and set up replication slots. Match max_replication_slots to your needs and make sure `max_wal_senders` is set appropriately. This prevents data loss during high transaction volumes and ensures all replication streams are handled effectively.
+
+### **How can PostgreSQL CDC be used to support disaster recovery and high availability in AWS RDS?**
+
+Use PostgreSQL CDC for disaster recovery by replicating data to standby databases. Set up logical replication across different regions to ensure high availability. This way, even if the primary region fails, your data stays accessible, keeping your system resilient and reliable.

@@ -1,0 +1,84 @@
+---
+title: 3. CDC in Replica Mode 
+description: CDC in Replica Mode
+sidebar_position: 3
+---
+
+# PostgreSQL Connector – CDC in Replica Mode (Using a Read Replica)
+
+In some scenarios, you may want to offload CDC from the primary PostgreSQL server by streaming changes from a **replica** (standby) instead. Traditionally, logical decoding could only run on the primary, but with PostgreSQL 16 and above, it's now possible to create logical replication slots on a physical standby server ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=,replication%20slots%20after%20a%20failover)). This section describes how to set up CDC in “replica mode” – i.e., using a PostgreSQL streaming replication standby as the source for CDC. 
+
+**Prerequisites:**
+
+- PostgreSQL **16 or later** on both primary and standby for direct logical decoding on the standby. (Prior to PG 16, logical decoding on a standby is not natively supported. For PG 10–15, you could partially achieve it by creating the slot on primary and using a cascading replication; however, failover handling is manual. We focus on PG16+ for native support.)
+- A configured physical replication **standby** (hot standby) that is in sync with the primary.
+- Superuser access on the primary (to create slots and configure settings) and replication access on the standby.
+
+**Setup Steps:**
+
+1. **Enable Logical Decoding on the Primary:** On the primary server, ensure logical replication is enabled (much like the standalone setup):
+   - In `postgresql.conf` of primary: `wal_level = logical`, and sufficient `max_replication_slots` and `max_wal_senders`.
+   - If you intend to create the logical slot on the standby (PG16 feature), the primary still needs to have `wal_level=logical` so that WAL records contain logical info.
+   - Also, set `max_replication_slots` on the **primary** to accommodate a physical replication slot for the standby (if using one) *plus* the logical slots. You might create a physical slot on primary to ensure WAL retention for the standby (so WAL isn’t removed before standby gets it).
+   - Restart primary if any changes were made. (If the primary was already replicating to a standby, likely wal_level was at least "replica"; you must elevate it to "logical" which requires restart.)
+
+2. **Configure the Standby for Logical Decoding:** On the standby server:
+   - Ensure the standby is a hot standby (`hot_standby = on`, which it is by default in modern Postgres for read replicas).
+   - In `postgresql.conf` on standby, set `hot_standby_feedback = on` ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=subscribers%20with%20very%20few%20changes%3A)). This prevents the primary from cleaning up rows that might still be needed for decoding on the standby. It helps avoid replication conflicts and keeps the history required by logical decoding until consumed.
+   - If using PostgreSQL 16’s feature, set `primary_slot_name = 'standby_slot'` in the standby's recovery settings (often in `postgresql.conf` or a `recovery.conf`/`standby.signal` setup). This makes the standby use a physical replication slot on the primary.
+   - (On primary, you would create that physical slot: `SELECT pg_create_physical_replication_slot('standby_slot');`).
+   - By using a physical replication slot for the standby, you ensure the primary does not remove WAL that the standby hasn’t consumed yet ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=,a%20subscription%20to%20a%20standby)). This is important to keep the standby up-to-date especially if logical decoding on standby lags behind.
+
+3. **Create a Logical Replication Slot on the Standby (PG16+):** On the standby, connect as a superuser and create a logical slot exactly as you would on a primary:
+   ```sql
+   SELECT * FROM pg_create_logical_replication_slot('replica_cdc_slot', 'wal2json');
+   ```
+   In PostgreSQL 16, this is allowed on a standby (it wasn’t in earlier versions). The standby will create the slot and begin decoding WAL it has already received. The slot’s restart LSN will correspond to the current standby WAL flush point.
+
+   - *Note:* The standby must be caught up enough. If the standby has not yet applied enough WAL (and thus doesn’t have all history), you might want to create the slot on primary first and let it stream to standby. PG16’s implementation effectively transparently handles it via the physical slot mechanism.
+
+4. **Grant Replication Permissions (if needed):** If you will have a different user connecting to the standby for CDC (instead of the superuser), create a role with REPLICATION on the standby (similar to previous sections):
+   ```sql
+   CREATE ROLE cdc_rep LOGIN PASSWORD '...' REPLICATION;
+   ```
+   Also ensure `pg_hba.conf` on the standby allows this user for replication connections. Since the standby is read-only (except for replication slots operations PG16 allows), using a non-superuser with replication rights is a good practice.
+
+5. **Connect CDC Client to the Standby:** Point your CDC tool to the standby instance’s host/IP. Use the `cdc_rep` user (or superuser) on the standby. In the connector configuration:
+   - Use the slot name created on the standby (`replica_cdc_slot`) and plugin `wal2json`.
+   - Host = standby host, Port = standby’s port (usually 5432), Database = name of the DB.
+   - The connector will connect in replication mode to the standby and start reading from the logical slot.
+
+   **Important:** The standby is read-only for normal queries. But logical replication connections are allowed and will read WAL from the standby’s replication slot.
+
+   - *Screenshot:* (Optional) A monitoring screenshot showing the standby (`pg_replication_slots` on standby) with `replica_cdc_slot` active when the CDC connector is running.
+
+6. **Monitor and Handle Failover:** One big consideration in “replica mode” CDC is failover:
+   - If the primary fails and the standby is promoted to primary (failover), what happens to the logical slot? In PostgreSQL 16, replication slots on a standby **persist promotion** – meaning the logical slot you created on the standby will remain and continue to work after failover (it effectively becomes a logical slot on the new primary) ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=,replication%20slots%20after%20a%20failover)). This is a new improvement. 
+   - The physical replication slot on the old primary is of course no longer relevant. But because the standby had its own logical slot that is now promoted, the CDC connector can continue as if nothing happened. (It might momentarily disconnect due to the failover, but reconnect it to the new primary – which has the same hostname if using a virtual IP or if you reroute DNS).
+   - **Action:** To make use of this, ensure you **enable `pg_failover_slots` extension or built-in support** if available. In some environments (like Azure or custom setups), you might need to explicitly enable the *pg_failover_slots* extension to persist slots on failover ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=,please%20refer%20to%20the%20documentation)). In vanilla PG16, logical slots on standbys are automatically preserved on promotion (no extension needed) – this was part of the PG16 feature.
+
+   If you are on PG15 or lower, the above seamless failover is not available. In those cases, if you attempted to use a standby for CDC:
+   - You would have had to create the logical slot on the primary (since standby can’t in `<=15`), and your connector would actually connect to the primary to create/read the slot even if reading via a cascade. This gets complicated and is generally not supported by standard CDC tools without custom solutions. It’s usually easier to upgrade to PG16 or run CDC on primary.
+
+**Troubleshooting:**
+
+- **Standby Not Allowing Slot Creation (PG version issue):** If `pg_create_logical_replication_slot` on standby gives an error like *“cannot execute on a standby”*, your PostgreSQL version is below 16 or not configured correctly. Double-check that the standby is indeed running PG16 or higher. On PG15 and below, you cannot create logical slots on a standby – you’ll need to upgrade or use primary for slot.
+
+- **WAL Retention on Primary:** If you did not use a physical replication slot for the standby on the primary, the primary could recycle WAL segments before the standby receives them, especially under load. This could break replication (and thus CDC). If you see errors on standby like *“requested WAL segment XXX has already been removed”*, it means the standby fell behind and WAL was purged. Mitigation:
+  - Always use a **physical slot** for the standby (as described in step 2) so primary retains WAL until standby confirms receipt ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=,a%20subscription%20to%20a%20standby)).
+  - Alternatively, set a high `wal_keep_size` on primary as a buffer (less reliable than a slot).
+  - Also monitor replication lag.
+
+- **Logical Slot Lag on Standby:** Monitor the standby’s logical slot statistics (`pg_replication_slots` on standby). If the slot’s `confirmed_flush_lsn` is far behind the `restart_lsn`, it means your CDC consumer is lagging. This will cause the standby to retain a lot of WAL. In extreme cases, the standby’s disk could fill or the standby could pause replay. The standby will retain WAL for logical slots similar to primary behavior ([Logical replication and logical decoding - Azure Database for PostgreSQL flexible server | Microsoft Learn](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-logical#:~:text=You%20must%20monitor%20logical%20decoding,longer%20used%2C%20drop%20it%20immediately)). The remedy is to speed up consumption or, if not needed, drop the logical slot.
+
+- **Hot Standby Conflicts:** Even with `hot_standby_feedback=on`, some conflicts might arise (though feedback prevents most typical ones). If the logical decoding on standby is slow to process a very old transaction, the standby might hold back `xmin` horizon, and the primary might eventually face bloat. Ensure the decoding slot doesn’t stay idle too long. Also ensure no other queries on standby interfere (e.g., if someone runs a long SELECT on standby, it could conflict with vacuum on primary if feedback is off).
+
+- **Connectivity and Performance:** The CDC connector in replica mode connects to the standby similarly as it would to primary. There may be slight performance differences (logical decoding on standby might use some additional resources on standby). Make sure the standby has enough CPU/memory to handle decoding + its regular replication tasks. If the standby is solely for CDC (no read queries from apps), you can tune it to prioritize WAL apply and decoding. 
+  - For example, you might increase `max_worker_processes` on standby if using a decoding plugin that spawns workers (pglogical uses that, wal2json doesn’t really spawn separate workers).
+  - Also, `maintenance_work_mem` could be tuned if needed for vacuum on standby (but standby vacuum is a bit different).
+  
+- **Failback (Returning to original primary):** In a scenario where you failover and later return operations to the original primary (which has fallen behind and then caught up as a new standby), slots do not magically move back. You would treat the original primary (now standby) as a new standby and possibly set up a new logical slot on it if needed. The continuity of the original slot would have been maintained on the promoted standby. This is a complex scenario; often it's easier to keep the new primary as the source of truth going forward.
+
+- **RDS/Aurora Read Replicas:** Note that the above primarily applies to self-managed Postgres. AWS RDS as of early 2025 might not support logical decoding on read replicas (even if underlying PG16). Aurora PostgreSQL replicas currently do not support creating logical slots on them – you must do CDC on the writer. Always check cloud vendor documentation if they added support for PG16 standby decoding. If not supported, “replica mode” may not be possible in those platforms yet.
+
+In summary, using a standby for CDC (replica mode) is now feasible with PG16+. It can reduce load on your primary and provide high availability for the CDC stream (the slot continues through failover) ([Logical Replication on Standbys in Postgres 16 | Crunchy Data Blog](https://www.crunchydata.com/blog/logical-replication-on-standbys-in-postgres-16#:~:text=,replication%20slots%20after%20a%20failover)). Ensure you configure the system properly to avoid WAL loss and that you monitor both primary and standby for any lag.

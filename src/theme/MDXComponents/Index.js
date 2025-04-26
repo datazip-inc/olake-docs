@@ -6,6 +6,8 @@ import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
 
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
+
 import DocCardList from '@theme/DocCardList';
 import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
@@ -50,6 +52,8 @@ import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
+import LocalParquetConfigDetails from '../../../docs/shared/config/LocalParquetConfigDetails.mdx'
+
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 
@@ -123,7 +127,9 @@ const MDXComponents = {
 
   S3Config,
   S3ConfigDetails,
+
   LocalParquetConfig,
+  LocalParquetConfigDetails,
 
   GlueIcebergWriterConfig,
   MinioJDBCIcebergWriterConfigLocal,
@@ -137,7 +143,9 @@ const MDXComponents = {
   HiveIcebergWriterConfigDetails,
 
   AdditionalReferences,
-  CatalogQuery
+  CatalogQuery,
+  
+  YouTubeEmbed
 };
 
 export default MDXComponents;

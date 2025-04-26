@@ -1,0 +1,118 @@
+---
+title: 2. Azure MySQL 
+description: Azure MySQL
+sidebar_position: 2
+---
+
+# MySQL Connector – Enabling CDC on Azure
+
+Azure Database for MySQL (the managed MySQL service) can also be configured for CDC by enabling binary logs. Azure offers MySQL in two deployment options: **Flexible Server** (newer) and **Single Server** (legacy). Flexible Server gives more control over server parameters, which is what we need for CDC.
+
+**Prerequisites:**
+
+- An Azure Database for MySQL server – preferably **Flexible Server** (for control over binlog settings). Ensure it's in a SKU that supports binary logging (General Purpose or better; Basic tier might not support replication features).
+- Admin access to the Azure MySQL server (the admin user set during creation).
+- If using Single Server, the ability to create at least one read replica (used as a trick to enable binlog, since Single Server requires a replica to turn on binlog).
+
+**Steps (Azure MySQL Flexible Server):**
+
+1. **Enable Binary Logging via Server Parameters:** In the Azure portal, go to your MySQL Flexible Server instance. Under **Settings**, click **Server parameters**. Locate parameters related to binary log:
+   - Find **`log_bin`** – ensure it is set to ON. (On Flexible Server, `log_bin` might be on by default; if not, attempt to set it. If it’s disabled and grayed out, you might be in a tier that doesn’t support it.)
+   - Set **`binlog_row_image` = FULL** ([Add MySQL Database CDC source to an eventstream - Microsoft Fabric | Microsoft Learn](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/add-source-mysql-database-change-data-capture#:~:text=)).
+   - Ensure **`binlog_format` = ROW**. Azure MySQL Flexible might already default to ROW format (especially if version 8.0.21+ because statement-based is not recommended). Double-check by looking at current value. If it's not editable, it could already be fixed to ROW internally.
+   - Set **`binlog_expire_logs_seconds`** to a retention value (in seconds) that suits your needs ([Add MySQL Database CDC source to an eventstream - Microsoft Fabric | Microsoft Learn](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/add-source-mysql-database-change-data-capture#:~:text=)). For example, 86400 for 1 day, or 604800 for 7 days. (On Azure, `expire_logs_days` might not be available; they use the seconds parameter for MySQL 8).
+   - Azure might require a restart after changing these. Click Save (the portal will indicate if a restart is required for any changed parameter; `log_bin` likely requires restart if it was off).
+   - *Screenshot:* Azure Portal screenshot of Server Parameters with `log_bin` = ON, `binlog_format` = ROW (if visible), `binlog_row_image` = FULL, and `binlog_expire_logs_seconds` set.
+
+2. **Restart the Server (if prompted):** If you toggled `log_bin` or other static params, perform a Restart of the MySQL server from the Azure portal. Wait for it to come back online.
+
+3. **Create a CDC User on Azure MySQL:** Use the admin account (e.g., `myadmin@myserver`) to create a replication user:
+   ```sql
+   CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'StrongPassword!';
+   GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+   GRANT SELECT ON *.* TO 'cdc_user'@'%';
+   GRANT SHOW VIEW, EVENT, TRIGGER ON *.* TO 'cdc_user'@'%';
+   FLUSH PRIVILEGES;
+   ```
+   The grants here cover replication and reading. We add `SHOW VIEW, EVENT, TRIGGER` in case the CDC solution needs to read metadata about those (some tools might need to dump schema including views or events). While not always necessary, it's included for completeness. Also, consider `LOCK TABLES` if using snapshot locks:
+   ```sql
+   GRANT LOCK TABLES ON *.* TO 'cdc_user'@'%';
+   ```
+   On Azure MySQL, you cannot grant SUPER, so anything requiring SUPER (like certain locks or setting global vars) will not be possible, but the above privileges suffice for CDC extraction.
+
+   - *Screenshot:* MySQL CLI on Azure showing user creation and grants.
+
+4. **Verify Binary Log Settings:** Connect to the Azure MySQL (using mysql CLI or MySQL Workbench) as admin:
+   ```sql
+   SHOW VARIABLES LIKE 'log_bin';
+   SHOW VARIABLES LIKE 'binlog_format';
+   SHOW VARIABLES LIKE 'binlog_row_image';
+   SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';
+   ```
+   You should see `log_bin` = ON, `binlog_format` = ROW, `binlog_row_image` = FULL, and the expire_logs_seconds to your set value (e.g., 86400) ([Add MySQL Database CDC source to an eventstream - Microsoft Fabric | Microsoft Learn](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/add-source-mysql-database-change-data-capture#:~:text=)). If `log_bin` is OFF and you couldn’t change it, see Single Server notes below. If any values didn’t stick, you might need to use Azure CLI or check if another parameter group-like concept is overriding (Azure doesn’t have custom param groups; the portal is the way).
+
+5. **Test Binary Logging on Azure:** Run a quick test:
+   ```sql
+   SHOW MASTER STATUS;
+   ```
+   You should see a File and Position if binlog is working (similar to MySQL output on other platforms). If it returns empty or an error, binary logging might still be off. 
+
+   If `SHOW MASTER STATUS` is empty but `log_bin` says ON, it might be that no write has happened since enabling. Do:
+   ```sql
+   CREATE TABLE test_binlog(id INT PRIMARY KEY, val VARCHAR(10));
+   INSERT INTO test_binlog VALUES(1, 'azure');
+   SHOW MASTER STATUS;
+   ```
+   Now you should see a binlog file (e.g., `binlog.000001`) and an position. This indicates CDC can proceed.
+
+6. **Configure the CDC Connector to Azure MySQL:** In Debezium or your CDC app, use:
+   - Host = `yourserver.mysql.database.azure.com` (Azure MySQL hostname).
+   - Port = 3306.
+   - User = `cdc_user@yourserver` (for Azure, often the username must include `@servername` as the login, depending on the client library).
+   - Password = the password.
+   - Use SSL parameters: Azure requires SSL connection (unless you disabled that requirement). Provide the public certificate Azure provides or use `sslMode=REQUIRED`.
+   - The connector will connect and likely do an initial snapshot. Since our `cdc_user` has SELECT, it can read all tables. Azure MySQL might not allow `FLUSH TABLES WITH READ LOCK` (due to no SUPER), but Debezium will detect lack of SUPER and use an alternative strategy (table by table locking or RR transaction).
+   - When it starts reading the binlog, it will connect as a replication client. Azure treats it like any MySQL replication connection. Ensure your Azure MySQL instance’s connection limit isn’t too low. Flexible Server allows a decent number (depends on SKU).
+   - Monitor the connection: In Azure’s portal metrics or by `SHOW PROCESSLIST`, you should see a connection with user cdc_user doing "Binlog Dump".
+
+**Single Server Consideration (if not using Flexible):**
+
+Azure Database for MySQL Single Server does not allow direct editing of binlog params. By default, Single Server **enables binary logging only if a read replica is created**. If you are stuck on Single Server:
+   - Create a read replica of the server (this requires it to be in General Purpose tier, as Basic doesn’t support replicas).
+   - Once the replica is created, the primary’s `log_bin` will be ON (Azure turns it on to feed the replica) ([enable binary logging Azure mysql server - Stack Overflow](https://stackoverflow.com/questions/54494717/enable-binary-logging-azure-mysql-server#:~:text=0)).
+   - You can then use the **primary** server’s binlog for CDC. (Alternatively, you might try connecting to the replica for CDC, but that requires `log_slave_updates` on the replica to capture changes, which Azure might not allow you to configure. It's simpler to use the primary after this point.)
+   - Downsides: If you don't actually need the replica for other purposes, you can delete it after it has caused the primary to enable binlog. According to some reports, the `log_bin` stays ON even after replica deletion ([enable binary logging Azure mysql server - Stack Overflow](https://stackoverflow.com/questions/54494717/enable-binary-logging-azure-mysql-server#:~:text=As%20I%20just%20check%20it%2C,web%20and%20then%20delete%20it)). This trick essentially forces the service to keep binary logging on.
+   - This is a hacky workaround; Azure’s recommendation would be to migrate to Flexible Server for better control. But it’s useful to know in case migration is not immediate.
+
+**Troubleshooting:**
+
+- **“log_bin” can’t be turned on / grayed out:** If in Flexible Server the `log_bin` parameter is not accessible or remains OFF:
+  - Check your pricing tier. Some lower tiers or older versions might not allow enabling it. Azure documentation indicates binary logging is supported in Flexible Server.
+  - If it truly cannot be enabled, you might be dealing with a limitation. In that case, you’d have to use the read replica method or upgrade the tier.
+  - For Single Server, as mentioned, you can’t manually enable it without a replica. The Stack Overflow solution of creating then deleting a replica is a known approach ([enable binary logging Azure mysql server - Stack Overflow](https://stackoverflow.com/questions/54494717/enable-binary-logging-azure-mysql-server#:~:text=0)).
+
+- **Permission Issues for CDC user:** If Debezium (or other tool) reports access issues:
+  - Ensure the username in the connection string is formatted correctly (Azure requires `user@servername` in some contexts).
+  - Make sure the Azure firewall is configured: by default, Azure Database for MySQL blocks all external IPs. Add the IP of your CDC server in the **Connection Security** -> Firewall rules. If your CDC is running from Azure VM or App Service, use its outbound IP. If running on-prem, use your public IP.
+  - Check that SSL is used if required. Azure often rejects non-SSL connections by default.
+  - Verify the grants by connecting as `cdc_user` and running a simple `SHOW MASTER STATUS` (should be allowed with REPLICATION CLIENT). If you get denied, the grants might not have taken or the user isn't recognized (maybe the host part didn't match – Azure often expects '%' to cover external, which we did).
+  - If the connector complains about “unknown variable binlog_backup” or something – that might be a specific tool’s option not supported on Azure. Make sure to disable any features in the connector related to backup/GTID if not supported.
+
+- **No changes being captured:** If the connection is fine but you see no events:
+  - Perhaps nothing has been written since the connector start (try inserting a row).
+  - Ensure `binlog_format` is actually ROW. If it somehow was STATEMENT or MIXED, those won’t produce row events for Debezium to capture properly (Debezium requires ROW).
+  - Debezium might not be reading from the start of history if you started it fresh on an existing database without snapshot – it might snapshot then only get new changes. If you expected it to get earlier changes, that’s a config issue (you’d need to set a specific binlog filename/position or GTID to start from).
+  - Check Debezium logs for messages about reading the binlog. If you see something like “Connected to MySQL binlog, starting at position X of file Y”, that’s good. If it keeps saying “No connector task is currently running” then it might not have started properly.
+
+- **Binlog retention in Azure:** By setting `binlog_expire_logs_seconds`, you control how long before Azure automatically purges binlogs. Keep in mind:
+  - Azure might have an internal maximum as well. For example, even if you set 7 days, if your server is tight on storage or other internal tasks, it might purge earlier (less likely if storage is fine).
+  - Monitor the storage usage. Azure allows auto-growth of storage in Flexible Server if configured, but watch the “Storage Used” metric. If binlogs pile up (like your connector down and you set 7 days retention), you could fill storage.
+  - Azure doesn’t expose a function like `rds_show_configuration`; you just rely on the variable. You can periodically check `SHOW BINARY LOGS` to see how many files accumulate.
+
+- **Failover (Geo-redundancy) in Azure:** If you have enabled geo-redundant HA for Azure MySQL (in preview for flexible), a failover might occur to a standby. In such a failover, similar to RDS, the binlog will continue on the new node (with potentially new file names). If using GTID (you can enable `gtid_mode=ON` in Azure MySQL as well, it is supported in 8.0), your CDC tool can resume via GTID. If not, you'll have to point it to the new file/position. Azure’s SLA for MySQL might not cover logical replication slots or anything (different from PG case).
+  
+- **CDC from a Read Replica (Azure):** If you wanted to offload CDC to a replica in Azure MySQL:
+  - Azure MySQL supports read replicas (for both Single and Flexible). To read changes from a replica’s binlog, the replica must log slave updates. Flexible Server replicas (if/when available) likely have `log_bin` on and `log_slave_updates` on by default (to allow cascading). You would connect your CDC to the replica endpoint. However, note that if that replica falls behind or is offline, you could miss events if the primary’s logs purge. Also, failover (if promoting that replica) complicates the connector’s context.
+  - This is advanced and not typically documented. For production, reading from primary on Azure is simpler.
+
+Once configured properly, Azure Database for MySQL will generate the binlog of changes which your CDC connector can consume just like a regular MySQL. The main difference is dealing with the cloud-managed aspects (firewall, parameter applying, etc.), but the core CDC concepts remain the same.

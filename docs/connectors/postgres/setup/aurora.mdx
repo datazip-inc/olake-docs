@@ -1,0 +1,93 @@
+---
+title: 1. Aurora Postgres 
+description: Aurora Postgres
+sidebar_position: 1
+---
+
+# Aurora PostgreSQL CDC Setup Guide
+
+Aurora PostgreSQL supports CDC through PostgreSQL logical decoding. In an Aurora cluster, CDC is enabled by turning on logical replication and using an output plugin like **wal2json** to stream changes. 
+
+**Prerequisites:**
+
+- An Amazon Aurora PostgreSQL cluster (PostgreSQL version 10+).
+- Access to modify the cluster's parameter group (to enable logical replication).
+- Ability to reboot the Aurora cluster (required for static parameter changes).
+- A database user with superuser or replication privileges (e.g. the default `postgres` user or another user granted the `rds_superuser` role).
+
+**Steps:**
+
+1. **Enable Logical Replication in the Parameter Group:** In the AWS RDS console, create or edit the **cluster parameter group** for your Aurora PostgreSQL cluster. 
+
+![postgres-aurora-pg-1](/img/docs/cdc/postgres/postgres-aurora-pg-1.png)
+
+Set the parameter `rds.logical_replication` to `1` (true). This parameter enables logical replication and allows the use of logical decoding plugins like wal2json. Also ensure that `wal_level` is set to `logical` and that you have adequate `max_wal_senders` and `max_replication_slots` configured (enabling `rds.logical_replication` may automatically adjust `wal_level`, but double-check these settings). Save the changes.
+
+![postgres-aurora-pg-2](/img/docs/cdc/postgres/postgres-aurora-pg-2.png)
+
+2. **Reboot the Cluster to Apply Changes:** `rds.logical_replication` is a static parameter, so reboot the Aurora cluster’s writer node to apply the new parameter group settings. After reboot, you can verify the setting by running: 
+
+   ```sql
+   SHOW rds.logical_replication;
+   ``` 
+
+   It should return “on” (1) 
+
+3. **Create or Grant a Replication-Privileged User:** Use the master user (which has the `rds_superuser` role) or another user with sufficient privileges for CDC. Aurora’s default `postgres` user is an `rds_superuser` and has replication permissions by default. If you prefer to use a different user, create one and grant it the required roles:
+   
+   ```sql
+   CREATE USER cdc_user WITH PASSWORD 'strongpassword';
+   GRANT rds_superuser TO cdc_user;
+   -- (rds_superuser in Aurora automatically has logical replication permissions)
+   ```
+   
+   Aurora PostgreSQL requires the CDC user to have superuser-level privileges (or at least the replication role). In Aurora, you cannot grant the literal `SUPERUSER` role, but `rds_superuser` is equivalent for permitted actions. Ensure this user can connect from your CDC client host (adjust security groups or VPC as needed).
+
+4. **Verify the wal2json Plugin Availability:** Aurora PostgreSQL comes with the wal2json plugin pre-installed (enabling `rds.logical_replication` loads it). You can verify by creating a test logical replication slot using wal2json:
+   
+   ```sql
+   SELECT * 
+   FROM pg_create_logical_replication_slot('test_slot', 'wal2json');
+   ```
+   
+   This should succeed, returning a slot name and LSN if everything is configured. (If you get an error about the plugin not found, it means logical replication isn’t enabled or wal2json isn’t available – double-check step 1). You can list slots with `SELECT * FROM pg_replication_slots;` to confirm the slot exists.
+
+5. **(Optional) Use the Slot to Stream Changes:** Although your CDC application will typically create and use its own slot, you can test manually. Make some data changes (INSERT/UPDATE/DELETE) in a test table, then use the SQL interface to fetch changes:
+   
+   ```sql
+   SELECT data 
+   FROM pg_logical_slot_get_changes('test_slot', NULL, NULL, 'pretty-print', '1');
+   ```
+   
+   You should see JSON output from wal2json representing the recent transactions (one JSON per change or transaction). This confirms that CDC is working. After testing, drop the test slot to avoid accumulating WAL: `SELECT pg_drop_replication_slot('test_slot');`.
+
+
+**Troubleshooting:**
+
+- **Permission Errors:** If you see `ERROR: permission denied to create replication slot` or the connector logs an authentication error for replication, it means the user lacks replication privileges. Use the master user or ensure your user has the `rds_superuser` (or at least `rds_replication`) role. On Aurora, using the default `postgres` user is simplest, since it already has the needed privileges.
+
+- **Plugin Not Found:** If you get an error like `ERROR: could not access file "wal2json": No such file or directory` when creating a slot, the wal2json plugin is not enabled. This typically means `rds.logical_replication` is not set or not applied. Re-check the parameter group (step 1) and reboot. Enabling that parameter makes wal2json available on RDS/Aurora.
+
+- **No Changes Captured:** If the slot exists and the connector is running but no changes are coming through:
+  - Verify that `wal_level` is indeed **logical** on the Aurora instance (you can `SHOW wal_level;` to confirm).
+  - Ensure the table you are changing is in a replication-enabled database (in Postgres, logical decoding is per database). The connector should connect to the specific database where the changes occur.
+  - Check the replication slot statistics: run `SELECT * FROM pg_replication_slots;`. If the slot’s `active` column is `f` (false), the connector isn’t actually connected. If `active` is `t` but `restart_lsn` isn’t advancing, the connector might be stuck or not processing events.
+  
+  - OLake supports using the wal2json plugin (and not expecting `pgoutput`). 
+
+- **WAL Retention and Bloat:** Logical replication slots will retain WAL segments on the cluster until they are consumed. If a slot is not actively read, the WAL will pile up and can eventually fill storage. On Aurora, monitor the “Write-Ahead Log consumption” or free storage. If your connector falls far behind or is stopped, you may see disk usage grow or even an error in the database logs about WAL retention. To resolve, resume consumption or if the slot is no longer needed, drop it. **Always drop unused logical slots**
+
+- **Replica Identity Issues:** PostgreSQL requires a primary key (or other replica identity) on tables to capture UPDATE/DELETE properly. If a table has no primary key and you have not set `REPLICA IDENTITY FULL`, deleting or updating rows can cause logical decoding to skip or not output those changes. If you see messages about **“no replica identity”** or missing information for some changes, consider setting `REPLICA IDENTITY FULL` on those tables:
+  
+  ```sql
+  ALTER TABLE my_table REPLICA IDENTITY FULL;
+  ```
+  
+  This will include the full before-image of rows in WAL for tables without a primary key, ensuring wal2json can output the changes.
+
+- **Network Connectivity:** If the CDC application cannot connect at all, check the Aurora cluster’s **security group**. The Aurora instance must allow inbound connections from your CDC client (open the PostgreSQL port, default 5432).
+  
+
+With Aurora PostgreSQL configured as above, you have logical decoding streaming changes via wal2json. This sets the stage for feeding those changes into downstream systems (data warehouses, Kafka, etc.) in a reliable, low-latency manner.
+
+
