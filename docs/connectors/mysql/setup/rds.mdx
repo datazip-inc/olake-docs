@@ -1,6 +1,6 @@
 ---
-title: 4. AWS RDS MySQL 
-description: Aurora MySQL
+title: 2. RDS MySQL 
+description: RDS MySQL
 sidebar_position: 2
 ---
 
@@ -20,6 +20,9 @@ Setting up CDC on Amazon RDS for MySQL is similar to Aurora MySQL, with a few di
 1. **Enable Automated Backups (if not already):** In the RDS console, check your MySQL instance’s backup retention setting. If “Backup retention period” is 0 (no backups), set it to at least 1 day. This ensures binary logs are retained between snapshots and also allows using the retention configuration SP. RDS often ties the ability to retain binlogs to having backups turned on (for point-in-time recovery purposes).
 
 2. **Create and Attach a Parameter Group:** Go to *Parameter Groups* in AWS console, create a new **DB Parameter Group** for your MySQL version (e.g., “default.mysql8.0” as family if you need the name as a base). Name it e.g. “mysql8-cdc”. 
+
+![mysql-rds-pg-1](/img/docs/cdc/mysql/mysql-rds-pg-1.png)
+
    - Edit the parameters:
      - Set `binlog_format = ROW` 
      - Set `binlog_row_image = FULL`.
@@ -27,6 +30,8 @@ Setting up CDC on Amazon RDS for MySQL is similar to Aurora MySQL, with a few di
      - Ensure `log_bin` is ON (RDS may not show this as editable; it’s managed. If it’s a read-replica or multi-AZ, log_bin is automatically on).
      - If GTIDs are desired: set `gtid_mode = ON`, `enforce_gtid_consistency = ON`, and `@@global.server_id` should have a value (RDS usually sets a server_id automatically).
    - Save the changes. Now go to your RDS MySQL instance and modify it to use this new DB parameter group. Apply changes and reboot the instance.
+
+![mysql-rds-pg-2](/img/docs/cdc/mysql/mysql-rds-pg-2.png)
 
 3. **Reboot and Verify Settings:** After the instance reboots, verify:
    ```sql
@@ -95,7 +100,10 @@ Setting up CDC on Amazon RDS for MySQL is similar to Aurora MySQL, with a few di
 - **CDC User Privileges:** If your CDC connector reports errors like *"The MySQL server replied with an error: ACCESS DENIED"*:
   - Make sure the user host matches. For example, if the connector is running on an EC2 within the same VPC, connecting through the instance endpoint, `'%'` works. If you set a specific host in the user (like `'cdc_user'@'198.51.100.10'`), and your connector’s IP changed, it would be denied. 
   - Check `SHOW GRANTS FOR 'cdc_user'@'%'`; you should see REPLICATION SLAVE, etc 
-  - Ensure the connector isn’t trying to perform disallowed operations. For instance, some tools might try to flush logs or set variables – those would fail. 
+  - If you see `ERROR 1449 (HY000): The MySQL server is running with the --read-only option` or similar, it means the user lacks privileges to perform the operation. This can happen if you try to run a snapshot or other operations that require higher privileges.
+  - If you see `ERROR 1227 (42000): Access denied; you need (at least one of) the SUPER privilege(s) for this operation`, it means the user lacks SUPER privileges. This can happen if you try to run a snapshot or other operations that require higher privileges. RDS does not allow granting SUPER, so use the master user for those operations.
+  - If you see `ERROR 1044 (42000): Access denied for user 'cdc_user'@'%' to database 'mysql'`, it means the user lacks access to the mysql database. This can happen if you try to run a command that requires access to the mysql database, such as `SHOW MASTER STATUS`. You can either grant access to the mysql database or use the master user for those commands.
+  - If you see `ERROR 1142 (42000): SELECT command denied to user 'cdc_user'@'%' for table 'mysql.user'`, it means the user lacks access to the mysql.user table. This can happen if you try to run a command that requires access to the mysql.user table, such as `SHOW GRANTS FOR cdc_user`. You can either grant access to the mysql.user table or use the master user for those commands.
   - If initial snapshot fails because of lack of privileges, consider temporarily using the master user for the snapshot then switch to the replication user for CDC.
 
 - **Locked Queries / Long Locks:** In RDS, global locks for backup or schema changes might interfere with CDC if they pause transactions. 
