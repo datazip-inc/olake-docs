@@ -54,9 +54,9 @@ const WebinarsPage = () => {
       route: '/webinar/w-4-pratical-session-on-apache-iceberg',
       img: `/img/webinars/w-4-pratical-session-on-apache-iceberg-cover.webp`,
       alt: 'Pratical Session on Apache Iceberg by Sachin Tripathi Webinar',
-      status: 'upcoming',
-      button: 'primary',
-      CTA: 'Register Now',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
       date: '28 March 2025',
       // icon: FaVideo
     },
