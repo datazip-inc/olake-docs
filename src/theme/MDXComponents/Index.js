@@ -36,6 +36,7 @@ import LocalSyncPostgres from '../../../docs/shared/commands/LocalSyncPostgres.m
 import LocalSyncWithStatePostgres from '../../../docs/shared/commands/LocalSyncWithStatePostgres.mdx'
 
 import MongoDBSourceConfig from '../../../docs/shared/config/MongoDBSourceConfig.mdx'
+import MongoDBSourceConfigWithSRV from '../../../docs/shared/config/MongoDBSourceConfigWithSRV.mdx'
 import MongoDBSourceConfigDetails from '../../../docs/shared/config/MongoDBSourceConfigDetails.mdx'
 import MongoDBStateConfig from '../../../docs/shared/config/MongoDBStateConfig.mdx'
 import MongoDBStateConfigDetails from '../../../docs/shared/config/MongoDBStateConfigDetails.mdx'
@@ -109,6 +110,7 @@ const MDXComponents = {
   LocalSyncWithStatePostgres,
 
   MongoDBSourceConfig,
+  MongoDBSourceConfigWithSRV,
   MongoDBSourceConfigDetails,
   MongoDBStateConfig,
   MongoDBStateConfigDetails,
