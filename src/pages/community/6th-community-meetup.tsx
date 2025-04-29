@@ -8,7 +8,7 @@ import React = require('react');
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
-import meetupData from '../../data/meetup/5th-meetup.json'
+import meetupData from '../../data/meetup/6th-meetup.json'
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 const hosts = [
@@ -31,8 +31,8 @@ const hosts = [
 const CommunityPage = () => {
 
   const communityData = {
-    title: 'OLake 5th Community Meetup',
-    summary: 'OLake 5th Community Meetup',
+    title: 'OLake 6th Community Meetup',
+    summary: 'OLake 6th Community Meetup',
   };
   return (
     <Layout
@@ -47,15 +47,15 @@ const CommunityPage = () => {
         />
 
         <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="dgxEBp9qWOQ" className="max-w-6xl" />
+          <YouTubeEmbed videoId="B8ApTbZ5Py4" className="max-w-6xl" />
         </section>
 
         <Hr />
         <br />
 
         <WebinarOverview
-          date="March 27, 2025"
-          time="09:00 PM - 10:00 PM IST"
+          date="April 28, 2025"
+          time="04:30 PM - 05:30 PM IST"
           duration="1 hours"
           summary={communityData.summary}
           bulletPoints={[

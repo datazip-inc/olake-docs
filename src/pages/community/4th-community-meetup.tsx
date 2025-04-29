@@ -1,5 +1,5 @@
 import WebinarTitle from '../../components/webinars/WebinarTitle';
-import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
+// import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';

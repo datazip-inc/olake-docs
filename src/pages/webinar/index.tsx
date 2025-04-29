@@ -7,8 +7,19 @@ import { FaFileVideo, FaVideo } from 'react-icons/fa';
 // Define the webinar type directly here if not using a separate types file
 
 const WebinarsPage = () => {
-
   const communityMeets = [
+    {
+      title: 'OLake 6th Community Meetup',
+      subtitle: 'Join us ',
+      route: '/community/6th-community-meetup',
+      img: `/img/community/6th-community-meetup-cover.png`,
+      alt: 'OLake 6th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 April 2025',
+      icon: FaVideo
+    },
     {
       title: 'OLake 5th Community Meetup',
       subtitle: 'Join us ',
