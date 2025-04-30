@@ -37,10 +37,10 @@ NODE_AFFINITY_LABEL_VALUE = "olake" # <-- EDIT THIS LINE (e.g., "us-central1-a")
 
 # --- Names of ConfigMaps ---
 # Ensure ConfigMaps with these names exist in the TARGET_NAMESPACE
-# containing your source, writer, and catalog JSON configurations respectively.
+# containing your source, destination, and streams JSON configurations respectively.
 SOURCE_CONFIG_MAP_NAME = "olake-source-config"
-WRITER_CONFIG_MAP_NAME = "olake-destination-config"
-CATALOG_CONFIG_MAP_NAME = "olake-streams-config"
+DESTINATION_CONFIG_MAP_NAME = "olake-destination-config"
+STREAMS_CONFIG_MAP_NAME = "olake-streams-config"
 
 # --- DAG Definition ---
 # Set the start date to the current time in the Asia/Kolkata timezone
@@ -57,7 +57,7 @@ with DAG(
     ### Olake Sync DAG
 
     This DAG runs the Olake `sync` command using pre-created ConfigMaps
-    for source, writer, and catalog configuration. It ensures a persistent
+    for source, destination, and streams configuration. It ensures a persistent
     volume claim exists before running the sync task.
 
     **Requires pre-configured Kubernetes Connection, ConfigMaps, and appropriate StorageClass.**
@@ -75,20 +75,20 @@ with DAG(
         )
     )
     
-    # Writer config volume: Contains destination configuration
-    writer_config_volume = k8s.V1Volume(
-        name="writer-config-volume", 
+    # Destination config volume: Contains destination configuration
+    destination_config_volume = k8s.V1Volume(
+        name="destination-config-volume", 
         config_map=k8s.V1ConfigMapVolumeSource(
-            name=WRITER_CONFIG_MAP_NAME,
+            name=DESTINATION_CONFIG_MAP_NAME,
             items=[k8s.V1KeyToPath(key="destination.json", path="destination.json")]
         )
     )
     
-    # Catalog config volume: Contains pre-generated catalog configuration
-    catalog_config_volume = k8s.V1Volume(
-        name="catalog-config-volume",
+    # Streams config volume: Contains pre-generated streams configuration
+    streams_config_volume = k8s.V1Volume(
+        name="streams-config-volume",
         config_map=k8s.V1ConfigMapVolumeSource(
-            name=CATALOG_CONFIG_MAP_NAME,
+            name=STREAMS_CONFIG_MAP_NAME,
             items=[k8s.V1KeyToPath(key="streams.json", path="streams.json")]
         )
     )
@@ -157,7 +157,7 @@ with DAG(
     )
     
     # --- Init Container for Sync Task ---
-    # Copies source, writer, AND catalog configs from ConfigMaps to the shared PVC
+    # Copies source, destination, AND streams configs from ConfigMaps to the shared PVC
     # Also ensures an empty state.json exists if one is not already present.
     init_container_sync = k8s.V1Container(
         name="init-config",
@@ -168,8 +168,8 @@ with DAG(
                      "echo 'Copying config files to shared volume...' && "
                      "mkdir -p /mnt/workspace && " # Ensure target directory exists
                      "cp /etc/source-config/source.json /mnt/workspace/source.json && "
-                     "cp /etc/writer-config/destination.json /mnt/workspace/destination.json && "
-                     "cp /etc/catalog-config/streams.json /mnt/workspace/streams.json && "
+                     "cp /etc/destination-config/destination.json /mnt/workspace/destination.json && "
+                     "cp /etc/streams-config/streams.json /mnt/workspace/streams.json && "
                      "echo 'Checking for existing state.json...' && "
                      # Check if state.json does NOT exist
                      "if [ ! -f /mnt/workspace/state.json ]; then "
@@ -185,8 +185,8 @@ with DAG(
         volume_mounts=[
             # Mount ConfigMaps read-only to copy from
             k8s.V1VolumeMount(name="source-config-volume", mount_path="/etc/source-config", read_only=True),
-            k8s.V1VolumeMount(name="writer-config-volume", mount_path="/etc/writer-config", read_only=True),
-            k8s.V1VolumeMount(name="catalog-config-volume", mount_path="/etc/catalog-config", read_only=True),
+            k8s.V1VolumeMount(name="destination-config-volume", mount_path="/etc/destination-config", read_only=True),
+            k8s.V1VolumeMount(name="streams-config-volume", mount_path="/etc/streams-config", read_only=True),
             # Mount the shared PVC writable to copy into and potentially create state.json
             k8s.V1VolumeMount(name="shared-data", mount_path="/mnt/workspace", read_only=False)
         ]
@@ -237,8 +237,8 @@ with DAG(
         # Define volumes needed by init and main containers
         volumes=[
             source_config_volume,
-            writer_config_volume,
-            catalog_config_volume,
+            destination_config_volume,
+            streams_config_volume,
             shared_volume,
         ],
         # Define how the main container mounts the shared volume
@@ -260,7 +260,7 @@ with DAG(
             "--config", "/mnt/config/source.json",     # Path within the mounted volume
             "--catalog", "/mnt/config/streams.json",    # Path within the mounted volume
             "--destination", "/mnt/config/destination.json", # Path within the mounted volume
-            "--state", "/mnt/config/state.json"
+            # "--state", "/mnt/config/state.json"
         ],
 
         # Operator settings

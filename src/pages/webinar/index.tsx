@@ -60,6 +60,18 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Women in Data: Building Technical Expertise and Career Pathways in Data Engineering',
+      subtitle: 'Join us for an in-depth technical discussion with six accomplished women data engineers who are architecting the backbone of modern data-driven organizations. This 60-minute session brings together specialists from healthcare, retail, cloud platforms, and enterprise data systems to share their technical approaches to solving complex data engineering challenges',
+      route: '/webinar/w-5-women-in-data-engineering',
+      img: `/img/webinars/w-5-women-in-data-engineering-cover.png`,
+      alt: 'Women in Data Engineering',
+      status: 'upcoming',
+      button: 'primary',
+      CTA: 'Register',
+      date: '30 April 2025',
+      // icon: FaVideo
+    },
+    {
       title: 'Pratical Session on Apache Iceberg by Sachin Tripathi',
       subtitle: 'Join us on Friday, March 28th at 4 PM IST for a technical session on Apache Iceberg with Sachin Tripathi, Senior Data Engineer at EarnIn. The session will examine Icebergs ACID-like transaction model, time travel capabilities, schema evolution mechanisms, hidden partitioning system, and catalog architecture',
       route: '/webinar/w-4-pratical-session-on-apache-iceberg',
