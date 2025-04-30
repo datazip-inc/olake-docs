@@ -39,8 +39,8 @@ NODE_AFFINITY_LABEL_VALUE = "olake" # <-- EDIT THIS LINE (e.g., "us-central1-a")
 # Ensure ConfigMaps with these names exist in the TARGET_NAMESPACE
 # containing your source, writer, and catalog JSON configurations respectively.
 SOURCE_CONFIG_MAP_NAME = "olake-source-config"
-WRITER_CONFIG_MAP_NAME = "olake-writer-config"
-CATALOG_CONFIG_MAP_NAME = "olake-catalog-config"
+WRITER_CONFIG_MAP_NAME = "olake-destination-config"
+CATALOG_CONFIG_MAP_NAME = "olake-streams-config"
 
 # --- DAG Definition ---
 # Set the start date to the current time in the Asia/Kolkata timezone
@@ -71,7 +71,7 @@ with DAG(
         name="source-config-volume",
         config_map=k8s.V1ConfigMapVolumeSource(
             name=SOURCE_CONFIG_MAP_NAME,
-            items=[k8s.V1KeyToPath(key="config.json", path="config.json")]
+            items=[k8s.V1KeyToPath(key="source.json", path="source.json")]
         )
     )
     
@@ -80,7 +80,7 @@ with DAG(
         name="writer-config-volume", 
         config_map=k8s.V1ConfigMapVolumeSource(
             name=WRITER_CONFIG_MAP_NAME,
-            items=[k8s.V1KeyToPath(key="writer.json", path="writer.json")]
+            items=[k8s.V1KeyToPath(key="destination.json", path="destination.json")]
         )
     )
     
@@ -89,7 +89,7 @@ with DAG(
         name="catalog-config-volume",
         config_map=k8s.V1ConfigMapVolumeSource(
             name=CATALOG_CONFIG_MAP_NAME,
-            items=[k8s.V1KeyToPath(key="catalog.json", path="catalog.json")]
+            items=[k8s.V1KeyToPath(key="streams.json", path="streams.json")]
         )
     )
     
@@ -167,9 +167,9 @@ with DAG(
                  (
                      "echo 'Copying config files to shared volume...' && "
                      "mkdir -p /mnt/workspace && " # Ensure target directory exists
-                     "cp /etc/source-config/config.json /mnt/workspace/config.json && "
-                     "cp /etc/writer-config/writer.json /mnt/workspace/writer.json && "
-                     "cp /etc/catalog-config/catalog.json /mnt/workspace/catalog.json && "
+                     "cp /etc/source-config/source.json /mnt/workspace/source.json && "
+                     "cp /etc/writer-config/destination.json /mnt/workspace/destination.json && "
+                     "cp /etc/catalog-config/streams.json /mnt/workspace/streams.json && "
                      "echo 'Checking for existing state.json...' && "
                      # Check if state.json does NOT exist
                      "if [ ! -f /mnt/workspace/state.json ]; then "
@@ -257,9 +257,9 @@ with DAG(
         # Pass arguments for the 'sync' command
         arguments=[
             "sync",
-            "--config", "/mnt/config/config.json",     # Path within the mounted volume
-            "--catalog", "/mnt/config/catalog.json",    # Path within the mounted volume
-            "--destination", "/mnt/config/writer.json", # Path within the mounted volume
+            "--config", "/mnt/config/source.json",     # Path within the mounted volume
+            "--catalog", "/mnt/config/streams.json",    # Path within the mounted volume
+            "--destination", "/mnt/config/destination.json", # Path within the mounted volume
             "--state", "/mnt/config/state.json"
         ],
 
