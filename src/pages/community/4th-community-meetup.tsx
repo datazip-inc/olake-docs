@@ -11,6 +11,13 @@ import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/4th-meetup.json'
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
+import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';
+
+const decks: Slide[] = [
+  { title: '4th Community Meetup', url: 'https://docs.google.com/presentation/d/1zU4lkoEoX9ilHfxgU7nlq5mGC_CW52uBgz-ZtEEFJJE/edit#slide=id.g330c4f6be02_0_0' }
+];
+
+
 const hosts = [
   {
     name: "Priyansh Khodiyar",
@@ -71,6 +78,8 @@ const CommunityPage = () => {
         />
         <Hr />
         <br />
+
+        <SlidesCarousel slides={decks} />
 
         <WebinarHosts hosts={hosts} />
 

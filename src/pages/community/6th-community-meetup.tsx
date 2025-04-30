@@ -11,6 +11,15 @@ import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/6th-meetup.json'
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
+import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';
+
+const decks: Slide[] = [
+  { title: '6th Community Meetup', url: 'https://docs.google.com/presentation/d/15vg09t-JY2uLn4H3uGHRCDtRDS1JeUnkfwVraCiD8Gw/edit#slide=id.g330c4f6be02_0_0' },
+  { title: 'PhysicsWallah with OLake', url: 'https://docs.google.com/presentation/d/1Kbwjh7MMc-6pWMEH6Fat7K9us-Osiygf-NNXOxwYStI/edit?slide=id.g3531bdb1a28_2_75#slide=id.g3531bdb1a28_2_75' },
+];
+
+
+
 const hosts = [
   {
     name: "Priyansh Khodiyar",
@@ -29,7 +38,6 @@ const hosts = [
 ];
 
 const CommunityPage = () => {
-
   const communityData = {
     title: 'OLake 6th Community Meetup',
     summary: 'OLake 6th Community Meetup',
@@ -65,6 +73,9 @@ const CommunityPage = () => {
         <Hr />
         <br />
 
+
+        <SlidesCarousel slides={decks} />
+
         <WebinarHosts hosts={hosts} />
 
         <MeetupNotes data={meetupData} />
@@ -79,3 +90,4 @@ const CommunityPage = () => {
 };
 
 export default CommunityPage;
+
