@@ -58,7 +58,6 @@ const hosts = [
     image: "/img/authors/mitali.jpg",
     linkedin: "https://www.linkedin.com/in/mitaliz/",
   },
-
 ];
 
 const WebinarPage = () => {
