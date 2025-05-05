@@ -260,7 +260,7 @@ with DAG(
             "--config", "/mnt/config/source.json",     # Path within the mounted volume
             "--catalog", "/mnt/config/streams.json",    # Path within the mounted volume
             "--destination", "/mnt/config/destination.json", # Path within the mounted volume
-            # "--state", "/mnt/config/state.json"
+            "--state", "/mnt/config/state.json"
         ],
 
         # Operator settings

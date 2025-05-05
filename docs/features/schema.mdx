@@ -1,0 +1,113 @@
+---
+title: Schema Evolution and Datatype Change
+description: OLake Features description
+sidebar_position: 2
+---
+
+# Schema Evolution and Data Type Changes
+
+This document explains how OLake handles schema changes and data type changes in your data pipelines. It covers two distinct features that help maintain pipeline resilience when your source data structures evolve.
+
+## Schema Evolution
+
+Schema evolution refers to changes in your database structure like adding, removing, or renaming columns and tables. OLake handles these changes to prevent pipeline failures and data loss.
+
+### What OLake Handles
+
+#### Column-Level Changes
+
+| Change Type                                                    | How OLake Handles It                                                                                                                                                                                                                                                                                                                                                                                      | Pipeline Impact |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| **Adding Columns**                                             | **All Columns Selected for Sync** <br/> Automatically discoverable in the schema and column gets populated with values . If old records have been updated with default value, cdc will treat this as updates and will update accordingly. <br/> <br/> **Specific Columns Selected for Sync** <br/> If an existing column is enabled at later stage , the values will get populated since the sync is run. | No breakage     |
+| **Removing Columns**                                           | Column will still exist in destination schema but values won't get populated post dropping column. Prior data will be unaffected                                                                                                                                                                                                                                                                          | No breakage     |
+| **Renaming Columns**                                           | Data will be loaded to the same column as iceberg used field id and not field name hence schema gets updated with the new column name whereas field id remains the same hence the same column will be populated with values post the column name change                                                                                                                                                   | No breakage     |
+| Non Normalised Data (JSON): Addition/Deletion / Rename columns | Automatically new key will be created in case of new columns added , likewise if any key is deleted , it wont appear in the JSON data                                                                                                                                                                                                                                                                     | No breakage     |
+
+#### Table-Level Changes
+
+| Change Type                                                    | How OLake Handles It                                                                                                                                                                                                                                                                                                                                                                               | Pipeline Impact      |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| **Adding Tables/Streams**                                      | Scenario 1 : 1. Discover New Streams - Enabled (All streams selected) - New Streams will be synced first time full load and CDC in subsequent runs 2. Discover & Sync New Streams - Enabled (Specific streams selected) New stream will be discovered but need to be explicitly selected for sync <br/> Scenario 2: Discover New Streams - Disabled - New Streams will not be synced or discovered | No breakage          |
+| **Removing Tables/Streams**                                    | Auto Detected at the stream level. Existing Data/Tables remains in the destination                                                                                                                                                                                                                                                                                                                 | No breakage          |
+| **Renaming Tables**                                            | 1. If discover new stream option is enabled then the renamed table with new name will be visible and can be selected for sync 2. If discover new stream option is disabled the table with new name will not be discovered/synced. The table with older name in destination will not get populated                                                                                                  | No breakage          |
+| **Cursor Column Deletion** (WIP)                               | If a column used for incremental sync is dropped, issues will occur                                                                                                                                                                                                                                                                                                                                | Possible breakage    |
+| Non Normalised Data (JSON): Addition/Deletion / Rename columns | Automatically discoverable in schema (Discover New Streams enabled)                                                                                                                                                                                                                                                                                                                                | No Pipeline Breakage |
+
+## Schema Data Type Changes
+
+Schema data type changes refer to modifications to the data type of existing columns (e.g., changing `INT` to `BIGINT`). OLake leverages `Apache Iceberg v2` tables' type promotion capabilities to handle compatible changes automatically.
+
+### Supported Data Type Promotions
+
+OLake fully supports all Iceberg v2 data type promotions:
+
+| From          | To                          | Notes                                                 |
+| ------------- | --------------------------- | ----------------------------------------------------- |
+| INT           | LONG (BIGINT)               | Widening integers is safe                             |
+| FLOAT         | DOUBLE                      | Promoting to higher precision works without data loss |
+| DATE          | TIMESTAMP, TIMESTAMP_NS     | Dates can be safely converted to timestamps           |
+| DECIMAL(P, S) | DECIMAL(P', S) where P' > P | Only widening precision is supported                  |
+
+### Handling Incompatible Type Changes
+
+For type changes not supported by Iceberg v2 (like STRING to INT), OLake offers two options:
+
+1. **Schema Data Type Changes Enabled with DLQ** (coming soon):
+
+   - Records with incompatible types will be routed to a Dead Letter Queue
+   - Main pipeline continues processing compatible records
+   - Full record information preserved for troubleshooting
+
+2. **Schema Data Type Changes Enabled without DLQ**:
+
+   - Sync fails with clear error message about incompatible type change
+   - Message identifies the specific column and type conversion that failed
+
+3. **Schema Data Type Changes Disabled**:
+   - Any data type change results in sync failure
+   - Provides explicit error about the type change detected
+
+### Production Best Practices
+
+- Enable Schema Data Type Changes for production environments
+- Implement robust monitoring for type change errors
+- Test schema changes in non-production environments first
+- Consider enabling DLQ (when available) for critical pipelines
+- Document your schema and track changes over time
+
+### Limitations
+
+- Type promotion is not allowed for fields used in certain partition transforms
+- Variant datatypes may require special handling
+- Some narrowing type changes might result in data truncation or loss
+- DLQ functionality is coming soon
+
+## Example Scenarios
+
+### Scenario 1: Adding a Column in Source
+
+When a new column appears in your source data:
+
+- OLake automatically detects the new column
+- The column is added to your destination schema
+- New data includes values for this column
+- Historical data has null values for this column
+
+### Scenario 2: INT to BIGINT Conversion
+
+When a column changes from INT to BIGINT type:
+
+- OLake detects the widening type change
+- Column type is updated in the destination
+- All values are properly converted
+- Pipeline continues without interruption
+
+### Scenario 3: Incompatible Type Change
+
+When a column changes from STRING to INT type:
+
+- Without DLQ: Sync fails with clear error message
+- With DLQ (coming soon): Incompatible records go to DLQ table
+- Records that can be safely converted continue to destination
+
+For more detailed information on Iceberg's schema evolution capabilities, refer to the [Apache Iceberg documentation](https://iceberg.apache.org/spec/#schema-evolution).
