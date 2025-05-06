@@ -116,7 +116,7 @@ const BlogShowcase: React.FC = () => {
                       alt={post.title}
                       width={64}
                       height={64}
-                      className='h-48 w-full object-contain'
+                      className='h-56 md:h-48 w-full object-contain'
                     />
                   </div>
                   <div className='flex h-full flex-col bg-white p-6 dark:bg-gray-800'>

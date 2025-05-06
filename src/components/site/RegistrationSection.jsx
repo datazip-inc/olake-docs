@@ -38,7 +38,7 @@ const RegistrationSection = () => {
   }, [history, history.location.hash])
 
   return (
-    <section className='relative mx-auto w-4/5 overflow-hidden rounded-xl p-6'>
+    <section id='olake-form-product' className='relative mx-auto w-4/5 overflow-hidden rounded-xl p-6'>
       {/* Background lake image */}
       <div className='absolute inset-0 z-0'>
         <img
@@ -68,11 +68,11 @@ const RegistrationSection = () => {
                 </p>
               </div>
 
-                        
+
               
               {/* added the form here */}
               <div
-                id='olake-form-product'
+                id='olake-form-product2'
                 ref={formRef}
                 className='flex w-full flex-col bg-white rounded-2xl md:flex-row'
               >
