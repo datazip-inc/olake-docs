@@ -18,6 +18,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   return (
     <div className='mx-6 flex w-full flex-col-reverse items-center lg:flex-row lg:items-start justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-8 lg:py-20'>
       {/* Mobile Image - Only visible on mobile */}
+      
+
+
+      <div className='md:hidden'>
+          <StatsSection />
+        </div>
+
+
       <div className='w-full mb-8 lg:hidden'>
         <div className='flex justify-center'>
           <img
@@ -28,22 +36,23 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
       </div>
 
+
       {/* Left Column - contains 2 rows */}
-      <div className='mt-0 lg:mt-0 flex w-full flex-col lg:w-3/5'>
+      <div className='mt-0 container lg:mt-0 flex w-full flex-col lg:w-3/5'>
         {/* Row 1: "Fastest way to replicate..." section */}
-        <div className='mb-8'>
+        <div className='mb-8 mr-8'>
 
           <div className='flex flex-col gap-4'>
-            <h1 className='mb-4 text-[28px] font-medium text-center lg:text-left text-gray-800 dark:text-white md:text-4xl lg:text-4xl'>
+            <h1 className='mb-4 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-4xl lg:text-4xl'>
               {title}
             </h1>
 
-            <h2 className='text-2xl text-center lg:text-left font-normal md:text-4xl lg:text-6xl'>
-              <span className='rounded-3xl bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
+            <h2 className='text-2xl text-center leading-8 lg:text-left font-normal md:text-4xl lg:text-4xl xl:text-4xl 2xl:text-5xl'>
+              <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Database
               </span>
               <span className='text-[#193AE6] dark:text-blue-400'>→</span>
-              <span className='rounded-3xl bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-widest text-[#193AE6] dark:bg-gray-800/80 dark:text-blue-400'>
+              <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-widest text-[#193AE6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Data Lakehouse
               </span>
             </h2>
@@ -74,7 +83,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
 
         {/* Row 2: Stats Section */}
-        <div>
+         <div className='hidden lg:flex w-full lg:w-3/5 justify-center lg:justify-start'>
           <StatsSection />
         </div>
       </div>
@@ -85,6 +94,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           <img src='/img/site/hero-section.svg' alt='O.Lake Data Pipeline' className='max-w-full h-auto dark:filter dark:brightness-90' />
         </div>
       </div>
+
+      
     </div>
   )
 }
