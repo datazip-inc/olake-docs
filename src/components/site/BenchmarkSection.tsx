@@ -20,7 +20,7 @@ const BenchmarkRow: React.FC<BenchmarkRowProps> = ({
   return (
     <div className='grid grid-cols-6 border-b border-gray-200 dark:border-gray-700'>
       <div className='p-5 font-medium text-gray-700 dark:text-gray-300 md:p-6'>{metric}</div>
-      <div className='bg-green-50/70 p-5 text-center font-medium text-green-600 dark:bg-green-900/10 dark:text-green-400 md:p-6'>
+      <div className='bg-green-50/70 p-5 text-center font-medium text-green-600 dark:text-green-400 md:p-6'>
         {olakeValue}
       </div>
       <div className='p-5 text-center text-gray-600 dark:text-gray-400 md:p-6'>{airbyteValue}</div>
@@ -54,7 +54,7 @@ const BenchmarkHeader: React.FC = () => {
       <div className='p-5 font-medium text-gray-700 dark:text-gray-300 md:p-6'>Metrics</div>
       <div className='p-5 md:p-6'>
         <div className='rounded-lg bg-green-50/70 p-3 text-center dark:bg-green-900/10'>
-          <div className='font-semibold text-gray-800 dark:text-white'>OLake</div>
+          <div className='font-semibold text-gray-800'>OLake</div>
           <div className='text-sm text-gray-600 dark:text-gray-400'>Open Source</div>
         </div>
       </div>
@@ -135,30 +135,30 @@ const BenchmarkSection: React.FC = () => {
     <section className='w-full bg-white py-16 dark:bg-gray-900 md:py-24'>
       <div className='mx-auto mb-12 w-full text-center md:mb-16'>
         <div className='mb-3 text-xl font-bold text-[#203FDD]'>Benchmarks</div>
-        <h2 className='text-5xl font-bold leading-tight text-[#333333] dark:text-white md:text-5xl'>
-          Get the <span className='leading-relaxed tracking-widest text-[#203FDD]'>best</span>
+        <h2 className='text-5xl font-bold leading-relaxed tracking-wider text-[#333333] dark:text-white md:text-5xl'>
+          Get the <span className='text-[#203FDD]'>best</span>
           <span className='md:ml-2'>with OLake</span>
         </h2>
       </div>
 
       <div className='mb-8 flex w-full justify-center'>
-        <div className='inline-flex overflow-hidden rounded-lg'>
+        <div className='inline-flex gap-2 overflow-hidden rounded-lg'>
           <button
             onClick={() => setActiveTab('full-load')}
-            className={`border px-10 py-3 text-sm font-medium transition-all ${
+            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${
               activeTab === 'full-load'
-                ? 'border-blue-200 bg-blue-100 text-blue-700'
-                : 'border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[#E8EBFD] text-blue-700'
+                : 'bg-transparent text-gray-600'
             }`}
           >
             Full Load
           </button>
           <button
             onClick={() => setActiveTab('cdc-sync')}
-            className={`border-b border-r border-t px-10 py-3 text-sm font-medium transition-all ${
+            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${
               activeTab === 'cdc-sync'
-                ? 'border-blue-200 bg-blue-100 text-blue-700'
-                : 'border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[#E8EBFD] text-blue-700'
+                : 'bg-transparent text-gray-600'
             }`}
           >
             CDC Sync
@@ -166,11 +166,11 @@ const BenchmarkSection: React.FC = () => {
         </div>
       </div>
 
-      <div className='flex justify-center'>
-        {activeTab === 'full-load' && (
-          <div className='mx-auto w-full max-w-screen-2xl px-4'>
-            <div className='overflow-x-auto'>
-              <table className='w-full table-fixed border-collapse'>
+      <div className='w-full overflow-x-auto'>
+        <div className='mx-auto max-w-full px-4'>
+          {activeTab === 'full-load' && (
+            <div className='flex w-full justify-center'>
+              <table className='w-full max-w-7xl table-fixed border-collapse'>
                 <thead>
                   <tr className='border-t border-gray-200'>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
@@ -178,11 +178,11 @@ const BenchmarkSection: React.FC = () => {
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-green-50/70 p-6'>
                       <div className='flex flex-col items-center justify-center'>
-                        <div className='font-semibold text-gray-800 dark:text-white'>OLake</div>
+                        <div className='font-bold text-gray-800'>OLake</div>
                         <div className='text-sm text-gray-600 dark:text-gray-400'>Open Source</div>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
@@ -195,7 +195,7 @@ const BenchmarkSection: React.FC = () => {
                         <span>Airbyte</span>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
@@ -208,7 +208,7 @@ const BenchmarkSection: React.FC = () => {
                         <span>Fivetran</span>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path d='M4 4h16v16H4z' stroke='currentColor' strokeWidth='2' />
@@ -216,7 +216,7 @@ const BenchmarkSection: React.FC = () => {
                         <span>Debezium</span>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
@@ -336,13 +336,11 @@ const BenchmarkSection: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'cdc-sync' && (
-          <div className='mx-auto w-full max-w-screen-2xl px-4'>
-            <div className='overflow-x-auto'>
-              <table className='w-full table-fixed border-collapse'>
+          {activeTab === 'cdc-sync' && (
+            <div className='flex w-full justify-center'>
+              <table className='w-full max-w-7xl table-fixed border-collapse'>
                 <thead>
                   <tr className='border-t border-gray-200'>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
@@ -350,11 +348,11 @@ const BenchmarkSection: React.FC = () => {
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-green-50/70 p-6'>
                       <div className='flex flex-col items-center justify-center'>
-                        <div className='font-semibold text-gray-800 dark:text-white'>OLake</div>
+                        <div className='font-bold text-gray-800'>OLake</div>
                         <div className='text-sm text-gray-600 dark:text-gray-400'>Open Source</div>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
@@ -367,7 +365,7 @@ const BenchmarkSection: React.FC = () => {
                         <span>Airbyte</span>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
@@ -380,7 +378,7 @@ const BenchmarkSection: React.FC = () => {
                         <span>Fivetran</span>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path d='M4 4h16v16H4z' stroke='currentColor' strokeWidth='2' />
@@ -388,7 +386,7 @@ const BenchmarkSection: React.FC = () => {
                         <span>Debezium</span>
                       </div>
                     </th>
-                    <th className='w-1/6 border border-gray-200 p-6'>
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
@@ -492,24 +490,24 @@ const BenchmarkSection: React.FC = () => {
                     <td className='border border-gray-200 bg-green-50/70 p-6 text-center font-medium dark:bg-green-900/10 dark:text-gray-400'>
                       -
                     </td>
-                    <td className='border border-gray-200 p-6 text-center text-gray-600 dark:text-gray-400'>
+                    <td className='border border-gray-200 p-6 text-center font-medium text-blue-600 dark:text-blue-400'>
                       3X more resources
                     </td>
-                    <td className='border border-gray-200 p-6 text-center text-gray-600 dark:text-gray-400'>
+                    <td className='border border-gray-200 p-6 text-center font-medium text-blue-600 dark:text-blue-400'>
                       3X more resources
                     </td>
-                    <td className='border border-gray-200 p-6 text-center text-gray-600 dark:text-gray-400'>
+                    <td className='border border-gray-200 p-6 text-center font-medium text-blue-600 dark:text-blue-400'>
                       3X more resources
                     </td>
-                    <td className='border border-gray-200 p-6 text-center text-gray-600 dark:text-gray-400'>
+                    <td className='border border-gray-200 p-6 text-center font-medium text-blue-600 dark:text-blue-400'>
                       3X more resources
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </section>
   )

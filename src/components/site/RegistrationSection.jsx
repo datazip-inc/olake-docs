@@ -38,50 +38,93 @@ const RegistrationSection = () => {
   }, [history, history.location.hash])
 
   return (
-    <section className='relative overflow-hidden py-20'>
-      {/* Background image placeholder - this will be replaced later */}
-      <div className='absolute inset-0 z-0 bg-gradient-to-b from-blue-500 to-blue-900'>
-        {/* Placeholder for the actual image that will be added later */}
+    <section className='relative mx-auto w-4/5 overflow-hidden rounded-xl p-6'>
+      {/* Background lake image */}
+      <div className='absolute inset-0 z-0'>
+        <img
+          src='/img/site/registration-bg.svg'
+          alt='Lake background'
+          className='h-full w-full object-cover'
+        />
+        <div className='absolute inset-0 bg-blue-900/70'></div>
       </div>
 
-      <div className='container relative z-10 mx-auto'>
-        <div className='mx-auto '>
+      <div className='container relative z-10 mx-auto py-16'>
+        <div className='mx-auto'>
           <div className='grid items-center gap-8 md:grid-cols-2 lg:gap-16'>
-            {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}
-            <div className='rounded-3xl bg-white shadow-xl dark:bg-gray-800 md:p-10'>
-              <div className='mb-8'>
+            {/* Left side - Registration Form Card */}
+            <div className='rounded-xl bg-white p-8 shadow-xl'>
+              <div className='mb-6'>
                 <h3 className='mb-2 text-xl font-bold text-blue-600'>OLake</h3>
-                <h2 className='mb-2 text-2xl font-bold text-gray-900 dark:text-white md:text-3xl'>
+                <h2 className='mb-2 text-2xl font-bold text-gray-900'>
                   Register for Pilot Program
                 </h2>
-                <p className='text-gray-600 dark:text-gray-300'>
-                  Set up your account to get started
-                </p>
+                <p className='text-gray-600'>Set up your account to get started</p>
               </div>
 
-              {/* added the form here */}
+              {/* Custom form to match image */}
+              <div className='mb-4'>
+                <label htmlFor='fullName' className='mb-1 block text-sm font-medium text-gray-700'>
+                  Full Name
+                </label>
+                <input
+                  type='text'
+                  id='fullName'
+                  placeholder='Full Name'
+                  className='w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500'
+                />
+              </div>
 
-              <div
-                id='olake-form-product'
-                ref={formRef}
-                className='flex w-full flex-col md:flex-row'
-              >
-                <div className='m-8 min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-5 dark:bg-white md:w-1/2 md:p-10'>
-                  <div id='olake-product-form'></div>
+              <div className='mb-4'>
+                <label htmlFor='emailID' className='mb-1 block text-sm font-medium text-gray-700'>
+                  Email ID
+                </label>
+                <div className='relative'>
+                  <input
+                    type='email'
+                    id='emailID'
+                    placeholder='Email ID'
+                    className='w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500'
+                  />
+                  <div className='absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400'>
+                    0 / 20
+                  </div>
                 </div>
               </div>
 
-              <div className='mt-8 text-sm text-gray-600 dark:text-gray-400'>
+              <div className='mb-6'>
+                <label
+                  htmlFor='companyName'
+                  className='mb-1 block text-sm font-medium text-gray-700'
+                >
+                  Company Name
+                </label>
+                <input
+                  type='text'
+                  id='companyName'
+                  placeholder='Company Name'
+                  className='w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500'
+                />
+              </div>
+
+              <button className='w-32 rounded-md bg-blue-600 px-6 py-2 text-center font-medium text-white hover:bg-blue-700'>
+                Talk to us
+              </button>
+
+              <div className='mt-8 text-xs text-gray-600'>
                 OLake makes data replication faster by parallelising full loads, leveraging change
                 streams for real-time sync, and pulling data in a lake house
               </div>
+
+              {/* Hidden element for HubSpot form (kept for functionality but not displayed) */}
+              <div id='olake-product-form' ref={formRef} className='hidden'></div>
             </div>
 
             {/* Right side - Feature Text */}
             <div className='text-white'>
-              <div className='mb-2'>
+              <div className='mb-8'>
                 <h3 className='mb-3 text-2xl font-medium'>OLake</h3>
-                <h2 className='mb-10 text-4xl font-bold md:text-6xl'>
+                <h2 className='mb-10 text-4xl font-medium md:text-6xl'>
                   Interested?
                   <br />
                   Register Now.
