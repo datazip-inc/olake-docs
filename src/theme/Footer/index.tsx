@@ -66,12 +66,12 @@ const Footer: React.FC = () => {
     return (
         <footer className="py-12 bg-gradient-to-br from-[#F5F4FE] to-[#E3E1FF] dark:bg-gray-900 dark:from-gray-900 dark:to-gray-900">
             <div className="container mx-auto px-4 md:px-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
                     {/* Logo and Social Links Section */}
-                    <div className="col-span-1 md:col-span-1">
+                    <div className="col-span-1 md:col-span-3">
                         <div className="mb-6">
-                            <Link to="/" className="text-3xl font-bold text-blue-600 dark:text-blue-400">OLake</Link>
-                            <h2 className="text-4xl font-bold mt-6 mb-6 text-gray-800 dark:text-white">
+                            <Link to="/" className="text-xl  text-blue-600 dark:text-blue-400">OLake</Link>
+                            <h2 className="text-5xl font-extralight mt-6 mb-6 text-gray-800 dark:text-white">
                                 Fastest<br />
                                 Data<br />
                                 Replication
@@ -84,7 +84,7 @@ const Footer: React.FC = () => {
                                     key={social.icon}
                                     href={social.href}
                                     aria-label={social.ariaLabel}
-                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                    className="w-10 h-10 flex items-center justify-center rounded-md bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
