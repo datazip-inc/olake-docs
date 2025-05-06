@@ -150,7 +150,7 @@ const config = {
           // },
 
 
-          { to: '/docs', label: 'Docs', position: 'left' },
+          { to: '/docs', label: 'Docs', position: 'right' },
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
           { to: '/webinar', label: 'Webinars & Events', position: 'right' },
@@ -291,112 +291,112 @@ const config = {
         //   //... other Algolia params
       },
 
-      footer: {
-        style: 'dark',
-        links: [
-          {
-            title: 'Socials',
-            items: [
-              {
-                label: 'LinkedIn',
-                href: 'https://www.linkedin.com/company/datazipio',
-              },
-              {
-                label: 'X (Twitter)',
-                href: 'https://x.com/_olake',
-              },
-              {
-                label: 'YouTube',
-                href: 'https://www.youtube.com/@olakeio',
-              },
-              {
-                label: 'Slack Community',
-                href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
-              },
-              {
-                label: 'Instagram',
-                href: 'https://instagram.com/olake_io',
-              },
-            ],
-          },
-          {
-            title: 'Resources',
-            items: [
-              {
-                label: 'Docs',
-                to: '/docs',
-              },
-              {
-                label: 'Blogs',
-                to: '/blog',
-              },
-              {
-                label: 'Search',
-                to: '/search',
-              },
-              {
-                label: 'Slack Archive',
-                href: 'https://meetwaves.com/library/olake',
-              },
-            ],
-          },
-          {
-            title: 'Top Reads',
-            items: [
-              {
-                label: 'Issues with Debezium ',
-                to: '/blog/issues-debezium-kafka',
-              },
-              {
-                label: 'OLake Architecture',
-                to: '/blog/olake-architecture',
-              },
-            ],
-          },
-          {
-            title: 'Company',
-            items: [
-              {
-                label: 'About us',
-                to: '/about-us',
-              },
-              {
-                label: 'Contact us',
-                to: '/contact',
-              },
-              {
-                label: 'Branding',
-                to: '/branding',
-              },
-              {
-                label: 'Terms of Use',
-                href: 'https://datazip.io/terms-of-use',
-              },
-              {
-                label: 'Privacy (Visitors)',
-                href: 'https://datazip.io/privacy-policy',
-              },
-              {
-                label: 'Privacy (Customers)',
-                href: 'https://datazip.io/privacy-policy-customer',
-              },
-            ],
-          },
-        ],
-        // logo: {
-        //   alt: 'name',
-        //   src: 'img/logo-blue.svg',
-        //   srcDark: 'img/logo-white.svg',
-        //   width: 200,
-        // },
-        copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
-      },
-      prism: {
-        theme: prismThemes.github,
-        darkTheme: prismThemes.dracula,
-        additionalLanguages: ['java', 'bash', 'yaml', 'regex', 'mongodb', 'docker'],
+      // footer: {
+      //   style: 'dark',
+      //   links: [
+      //     {
+      //       title: 'Socials',
+      //       items: [
+      //         {
+      //           label: 'LinkedIn',
+      //           href: 'https://www.linkedin.com/company/datazipio',
+      //         },
+      //         {
+      //           label: 'X (Twitter)',
+      //           href: 'https://x.com/_olake',
+      //         },
+      //         {
+      //           label: 'YouTube',
+      //           href: 'https://www.youtube.com/@olakeio',
+      //         },
+      //         {
+      //           label: 'Slack Community',
+      //           href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+      //         },
+      //         {
+      //           label: 'Instagram',
+      //           href: 'https://instagram.com/olake_io',
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       title: 'Resources',
+      //       items: [
+      //         {
+      //           label: 'Docs',
+      //           to: '/docs',
+      //         },
+      //         {
+      //           label: 'Blogs',
+      //           to: '/blog',
+      //         },
+      //         {
+      //           label: 'Search',
+      //           to: '/search',
+      //         },
+      //         {
+      //           label: 'Slack Archive',
+      //           href: 'https://meetwaves.com/library/olake',
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       title: 'Top Reads',
+      //       items: [
+      //         {
+      //           label: 'Issues with Debezium ',
+      //           to: '/blog/issues-debezium-kafka',
+      //         },
+      //         {
+      //           label: 'OLake Architecture',
+      //           to: '/blog/olake-architecture',
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       title: 'Company',
+      //       items: [
+      //         {
+      //           label: 'About us',
+      //           to: '/about-us',
+      //         },
+      //         {
+      //           label: 'Contact us',
+      //           to: '/contact',
+      //         },
+      //         {
+      //           label: 'Branding',
+      //           to: '/branding',
+      //         },
+      //         {
+      //           label: 'Terms of Use',
+      //           href: 'https://datazip.io/terms-of-use',
+      //         },
+      //         {
+      //           label: 'Privacy (Visitors)',
+      //           href: 'https://datazip.io/privacy-policy',
+      //         },
+      //         {
+      //           label: 'Privacy (Customers)',
+      //           href: 'https://datazip.io/privacy-policy-customer',
+      //         },
+      //       ],
+      //     },
+      //   ],
+      //   // logo: {
+      //   //   alt: 'name',
+      //   //   src: 'img/logo-blue.svg',
+      //   //   srcDark: 'img/logo-white.svg',
+      //   //   width: 200,
+      //   // },
+      //   copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
+      // },
+      // prism: {
+      //   theme: prismThemes.github,
+      //   darkTheme: prismThemes.dracula,
+      //   additionalLanguages: ['java', 'bash', 'yaml', 'regex', 'mongodb', 'docker'],
 
-      },
+      // },
     }),
   // satisfies Preset.ThemeConfig,
 

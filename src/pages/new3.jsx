@@ -11,6 +11,7 @@ import FeatureShowcase from '../components/site/FeatureShowcase'
 import SetupStepsSection from '../components/site/SetupStepsSection'
 import RegistrationSection from '../components/site/RegistrationSection'
 import BlogShowcase from '../components/site/BlogShowcase'
+import Footer from '../components/site/Footer.tsx'
 
 export default function New3Page() {
   const OLakeFaqs = [
