@@ -44,11 +44,11 @@ const RegistrationSection = () => {
         {/* Placeholder for the actual image that will be added later */}
       </div>
 
-      <div className='container relative z-10 mx-auto px-4 md:px-6'>
-        <div className='mx-auto max-w-7xl'>
+      <div className='container relative z-10 mx-auto'>
+        <div className='mx-auto '>
           <div className='grid items-center gap-8 md:grid-cols-2 lg:gap-16'>
             {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}
-            <div className='rounded-3xl bg-white p-8 shadow-xl dark:bg-gray-800 md:p-10'>
+            <div className='rounded-3xl bg-white shadow-xl dark:bg-gray-800 md:p-10'>
               <div className='mb-8'>
                 <h3 className='mb-2 text-xl font-bold text-blue-600'>OLake</h3>
                 <h2 className='mb-2 text-2xl font-bold text-gray-900 dark:text-white md:text-3xl'>
@@ -64,35 +64,8 @@ const RegistrationSection = () => {
               <div
                 id='olake-form-product'
                 ref={formRef}
-                className='flex w-full flex-col md:my-8 md:max-w-[90%] md:flex-row'
+                className='flex w-full flex-col md:flex-row'
               >
-                <div className='flex-1 shrink-0 pl-[50px] pt-[50px] md:w-1/2'>
-                  {/* Logo and Title Row */}
-                  <div className='flex items-center gap-2 text-[24px] font-semibold text-gray-900 dark:text-white'>
-                    {/* Light Mode Logo */}
-                    <img
-                      src='/img/logo/olake-black.svg'
-                      alt='OLake logo (light)'
-                      className='h-auto w-12 dark:hidden'
-                    />
-
-                    {/* Dark Mode Logo */}
-                    <img
-                      src='/img/logo/olake-white.svg'
-                      alt='OLake logo (dark)'
-                      className='hidden h-auto w-12 dark:block'
-                    />
-
-                    <span>OLake</span>
-                  </div>
-
-                  {/* Headline */}
-                  <div className='mt-4 text-4xl font-normal text-gray-900 dark:text-white'>
-                    Interested?
-                    <br /> Get Early Access.
-                  </div>
-                </div>
-
                 <div className='m-8 min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-5 dark:bg-white md:w-1/2 md:p-10'>
                   <div id='olake-product-form'></div>
                 </div>

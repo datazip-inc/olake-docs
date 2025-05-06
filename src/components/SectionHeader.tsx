@@ -13,6 +13,8 @@ export interface SectionHeaderProps {
   subheadingClassName?: string;
   /** Additional classes for the horizontal rule */
   hrClassName?: string;
+  /** Whether to show the horizontal rule */
+  showHr?: boolean;
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({
@@ -26,6 +28,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
   headingClassName = "",
   subheadingClassName = "",
   hrClassName = "",
+  showHr = true,
 }) => {
   // Container: center content, set a max width, and stack them vertically
   const defaultContainerClasses =
@@ -76,7 +79,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
       <div className={`${defaultHeadingClasses} ${headingClassName}`}>
         {heading}
       </div>
-      <hr className={`${defaultHrClasses} ${hrClassName}`} />
+      {showHr && <hr className={`${defaultHrClasses} ${hrClassName}`} />}
       <div className={`${defaultSubheadingClasses} ${subheadingClassName}`}>
         {subheading}
       </div>
