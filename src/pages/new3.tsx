@@ -17,12 +17,13 @@ export default function New3Page(): React.ReactElement {
             title='OLake'
             description='Fastest Database to Data Lakehouse data replication tool, open sourced'
         >
-            <div className="min-h-screen bg-white dark:bg-gray-900">
+            <div className=" bg-white dark:bg-white">
                 <DataWarehouseToLakes />
                 <WorkflowSection />
+                <IcebergHero />
                 <SetupStepsSection />
                 <FeatureShowcase />
-                <IcebergHero />
+                
                 <BenchmarkSection />
                 <BlogShowcase />
                 <RegistrationSection />
