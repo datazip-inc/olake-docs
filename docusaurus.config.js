@@ -239,7 +239,7 @@ const config = {
       },
 
       colorMode: {
-        defaultMode: "dark",
+        defaultMode: "light", // dark or light
         disableSwitch: false,
         respectPrefersColorScheme: false,
       },

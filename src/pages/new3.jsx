@@ -82,7 +82,7 @@ export default function New3Page() {
       title='OLake'
       description='Fastest Database to Data Lakehouse data replication tool, open sourced'
     >
-      <div className='bg-white dark:bg-white'>
+      <div className='bg-white dark:bg-gray-900'>
         <DataWarehouseToLakes />
         <WorkflowSection />
         <IcebergHero />
