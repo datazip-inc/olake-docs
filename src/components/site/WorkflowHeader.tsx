@@ -1,27 +1,28 @@
-import React from 'react';
+import React from 'react'
 
 interface WorkflowHeaderProps {
-    subtitle?: string;
-    title?: React.ReactNode;
+  subtitle?: string
+  title?: React.ReactNode
 }
 
 const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
-    subtitle = 'The Fundamental',
-    title = (
-        <>
-            Experience the most <br className="hidden sm:block md:hidden lg:block" />
-            seamless <span className="text-gray-700 dark:text-gray-300">workflow</span>
-        </>
-    ),
+  subtitle = 'The Fundamental',
+  title = (
+    <>
+      Experience the most <br className='hidden sm:block md:hidden lg:block' />
+      <span className='dark:text-gray- font-light tracking-wide text-[#333333]'>seamless</span>{' '}
+      workflow
+    </>
+  )
 }) => {
-    return (
-        <div className="text-center max-w-4xl mx-auto mb-16">
-            <h3 className="text-blue-600 font-medium text-lg mb-4">{subtitle}</h3>
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 dark:text-white leading-tight">
-                {title}
-            </h2>
-        </div>
-    );
-};
+  return (
+    <div className='mx-auto mb-16 max-w-4xl text-center'>
+      <h3 className='mb-4 text-lg font-medium text-[#193ae6]'>{subtitle}</h3>
+      <h2 className='text-4xl font-bold tracking-wide text-[#333333] dark:text-white sm:text-5xl md:text-6xl'>
+        {title}
+      </h2>
+    </div>
+  )
+}
 
-export default WorkflowHeader; 
+export default WorkflowHeader
