@@ -4,7 +4,7 @@ import StatsSection from './StatsSection'
 
 const DataWarehouseToLakes: React.FC = () => {
   return (
-    <section className='bg-white dark:bg-white'>
+    <section className='bg-white dark:bg-gray-900'>
       <div className='mx-auto'>
         <HeroSection />
         {/* <StatsSection /> */}

@@ -16,6 +16,7 @@ import HeroHeading from '../components/HeroHeading'
 import CTAComponent from '../components/CTA'
 import { FaWalkieTalkie } from 'react-icons/fa6'
 import ArchitectureImage from '../components/olake/ArchitectureImage'
+import SpaceGroteskDemo from '../components/SpaceGroteskDemo'
 
 const OLakeFaqs = [
   {
@@ -215,10 +216,21 @@ const OLakeProduct = () => {
         <SectionHeader heading={<>Why choose us?</>} />
         <AlternatingRows items={sampleItems} />
 
-        {/* Blog List */}
+        {/* Add the font demo component */}
+        <div className="w-full my-12">
+          <SectionHeader 
+            heading="Font Demo" 
+            subheading="Example of Space Grotesk font usage" 
+            center={true}
+          />
+          <SpaceGroteskDemo />
+        </div>
+
+        {/* OLake Blog List */}
         <div className='my-8 w-full'>
           <OLakeBlogList />
         </div>
+
         {/* FAQ */}
         <div className='my-8 w-full max-w-[90%]'>
           <Faq data={OLakeFaqs} showHeading={true} />

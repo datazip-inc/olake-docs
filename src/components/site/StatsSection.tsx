@@ -28,11 +28,11 @@ interface StatsSectionProps {
 const StatsSection: React.FC<StatsSectionProps> = ({
   title = 'Get the OLake Advantage',
   linkText = 'View all Performance Benchmarks',
-  linkUrl = '/benchmarks',
+  linkUrl = '/docs/connectors/postgres/benchmarks',
   stats = [
-    { value: '3X', label: 'Faster' },
-    { value: '70%', label: 'Savings' },
-    { value: '3x', label: 'Less CPU' }
+    { value: '3 -100X', label: 'Faster than traditional tools' },
+    { value: '90%', label: 'Cost Savings with OSS' },
+    // { value: '3x', label: 'Less CPU' }
   ]
 }) => {
   return (
@@ -64,7 +64,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({
               <div className='hidden h-auto w-px self-stretch bg-gray-300 dark:bg-gray-700 md:block'></div>
             )}
             <div className='flex flex-col items-center px-4 py-6 text-center'>
-              <div className='text-4xl font-extrabold text-[#333333] dark:text-white sm:text-5xl md:text-6xl'>
+              <div className='text-4xl font-medium text-[#333333] dark:text-white sm:text-3xl md:text-5xl'>
                 {stat.value}
               </div>
               <div className='mt-2 text-center text-base text-[#858585] dark:text-gray-400 sm:text-lg'>

@@ -16,53 +16,42 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   showIcebergBadge = true
 }) => {
   return (
-    <div className='mx-6 flex w-full items-start justify-between overflow-hidden px-4 py-12 md:px-6 md:py-16 lg:flex-row lg:px-8 lg:py-20'>
+    <div className='mx-6 flex w-full flex-col-reverse items-center lg:flex-row lg:items-start justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-8 lg:py-20'>
       {/* Left Column - contains 2 rows */}
-      <div className='mb-8 flex w-full flex-col lg:mb-0 lg:w-3/5'>
+      <div className='mt-8 lg:mt-0 flex w-full flex-col lg:mb-0 lg:w-3/5'>
         {/* Row 1: "Fastest way to replicate..." section */}
         <div className='mb-8'>
-          {showIcebergBadge && (
-            <div className='mb-6 inline-flex items-center rounded-xl bg-[#EEF8FF] px-4 py-2.5 dark:bg-gray-800'>
-              <span className='text-sm font-medium text-gray-800 dark:text-gray-200'>
-                Now Supporting
-              </span>
-              <span className='ml-2 flex items-center'>
-                <img src='/img/site/iceberg-logo.svg' alt='Iceberg' className='mr-1 h-5 w-5' />
-                <span className='text-sm font-bold uppercase text-gray-800 dark:text-gray-200'>
-                  ICEBERG
-                </span>
-              </span>
-            </div>
-          )}
+
           <div className='flex flex-col gap-4'>
-            <h1 className='mb-4 text-[32px] font-medium text-gray-800 dark:text-white md:text-4xl lg:text-5xl'>
+            <h1 className='mb-4 text-[28px] font-medium text-center lg:text-left text-gray-800 dark:text-white md:text-4xl lg:text-4xl'>
               {title}
             </h1>
 
-            <h2 className='text-3xl font-bold md:text-4xl lg:text-6xl'>
-              <span className='rounded-full bg-[#E9EBFC] px-2 py-1.5 tracking-wider text-[#193ae6]'>
+            <h2 className='text-2xl text-center lg:text-left font-normal md:text-4xl lg:text-6xl'>
+              <span className='rounded-3xl bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Database
               </span>
-              <span className='text-[#193AE6]'>→</span>
-              <span className='rounded-full bg-[#E9EBFC] px-2 py-1.5 tracking-widest text-[#193AE6]'>
+              <span className='text-[#193AE6] dark:text-blue-400'>→</span>
+              <span className='rounded-3xl bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-widest text-[#193AE6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Data Lakehouse
               </span>
             </h2>
           </div>
 
-          <div className='mt-6 flex gap-4'>
+          <div className='mt-6 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start'>
             <Link
               to='#talk-to-us'
-              className='inline-flex items-center justify-center rounded-md bg-[#203FDD] px-6 py-2 font-medium text-white transition-colors hover:bg-blue-700'
+              className='inline-flex items-center justify-center rounded-md bg-[#203FDD] px-4 sm:px-6 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
             >
               Talk to us
             </Link>
 
             <Link
               to='https://github.com/olakeio/olake'
-              className='inline-flex items-center justify-center rounded-full bg-[#f0f0f0] px-6 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+              className='inline-flex items-center justify-center rounded-full bg-[#f0f0f0] px-4 sm:px-6 py-2.5 font-medium text-gray-800 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
               style={{
-                border: '1px solid #bfbfbf'
+                border: '1px solid rgba(191, 191, 191, 0.8)',
+                borderColor: 'rgba(191, 191, 191, 0.8)'
               }}
             >
               <svg className='mr-2 h-5 w-5' viewBox='0 0 24 24' fill='currentColor'>
@@ -80,9 +69,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       </div>
 
       {/* Right Column - contains the image */}
-      <div className='flex w-full justify-end lg:w-2/5'>
+      <div className='flex w-full justify-center lg:justify-end lg:w-2/5'>
         <div className='relative'>
-          <img src='/img/site/hero-section.svg' alt='' />
+          <img src='/img/site/hero-section.svg' alt='O.Lake Data Pipeline' className='max-w-full h-auto dark:filter dark:brightness-90' />
         </div>
       </div>
     </div>

@@ -38,17 +38,26 @@ const RegistrationSection = () => {
   }, [history, history.location.hash])
 
   return (
-    <section className='relative overflow-hidden py-8 sm:py-12 md:py-16 lg:py-20'>
-      {/* Background image placeholder - this will be replaced later */}
-      <div className='absolute inset-0 z-0 bg-gradient-to-b from-blue-500 to-blue-900 dark:from-blue-700 dark:to-blue-950'>
-        {/* Placeholder for the actual image that will be added later */}
+    <section className='relative mx-auto w-4/5 overflow-hidden rounded-xl p-6'>
+      {/* Background lake image */}
+      <div className='absolute inset-0 z-0'>
+        <img
+          src='/img/site/registration-bg.jpg'
+          alt='Lake background'
+          className='h-full w-full object-cover'
+        />
+        {/* <div className='absolute inset-0 bg-blue-900/70'></div> */}
       </div>
 
-      <div className='container relative z-10 mx-auto px-4 sm:px-6 lg:px-8'>
+      <div className='container relative z-10 mx-auto py-8 md:py-16'>
         <div className='mx-auto'>
-          <div className='grid items-center gap-6 sm:gap-8 md:grid-cols-2 lg:gap-12 xl:gap-16'>
+          <div className='grid items-center gap-8 md:grid-cols-[60%_40%] lg:gap-16'>
+            
+            
             {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}
-            <div className='rounded-xl sm:rounded-2xl md:rounded-3xl bg-white shadow-lg sm:shadow-xl dark:bg-gray-800 p-4 sm:p-6 md:p-8 lg:p-10'>
+            <div className='rounded-xl sm:rounded-2xl md:rounded-3xl bg-white shadow-lg sm:shadow-xl dark:bg-gray-800 p-4 sm:p-6 md:p-8 lg:p-10 order-2 md:order-1'>
+             
+             
               <div className='mb-4 sm:mb-6 md:mb-8'>
                 <h3 className='mb-1 sm:mb-2 text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400'>OLake</h3>
                 <h2 className='mb-2 text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
@@ -59,13 +68,15 @@ const RegistrationSection = () => {
                 </p>
               </div>
 
+                        
+              
               {/* added the form here */}
               <div
                 id='olake-form-product'
                 ref={formRef}
                 className='flex w-full flex-col bg-white rounded-2xl md:flex-row'
               >
-                <div className='m-2 sm:m-4 md:m-6 lg:m-8 min-h-[250px] sm:min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] dark:border-gray-700 p-3 sm:p-4 md:p-5 lg:p-10  md:w-1/2'>
+                <div className='m-1 sm:m-2 md:m-3 min-h-[250px] sm:min-h-[300px] flex-1 shrink-0 rounded border border-[#f5f5f5] dark:border-gray-700 p-2 sm:p-3'>
                   <div id='olake-product-form' className='bg-white'></div>
                 </div>
               </div>
@@ -76,38 +87,44 @@ const RegistrationSection = () => {
               </div>
             </div>
 
+
+
+
+
+     
+
             {/* Right side - Feature Text */}
-            <div className='text-white order-first md:order-last'>
-              <div className='mb-2 sm:mb-4'>
-                <h3 className='mb-2 sm:mb-3 text-xl sm:text-2xl font-medium'>OLake</h3>
-                <h2 className='mb-6 sm:mb-8 md:mb-10 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold'>
+            <div className='text-white order-1 md:order-2'>
+              <div className='mb-6 md:mb-8'>
+                <h3 className='mb-2 md:mb-3 text-xl md:text-2xl font-medium'>OLake</h3>
+                <h2 className='mb-6 md:mb-10 text-3xl md:text-4xl lg:text-6xl font-medium'>
                   Interested?
                   <br />
                   Register Now.
                 </h2>
               </div>
 
-              <div className='space-y-6 sm:space-y-8 md:space-y-10'>
+              <div className='space-y-6 md:space-y-10'>
                 {/* Feature 1 */}
                 <div>
-                  <div className='mb-2 sm:mb-3 flex items-center'>
+                  <div className='mb-2 md:mb-3 flex items-center'>
                     <svg
-                      className='mr-2 sm:mr-3 h-5 w-5 sm:h-6 sm:w-6'
+                      className='mr-2 md:mr-3 h-5 w-5 md:h-6 md:w-6'
                       viewBox='0 0 24 24'
                       fill='none'
                       xmlns='http://www.w3.org/2000/svg'
                     >
                       <path
                         d='M20 7L12 3L4 7L12 11L20 7ZM20 7V17L12 21L4 17V7'
-                        stroke='currentColor'
+                        stroke='white'
                         strokeWidth='2'
                         strokeLinecap='round'
                         strokeLinejoin='round'
                       />
                     </svg>
-                    <h3 className='text-lg sm:text-xl md:text-2xl font-semibold'>Iceberg Native</h3>
+                    <h3 className='text-lg md:text-xl lg:text-2xl font-semibold'>Iceberg Native</h3>
                   </div>
-                  <p className='text-sm sm:text-base text-gray-100 dark:text-gray-200'>
+                  <p className='text-sm md:text-base text-gray-100'>
                     Instead of directly transforming data from Databases during extraction, we first
                     pull it in its native format.
                   </p>
@@ -115,30 +132,35 @@ const RegistrationSection = () => {
 
                 {/* Feature 2 */}
                 <div>
-                  <div className='mb-2 sm:mb-3 flex items-center'>
+                  <div className='mb-2 md:mb-3 flex items-center'>
                     <svg
-                      className='mr-2 sm:mr-3 h-5 w-5 sm:h-6 sm:w-6'
+                      className='mr-2 md:mr-3 h-5 w-5 md:h-6 md:w-6'
                       viewBox='0 0 24 24'
                       fill='none'
                       xmlns='http://www.w3.org/2000/svg'
                     >
                       <path
                         d='M13 10V3L4 14H11V21L20 10H13Z'
-                        stroke='currentColor'
+                        stroke='white'
                         strokeWidth='2'
                         strokeLinecap='round'
                         strokeLinejoin='round'
                       />
                     </svg>
-                    <h3 className='text-lg sm:text-xl md:text-2xl font-semibold'>Faster & More Efficient</h3>
+                    <h3 className='text-lg md:text-xl lg:text-2xl font-semibold'>Faster & More Efficient</h3>
                   </div>
-                  <p className='text-sm sm:text-base text-gray-100 dark:text-gray-200'>
+                  <p className='text-sm md:text-base text-gray-100'>
                     Instead of directly transforming data from Databases during extraction, we first
                     pull it in its native format.
                   </p>
                 </div>
               </div>
             </div>
+
+
+            
+
+
           </div>
         </div>
       </div>

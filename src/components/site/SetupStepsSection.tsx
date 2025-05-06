@@ -33,69 +33,79 @@ const SetupStepsSection: React.FC = () => {
                 <div className="grid md:grid-cols-2 gap-8 items-center max-w-6xl mx-auto">
                     {/* Left Side - Steps */}
                     <div>
-                        <div className="text-blue-600 font-medium mb-3">The Olake Experience</div>
-                        <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-16">
-                            Fast & Efficient<br />
-                            That is Olake
-                        </h2>
+            <div className='mb-3 text-xl font-semibold tracking-widest text-[#203FDD]'>
+              The OLake Experience
+            </div>
+            <h2 className='mb-16 text-4xl font-bold tracking-wider text-gray-900 dark:text-white md:text-5xl'>
+              Fast & Efficient
+              <br />
+              That is OLake
+            </h2>
 
-                        <div className="flex flex-col space-y-10">
-                            {/* Step 1 */}
-                            <div className="flex">
-                                <div className="mr-4 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
-                                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                                    </div>
-                                    <div className="w-0.5 h-16 bg-gray-300 dark:bg-gray-700 mt-1"></div>
-                                </div>
-                                <div>
-                                    <div className="text-gray-500 dark:text-gray-400 text-sm mb-1">Step I</div>
-                                    <div className="font-bold text-2xl text-gray-900 dark:text-white">Source</div>
-                                </div>
-                            </div>
+            <div className='flex flex-col'>
+              {/* Step 1 */}
+              <div className='flex'>
+                <div className='mr-4 flex flex-col items-center'>
+                  <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#203FDD]'>
+                    <div className='h-4 w-4 rounded-full bg-white'></div>
+                  </div>
+                  <div className='h-16 w-0.5 bg-gray-300'></div>
+                </div>
+                <div className='pb-10'>
+                  <div className='mb-1 text-sm text-gray-500'>Step I</div>
+                  <div className='text-2xl font-bold text-gray-900'>Source</div>
+                </div>
+              </div>
 
-                            {/* Step 2 */}
-                            <div className="flex">
-                                <div className="mr-4 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-                                    </div>
-                                    <div className="w-0.5 h-16 bg-gray-300 dark:bg-gray-700 mt-1"></div>
-                                </div>
-                                <div>
-                                    <div className="text-gray-500 dark:text-gray-400 text-sm mb-1">Step II</div>
-                                    <div className="font-bold text-2xl text-gray-900 dark:text-white">Destination</div>
-                                </div>
-                            </div>
+              {/* Step 2 */}
+              <div className='-mt-2 flex'>
+                <div className='mr-4 flex flex-col items-center'>
+                  <div className='flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300'>
+                    <div className='h-2 w-2 rounded-full bg-gray-300'></div>
+                  </div>
+                  <div className='h-16 w-0.5 bg-gray-300'></div>
+                </div>
+                <div className='pb-10'>
+                  <div className='mb-1 text-sm text-gray-500'>Step II</div>
+                  <div className='text-2xl font-bold text-gray-900'>Destination</div>
+                </div>
+              </div>
 
-                            {/* Step 3 */}
-                            <div className="flex">
-                                <div className="mr-4 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-                                    </div>
-                                    <div className="w-0.5 h-16 bg-gray-300 dark:bg-gray-700 mt-1"></div>
-                                </div>
-                                <div>
-                                    <div className="text-gray-500 dark:text-gray-400 text-sm mb-1">Step III</div>
-                                    <div className="font-bold text-2xl text-gray-900 dark:text-white">Schema</div>
-                                </div>
-                            </div>
+              {/* Step 3 */}
+              <div className='-mt-2 flex'>
+                <div className='mr-4 flex flex-col items-center'>
+                  <div className='flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300'>
+                    <div className='h-2 w-2 rounded-full bg-gray-300'></div>
+                  </div>
+                  <div className='h-16 w-0.5 bg-gray-300'></div>
+                </div>
+                <div className='pb-10'>
+                  <div className='mb-1 text-sm text-gray-500'>Step III</div>
+                  <div className='text-2xl font-bold text-gray-900'>Schema</div>
+                </div>
+              </div>
 
-                            {/* Step 4 */}
-                            <div className="flex">
-                                <div className="mr-4 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-700 flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-gray-500 dark:text-gray-400 text-sm mb-1">Step IV</div>
-                                    <div className="font-bold text-2xl text-gray-900 dark:text-white">Job Config</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+              {/* Step 4 */}
+              <div className='-mt-2 flex'>
+                <div className='mr-4 flex flex-col items-center'>
+                  <div className='flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300'>
+                    <div className='h-2 w-2 rounded-full bg-gray-300'></div>
+                  </div>
+                </div>
+                <div>
+                  <div className='mb-1 text-sm text-gray-500'>Step IV</div>
+                  <div className='text-2xl font-bold text-gray-900'>Job Config</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+
+
+
+
+
 
                     {/* Right Side - Form */}
                     <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-3xl shadow-lg">
