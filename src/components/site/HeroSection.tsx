@@ -16,7 +16,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   showIcebergBadge = true
 }) => {
   return (
-    <div className='xl:container mx-auto flex w-full flex-col-reverse items-center lg:flex-row justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-8 lg:py-20'>
+    <div className='xl:container mx-auto flex w-full flex-col-reverse items-center lg:flex-row justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-0 lg:py-20'>
       {/* Mobile Image - Only visible on mobile */}
 
       <div className='md:hidden'>
