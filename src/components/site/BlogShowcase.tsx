@@ -55,17 +55,23 @@ const BlogShowcase: React.FC = () => {
           {/* Main section with heading on right, featured post on left */}
           <div className='mb-12 flex flex-col gap-8 lg:flex-row'>
             {/* Featured Blog Post - Left side on desktop */}
-            <div className='order-2 w-full lg:order-1 lg:w-1/2'>
-              <a href={`https://olake.io/blog/${blogPosts[0].id}`} className='block h-full'>
-                <div className='h-full overflow-hidden rounded-2xl shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl'>
+            <div className='order-2 w-full rounded-2xl lg:order-1 lg:w-1/2'>
+              <a
+                href={`https://olake.io/blog/${blogPosts[0].id}`}
+                className='block h-full rounded-2xl'
+                style={{
+                  boxShadow: '2px 3px 20px 1px rgba(0,0,0,0.08)'
+                }}
+              >
+                <div className='h-full overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1'>
                   <div className='flex h-full flex-col'>
-                    <div className='flex items-center justify-center'>
+                    <div className='flex items-center justify-center rounded-tl-2xl rounded-tr-2xl dark:bg-gray-800'>
                       <img
                         src={blogPosts[0].imageSrc}
                         alt={blogPosts[0].title}
                         width={80}
                         height={80}
-                        className='h-64 w-full object-contain'
+                        className='h-auto w-full object-contain p-2'
                       />
                     </div>
                     <div className='flex flex-col justify-center bg-white p-6 dark:bg-gray-800 md:p-8'>
@@ -87,7 +93,7 @@ const BlogShowcase: React.FC = () => {
             {/* Heading section - Right side on desktop */}
             <div className='order-1 flex w-full flex-col justify-center lg:order-2 lg:w-1/2'>
               <div className='mb-3 text-lg font-medium tracking-wider text-[#203fdd]'>Blogs</div>
-              <h2 className='mb-8 text-4xl font-bold text-[#333333] dark:text-white md:text-5xl tracking-wider'>
+              <h2 className='mb-8 text-4xl font-bold tracking-wider text-[#333333] dark:text-white md:text-5xl'>
                 Stay ahead,
                 <br />
                 with our latest reads
@@ -108,15 +114,22 @@ const BlogShowcase: React.FC = () => {
           {/* Other Blog Posts in a row */}
           <div className='grid gap-6 rounded-2xl md:grid-cols-2 md:gap-8 lg:grid-cols-3'>
             {blogPosts.slice(1).map((post) => (
-              <a key={post.id} href={`https://olake.io/blog/${post.id}`} className='block h-full'>
-                <div className='h-full overflow-hidden rounded-2xl shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl'>
-                  <div className='flex items-center justify-center rounded-2xl'>
+              <a
+                key={post.id}
+                href={`https://olake.io/blog/${post.id}`}
+                className='block h-full rounded-3xl'
+                style={{
+                  boxShadow: '2px 3px 20px 1px rgba(0,0,0,0.08)'
+                }}
+              >
+                <div className='h-full overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1'>
+                  <div className='flex items-center justify-center rounded-tl-2xl rounded-tr-2xl dark:bg-gray-800'>
                     <img
                       src={post.imageSrc}
                       alt={post.title}
                       width={64}
                       height={64}
-                      className='h-56 md:h-48 w-full object-contain'
+                      className='h-56 w-full object-contain px-2 md:h-48'
                     />
                   </div>
                   <div className='flex h-full flex-col bg-white p-6 dark:bg-gray-800'>
@@ -126,9 +139,7 @@ const BlogShowcase: React.FC = () => {
                     <p className='mb-4 text-sm text-gray-600 dark:text-gray-300'>
                       {post.description}
                     </p>
-                    <div className=' text-sm text-gray-500 dark:text-gray-400'>
-                      {post.readTime}
-                    </div>
+                    <div className='text-sm text-gray-500 dark:text-gray-400'>{post.readTime}</div>
                   </div>
                 </div>
               </a>
