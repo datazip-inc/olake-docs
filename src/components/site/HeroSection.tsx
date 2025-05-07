@@ -16,13 +16,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   showIcebergBadge = true
 }) => {
   return (
-    <div className='mx-6 flex w-full flex-col-reverse items-center lg:flex-row lg:items-start justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-8 lg:py-20'>
+    <div className='xl:container mx-auto flex w-full flex-col-reverse items-center lg:flex-row justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-8 lg:py-20'>
       {/* Mobile Image - Only visible on mobile */}
-      
-      <div className='md:hidden'>
-          <StatsSection />
-        </div>
 
+      <div className='md:hidden'>
+        <StatsSection />
+      </div>
 
       <div className='w-full mb-8 lg:hidden'>
         <div className='flex justify-center'>
@@ -33,7 +32,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           />
         </div>
       </div>
-
 
       {/* Left Column - contains 2 rows */}
       <div className='mt-0 container lg:mt-0 flex w-full flex-col lg:w-3/5'>
@@ -81,19 +79,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
 
         {/* Row 2: Stats Section */}
-         <div className='hidden lg:flex w-full lg:w-3/5 justify-center lg:justify-start'>
+        <div className='hidden lg:flex w-full lg:w-3/5 justify-center lg:justify-start'>
           <StatsSection />
         </div>
       </div>
 
       {/* Desktop Image - Only visible on desktop */}
-      <div className='hidden lg:flex w-full lg:w-2/5 justify-center lg:justify-end'>
-        <div className='relative'>
+      <div className='hidden lg:flex w-full lg:w-2/5 justify-center items-center'>
+        <div className='flex justify-center w-full'>
           <img src='/img/site/hero-section.svg' alt='O.Lake Data Pipeline' className='max-w-full h-auto dark:filter dark:brightness-90' />
         </div>
       </div>
 
-      
+
     </div>
   )
 }
