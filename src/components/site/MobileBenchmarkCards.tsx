@@ -8,6 +8,7 @@ interface BenchmarkData {
     fivetran: string
     debezium: string
     estuary: string
+    isComparisonMetric?: boolean
 }
 
 interface MobileBenchmarkCardsProps {
@@ -59,19 +60,19 @@ const AccordionView: React.FC<{ data: BenchmarkData[] }> = ({ data }) => {
                                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
                                     <div className="flex items-center justify-between p-3">
                                         <span className="text-sm text-gray-600 dark:text-gray-400">{TOOLS.airbyte.name}</span>
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">{row.airbyte}</span>
+                                        <span className={`text-sm ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.airbyte}</span>
                                     </div>
                                     <div className="flex items-center justify-between p-3">
                                         <span className="text-sm text-gray-600 dark:text-gray-400">{TOOLS.fivetran.name}</span>
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">{row.fivetran}</span>
+                                        <span className={`text-sm ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.fivetran}</span>
                                     </div>
                                     <div className="flex items-center justify-between p-3">
                                         <span className="text-sm text-gray-600 dark:text-gray-400">{TOOLS.debezium.name}</span>
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">{row.debezium}</span>
+                                        <span className={`text-sm ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.debezium}</span>
                                     </div>
                                     <div className="flex items-center justify-between p-3">
                                         <span className="text-sm text-gray-600 dark:text-gray-400">{TOOLS.estuary.name}</span>
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">{row.estuary}</span>
+                                        <span className={`text-sm ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.estuary}</span>
                                     </div>
                                 </div>
                             </div>
@@ -105,19 +106,19 @@ const ResponsiveTableView: React.FC<{ data: BenchmarkData[] }> = ({ data }) => {
                         <div className="space-y-2 py-1">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-gray-500 dark:text-gray-400">{TOOLS.airbyte.name}</span>
-                                <span className="text-xs text-gray-600 dark:text-gray-400">{row.airbyte}</span>
+                                <span className={`text-xs ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.airbyte}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-gray-500 dark:text-gray-400">{TOOLS.fivetran.name}</span>
-                                <span className="text-xs text-gray-600 dark:text-gray-400">{row.fivetran}</span>
+                                <span className={`text-xs ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.fivetran}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-gray-500 dark:text-gray-400">{TOOLS.debezium.name}</span>
-                                <span className="text-xs text-gray-600 dark:text-gray-400">{row.debezium}</span>
+                                <span className={`text-xs ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.debezium}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-gray-500 dark:text-gray-400">{TOOLS.estuary.name}</span>
-                                <span className="text-xs text-gray-600 dark:text-gray-400">{row.estuary}</span>
+                                <span className={`text-xs ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{row.estuary}</span>
                             </div>
                         </div>
                     </div>
@@ -175,7 +176,7 @@ const FeatureComparisonView: React.FC<{ data: BenchmarkData[] }> = ({ data }) =>
                         >
                             <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{row.metric}</div>
                             <div className="text-sm font-medium text-green-600 dark:text-green-400">{row.olake}</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">{getCompetitorValue(row)}</div>
+                            <div className={`text-sm ${row.isComparisonMetric ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{getCompetitorValue(row)}</div>
                         </div>
                     ))}
                 </div>

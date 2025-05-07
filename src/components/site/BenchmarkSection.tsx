@@ -62,7 +62,8 @@ const BenchmarkHeader: React.FC = () => {
       </div>
       <div className='p-5 md:p-6'>
         <div className='flex items-center justify-center'>
-          <svg
+
+          {/* <svg
             className='mr-2 h-4 w-4 text-gray-600 dark:text-gray-400'
             viewBox='0 0 24 24'
             fill='none'
@@ -70,6 +71,10 @@ const BenchmarkHeader: React.FC = () => {
           >
             <path d='M12 6v12M8 12h8' stroke='currentColor' strokeWidth='2' strokeLinecap='round' />
           </svg>
+           */}
+
+          <img src="/img/site/airbyte.svg" alt="" />
+
           <span className='text-sm text-gray-800 dark:text-white'>Airbyte</span>
         </div>
       </div>
@@ -138,6 +143,9 @@ const BenchmarkSection: React.FC = () => {
     return Object.entries(data).map(([key, value]) => {
       const metricKey = key as keyof typeof METRIC_LABELS
 
+      // Check if this is a comparison metric (comparisonFull or comparisonCDC)
+      const isComparisonMetric = key === 'comparisonFull' || key === 'comparisonCDC'
+
       // Handle uniform values (when all tools have the same value)
       if ('isUniform' in value && value.isUniform) {
         return {
@@ -146,7 +154,8 @@ const BenchmarkSection: React.FC = () => {
           airbyte: value.value,
           fivetran: value.value,
           debezium: value.value,
-          estuary: value.value
+          estuary: value.value,
+          isComparisonMetric
         }
       }
 
@@ -157,7 +166,8 @@ const BenchmarkSection: React.FC = () => {
         airbyte: (value as any).airbyte,
         fivetran: (value as any).fivetran,
         debezium: (value as any).debezium,
-        estuary: (value as any).estuary
+        estuary: (value as any).estuary,
+        isComparisonMetric
       }
     })
   }
@@ -228,41 +238,54 @@ const BenchmarkSection: React.FC = () => {
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+
+                        <img src="/img/site/airbyte.svg" alt="" />
+
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
                             d='M12 6v12M8 12h8'
                             stroke='currentColor'
                             strokeWidth='2'
                             strokeLinecap='round'
                           />
-                        </svg>
+                        </svg> */}
+
                         <span>{TOOLS.airbyte.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
                             d='M4 12h16M12 4v16'
                             stroke='currentColor'
                             strokeWidth='2'
                             strokeLinecap='round'
                           />
-                        </svg>
+                        </svg> */}
+
+                        <img src="/img/site/fivetran.svg" alt="" />
+
                         <span>{TOOLS.fivetran.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path d='M4 4h16v16H4z' stroke='currentColor' strokeWidth='2' />
-                        </svg>
+                        </svg> */}
+
+
+                        <img src="/img/site/debezium.svg" alt="" />
+
+
                         <span>{TOOLS.debezium.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
                             d='M3 6l9 4 9-4M3 12l9 4 9-4M3 18l9 4 9-4'
                             stroke='currentColor'
@@ -271,6 +294,11 @@ const BenchmarkSection: React.FC = () => {
                             strokeLinejoin='round'
                           />
                         </svg>
+                         */}
+
+                        <img src="/img/site/estuary.svg" alt="" />
+
+
                         <span>{TOOLS.estuary.name}</span>
                       </div>
                     </th>
@@ -285,16 +313,16 @@ const BenchmarkSection: React.FC = () => {
                       <td className='border border-gray-200 bg-green-50/70 p-6 text-center font-medium text-green-600 dark:border-gray-700 dark:bg-green-900/20 dark:text-green-400'>
                         {row.olake}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.airbyte}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.fivetran}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.debezium}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.estuary}
                       </td>
                     </tr>
@@ -320,41 +348,52 @@ const BenchmarkSection: React.FC = () => {
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
                             d='M12 6v12M8 12h8'
                             stroke='currentColor'
                             strokeWidth='2'
                             strokeLinecap='round'
                           />
-                        </svg>
+                        </svg> */}
+
+                        <img src="/img/site/airbyte.svg" alt="" />
                         <span>{TOOLS.airbyte.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
                             d='M4 12h16M12 4v16'
                             stroke='currentColor'
                             strokeWidth='2'
                             strokeLinecap='round'
                           />
-                        </svg>
+                        </svg> */}
+
+                        <img src="/img/site/fivetran.svg" alt="" />
+
+
                         <span>{TOOLS.fivetran.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path d='M4 4h16v16H4z' stroke='currentColor' strokeWidth='2' />
-                        </svg>
+                        </svg> */}
+
+                        <img src="/img/site/debezium.svg" alt="" />
+
+
                         <span>{TOOLS.debezium.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
+
+                        {/* <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none'>
                           <path
                             d='M3 6l9 4 9-4M3 12l9 4 9-4M3 18l9 4 9-4'
                             stroke='currentColor'
@@ -362,7 +401,11 @@ const BenchmarkSection: React.FC = () => {
                             strokeLinecap='round'
                             strokeLinejoin='round'
                           />
-                        </svg>
+                        </svg> */}
+
+                        <img src="/img/site/estuary.svg" alt="" />
+
+
                         <span>{TOOLS.estuary.name}</span>
                       </div>
                     </th>
@@ -377,16 +420,16 @@ const BenchmarkSection: React.FC = () => {
                       <td className='border border-gray-200 bg-green-50/70 p-6 text-center font-medium text-green-600 dark:border-gray-700 dark:bg-green-900/20 dark:text-green-400'>
                         {row.olake}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.airbyte}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.fivetran}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.debezium}
                       </td>
-                      <td className='border border-gray-200 p-6 text-center text-gray-600 dark:border-gray-700 dark:text-gray-400'>
+                      <td className={`border border-gray-200 p-6 text-center ${row.isComparisonMetric ? 'font-medium text-lg text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
                         {row.estuary}
                       </td>
                     </tr>

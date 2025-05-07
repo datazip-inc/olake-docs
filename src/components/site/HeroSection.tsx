@@ -19,8 +19,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     <div className='mx-6 flex w-full flex-col-reverse items-center lg:flex-row lg:items-start justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-8 lg:py-20'>
       {/* Mobile Image - Only visible on mobile */}
       
-
-
       <div className='md:hidden'>
           <StatsSection />
         </div>

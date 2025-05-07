@@ -35,7 +35,7 @@ const FeatureCard = ({
             }}
           ></div>
         </div>
-        <div className='relative z-20'>
+        <div className='relative md:-mb-12 z-20'>
           <h3 className='mb-2 text-lg font-bold text-gray-900 dark:text-white sm:mb-3 sm:text-xl md:text-2xl'>
             {title}
           </h3>

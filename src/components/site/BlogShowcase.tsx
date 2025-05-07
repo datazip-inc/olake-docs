@@ -126,7 +126,7 @@ const BlogShowcase: React.FC = () => {
                     <p className='mb-4 text-sm text-gray-600 dark:text-gray-300'>
                       {post.description}
                     </p>
-                    <div className='mt-auto text-sm text-gray-500 dark:text-gray-400'>
+                    <div className=' text-sm text-gray-500 dark:text-gray-400'>
                       {post.readTime}
                     </div>
                   </div>

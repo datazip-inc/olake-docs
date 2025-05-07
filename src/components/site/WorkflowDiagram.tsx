@@ -19,9 +19,10 @@ const WorkflowDiagram: React.FC = () => {
                         <img
                             src="/img/site/timeline.svg"
                             alt="Workflow timeline"
-                            className="w-full h-auto"
+                            className="block mx-auto w-[80%] h-auto"
                         />
                     </div>
+
                 </div>
             </div>
         </div>
