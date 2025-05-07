@@ -1,9 +1,9 @@
 import React from 'react'
 
 interface SVGItem {
-    image: string
-    width: number
-    height: number
+  image: string
+  width: number
+  height: number
 }
 
 const InfoBoxes: React.FC = () => {
@@ -31,26 +31,21 @@ const InfoBoxes: React.FC = () => {
         }
     ]
 
-    return (
-        <div className='w-full overflow-hidden px-4 sm:px-6'>
-            <div className='grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-6'>
-                {svgItems.map((item, index) => (
-                    <div key={index} className='flex justify-center items-center py-4'>
-                        <img
-                            src={`/img/site/${item.image}`}
-                            alt={`Workflow image ${index + 1}`}
-                            className='h-auto w-full object-contain'
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '280px',
-                                height: 'auto'
-                            }}
-                        />
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+  return (
+    <div className='w-full overflow-hidden px-4 sm:px-6'>
+      <div className='flex flex-wrap items-center justify-center gap-8'>
+        {svgItems.map((item, index) => (
+          <div key={index} className='flex items-center justify-center py-4'>
+            <img
+              src={`/img/site/${item.image}`}
+              alt={`Workflow image ${index + 1}`}
+              className='h-[280px] w-auto object-contain'
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default InfoBoxes

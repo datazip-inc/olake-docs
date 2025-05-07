@@ -82,7 +82,7 @@ export default function New3Page() {
       title='OLake'
       description='Fastest Database to Data Lakehouse data replication tool, open sourced'
     >
-      <div className='bg-white dark:bg-gray-900'>
+      <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
         <DataWarehouseToLakes />
         <WorkflowSection />
         <IcebergHero />
@@ -91,7 +91,7 @@ export default function New3Page() {
         <SetupStepsSection />
         <RegistrationSection />
         <BlogShowcase />
-        <div className='container my-8 w-full max-w-[90%]'>
+        <div className='container mx-auto my-8 w-full max-w-[90%]'>
           <Faq data={OLakeFaqs} showHeading={true} />
         </div>
       </div>

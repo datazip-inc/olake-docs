@@ -41,11 +41,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         <div className='mb-8 mr-8'>
 
           <div className='flex flex-col gap-4'>
-            <h1 className='mb-4 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-4xl lg:text-4xl'>
+            <h1 className='mb-6 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-4xl lg:text-4xl'>
               {title}
             </h1>
 
-            <h2 className='text-2xl text-center leading-8 lg:text-left font-normal md:text-4xl lg:text-4xl xl:text-4xl 2xl:text-5xl'>
+            <h2 className='text-2xl text-center leading-8 lg:text-left font-normal md:text-[45px] lg:text-[56px] xl:text-[45px] 2xl:text-[56px]'>
               <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Database
               </span>

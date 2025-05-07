@@ -190,19 +190,21 @@ const BenchmarkSection: React.FC = () => {
         <div className='inline-flex gap-2 overflow-hidden rounded-lg'>
           <button
             onClick={() => setActiveTab('full-load')}
-            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${activeTab === 'full-load'
-              ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
-              }`}
+            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${
+              activeTab === 'full-load'
+                ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
+            }`}
           >
             Full Load
           </button>
           <button
             onClick={() => setActiveTab('cdc-sync')}
-            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${activeTab === 'cdc-sync'
-              ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
-              }`}
+            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${
+              activeTab === 'cdc-sync'
+                ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
+            }`}
           >
             CDC Sync
           </button>
@@ -214,9 +216,7 @@ const BenchmarkSection: React.FC = () => {
         {activeTab === 'full-load' && (
           <MobileBenchmarkCards data={fullLoadData} isFullLoad={true} />
         )}
-        {activeTab === 'cdc-sync' && (
-          <MobileBenchmarkCards data={cdcSyncData} isFullLoad={false} />
-        )}
+        {activeTab === 'cdc-sync' && <MobileBenchmarkCards data={cdcSyncData} isFullLoad={false} />}
       </div>
 
       {/* Desktop view */}
@@ -232,8 +232,12 @@ const BenchmarkSection: React.FC = () => {
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-green-50/70 p-6 dark:border-gray-700 dark:bg-green-900/20'>
                       <div className='flex flex-col items-center justify-center'>
-                        <div className='font-bold text-gray-800 dark:text-gray-200'>{TOOLS.olake.name}</div>
-                        <div className='text-sm text-gray-600 dark:text-gray-400'>{TOOLS.olake.description}</div>
+                        <div className='font-bold text-gray-800 dark:text-gray-200'>
+                          {TOOLS.olake.name}
+                        </div>
+                        <div className='text-sm text-gray-600 dark:text-gray-400'>
+                          {TOOLS.olake.description}
+                        </div>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
@@ -342,8 +346,12 @@ const BenchmarkSection: React.FC = () => {
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-green-50/70 p-6 dark:border-gray-700 dark:bg-green-900/20'>
                       <div className='flex flex-col items-center justify-center'>
-                        <div className='font-bold text-gray-800 dark:text-gray-200'>{TOOLS.olake.name}</div>
-                        <div className='text-sm text-gray-600 dark:text-gray-400'>{TOOLS.olake.description}</div>
+                        <div className='font-bold text-gray-800 dark:text-gray-200'>
+                          {TOOLS.olake.name}
+                        </div>
+                        <div className='text-sm text-gray-600 dark:text-gray-400'>
+                          {TOOLS.olake.description}
+                        </div>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
