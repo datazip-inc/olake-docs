@@ -100,13 +100,13 @@ const RegistrationSection = () => {
               <div className='space-y-6 md:space-y-10'>
                 {/* Feature 1 */}
                 <div>
-                  <div className='mb-3 flex items-start gap-2'>
-                    <img src='/img/site/iceberg-logo.svg' />
-                    <div className='flex flex-col gap-1'>
+                  <div className='mb-3 flex items-start gap-4'>
+                    <img src='/img/site/iceberg-logo.svg' className='mt-1' />
+                    <div className='flex max-w-[90%] flex-col gap-2'>
                       <div className='text-lg font-semibold md:text-xl lg:text-xl'>
                         Iceberg Native
                       </div>
-                      <div className='mr-2 text-sm text-gray-100 md:text-sm'>
+                      <div className='break-words pr-4 text-sm text-gray-100 md:text-sm'>
                         Instead of directly transforming data from Databases during extraction, we
                         first pull it in its native format.
                       </div>
@@ -116,9 +116,9 @@ const RegistrationSection = () => {
 
                 {/* Feature 2 */}
                 <div>
-                  <div className='flex items-start md:mb-3'>
+                  <div className='flex items-start gap-4 md:mb-3'>
                     <svg
-                      className='mr-2 h-5 w-5 md:mr-3 md:h-6 md:w-6'
+                      className='mt-1 h-5 w-5 flex-shrink-0 md:h-6 md:w-6'
                       viewBox='0 0 24 24'
                       fill='none'
                       xmlns='http://www.w3.org/2000/svg'
@@ -131,11 +131,11 @@ const RegistrationSection = () => {
                         strokeLinejoin='round'
                       />
                     </svg>
-                    <div className='flex flex-col gap-1'>
+                    <div className='flex max-w-[90%] flex-col gap-2'>
                       <div className='text-lg font-semibold md:text-xl lg:text-xl'>
                         Faster & More Efficient
                       </div>
-                      <div className='text-ellipsis text-sm text-gray-100 md:text-sm'>
+                      <div className='break-words pr-4 text-sm text-gray-100 md:text-sm'>
                         Engineered for high-throughput EL with adaptive chunking, parallel execution
                         for historical loads, and CDC for optimized data pipeline.
                       </div>
