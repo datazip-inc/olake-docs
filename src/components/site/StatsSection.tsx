@@ -36,7 +36,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({
   ]
 }) => {
   return (
-    <div className='mx-auto w-full max-w-7xl px-4 py-12 md:px-6 md:py-16 lg:px-8'>
+    <div className='mx-auto w-full max-w-7xl px-4 py-12 md:px-6 md:py-16 lg:px-2'>
       <div className='mb-6 md:mb-8'>
         <h2 className='mb-2 text-xl font-medium text-[#333333] dark:text-white sm:text-2xl md:mb-2 md:text-2xl'>
           {title}

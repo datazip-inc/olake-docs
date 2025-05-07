@@ -54,7 +54,7 @@ const RegistrationSection = () => {
       <div className='container relative z-10 mx-auto py-8 md:py-16'>
         <div className='mx-auto'>
 
-          <div className='grid items-center gap-8 md:grid-cols-[60%_40%] lg:gap-16'>
+          <div className='grid items-center gap-8 md:grid-cols-[50%_50%] lg:grid-cols-[60%_40%] lg:gap-16'>
             
             
             {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}

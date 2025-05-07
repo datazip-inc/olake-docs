@@ -181,7 +181,7 @@ const SetupStepsSection: React.FC = () => {
 
                         <a
                             href={getConnectorUrl()}
-                            className="inline-block bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 transition w-full text-center font-medium text-sm sm:text-base"
+                            className="inline-block bg-blue-600 text-white py-2.5 px-6 rounded-lg hover:bg-blue-700 hover:text-gray-100 transition w-full text-center font-medium text-sm sm:text-base"
                         >
                             Connect Source
                         </a>

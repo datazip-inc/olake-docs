@@ -39,7 +39,7 @@ const FeatureCard = ({
           <h3 className='mb-2 text-lg font-bold text-gray-900 dark:text-white sm:mb-3 sm:text-xl md:text-2xl'>
             {title}
           </h3>
-          <p className='text-xs text-gray-700 dark:text-gray-200 sm:text-sm md:text-base'>
+          <p className='text-xs text-gray-700 dark:text-gray-200 sm:text-sm md:text-sm'>
             {description}
           </p>
         </div>
@@ -80,7 +80,7 @@ const FeatureShowcase: React.FC = () => {
               title='Schema-Aware Logs and Alerts for Integrity '
               description='Actively monitors sync failures, schema changes, and data type modifications, ensuring that issues like incompatible updates or ingestion errors are swiftly detected, clearly logged, and immediately surfaced through real-time alerts'
               illustration={
-                <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
+                <div className='flex h-28 w-full items-center justify-center sm:h-28 md:h-32'>
                   <img
                     src='/img/site/why-olake-2.svg'
                     alt='Stay updated with ingestion logs'
@@ -95,7 +95,7 @@ const FeatureShowcase: React.FC = () => {
               title='CDC Cursor Preservation'
               description='When you add new big tables after a long time of setting up the ETL, we do full load for it, in parallel to already running incremental sync. So CDC cursors are never lost. We manage overhead of data ingestion order and deduplication.'
               illustration={
-                <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
+                <div className='flex h-44 w-full items-center pr-11 justify-end sm:h-28 md:h-44'>
                   <img
                     src='/img/site/why-olake-3.svg'
                     alt='CDC Cursor Preservation'
@@ -110,7 +110,7 @@ const FeatureShowcase: React.FC = () => {
               title='Achieve near real-time latency'
               description='Using Databases change stream logs (binglogs for MySQL, oplogs for mongoDB, WAL logs for Postgres), OLake enables parallel updates for each collection. This method facilitates rapid synchronization and ensures that data is consistently updated with near real-time updates.'
               illustration={
-                <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
+                <div className='flex h-36 w-full items-center justify-center sm:h-28 md:h-44'>
                   <img
                     src='/img/site/why-olake-4.svg'
                     alt='Fast & Stable Connectors'
