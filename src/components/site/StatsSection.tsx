@@ -64,7 +64,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({
               <div className='hidden h-auto w-px self-stretch bg-gray-300 dark:bg-gray-700 md:block'></div>
             )}
             <div className='flex flex-col items-center px-4 py-6 text-center'>
-              <div className='text-4xl font-medium text-[#333333] dark:text-white sm:text-3xl md:text-5xl'>
+              <div className='text-4xl font-medium text-[#333333] dark:text-white sm:text-3xl md:text-4xl'>
                 {stat.value}
               </div>
               <div className='mt-2 text-center text-base text-[#858585] dark:text-gray-400 sm:text-lg'>

@@ -38,7 +38,7 @@ const RegistrationSection = () => {
   }, [history, history.location.hash])
 
   return (
-    <section id='olake-form-product' className='relative mx-auto w-4/5 overflow-hidden rounded-xl p-6'>
+    <section id='olake-form-product' className='relative mx-auto w-5/5 2xl:w-4/5 overflow-hidden rounded-xl p-6'>
       {/* Background lake image */}
       <div className='absolute inset-0 z-0'>
         <img
@@ -49,8 +49,11 @@ const RegistrationSection = () => {
         {/* <div className='absolute inset-0 bg-blue-900/70'></div> */}
       </div>
 
+
+
       <div className='container relative z-10 mx-auto py-8 md:py-16'>
         <div className='mx-auto'>
+
           <div className='grid items-center gap-8 md:grid-cols-[60%_40%] lg:gap-16'>
             
             
@@ -97,7 +100,7 @@ const RegistrationSection = () => {
             <div className='text-white order-1 md:order-2'>
               <div className='mb-6 md:mb-8'>
                 <h3 className='mb-2 md:mb-3 text-xl md:text-2xl font-medium'>OLake</h3>
-                <h2 className='mb-6 md:mb-10 text-3xl md:text-4xl lg:text-6xl font-medium'>
+                <h2 className='mb-6 md:mb-10  text-3xl md:text-3xl lg:text-5xl font-medium'>
                   Interested?
                   <br />
                   Register Now.
@@ -107,7 +110,7 @@ const RegistrationSection = () => {
               <div className='space-y-6 md:space-y-10'>
                 {/* Feature 1 */}
                 <div>
-                  <div className='mb-2 md:mb-3 flex items-center'>
+                  <div className='mb-3 flex items-center'>
                     <svg
                       className='mr-2 md:mr-3 h-5 w-5 md:h-6 md:w-6'
                       viewBox='0 0 24 24'
@@ -156,10 +159,6 @@ const RegistrationSection = () => {
                 </div>
               </div>
             </div>
-
-
-            
-
 
           </div>
         </div>

@@ -10,7 +10,7 @@ const InfoBoxes: React.FC = () => {
     // Define each SVG with its exact pixel dimensions
     const svgItems: SVGItem[] = [
         {
-            image: '120+.svg',
+            image: 'sources.svg',
             width: 359,
             height: 360
         },

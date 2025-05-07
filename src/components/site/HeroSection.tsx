@@ -61,7 +61,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           <div className='mt-6 px-2 mx-auto lg:mx-0 max-w-full flex flex-col sm:flex-row gap-4 justify-center lg:justify-start'>
             <Link
               to='#olake-form-product'
-              className='inline-flex items-center justify-center rounded-md bg-[#203FDD] px-4 sm:px-6 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-sm sm:text-base'
+              className='inline-flex items-center justify-center rounded-md bg-[#203FDD] px-4 sm:px-6 py-2.5 font-medium text-white transition-colors hover:text-gray-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-sm sm:text-base'
             >
               Talk to us
             </Link>
