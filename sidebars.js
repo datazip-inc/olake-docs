@@ -297,7 +297,8 @@ const docSidebar = {
         },
         'core/architecture',
         'core/cli',
-        'core/state-controller'
+        'core/state-controller',
+        'core/use-cases',
       ],
     },
 
