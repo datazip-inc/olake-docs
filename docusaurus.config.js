@@ -608,6 +608,27 @@ const config = {
             from: '/docs/category/apache-iceberg',
           },
           {
+            to: '/docs/connectors/mongodb/overview',
+            from: '/docs/category/mongodb',
+          },
+
+          {
+            to: '/docs/connectors/postgres/overview',
+            from: '/docs/category/postgres',
+          },
+
+          {
+            to: '/docs/connectors/mysql/overview',
+            from: '/docs/category/mysql',
+          },
+
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/getting-started',
+          },
+
+
+          {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
           },
