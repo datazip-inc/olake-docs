@@ -604,6 +604,10 @@ const config = {
             from: '/docs/connectors/mysql/docker-compose',
           },
           {
+            to: '/docs/writers/iceberg/overview',
+            from: '/docs/category/apache-iceberg',
+          },
+          {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',
           },
