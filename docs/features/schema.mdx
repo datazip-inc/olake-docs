@@ -16,11 +16,11 @@ Schema evolution refers to changes in your database structure like adding, remov
 
 ### 1.  Schema Evolution — Column-Level Changes
 
-| Change Type                                          | How OLake Detects & Handles It                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Typical Pipeline Impact                                                                                                                             | Extra Details & Tips                                                                                                                                                                                                             |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Change Type | How OLake Detects & Handles It | Typical Pipeline Impact | Extra Details & Tips |
+| ----------- | ------------------------------ | ----------------------- | -------------------- |
 | **Adding a column**                                  | OLake runs a *schema discovery* at the start of every sync. When a new source column appears, it is **automatically** added to the Iceberg schema (new field-ID) and starts receiving values immediately. If the source back-fills historical rows, CDC registers them as updates. **No user action is required.** | **No breakage.** Historical rows show `NULL` until back-filled. | • Monitor write throughput if a back-fill is large. |
-| **Deleting (dropping) a column**                     | OLake notices the column is removed in the source streams.<br/>• The deleted column still exists in the destination (so old snapshots stay queryable).<br/>• New files no longer include that field; Iceberg readers treat it as `NULL`.                                                                                                                           | **No breakage**. ETL continues with a “virtual” column (null-filled).                                                                               | • Down-stream BI tools won’t break, but they might show the column full of nulls—communicate schema changes to analysts.<br/>• You can later run a “rewrite manifests” job to strip the dead column if storage footprint matters. |
-| **Renaming a column**                                | Iceberg identifies columns by immutable **field ID**, not by name. When the upstream DB renames `customer_id` to `client_id`, OLake:<br/>• Detects the rename.<br/>• Updates Iceberg’s `name` property while keeping the original field ID.<br/>• All data (past and future) stays in the same physical column.                                                                                                                                                                                                                                                                          | **No breakage**. | • Renames are instant—no file rewrites.<br/>• If you have SQL downstream, update column names in your SQL queries to use the new column name.                                                                                                           |
+| **Deleting (dropping) a column**                     | OLake notices the column is removed in the source streams.<br/>• The deleted column still exists in the destination (so old snapshots stay queryable).<br/>  | **No breakage**. ETL continues with a “virtual” column (null-filled).                                                                               | • Down-stream BI tools won’t break, but they might show the column full of nulls—communicate schema changes to analysts.<br/>• You can later run a “rewrite manifests” job to strip the dead column if storage footprint matters. |
+| **Renaming a column**                                |  Source column renamed → old column stays in destination (no new values) → new column with updated name is created and receives all incoming data.    <br/> <br/> WIP: Iceberg keeps immutable field IDs, so on rename (customer_id → client_id) OLake just updates the column’s name on the same field ID—no data migration required.             | **No breakage**. | • Renames are instant—no file rewrites.<br/>• If you have SQL downstream, update column names in your SQL queries to use the new column name.                                                                                                           |
 | **JSON / Semi-structured key add / remove / rename** | OLake flattens keys to a canonical path inside a single JSON column (or keeps raw JSON).<br/>• Added keys appear automatically.<br/>• Removed keys simply vanish from new rows.<br/>• Renamed keys are treated as “remove + add” because JSON has no intrinsic field ID.                                                                        | **No breakage**.                       |          |
 
 
@@ -31,11 +31,11 @@ Schema evolution refers to changes in your database structure like adding, remov
 
 ### 2  Schema Evolution — Table-Level Changes
 
-| Change Type                                                                   | How OLake Detects & Handles It                                                                                                                                                                                                                                                                                                                                                                                                            | Typical Pipeline Impact                                                                                               | Extra Details & Tips                                                                                                                                                                                     |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Change Type | How OLake Detects & Handles It | Typical Pipeline Impact | Extra Details & Tips|
+| ----------- | ------------------------------ | ----------------------- | ------------------- |
 | **Adding a table / stream**                                                  | Newly detected source tables appear in the OLake UI list. **You choose which ones to sync.** Once added, OLake performs an initial full load and then switches to CDC. Tables not selected to sync are ignored. | **No breakage.** Pipelines for existing tables run as usual; disabled tables simply do not sync. | • Initial full loads run in parallel.<br/>• Default naming is `source_db.table_name`. |
 | **Removing (dropping) a table / stream**       |  No new data will get added to the deleted table. Existing table data and metadata remain queryable.                                                                                                                                                                                                                                              | **No breakage.** Downstream queries on historic data still work; new inserts stop.                                    | • If the table is recreated later with the same name but different structure, treat it as a brand-new stream to avoid field-ID collisions.                                                               |
-| **Renaming a table**                                                         | renaming of a table is treated as a new table itself and will be discovered as a new stream. and on enbaling sync for this table it will be synced as full load + CDC.<br/>• The old Iceberg table keeps historical data.                                         | **No breakage**, but post-rename data lands in a separate table unless you merge histories.      | • For continuous history, enable the new table quickly and (optionally) set an alias so both names map to the same Iceberg table.     |
+| **Renaming a table**                                                         | Renaming of a table is treated as a new table itself and will be discovered as a new stream and on enbaling sync for this table it will be synced as full load + CDC.<br/> <br/>• The old Iceberg table keeps historical data.                                         | **No breakage**, but post-rename data lands in a separate table unless you merge histories.      | For continuous history, enable the new table quickly and (optionally) set an alias so both names map to the same Iceberg table.     |
 
 
 
@@ -53,6 +53,10 @@ OLake fully supports all Iceberg v2 data type promotions:
 | FLOAT         | DOUBLE                      | Promoting to higher precision works without data loss |
 | DATE          | TIMESTAMP, TIMESTAMP_NS     | Dates can be safely converted to timestamps           |
 | DECIMAL(P, S) | DECIMAL(P', S) where P' > P | Only widening precision is supported                  |
+
+:::caution
+- Iceberg v2 supports widening type changes only. Narrowing changes (e.g., `BIGINT` to `INT`) along with any other data type changes will result in an errror as are not supported.
+- All the incompatible type changes will be handled by OLake with DLQ (Dead Letter Queue) tables (coming soon)
 
 ### Handling Incompatible Type Changes
 
@@ -78,7 +82,6 @@ For type changes not supported by Iceberg v2 (like STRING to INT), OLake offers 
 - Enable Schema Data Type Changes for production environments
 - Implement robust monitoring for type change errors
 - Test schema changes in non-production environments first
-- Consider enabling DLQ (when available) for critical pipelines
 - Document your schema and track changes over time
 
 ## Example Scenarios
@@ -120,20 +123,6 @@ When a column changes from INT to BIGINT type:
 
 ### Scenario 5: Incompatible Type Change
 
-When a column changes from STRING to INT type:
-
-- Without DLQ: Sync fails with clear error message
-- With DLQ (coming soon): Incompatible records go to DLQ table
-- Records that can be safely converted continue to destination
+When a column changes from STRING to INT type, incompatible with Iceberg v2, sync fails.
 
 For more detailed information on Iceberg's schema evolution capabilities, refer to the [Apache Iceberg documentation](https://iceberg.apache.org/spec/#schema-evolution).
-
-
-
-
-
-
-
-
-
-
