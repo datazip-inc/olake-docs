@@ -24,7 +24,7 @@ SSH_CONN_ID = "SSH_CONNECTION_ID"   # SSH connection ID for connecting to instan
 
 # EC2 Instance Configuration
 AMI_ID = "ami-000ff0b5b095afd18"            # AMI ID for container-ready image
-INSTANCE_TYPE = "ARM_INSTANCE_TYPE"         # Instance size based on workload requirements
+INSTANCE_TYPE = "m7g.xlarge"         # Instance size based on workload requirements
 KEY_NAME = "EC2_KEY_PAIR_NAME"              # SSH key pair name
 SUBNET_ID = "VPC_SUBNET_ID" 
 SECURITY_GROUP_ID = "VPC_SECUROTY_GROUP"    # Ensure required ports are open
@@ -35,7 +35,6 @@ DEFAULT_EC2_USER = "ubuntu"  # Default user for SSH connection
 # ETL Configuration 
 S3_BUCKET = "S3_BUCKET_NAME"
 S3_PREFIX = "S3_BUCKET_PREFIX"
-S3_STATE_KEY_PATH = f"{S3_PREFIX}state.json"
 
 # Find images at: https://hub.docker.com/u/olakego
 # Examples: "olakego/source-mongodb:latest", "olakego/source-mysql:latest", "olakego/source-postgres:latest"
@@ -48,6 +47,8 @@ EC2_OLAKE_BASE_DIR = "/opt/olake_run"
 EC2_CONFIG_DIR = f"{EC2_OLAKE_BASE_DIR}/configs"
 EC2_STATE_DIR = EC2_CONFIG_DIR  # Same directory for configs and state
 EC2_STATE_FILE = f"{EC2_CONFIG_DIR}/state.json"
+
+S3_STATE_KEY_PATH = f"{S3_PREFIX}state.json"
 
 # --- Initialization script for compute instance ---
 USER_DATA_SCRIPT_CONTENT = f"""#!/bin/bash -xe
@@ -226,12 +227,8 @@ sudo ctr run --rm \
 OLAKE_EXIT_CODE=$?
 echo "INFO: ETL process finished with exit code: $OLAKE_EXIT_CODE"
 
-if [ $OLAKE_EXIT_CODE -ne 0 ]; then
-  echo "ERROR: ETL job failed with exit code $OLAKE_EXIT_CODE."
-  exit $OLAKE_EXIT_CODE
-fi
-
-echo "ETL sync successful. Uploading updated state file to storage..."
+# Always upload state file, regardless of exit code
+echo "Uploading state file to storage..."
 sudo aws s3 cp --region {AWS_REGION_NAME} $EC2_STATE_FILE s3://{S3_BUCKET}/{S3_STATE_KEY_PATH}
 UPLOAD_STATE_EXIT_CODE=$?
 if [ $UPLOAD_STATE_EXIT_CODE -ne 0 ]; then
@@ -239,6 +236,14 @@ if [ $UPLOAD_STATE_EXIT_CODE -ne 0 ]; then
     exit $UPLOAD_STATE_EXIT_CODE
 fi
 echo "INFO: State file uploaded successfully."
+
+# Now check the Olake exit code
+if [ $OLAKE_EXIT_CODE -ne 0 ]; then
+  echo "ERROR: ETL job failed with exit code $OLAKE_EXIT_CODE."
+  exit $OLAKE_EXIT_CODE
+fi
+
+echo "ETL sync completed successfully."
 
 echo "--- ETL Process Completed Successfully ---"
 date
