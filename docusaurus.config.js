@@ -463,7 +463,7 @@ const config = {
         onUntruncatedBlogPosts: 'ignore',
         // Remove this to remove the "edit this page" links.
         editUrl:
-          'https://github.com/datazip-inc/olake/tree/master/',
+          'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
         rehypePlugins: [imageFetchPriorityRehypePlugin],
 
@@ -493,7 +493,7 @@ const config = {
         onUntruncatedBlogPosts: 'ignore',
         // Remove this to remove the "edit this page" links.
         editUrl:
-          'https://github.com/datazip-inc/olake/tree/master/',
+          'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
         rehypePlugins: [imageFetchPriorityRehypePlugin],
 
