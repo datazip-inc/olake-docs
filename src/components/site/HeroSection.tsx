@@ -36,7 +36,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       {/* Left Column - contains 2 rows */}
       <div className='mt-0 container lg:mt-0 flex w-full flex-col lg:w-3/5'>
         {/* Row 1: "Fastest way to replicate..." section */}
-        <div className='mb-8 mr-8'>
+        <div className='mb-8'>
 
           <div className='flex flex-col gap-4'>
             <h1 className='mb-6 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-3xl lg:text-2xl xl:text-3xl'>
