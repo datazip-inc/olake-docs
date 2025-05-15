@@ -42,7 +42,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             <h1 className='mb-6 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-3xl lg:text-2xl xl:text-3xl'>
               {title}
             </h1>
-
+ 
             <h2 className='text-2xl text-center leading-8 lg:text-left font-normal sm:text[32px] md:text-[32px] lg:text-[28px] xl:text-[41px] 2xl:text-[50px]'>
               <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Database
