@@ -1,6 +1,6 @@
 // components/webinars/WebinarHosts.tsx
 
-import React = require('react');
+import React from "react";
 import Image from '@theme/IdealImage'
 import { FaLinkedin } from 'react-icons/fa';
 
@@ -36,8 +36,8 @@ const WebinarHosts: React.FC<WebinarHostsProps> = ({ hosts }) => {
               <Image
                 img={host.image}
                 alt={`${host.name}'s profile picture`}
-                layout="fill"
-                objectFit="cover"
+                // layout="fill"
+                // objectFit="cover"
                 className="rounded-full border-2 border-blue-600"
               />
             </div>

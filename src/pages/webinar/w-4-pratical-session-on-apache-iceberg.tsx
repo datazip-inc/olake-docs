@@ -8,7 +8,7 @@ import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 // import CTAButton from '../../components/webinars/CTAButton';
 
 import Layout from '@theme/Layout';
-import React = require('react');
+import React from "react";
 import Hr from '../../components/Hr';
 import { FaRegCalendarAlt } from 'react-icons/fa';
 
@@ -83,9 +83,8 @@ const WebinarPage = () => {
         <Hr />
         <br />
 
-
         <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="jqJko1uhL-4" className="max-w-6xl" />
+          <YouTubeEmbed videoId="rkYXBdp7uSw" className="max-w-6xl" />
 
           {/* comming soon */}
         </div>

@@ -8,9 +8,10 @@ import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/webinar/5th.json'
 
 import CTAButton from '../../components/webinars/CTAButton';
+import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 import Layout from '@theme/Layout';
-import React = require('react');
+import React from "react";
 import Hr from '../../components/Hr';
 import { FaRegCalendarAlt } from 'react-icons/fa';
 
@@ -95,7 +96,7 @@ const WebinarPage = () => {
 
             {/* remove this button with email collection form that leads to confirmation page of this webinar */}
 
-            <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
+            {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
               <CTAButton
                 title="Join Our Upcoming Event"
                 buttonText="Register Now!"
@@ -103,13 +104,21 @@ const WebinarPage = () => {
                 href="https://app.livestorm.co/datazip-inc/women-in-data"
                 variant="secondary"
               />
-            </div>
+            </div> */}
 
           </div>
         </div>
 
         <Hr />
         <br />
+
+
+        <div className="flex justify-center mb-12">
+          <YouTubeEmbed videoId="7fuvICHBvbc" className="max-w-6xl" />
+
+          {/* comming soon */}
+        </div>
+
 
         <WebinarOverview
           date="April 30, 2025"
