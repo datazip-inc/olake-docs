@@ -184,7 +184,12 @@ const BenchmarkSection: React.FC = () => {
           Get the <span className='text-[#203FDD]'>best</span>
           <span className='md:ml-2'>with OLake</span>
         </h2>
+        <div>
+        <img src="img/site/postgres-iceberg.svg" alt="postgres-iceberg" />
       </div>
+      </div>
+
+      
 
       <div className='mb-8 flex w-full justify-center'>
         <div className='inline-flex gap-2 overflow-hidden rounded-lg'>
@@ -228,16 +233,17 @@ const BenchmarkSection: React.FC = () => {
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left text-xl font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       Metrics
                     </th>
-                    <th className='w-1/6 border border-gray-200 bg-green-50/70 px-16 py-6 dark:border-gray-700 dark:bg-green-900/20'>
-                      <div className='flex flex-col items-center justify-center'>
-                        <div className='text-xl font-bold text-gray-800 dark:text-gray-200'>
-                          {TOOLS.olake.name}
-                        </div>
-                        <div className='text-sm text-gray-600 dark:text-gray-400'>
+
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
+                      <div className='flex items-center justify-center space-x-2'>
+                        <img src='/img/site/olake.svg' alt='' />
+                        <span className='text-xl'>{TOOLS.olake.name}</span>
+                      </div>
+                      <div className='text-sm text-gray-600 dark:text-gray-400'>
                           {TOOLS.olake.description}
                         </div>
-                      </div>
                     </th>
+
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <img src='/img/site/airbyte.svg' alt='' />
@@ -308,8 +314,10 @@ const BenchmarkSection: React.FC = () => {
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left text-xl font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       Metrics
                     </th>
+{/*                     
                     <th className='w-1/6 border border-gray-200 bg-green-50/70 px-16 py-6 dark:border-gray-700 dark:bg-green-900/20'>
                       <div className='flex flex-col items-center justify-center'>
+                      <img src='/img/site/airbyte.svg' alt='' />
                         <div className='text-xl font-bold text-gray-800 dark:text-gray-200'>
                           {TOOLS.olake.name}
                         </div>
@@ -317,13 +325,25 @@ const BenchmarkSection: React.FC = () => {
                           {TOOLS.olake.description}
                         </div>
                       </div>
+                    </th> */}
+
+                    <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
+                      <div className='flex items-center justify-center space-x-2'>
+                        <img src='/img/site/olake.svg' alt='' />
+                        <span className='text-xl'>{TOOLS.olake.name}</span>
+                      </div>
+                      <div className='text-sm text-gray-600 dark:text-gray-400'>
+                          {TOOLS.olake.description}
+                        </div>
                     </th>
+
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <img src='/img/site/airbyte.svg' alt='' />
                         <span className='text-xl'>{TOOLS.airbyte.name}</span>
                       </div>
                     </th>
+
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
                         <img src='/img/site/fivetran.svg' alt='' />
