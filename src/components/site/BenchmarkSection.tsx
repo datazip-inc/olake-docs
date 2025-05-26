@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import MobileBenchmarkCards from './MobileBenchmarkCards'
 import { FULL_LOAD, CDC_SYNC, TOOLS, METRIC_LABELS } from '../../data/benchmarkData'
+import Link from '@docusaurus/Link'
 
 interface BenchmarkRowProps {
   metric: string
@@ -189,21 +190,19 @@ const BenchmarkSection: React.FC = () => {
         <div className='inline-flex gap-2 overflow-hidden rounded-lg'>
           <button
             onClick={() => setActiveTab('full-load')}
-            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${
-              activeTab === 'full-load'
-                ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
-            }`}
+            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${activeTab === 'full-load'
+              ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+              : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
+              }`}
           >
             Full Load
           </button>
           <button
             onClick={() => setActiveTab('cdc-sync')}
-            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${
-              activeTab === 'cdc-sync'
-                ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
-            }`}
+            className={`rounded-xl border-none px-10 py-3 text-sm font-medium transition-all ${activeTab === 'cdc-sync'
+              ? 'bg-[#E8EBFD] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+              : 'bg-transparent text-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
+              }`}
           >
             CDC Sync
           </button>
@@ -383,8 +382,35 @@ const BenchmarkSection: React.FC = () => {
               </table>
             </div>
           )}
+          <div className="mt-2 flex w-full flex-col space-y-4 2xl:px-40 md:flex-row md:space-x-2 md:space-y-0">
+            <Link
+              to="https://olake.io/docs/connectors/postgres/benchmarks"
+              className="inline-flex items-center font-medium text-[#203FDD] hover:text-blue-700 ml-auto"
+            >
+              View all Performance Benchmarks
+              <svg
+                className="ml-1 h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </Link>
+          </div>
+
         </div>
+
+
       </div>
+
+
+
     </section>
   )
 }

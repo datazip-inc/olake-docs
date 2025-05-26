@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 
 const SetupStepsSection: React.FC = () => {
-  const [selectedConnector, setSelectedConnector] = useState('mongodb')
+  const [selectedConnector, setSelectedConnector] = useState('postgres')
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
   const connectors = [
@@ -47,7 +47,7 @@ const SetupStepsSection: React.FC = () => {
               <div className='flex'>
                 <div className='mr-4 flex flex-col items-center'>
                   {/* <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#203FDD]'> */}
-                  <div className='z-40 h-2 w-2 rounded-full bg-white outline outline-2 outline-[#203FDD]'></div>
+                  <div className='z-40 h-2 w-2 rounded-full bg-white outline outline-2 outline-[#e5e5e5]'></div>
                   {/* </div> */}
                   <div className='h-20 w-0.5 bg-[#e5e5e5]'></div>
                 </div>
@@ -128,7 +128,7 @@ const SetupStepsSection: React.FC = () => {
                   strokeLinecap='round'
                 />
               </svg>
-              <span className='text-base font-semibold sm:text-lg'>Capture information</span>
+              <span className='text-base font-semibold sm:text-lg'>Setup Source</span>
             </div>
 
             <div className='mb-5'>
