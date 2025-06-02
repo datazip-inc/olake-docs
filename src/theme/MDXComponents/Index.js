@@ -50,6 +50,7 @@ import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
+import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 
@@ -66,6 +67,7 @@ import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIceb
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -124,6 +126,7 @@ const MDXComponents = {
   S3Config,
   S3ConfigDetails,
   LocalParquetConfig,
+  DockerParquetConfig,
 
   GlueIcebergWriterConfig,
   MinioJDBCIcebergWriterConfigLocal,
@@ -137,7 +140,8 @@ const MDXComponents = {
   HiveIcebergWriterConfigDetails,
 
   AdditionalReferences,
-  CatalogQuery
+  CatalogQuery,
+  YouTubeEmbed
 };
 
 export default MDXComponents;

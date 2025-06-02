@@ -1,10 +1,10 @@
 import WebinarTitle from '../../components/webinars/WebinarTitle';
-import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
+// import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 // import WebinarForm from "../../components/forms/WebinarForm";
-import React = require('react');
+import React from "react";
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';

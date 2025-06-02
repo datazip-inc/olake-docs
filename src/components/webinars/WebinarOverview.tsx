@@ -22,7 +22,7 @@ const WebinarOverview: React.FC<WebinarOverviewProps> = ({
   bulletPoints
 }) => {
   return (
-    <section className="bg-white dark:bg-slate-800 px-6 py-8 md:px-8 md:py-10 rounded-lg mb-12">
+    <section className="bg-white dark:bg-slate-800 px-6 py-8 md:px-8 md:py-10 rounded-lg">
       <div className="grid grid-cols-1 md:grid-cols-2 ">
         {/* Webinar Details */}
         <div>
@@ -71,7 +71,7 @@ const WebinarOverview: React.FC<WebinarOverviewProps> = ({
 
         {/* Webinar Summary */}
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-6">
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
             Summary
           </h2>
           <p className="text-gray-700 dark:text-gray-300 mb-5">{summary}</p>

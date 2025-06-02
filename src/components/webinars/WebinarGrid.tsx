@@ -55,7 +55,7 @@ const WebinarGrid: React.FC<WebinarGridProps> = ({ webinars }) => {
                 img={webinar.img}
                 alt={webinar.alt}
                 className="w-full h-full object-cover"
-                priority
+
               />
             </div>
 

@@ -7,7 +7,7 @@ import CommunityForum from '../../components/community/forum'
 import CommunityContribute from '../../components/community/communityContribute'
 import CommunityEvents from '../../components/community/CommunityEvents'
 import ActiveContributors from '../../components/community/activeContributors'
-import CommunitySpotlights from '../../components/community/communitySpotlights'
+// import CommunitySpotlights from '../../components/community/communitySpotlights'
 import CommunityAbout from '../../components/community/communityAbout'
 
 interface Contributor {

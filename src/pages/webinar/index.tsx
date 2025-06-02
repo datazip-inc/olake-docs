@@ -1,14 +1,23 @@
-import WebinarGrid from '../../components/webinars/WebinarGrid';
-
-import React = require('react');
+import React from "react";
 import Layout from '@theme/Layout';
-
+import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo } from 'react-icons/fa';
 // Define the webinar type directly here if not using a separate types file
 
 const WebinarsPage = () => {
-
   const communityMeets = [
+    {
+      title: 'OLake 6th Community Meetup',
+      subtitle: 'Join us ',
+      route: '/community/6th-community-meetup',
+      img: `/img/community/6th-community-meetup-cover.png`,
+      alt: 'OLake 6th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 April 2025',
+      icon: FaVideo
+    },
     {
       title: 'OLake 5th Community Meetup',
       subtitle: 'Join us ',
@@ -49,6 +58,42 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Demystifying Lakehouse Architecture: From Theory to Practice',
+      subtitle: 'Join Akshat Mathur, Senior Software Engineer at Cloudera and Apache Hive contributor, as he delivers a comprehensive technical exploration of lakehouse architecture. This session will bridge theoretical concepts with practical implementation strategies based on Akshats extensive experience with Apache Iceberg and data platform optimization',
+      route: '/webinar/w-7-demystifying-lakehouse-architecture',
+      img: `/img/webinars/w-7-demystifying-lakehouse-architecture-cover.png`,
+      alt: 'Demystifying Lakehouse Architecture: From Theory to Practice',
+      status: 'upcoming',
+      button: 'primary',
+      CTA: 'Register Now',
+      date: '29 May 2025',
+      // icon: FaVideo
+    },
+    {
+      title: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
+      subtitle: 'Join Viktor Kessler, co-founder of Vakamo and former technical leader at MongoDB and Dremio, for an in-depth technical exploration of how Apache Iceberg is fundamentally transforming the data engineering landscape',
+      route: '/webinar/w-6-iceberg-lakehouse-architecture-lakekeeper',
+      img: `/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.png`,
+      alt: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '15 May 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'Women in Data: Building Technical Expertise and Career Pathways in Data Engineering',
+      subtitle: 'Join us for an in-depth technical discussion with six accomplished women data engineers who are architecting the backbone of modern data-driven organizations. This 60-minute session brings together specialists from healthcare, retail, cloud platforms, and enterprise data systems to share their technical approaches to solving complex data engineering challenges',
+      route: '/webinar/w-5-women-in-data-engineering',
+      img: `/img/webinars/w-5-women-in-data-engineering-cover.png`,
+      alt: 'Women in Data Engineering',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '30 April 2025',
+      icon: FaVideo
+    },
+    {
       title: 'Pratical Session on Apache Iceberg by Sachin Tripathi',
       subtitle: 'Join us on Friday, March 28th at 4 PM IST for a technical session on Apache Iceberg with Sachin Tripathi, Senior Data Engineer at EarnIn. The session will examine Icebergs ACID-like transaction model, time travel capabilities, schema evolution mechanisms, hidden partitioning system, and catalog architecture',
       route: '/webinar/w-4-pratical-session-on-apache-iceberg',
@@ -58,7 +103,7 @@ const WebinarsPage = () => {
       button: 'secondary',
       CTA: 'Watch Now',
       date: '28 March 2025',
-      // icon: FaVideo
+      icon: FaVideo
     },
     {
       title: 'CDC Unplugged - Modern Data Integration with Real World Insights',

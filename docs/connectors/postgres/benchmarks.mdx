@@ -4,6 +4,163 @@ description: OLake Benchmarks Description
 sidebar_position: 2
 ---
 
-# Postgres Benchmarks
+# Benchmarks
 
-Coming Soon
+### PostgreSQL → Apache Iceberg Connector Benchmark
+
+_(OLake vs. Popular Data-Movement Tools)_
+
+#### 1. Speed Comparison – **Full-Load Performance**
+
+| Tool               | Rows Synced | Throughput (rows / sec) | Relative to OLake    |
+| ------------------ | ----------: | ----------------------: | -------------------- |
+| **OLake**          |  **4.01 B** |          **46,262 RPS** | –                    |
+| Fivetran           |      4.01 B |              46,395 RPS | Parity (≤1 % faster) |
+| Debezium (memiiso) |      1.28 B |              14,839 RPS | **3.1 × slower**     |
+| Estuary            |      0.34 B |               3,982 RPS | **11.6 × slower**¹   |
+| Airbyte Cloud          |      12.7 M |                 457 RPS | **101 × slower**     |
+
+¹ _Estuary ran the same 24-hour window but processed a \~10× smaller dataset, so its throughput looks even lower when normalized._
+
+:::info
+1. The time elapsed for all the tools was 24 hours, but OLake, Debezium, Estuary and Fivetran were able to process the entire dataset in that time. Airbyte failed with a sync after 7.5 hours, so we only have throughput for the first part of the test.
+:::
+
+**Key takeaway:** OLake sustains the same top-tier bulk-load speed as Fivetran while outpacing every other open-source option by 3-to-100×.
+
+#### 2. Speed Comparison – **Change-Data-Capture (CDC)**
+
+| Tool               |   CDC Window | Throughput (rows / sec) | Relative to OLake |
+| ------------------ | -----------: | ----------------------: | ----------------- |
+| **OLake**          | **22.5 min** |          **36 982 RPS** | –                 |
+| Fivetran           |       31 min |              26,910 RPS | **1.4 × slower**  |
+| Debezium (memiiso) |       60 min |              13,808 RPS | **2.7 × slower**  |
+| Estuary            |        4.5 h |               3,085 RPS | **12 × slower**   |
+| Airbyte Cloud            |         23 h |                 585 RPS | **63 × slower**   |
+
+:::info
+The rows synced in the CDC test were the same 50 million changes that OLake processed in 22.5 minutes. The other tools were tested on the same dataset, but they had different CDC windows (timings).
+:::
+
+**Key takeaway:** For incremental workloads OLake leads the pack, moving 50 million PostgreSQL changes into Iceberg **40 % faster than Fivetran** and **10-60× faster than other OSS connectors**.
+
+
+
+#### 3. Cost Comparison (Vendor List Prices)
+
+| Tool          | Scenario        |                                                                           Spend (USD) |  Rows Synced |
+| ------------- | --------------- | ------------------------------------------------------------------------------------: | -----------: |
+| **OLake**     | Full Load / CDC | Cost of a `Standard D64ls v5 (64 vcpus, 128 GiB memory)` running for 24 hours `< $75` | 4.01 B / 50M |
+| Fivetran      | Full Load       |                                                                 \$ 0 (free full sync) |       4.01 B |
+| Estuary       | Full Load       |                                                                              \$ 1,668 |       0.34 B |
+| Airbyte Cloud | Full Load       |                                                                              \$ 5,560 |       12.7 M |
+| Fivetran      | CDC             |                                                                              \$ 2, 375.80 |         50 M |
+| Estuary       | CDC             |                                                                              \$ 17.63 |         50 M |
+| Airbyte Cloud | CDC             |                                                                             \$ 148.95 |         50 M |
+
+- **OLake** is open-source and can be deployed on your own Kubernetes cluster or cloud VMs; you pay only for the compute and storage you provision.
+
+### Footnotes
+1. **Airbyte**: Please find attached data for the Airbyte issues we faced during the test - [here.](https://drive.google.com/drive/folders/10oWFBp-MELPSBdIzYJFqXlyHpmPykT_p?usp=sharing)
+
+## Dataset and Table Schemas
+Please refer to [this GitHub repository](https://github.com/datazip-inc/nyc-taxi-data-benchmark/tree/remote-postgres) for the dataset we used to conduct these benchmarks. 
+
+### `trips` table (used for Full Load)
+
+```sql
+CREATE TABLE trips (
+   trip_id                 BIGINT,
+   vendor_id               VARCHAR,
+   pickup_datetime         TIMESTAMP,
+   dropoff_datetime        TIMESTAMP,
+   store_and_fwd_flag      VARCHAR(1),
+   rate_code_id            BIGINT,
+   pickup_longitude        DOUBLE,
+   pickup_latitude         DOUBLE,
+   dropoff_longitude       DOUBLE,
+   dropoff_latitude        DOUBLE,
+   passenger_count         BIGINT,
+   trip_distance           DOUBLE,
+   fare_amount             DOUBLE,
+   extra                   DOUBLE,
+   mta_tax                 DOUBLE,
+   tip_amount              DOUBLE,
+   tolls_amount            DOUBLE,
+   ehail_fee               DOUBLE,
+   improvement_surcharge   DOUBLE,
+   total_amount            DOUBLE,
+   payment_type            VARCHAR,
+   trip_type               VARCHAR,
+   pickup                  VARCHAR,
+   dropoff                 VARCHAR,
+   cab_type                VARCHAR,
+   precipitation           BIGINT,
+   snow_depth              BIGINT,
+   snowfall                BIGINT,
+   max_temperature         BIGINT,
+   min_temperature         BIGINT,
+   average_wind_speed      BIGINT,
+   pickup_nyct2010_gid     BIGINT,
+   pickup_ctlabel          VARCHAR,
+   pickup_borocode         BIGINT,
+   pickup_boroname         VARCHAR,
+   pickup_ct2010           VARCHAR,
+   pickup_boroct2010       BIGINT,
+   pickup_cdeligibil       VARCHAR(1),
+   pickup_ntacode          VARCHAR,
+   pickup_ntaname          VARCHAR,
+   pickup_puma             VARCHAR,
+   dropoff_nyct2010_gid    BIGINT,
+   dropoff_ctlabel         VARCHAR,
+   dropoff_borocode        BIGINT,
+   dropoff_boroname        VARCHAR,
+   dropoff_ct2010          VARCHAR,
+   dropoff_boroct2010      BIGINT,
+   dropoff_cdeligibil      VARCHAR(1),
+   dropoff_ntacode         VARCHAR,
+   dropoff_ntaname         VARCHAR,
+   dropoff_puma            VARCHAR
+);
+```
+
+* **Column count:** 51
+* **Type mix:** 26 × `VARCHAR` (labels & categorical codes), 18 × numeric (`DOUBLE` or `BIGINT`), 5 × `TIMESTAMP`, 2 × single-byte flags.
+* **Why so wide?** Weather columns (precipitation → wind) and geography lookup columns (borough/census codes) are pre-joined to make BI queries single-table.
+
+
+###  `fhv_trips` table (used for CDC)
+
+| # | Column                   | Type            | Note               |
+| - | ------------------------ | --------------- | ------------------ |
+| 1 | `dispatching_base_num`   | `VARCHAR(6)`    | TLC base licence   |
+| 2 | `pickup_datetime`        | `TIMESTAMP`     | ISO 8601           |
+| 3 | `dropoff_datetime`       | `TIMESTAMP`     | "                  |
+| 4 | `PUlocationID`           | `INT`           | TLC zone ID        |
+| 5 | `DOlocationID`           | `INT`           | "                  |
+| 6 | `SR_Flag`                | `SMALLINT NULL` | 1 = shared-ride    |
+| 7 | `affiliated_base_number` | `VARCHAR(6)`    | vehicle’s own base |
+
+* **Column count:** 7
+* **All types present:** timestamp, integer, varchar, boolean-as-tinyint.
+
+###  Average row size & storage footprint
+
+| Table       | Rows  | Raw CSV size           | Size ÷ rows     | 
+| ----------- | ---------------- | ---------------------- | --------------- | 
+| `trips`     | ≈ 3.96 B         | ≈ 518 GB un-compressed | **≈ 505 B/row** | 
+| `fhv_trips` | ≈ 50 M           | ≈ 2.8 GB un-compressed | **≈ 56 B/row**  | 
+
+
+:::note
+We used AWS Glue as Iceberg catalog and AWS S3 as the storage layer on the destination side for this benchmarks. 
+:::
+
+### What These Numbers Mean for You
+
+- **Peak throughput without lock-in:** OLake matches or beats proprietary SaaS speeds while letting you keep data and infrastructure in your own account.
+- **Superior CDC latency:** Faster change propagation means fresher downstream analytics and near-real-time feature generation for ML.
+- **Predictable TCO:** Because OLake is self-hosted, you scale resources up or down to hit your desired SLA at the lowest cloud cost—no opaque credit systems.
+- **Resource profile:** In these tests OLake used 57.6 GB RAM (roughly one `Standard D64ls v5 (64 vcpus, 128 GiB memory)` VM) for both full-load and CDC runs; adjust sizing linearly with your workload.
+
+> **Bottom line:** If you need to land terabytes of PostgreSQL data into Apache Iceberg quickly—and keep it continually up-to-date—OLake delivers enterprise-grade speed without the enterprise-grade bill.
