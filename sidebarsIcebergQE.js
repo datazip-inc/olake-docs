@@ -26,6 +26,22 @@ const docSidebar = {
     docSidebar: [
         sectionHeader("GETTING STARTED"),
         'intro',
+        'athena',
+        'bigquery',
+        'clickhouse',
+        'databricks',
+        'doris',
+        'dreamio', 
+        'duckdb',
+        'flink',
+        'hive',
+        'impala',
+        'presto',
+        'snowflake',
+        'spark',
+        'starburst',
+        'starrocks',
+        'trino',
     ],
 };
 

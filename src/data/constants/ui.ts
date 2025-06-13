@@ -1,7 +1,7 @@
 // data/constants/ui.ts
 export const LAYOUT = {
     CONTAINER: "w-full p-4 sm:p-6 lg:p-8",
-    CARD_GRID: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full",
+    CARD_GRID: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 gap-6 w-full",
     FEATURE_GRID: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full"
   } as const;
   

@@ -20,7 +20,7 @@ const TableView: React.FC<TableViewProps> = ({ engines }) => {
   };
 
   const handleEngineClick = (engineId: string) => {
-    window.open(`/iceberg/query-engine/${engineId}`, '_blank');
+    window.open(`/iceberg/query-engine/${engineId}`, '_self');
   };
 
   // Safety check for empty engines array
@@ -36,7 +36,7 @@ const TableView: React.FC<TableViewProps> = ({ engines }) => {
   const featureKeys = sampleEngine ? Object.keys(sampleEngine.features) : [];
 
   return (
-    <div className={`${STYLES.ROUNDED_CONTAINER} overflow-hidden w-full`}>
+    <div className={`${STYLES.ROUNDED_CONTAINER} overflow-hidden`}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>

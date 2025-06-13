@@ -59,3 +59,4 @@ CREATE TABLE iceberg_catalog.db.table (
     'Keep the latest Flink snapshot alive when expiring old snapshots'
   ]
 };
+
