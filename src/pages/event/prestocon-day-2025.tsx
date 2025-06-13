@@ -54,7 +54,7 @@ const WebinarPage = () => {
         <meta property="og:title" content={webinarData.title} />
         
         <meta property="og:description" content={webinarData.summary} />
-        <meta property="og:image" content={`https://olake.io${image_url}`} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
 
         <meta property="og:url" content={webinarData.event_url} />
 
@@ -65,7 +65,7 @@ const WebinarPage = () => {
         
         <meta name="twitter:description" content={webinarData.summary} />
         
-        <meta name="twitter:image" content={`https://olake.io${image_url}`} />
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
       </Head>
 
       <Layout
