@@ -68,6 +68,7 @@ import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIceb
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed'
+import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
 
 const MDXComponents = {
   ...InitialComponents,
@@ -141,7 +142,8 @@ const MDXComponents = {
 
   AdditionalReferences,
   CatalogQuery,
-  YouTubeEmbed
+  YouTubeEmbed,
+  IcebergQueryEngines
 };
 
 export default MDXComponents;

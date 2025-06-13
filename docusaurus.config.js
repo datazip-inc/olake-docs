@@ -47,18 +47,19 @@ const config = {
       'classic',
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
-        docs: {
-          routeBasePath: '/docs',
-          sidebarPath: './sidebars.js',
-          showLastUpdateAuthor: true,
-          showLastUpdateTime: true,
-          rehypePlugins: [imageFetchPriorityRehypePlugin],
+        docs: false,
+        // {
+        //   routeBasePath: '/docs',
+        //   sidebarPath: './sidebars.js',
+        //   showLastUpdateAuthor: true,
+        //   showLastUpdateTime: true,
+        //   rehypePlugins: [imageFetchPriorityRehypePlugin],
 
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/datazip-inc/olake-docs/tree/master/',
-        },
+        //   // Please change this to your repo.
+        //   // Remove this to remove the "edit this page" links.
+        //   editUrl:
+        //     'https://github.com/datazip-inc/olake-docs/tree/master/',
+        // },
 
         theme: {
           customCss: './src/css/custom.css',
@@ -426,7 +427,11 @@ const config = {
     'plugin-image-zoom',
     // 'docusaurus-plugin-sass',
     // tailwindPlugin,
-    ['./src/plugins/tailwind-config.js', {}],
+    
+    [
+      './src/plugins/tailwind-config.js', {}
+    ],
+    
     [
       'ideal-image',
       /** @type {import('@docusaurus/plugin-ideal-image').PluginOptions} */
@@ -439,6 +444,34 @@ const config = {
         disableInDev: true
       })
     ],
+
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'main-docs',             // must be unique
+        path: 'docs',                // folder on disk
+        routeBasePath: 'docs',       // URL => /docs/…
+        sidebarPath: require.resolve('./sidebars.js'),
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
+      },
+    ],
+
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'iceberg-query-engine',
+        path: 'docs-iceberg-query-engine',      // new folder on disk
+        routeBasePath: 'iceberg/query-engine',  // final URL → /iceberg/query-engine/*
+        sidebarPath: require.resolve('./sidebarsIcebergQE.js'),
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/docs-iceberg-query-engine/',
+      },
+    ],
+    
     [
       './src/plugins/blog-plugin',
       {
@@ -469,6 +502,7 @@ const config = {
 
       }
     ],
+    
     [
       './src/plugins/blog-plugin',
       {
