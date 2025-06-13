@@ -568,7 +568,7 @@ const config = {
             from: '/img/blog/2024/11/issues-debezium-kafka-cover.webp',
           },
           {
-            to: '/docs/writers/s3/config',
+            to: '/docs/writers/parquet/s3/config',
             from: '/docs/configs/s3',
           },
           {
@@ -583,10 +583,7 @@ const config = {
             to: '/',
             from: '/docs/community/sheet',
           },
-          {
-            to: '/docs/faqs',
-            from: '/docs/faqs/',
-          },
+         
           {
             to: '/docs/writers/iceberg/catalog/overview',
             from: '/docs/writers/iceberg/config',
@@ -627,6 +624,42 @@ const config = {
             from: '/docs/category/getting-started',
           },
 
+
+
+// recent destination doc re-structuring redirects
+
+          {
+            to: '/docs/writers/iceberg/azure/overview',
+            from: '/docs/writers/azure-adls/overview',
+          },
+
+          {
+            to: '/docs/writers/iceberg/gcs/overview',
+            from: '/docs/writers/gcs/overview',
+          },
+
+          {
+            to: '/docs/writers/parquet/s3/overview',
+            from: '/docs/writers/s3/overview',
+          },
+
+          {
+            to: '/docs/writers/parquet/s3/config',
+            from: '/docs/writers/s3/config',
+          },
+
+          {
+            to: '/docs/writers/parquet/s3/partitioning',
+            from: '/docs/writers/s3/partitioning',
+          },
+
+          {
+            to: '/docs/writers/parquet/local',
+            from: '/docs/writers/local',
+          },
+
+
+// END
 
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
