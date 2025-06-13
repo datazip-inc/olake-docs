@@ -568,7 +568,7 @@ const config = {
             from: '/img/blog/2024/11/issues-debezium-kafka-cover.webp',
           },
           {
-            to: '/docs/writers/parquet/s3/config',
+            to: '/docs/writers/parquet/config',
             from: '/docs/configs/s3',
           },
           {
@@ -629,27 +629,27 @@ const config = {
 // recent destination doc re-structuring redirects
 
           {
-            to: '/docs/writers/iceberg/azure/overview',
+            to: '/docs/writers/iceberg/azure',
             from: '/docs/writers/azure-adls/overview',
           },
 
           {
-            to: '/docs/writers/iceberg/gcs/overview',
+            to: '/docs/writers/iceberg/gcs',
             from: '/docs/writers/gcs/overview',
           },
 
           {
-            to: '/docs/writers/parquet/s3/overview',
+            to: '/docs/writers/parquet/s3',
             from: '/docs/writers/s3/overview',
           },
 
           {
-            to: '/docs/writers/parquet/s3/config',
+            to: '/docs/writers/parquet/config',
             from: '/docs/writers/s3/config',
           },
 
           {
-            to: '/docs/writers/parquet/s3/partitioning',
+            to: '/docs/writers/parquet/partitioning',
             from: '/docs/writers/s3/partitioning',
           },
 
