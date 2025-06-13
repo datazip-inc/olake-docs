@@ -12,6 +12,23 @@ module.exports = {
   darkMode: ['class', '[data-theme="dark"]'], // Support Docusaurus dark mode
   theme: {
     extend: {
+
+      animation: {
+        'in': 'fadeIn 0.2s ease-in-out',
+        'slide-in-from-top': 'slideInFromTop 0.3s ease-out',
+      },
+
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideInFromTop: {
+          '0%': { transform: 'translateY(-10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+      },
+
       fontFamily: {
         'space-grotesk': ['Space Grotesk', 'sans-serif'],
       },
@@ -57,5 +74,8 @@ module.exports = {
       }
     }
   },
-  plugins: [require('tailwindcss-animate')]
+  plugins: [
+    require('tailwindcss-animate'),
+    // require('tailwindcss/line-clamp'), // For text truncation
+  ],
 }
