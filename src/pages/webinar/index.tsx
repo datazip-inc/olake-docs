@@ -58,13 +58,25 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'From Source to Presto: Developer Playground for Fast Analytics',
+      subtitle: 'This talk introduces a lightweight developer playground that demonstrates how to ingest change data from a transactional database (like Postgres or MySQL), register it via an open-source REST catalog (e.g., Polaris or LakeKeeper), and instantly make it queryable in Presto. The demo will walk through the setup, tools, and real-time experience of how quickly one can go from source data to interactive Presto queries using open standards and pluggable components. Ideal for developers and data engineers exploring modern lakehouse and federated query patterns',
+      route: '/event/prestocon-day-2025',
+      img: `/img/events/prestocon-day-2025-cover.jpg`,
+      alt: 'From Source to Presto: Developer Playground for Fast Analytics',
+      status: 'upcoming',
+      button: 'primary',
+      CTA: 'Register Now',
+      date: '17 June 2025',
+      // icon: FaVideo
+    },
+    {
       title: 'Demystifying Lakehouse Architecture: From Theory to Practice',
       subtitle: 'Join Akshat Mathur, Senior Software Engineer at Cloudera and Apache Hive contributor, as he delivers a comprehensive technical exploration of lakehouse architecture. This session will bridge theoretical concepts with practical implementation strategies based on Akshats extensive experience with Apache Iceberg and data platform optimization',
       route: '/webinar/w-7-demystifying-lakehouse-architecture',
       img: `/img/webinars/w-7-demystifying-lakehouse-architecture-cover.png`,
       alt: 'Demystifying Lakehouse Architecture: From Theory to Practice',
-      status: 'upcoming',
-      button: 'primary',
+      status: 'archived',
+      button: 'secondary',
       CTA: 'Register Now',
       date: '29 May 2025',
       // icon: FaVideo
@@ -165,11 +177,19 @@ const WebinarsPage = () => {
     >
 
       <div className="container items-center mx-auto py-12 px-12">
-        <h1 className="text-4xl font-bold mb-8">Community Meetups</h1>
-        <WebinarGrid webinars={communityMeets} />
-        <br />
+
+
         <h1 className="text-4xl font-bold mb-8">Events & Webinars</h1>
         <WebinarGrid webinars={webinars} />
+
+        <br />
+        
+        <h1 className="text-4xl font-bold mb-8">Community Meetups</h1>
+        <WebinarGrid webinars={communityMeets} />
+
+
+
+
 
       </div>
     </Layout>
