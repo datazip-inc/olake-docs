@@ -1,9 +1,15 @@
 // types/iceberg.ts
 export type SupportLevel = 'full' | 'partial' | 'preview' | 'none';
 
+export interface ExternalLink {
+  label: string;
+  url: string;
+}
+
 export interface Feature {
   support: SupportLevel;
   details: string;
+  externalLinks?: ExternalLink[];
 }
 
 export interface QueryEngine {
