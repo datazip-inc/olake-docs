@@ -53,17 +53,22 @@ import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.m
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
+import S3ConfigUIDetails from '../../../docs/shared/config/S3ConfigUIDetails.mdx'
 
 import GlueIcebergWriterConfig from '../../../docs/shared/config/GlueIcebergWriterConfig.mdx'
 import MinioJDBCIcebergWriterConfigLocal from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocal.mdx'
 import GlueIcebergWriterConfigDetails from '../../../docs/shared/config/GlueIcebergWriterConfigDetails.mdx'
+import GlueIcebergWriterUIConfigDetails from '../../../docs/shared/config/GlueIcebergWriterUIConfigDetails.mdx'
 import MinioJDBCIcebergWriterConfigLocalDetails from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocalDetails.mdx'
+import MinioJDBCIcebergWriterUIConfigLocalDetails from '../../../docs/shared/config/MinioJDBCIcebergWriterUIConfigLocalDetails.mdx'
 
 import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWriterConfig.mdx'
 import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
+import RESTIcebergWriterUIConfigDetails from '../../../docs/shared/config/RESTIcebergWriterUIConfigDetails.mdx'
 
 import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWriterConfig.mdx'
 import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
+import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIcebergWriterUIConfigDetails.mdx'
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
@@ -126,24 +131,29 @@ const MDXComponents = {
 
   S3Config,
   S3ConfigDetails,
+  S3ConfigUIDetails,
   LocalParquetConfig,
   DockerParquetConfig,
 
   GlueIcebergWriterConfig,
   MinioJDBCIcebergWriterConfigLocal,
   GlueIcebergWriterConfigDetails,
+  GlueIcebergWriterUIConfigDetails,
   MinioJDBCIcebergWriterConfigLocalDetails,
+  MinioJDBCIcebergWriterUIConfigLocalDetails,
 
   RESTIcebergWriterConfig,
   RESTIcebergWriterConfigDetails,
+  RESTIcebergWriterUIConfigDetails,
 
   HiveIcebergWriterConfig,
   HiveIcebergWriterConfigDetails,
+  HiveIcebergWriterUIConfigDetails,
 
   AdditionalReferences,
   CatalogQuery,
   YouTubeEmbed,
-  IcebergQueryEngines
+  IcebergQueryEngines,
 };
 
 export default MDXComponents;
