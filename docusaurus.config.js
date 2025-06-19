@@ -427,11 +427,11 @@ const config = {
     'plugin-image-zoom',
     // 'docusaurus-plugin-sass',
     // tailwindPlugin,
-    
+
     [
       './src/plugins/tailwind-config.js', {}
     ],
-    
+
     [
       'ideal-image',
       /** @type {import('@docusaurus/plugin-ideal-image').PluginOptions} */
@@ -471,7 +471,7 @@ const config = {
     //     editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/docs-iceberg-query-engine/',
     //   },
     // ],
-    
+
     [
       './src/plugins/blog-plugin',
       {
@@ -502,7 +502,7 @@ const config = {
 
       }
     ],
-    
+
     [
       './src/plugins/blog-plugin',
       {
@@ -617,7 +617,6 @@ const config = {
             to: '/',
             from: '/docs/community/sheet',
           },
-         
           {
             to: '/docs/writers/iceberg/catalog/overview',
             from: '/docs/writers/iceberg/config',
@@ -660,7 +659,7 @@ const config = {
 
 
 
-// recent destination doc re-structuring redirects
+          // recent destination doc re-structuring redirects
 
           {
             to: '/docs/writers/iceberg/azure',
@@ -693,7 +692,39 @@ const config = {
           },
 
 
-// END
+          // END
+
+          // START - 404 redirects
+
+          {
+            to: '/docs/core/architecture',
+            from: '/docs/category/understanding-olake',
+          },
+
+          {
+            to: '/docs/features/overview',
+            from: '/docs/category/features',
+          },
+
+          {
+            to: '/docs/core/configs/catalog',
+            from: '/docs/configs/catalog',
+          },
+          {
+            to: '/blog/tags',
+            from: '/blog/tags/nosql',
+          },
+          {
+            to: '/docs/connectors/mongodb/config',
+            from: '/docs/connectors/mongodb/catalog',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/connectors/intro',
+          },
+        
+
+          // END
 
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
