@@ -63,9 +63,9 @@ const WebinarsPage = () => {
       route: '/event/prestocon-day-2025',
       img: `/img/events/prestocon-day-2025-cover.jpg`,
       alt: 'From Source to Presto: Developer Playground for Fast Analytics',
-      status: 'upcoming',
-      button: 'primary',
-      CTA: 'Register Now',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
       date: '17 June 2025',
       // icon: FaVideo
     },
@@ -77,7 +77,7 @@ const WebinarsPage = () => {
       alt: 'Demystifying Lakehouse Architecture: From Theory to Practice',
       status: 'archived',
       button: 'secondary',
-      CTA: 'Register Now',
+      CTA: 'Watch Now',
       date: '29 May 2025',
       // icon: FaVideo
     },

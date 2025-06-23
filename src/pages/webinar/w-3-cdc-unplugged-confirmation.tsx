@@ -62,7 +62,7 @@ const WebinarPage = () => {
 
         {/* Embedded YouTube Video */}
         <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="IxEHnyZpheQ" className="max-w-6xl" />
+          <YouTubeEmbed videoId="iCEXVkvDVjI" className="max-w-6xl" />
 
           {/* comming soon */}
         </section>

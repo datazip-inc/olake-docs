@@ -9,6 +9,7 @@ import WebinarForm from '../../components/forms/WebinarForm';
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
 const hosts = [
   {
@@ -61,12 +62,12 @@ const WebinarPage = () => {
           </div>
 
 
-          <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20"> */}
 
-            <WebinarForm
+            {/* <WebinarForm
               source="w-3-cdc-unplugged"
               nexturl="w-3-cdc-unplugged-confirmation"
-            />
+            /> */}
 
 
             {/* remove this button with email collection form that leads to confirmation page of this webinar */}
@@ -81,11 +82,17 @@ const WebinarPage = () => {
                 />
               </div> */}
 
-          </div>
+          {/* </div> */}
         </div>
 
         <Hr />
         <br />
+
+        <div className="flex justify-center mb-12">
+          <YouTubeEmbed videoId="iCEXVkvDVjI" className="max-w-6xl" />
+
+          {/* comming soon */}
+        </div>
 
         <WebinarOverview
           date="January 09, 2025"

@@ -39,7 +39,7 @@ const WebinarPage = () => {
     register_link: 'https://linuxfoundation.regfox.com/prestocon-day-2025',
   };
 
-  
+
 
   return (
     <>
@@ -50,9 +50,9 @@ const WebinarPage = () => {
 
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
-        
+
         <meta property="og:title" content={webinarData.title} />
-        
+
         <meta property="og:description" content={webinarData.summary} />
         <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
 
@@ -60,11 +60,11 @@ const WebinarPage = () => {
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        
+
         <meta name="twitter:title" content={webinarData.title} />
-        
+
         <meta name="twitter:description" content={webinarData.summary} />
-        
+
         <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
       </Head>
 
@@ -86,7 +86,7 @@ const WebinarPage = () => {
 
             <div className="md:w-1/3 md:relative md:left-56 p-4">
 
-              <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
+              {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
 
                 <CTAButton
                   title="Join the Upcoming Event"
@@ -95,12 +95,16 @@ const WebinarPage = () => {
                   href={webinarData.register_link}
                   variant="primary"
                 />
-              </div>
+              </div> */}
 
             </div>
           </div>
 
           <Hr /> <br />
+
+          <div className="flex justify-center mb-12">
+            Video Coming soon!
+          </div>
 
           <WebinarOverview
             date="June 17, 2023 (PDT) | June 18, 2023 (IST)"

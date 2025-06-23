@@ -75,6 +75,17 @@ import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed'
 import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
 
+import OLakeFeaturesTLDR from '../../../docs/shared/OLakeFeaturesTLDR.mdx'
+import SupportedSources from '../../../docs/shared/SupportedSources.mdx'
+import SupportedDestinations from '../../../docs/shared/SupportedDestinations.mdx'
+import SupportedIcebergCatalogs from '../../../docs/shared/SupportedIcebergCatalogs.mdx'
+
+import SelectedStreamsOnly from '../../../docs/shared/streams/SelectedStreamsOnly.mdx'
+import SelectedStreamsOnlyDetails from '../../../docs/shared/streams/SelectedStreamsOnlyDetails.mdx'
+import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
+import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
+import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
+
 const MDXComponents = {
   ...InitialComponents,
   Badge,
@@ -154,6 +165,17 @@ const MDXComponents = {
   CatalogQuery,
   YouTubeEmbed,
   IcebergQueryEngines,
+
+  OLakeFeaturesTLDR,
+  SupportedSources,
+  SupportedDestinations,
+  SupportedIcebergCatalogs,
+
+  SelectedStreamsOnly,
+  SelectedStreamsOnlyDetails,
+  StreamsFull,
+  StreamsOnly,
+  StreamsOnlyDetails
 };
 
 export default MDXComponents;

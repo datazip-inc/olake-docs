@@ -722,7 +722,168 @@ const config = {
             to: '/docs/connectors/overview',
             from: '/docs/connectors/intro',
           },
-        
+
+          {
+            to: '/iceberg/paimon-vs-iceberg',
+            from: '/blog/paimon-vs-iceberg',
+          },
+          {
+            to: '/docs/writers/parquet/s3',
+            from: '/docs/category/aws-s3',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/olake/drivers',
+          },
+          {
+            to: '/docs/connectors/mongodb/overview',
+            from: '/docs/olake/drivers/mongodb-poc',
+          },
+          {
+            to: '/docs/connectors/mongodb/overview',
+            from: '/docs/olake/mongodb/colake-connectors-for-olake',
+          },
+          {
+            to: '/docs/core/configs/catalog',
+            from: '/core/configs/catalog',
+          },
+          {
+            to: '/docs/core/configs/source',
+            from: '/core/configs/source',
+          },
+          {
+            to: '/docs/core/configs/state',
+            from: '/core/configs/state',
+          },
+          {
+            to: '/docs/core/configs/writer',
+            from: '/core/configs/writer',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/overview',
+            from: '/docs/category/catalogs',
+          },
+          {
+            to: '/community',
+            from: '/docs/category/community',
+          },
+          {
+            to: '/docs/core/configs/source',
+            from: '/docs/category/configurations',
+          },
+          {
+            to: '/docs/community/contributing',
+            from: '/docs/category/contributing',
+          },
+          {
+            to: '/docs/core/architecture',
+            from: '/docs/category/core',
+          },
+          {
+            to: '/docs/writers/overview',
+            from: '/docs/category/destinations-writers',
+          },
+          {
+            to: '/docs/install/setup',
+            from: '/docs/category/install',
+          },
+          {
+            to: '/docs/resources/olake-terminologies',
+            from: '/docs/category/resources',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/setup',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/setup-1',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/setup-2',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/category/sources',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/category/sources-connectors',
+          },
+          {
+            to: '/docs/writers/overview',
+            from: '/docs/category/writers-destinations',
+          },
+          {
+            to: '/docs/core/configs/source',
+            from: '/docs/configs/source',
+          },
+          {
+            to: '/docs/core/configs/state',
+            from: '/docs/configs/state',
+          },
+          {
+            to: '/docs/core/configs/writer',
+            from: '/docs/configs/writer',
+          },
+          {
+            to: '/docs/connectors/mongodb/config',
+            from: '/docs/connectors/mongodb/state',
+          },
+          {
+            to: '/docs/release/overview',
+            from: '/docs/release-notes',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/DockerDiscover',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/DockerSync',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/DockerSyncWithState',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/LocalDiscover',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/LocalSync',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/LocalSyncWithState',
+          },
+          {
+            to: '/docs',
+            from: '/docs/troubleshooting',
+          },
+
+          {
+            to: '/docs/writers/iceberg/catalog/overview',
+            from: '/docs/writers/catalog/overview',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/writers/getting-started/overview',
+          },
+          {
+            to: '/docs/writers/iceberg/overview',
+            from: '/docs/writers/iceberg/',
+          },
+          {
+            to: '/docs/writers/parquet/partitioning',
+            from: '/docs/writers/parquet/s3/partitioning',
+          },
+          {
+            to: '/docs/writers/parquet/s3',
+            from: '/docs/writers/s3/',
+          },
 
           // END
 

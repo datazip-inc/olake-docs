@@ -57,7 +57,7 @@ const WebinarPage = () => {
         </section>
 
         <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="3TQgSfbTrn0" className="max-w-6xl" />
+          <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
         </section>
 
         <WebinarOverview

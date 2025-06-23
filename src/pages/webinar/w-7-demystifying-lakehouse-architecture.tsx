@@ -68,7 +68,7 @@ const WebinarPage = () => {
 
             {/* remove this button with email collection form that leads to confirmation page of this webinar */}
 
-            <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
+            {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
               <CTAButton
                 title="Join Our Upcoming Event"
                 buttonText="Register Now!"
@@ -76,7 +76,7 @@ const WebinarPage = () => {
                 href="https://app.livestorm.co/datazip-inc/lakehouse-architectures"
                 variant="secondary"
               />
-            </div>
+            </div> */}
 
           </div>
         </div>
@@ -86,8 +86,12 @@ const WebinarPage = () => {
 
 
         {/* <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="7fuvICHBvbc" className="max-w-6xl" />
+          Video Coming soon!
         </div> */}
+
+        <div className="flex justify-center mb-12">
+          <YouTubeEmbed videoId="9ZG_XBwIXYY" className="max-w-6xl" />
+        </div>
 
 
         <WebinarOverview
