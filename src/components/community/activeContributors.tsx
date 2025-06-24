@@ -10,7 +10,7 @@ interface Contributor {
   contributions: number
 }
 const ActiveContributors = () => {
-  const excludedContributors = ['zriyanshdz', 'hash-data', 'piyushsingariya'] //add Contributors
+  const excludedContributors = ['zriyanshdz', 'hash-data', 'piyushsingariya', 'piyushdatazip', 'shubham19may', 'vikash390', 'vaibhav-datazip', 'vishalm0509', 'schitizsharma', 'ImDoubD-datazip', 'rkhameshra', 'tanishaAtDatazip'] //add Contributors
    const [contributors, setContributors] = useState<Contributor[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -53,7 +53,7 @@ const ActiveContributors = () => {
               ))}
             </div>
           )}
-          <Link legacyBehavior href={"https://olake.io/community/contributors"} className='p-4 bg-blue-600 w-fit text-center  rounded-full text-white text-[20px]'>See All Contributors</Link>
+          <Link legacyBehavior href={"/community/contributors"} className='p-4 bg-blue-600 w-fit text-center  rounded-full text-white text-[20px]'>See All Contributors</Link>
 
       </div> 
     </SectionLayout>
