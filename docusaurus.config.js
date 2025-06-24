@@ -156,6 +156,34 @@ const config = {
           { to: '/blog', label: 'Blogs', position: 'right' },
           { to: '/webinar', label: 'Webinars & Events', position: 'right' },
 
+          {
+            // Dropdown menu in the navbar for "Learn" section
+            type: "dropdown",
+            position: "right",
+            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
+            label: "Community",
+            items: [
+              {
+                label: "OLake Community",
+                // type: 'link',
+                href: `/community`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+              {
+                label: "Top Contributors",
+                // type: 'link',
+                href: `/community/contributors`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+              {
+                label: "Contributor's Program",
+                // type: 'link',
+                href: `/community/contributor-program`,
+                // activeBaseRegex: 'docs/catena',
+              },
+            ],
+          },
+
           // {
           //   type: 'html',
           //   position: 'right',
