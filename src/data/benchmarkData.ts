@@ -32,7 +32,7 @@ export const CDC_SYNC = {
         airbyte: '$ 148.95',
         fivetran: '$ 2,257',
         debezium: '$ 2.02',
-        estuary: '$ 22.72'
+        estuary: '$ 17.63'
     }
 }
 
@@ -47,11 +47,11 @@ export const FULL_LOAD = {
         estuary: '0.34 Billion'
     },
     elapsedTimeFull: {
-        olake: '22.5 minutes',
-        airbyte: '23 hours',
-        fivetran: '31 minutes',
-        debezium: '60 minutes',
-        estuary: '4.5 hours'
+        olake: '24 hours',
+        airbyte: '7.5 hours (failed sync)',
+        fivetran: '24 hours',
+        debezium: '24 hours',
+        estuary: '24 hours'
     },
     speedFull: {
         olake: '46,262 RPS',
@@ -70,9 +70,9 @@ export const FULL_LOAD = {
     costFull: {
         olake: '$ 75',
         airbyte: '$ 5,560',
-        fivetran: '$ 7,446',
+        fivetran: '$ 0 (Free full load)',
         debezium: '$ 75',
-        estuary: '$ 4,462'
+        estuary: '$1,668'
     },
    
 }
