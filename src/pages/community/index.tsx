@@ -89,16 +89,16 @@ const CommunityPage = () => {
   ]
 
   const stats = [
-    { label: 'Community Members', value: '20,000+' },
-    { label: 'Contributors', value: '500+' },
-    { label: 'Pull Requests', value: '2,000+' },
-    { label: 'Issues Resolved', value: '5,000+' }
+    { label: 'Community Members', value: '205+' },
+    { label: 'Contributors', value: '10+' },
+    { label: 'Pull Requests', value: '30+' },
+    { label: 'Issues Resolved', value: '76+' }
   ]
 
   return (
     <Layout
       title='OLake Community'
-      description='Join the fastest growing data engineering community. Connect, learn, and contribute with 20,000+ passionate practitioners.'
+      description='Join the fastest growing data engineering community. Connect, learn, and contribute with 205+ passionate practitioners.'
     >
       {/* Hero Section */}
       <PageHeader
