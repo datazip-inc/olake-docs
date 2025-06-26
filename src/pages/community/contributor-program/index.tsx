@@ -4,19 +4,7 @@ import Layout from '@theme/Layout'
 import Link from '@docusaurus/Link'
 import { 
   FaGithub,
-  FaSlack,
-  FaTrophy,
-  FaGraduationCap,
-  FaStar,
-  FaCode,
-  FaBook,
-  FaBug,
-  FaRocket,
   FaHandsHelping,
-  FaGift,
-  FaUserGraduate,
-  FaBullhorn,
-  FaCertificate
 } from 'react-icons/fa'
 import { LuUnplug } from 'react-icons/lu'
 import { FaFeather, FaMagnifyingGlass } from 'react-icons/fa6'
@@ -28,7 +16,7 @@ import Button from '../../../components/community/improved/Button'
 import PageHeader from '../../../components/community/improved/PageHeader'
 import SectionHeader from '../../../components/community/improved/SectionHeader'
 import FeatureCard from '../../../components/community/improved/FeatureCard'
-import StatCard from '../../../components/community/improved/StatCard'
+// import StatCard from '../../../components/community/improved/StatCard'
 import SectionLayout from '../../../components/community/SectionLayout'
 
 const ContributorProgramPage = () => {
@@ -148,7 +136,7 @@ const ContributorProgramPage = () => {
           </>
         }
         subtitle="OLake Contributor Program"
-        description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 500+ contributors making a difference."
+        description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 10+ contributors making a difference."
         cta={
           <div className="flex flex-wrap gap-4 justify-center">
             <Button 

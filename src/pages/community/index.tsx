@@ -5,7 +5,6 @@ import Link from '@docusaurus/Link'
 import {
   FaSlack,
   FaGithub,
-  FaDiscourse,
   FaCalendarAlt,
   FaUsers,
   FaHandsHelping,
@@ -32,32 +31,32 @@ const CommunityPage = () => {
     {
       name: 'contributing-to-olake',
       description: 'Get support on starting to contribute to OLake',
-      members: '2.5k+'
+      members: '180+'
     },
     {
       name: 'general',
       description: 'Major community updates and announcements',
-      members: '20k+'
+      members: '200+'
     },
     {
       name: 'help',
       description: 'Get help from the community when you\'re stuck',
-      members: '15k+'
+      members: '200+'
     },
     {
       name: 'discussions',
       description: 'Share articles and resources you\'ve found helpful',
-      members: '8k+'
+      members: '200+'
     },
     {
       name: 'introduce-yourself',
       description: 'Best way to say hello to the community',
-      members: '10k+'
+      members: '170+'
     },
     {
       name: 'social-and-events',
       description: 'Everything related to OLake social events',
-      members: '5k+'
+      members: '204+'
     }
   ]
 
