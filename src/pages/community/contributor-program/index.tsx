@@ -1,8 +1,9 @@
 // src/pages/community/contributor-program/index.tsx
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Layout from '@theme/Layout'
+import clsx from 'clsx'
 import Link from '@docusaurus/Link'
-import { 
+import {
   FaGithub,
   FaHandsHelping,
 } from 'react-icons/fa'
@@ -11,6 +12,8 @@ import { FaFeather, FaMagnifyingGlass } from 'react-icons/fa6'
 import { AiOutlineDollarCircle } from 'react-icons/ai'
 import { LiaCodeBranchSolid } from 'react-icons/lia'
 import { BsStars } from 'react-icons/bs'
+import { FaLinkedin, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+
 
 import Button from '../../../components/community/improved/Button'
 import PageHeader from '../../../components/community/improved/PageHeader'
@@ -119,9 +122,43 @@ const ContributorProgramPage = () => {
     }
   ]
 
+  const linkedinPosts = [
+    { embedId: 'urn:li:share:7324402000287215616', contributor: 'Aditya SwayamSiddha' },
+    // { embedId: 'urn:li:share:0987654321', contributor: 'Jane Smith' },
+    // Add your LinkedIn post IDs here
+  ]
+
+  // <iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7324402000287215616?collapsed=1" height="671" width="504" frameborder="0" allowfullscreen="" title="Embedded post"></iframe>
+
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [showLinkedInPanel, setShowLinkedInPanel] = useState(false)
+
+  useEffect(() => {
+  // Check if window is defined (for SSR)
+  if (typeof window !== 'undefined') {
+    // Set initial state based on screen width
+    const handleResize = () => {
+      if (window.innerWidth >= 768) { // md breakpoint
+        setShowLinkedInPanel(true)
+      } else {
+        setShowLinkedInPanel(false)
+      }
+    }
+    
+    // Set initial state
+    handleResize()
+    
+    // Add resize listener
+    window.addEventListener('resize', handleResize)
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize)
+  }
+}, [])
+
   return (
-    <Layout 
-      title='OLake Contributor Program' 
+    <Layout
+      title='OLake Contributor Program'
       description='Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.'
     >
       {/* Hero Section */}
@@ -139,16 +176,16 @@ const ContributorProgramPage = () => {
         description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 10+ contributors making a difference."
         cta={
           <div className="flex flex-wrap gap-4 justify-center">
-            <Button 
-              href="https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22" 
+            <Button
+              href="https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22"
               size="lg"
               external
             >
               <FaHandsHelping className="mr-2" /> Start Now
             </Button>
-            <Button 
-              href="/docs/community/contributing" 
-              variant="outline" 
+            <Button
+              href="/docs/community/contributing"
+              variant="outline"
               size="lg"
             >
               Read Contributing Guide
@@ -163,10 +200,10 @@ const ContributorProgramPage = () => {
           title={<span className="text-white">Contribute in Multiple Ways</span>}
           subtitle="Choose how you want to contribute based on your skills and interests"
         />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {contributionTypes.map((type, index) => (
-            <div 
+            <div
               key={index}
               className="group relative bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/20 transition-all duration-300"
             >
@@ -200,7 +237,7 @@ const ContributorProgramPage = () => {
             subtitle="Empowering contributors to shape the future of data engineering"
             align="center"
           />
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 md:p-12 shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="space-y-8">
               <div>
@@ -208,13 +245,13 @@ const ContributorProgramPage = () => {
                   What is the Contributor Program?
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                  The OLake Contributor Program is a community collaboration initiative designed to improve 
-                  the quality and expand the ecosystem of OLake connectors. We sponsor various tasks around 
-                  features, usability, and reliability while empowering both veteran contributors and newcomers 
+                  The OLake Contributor Program is a community collaboration initiative designed to improve
+                  the quality and expand the ecosystem of OLake connectors. We sponsor various tasks around
+                  features, usability, and reliability while empowering both veteran contributors and newcomers
                   to make meaningful contributions to the project.
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-2xl font-bold text-[#193ae6] dark:text-blue-400 mb-4">
                   How it Works
@@ -242,7 +279,7 @@ const ContributorProgramPage = () => {
             title="Why Join the Program?"
             subtitle="Unlock exclusive benefits while making a real impact"
           />
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {benefits.map((benefit, index) => (
               <FeatureCard
@@ -263,10 +300,10 @@ const ContributorProgramPage = () => {
           title="Reward Tiers"
           subtitle="Earn points with every contribution and unlock amazing rewards"
         />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {rewardTiers.map((tier, index) => (
-            <div 
+            <div
               key={index}
               className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
             >
@@ -290,7 +327,7 @@ const ContributorProgramPage = () => {
             </div>
           ))}
         </div>
-        
+
         <div className="text-center mt-12">
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             See where you stand among our amazing contributors
@@ -307,7 +344,7 @@ const ContributorProgramPage = () => {
           title="How to Get Started"
           subtitle="Join the program in 4 simple steps"
         />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, index) => (
             <div key={index} className="text-center">
@@ -318,7 +355,7 @@ const ContributorProgramPage = () => {
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 {step.description}
               </p>
-              <Link 
+              <Link
                 to={step.link}
                 className="text-[#193ae6] dark:text-blue-400 hover:underline font-medium"
               >
@@ -336,20 +373,20 @@ const ContributorProgramPage = () => {
             Ready to Make an Impact?
           </h2>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Join hundreds of contributors who are shaping the future of data engineering. 
+            Join hundreds of contributors who are shaping the future of data engineering.
             Your contributions matter, and we can't wait to have you on board!
           </p>
           <div className="flex flex-wrap gap-4 justify-center pt-4">
-            <Button 
-              href="https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22" 
+            <Button
+              href="https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22"
               size="lg"
               external
             >
               <FaHandsHelping className="mr-2" /> Start Now
             </Button>
-            <Button 
-              href="https://github.com/datazip-inc/olake" 
-              variant="outline" 
+            <Button
+              href="https://github.com/datazip-inc/olake"
+              variant="outline"
               size="lg"
               external
             >
@@ -358,6 +395,96 @@ const ContributorProgramPage = () => {
           </div>
         </div>
       </SectionLayout>
+
+
+
+      <div className={clsx(
+        "fixed right-0 top-24 z-40 transition-transform duration-300",
+        "hidden md:block", // Hide on mobile completely
+        showLinkedInPanel ? "translate-x-0" : "translate-x-full"
+      )}>
+        <button
+          onClick={() => setShowLinkedInPanel(!showLinkedInPanel)}
+          className="absolute -left-12 top-8 bg-[#0077B5] border-none text-white p-3 rounded-l-lg shadow-lg hover:bg-[#005885] transition-colors"
+          aria-label={showLinkedInPanel ? "Close LinkedIn feed" : "Open LinkedIn feed"}
+        >
+          <FaLinkedin className="w-6 h-6" />
+        </button>
+
+        <div className="w-[400px] h-[calc(100vh-8rem)] bg-white dark:bg-gray-800 shadow-2xl rounded-l-lg overflow-hidden">
+          <div className="p-4 bg-[#0077B5] text-white">
+            <h3 className="font-bold text-lg">Contributor Spotlights</h3>
+            <p className="text-sm opacity-90 mt-1">Success stories from our community</p>
+          </div>
+          <div className="overflow-y-auto h-[calc(100%-5rem)] p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+            {linkedinPosts.map((post, index) => (
+              <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-0">
+                <iframe
+                  src={`https://www.linkedin.com/embed/feed/update/${post.embedId}`}
+                  height="400"
+                  width="100%"
+                  frameBorder="0"
+                  allowFullScreen
+                  title={`Contributor Story ${index + 1}`}
+                  className="rounded"
+                  loading="lazy" // Lazy load for performance
+                />
+                {post.contributor && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 text-center">
+                    - {post.contributor}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile-only floating button */}
+      <button
+        onClick={() => setShowLinkedInPanel(!showLinkedInPanel)}
+        className="fixed bottom-6 border-none right-6 z-40 bg-[#0077B5] text-white p-4 rounded-full shadow-lg md:hidden"
+        aria-label="View contributor stories"
+      >
+        <FaLinkedin className="w-6 h-6"  />
+      </button>
+
+      {/* Mobile LinkedIn Modal */}
+      {showLinkedInPanel && (
+        <div className="fixed inset-0 z-50 bg-black/50 md:hidden" onClick={() => setShowLinkedInPanel(false)}>
+          <div
+            className="fixed inset-x-4 bottom-4 top-20 bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-[#0077B5] text-white flex justify-between items-center">
+              <h3 className="font-bold text-lg">Contributor Spotlights</h3>
+              <button
+                onClick={() => setShowLinkedInPanel(false)}
+                className="bg-[#104663] text-white hover:bg-white/20 p-2 rounded border-none "
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-y-auto h-[calc(100%-4rem)] p-4 space-y-4">
+              {linkedinPosts.map((post, index) => (
+                <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-0">
+                  <iframe
+                    src={`https://www.linkedin.com/embed/feed/update/${post.embedId}`}
+                    height="350"
+                    width="100%"
+                    frameBorder="0"
+                    allowFullScreen
+                    title={`Contributor Story ${index + 1}`}
+                    className="rounded"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </Layout>
   )
 }
