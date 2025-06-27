@@ -122,24 +122,6 @@ const docSidebar = {
         'connectors/overview',
         {
           type: 'category',
-          label: 'MongoDB',
-          items: [
-            'connectors/mongodb/overview',
-            'connectors/mongodb/config',
-            'connectors/mongodb/benchmarks',
-            {
-              type: 'category',
-              label: 'Setup',
-              items: [
-                'connectors/mongodb/setup/local',
-              ],
-            },
-            'connectors/mongodb/troubleshooting',
-          ],
-        },
-
-        {
-          type: 'category',
           label: 'Postgres',
           items: [
             'connectors/postgres/overview',
@@ -158,6 +140,24 @@ const docSidebar = {
 
         {
           type: 'category',
+          label: 'MongoDB',
+          items: [
+            'connectors/mongodb/overview',
+            'connectors/mongodb/config',
+            'connectors/mongodb/benchmarks',
+            {
+              type: 'category',
+              label: 'Setup',
+              items: [
+                'connectors/mongodb/setup/local',
+              ],
+            },
+            'connectors/mongodb/troubleshooting',
+          ],
+        },
+
+        {
+          type: 'category',
           label: 'MySQL',
           items: [
             'connectors/mysql/overview',
@@ -171,6 +171,16 @@ const docSidebar = {
               ],
             },
             'connectors/mysql/troubleshooting',
+          ],
+        },
+
+        {
+          type: 'category',
+          label: 'Oracle',
+          items: [
+            'connectors/oracle/overview',
+            'connectors/oracle/config',
+            'connectors/oracle/troubleshooting',
           ],
         },
       ],

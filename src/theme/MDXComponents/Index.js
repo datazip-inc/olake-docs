@@ -21,6 +21,9 @@ import DockerDiscoverPostgres from '../../../docs/shared/commands/DockerDiscover
 import DockerSyncPostgres from '../../../docs/shared/commands/DockerSyncPostgres.mdx'
 import DockerSyncWithStatePostgres from '../../../docs/shared/commands/DockerSyncWithStatePostgres.mdx'
 
+import DockerDiscoverOracle from '../../../docs/shared/commands/DockerDiscoverOracle.mdx'
+import DockerSyncOracle from '../../../docs/shared/commands/DockerSyncOracle.mdx'
+
 import LocalDiscoverMongoDB from '../../../docs/shared/commands/LocalDiscoverMongoDB.mdx'
 import LocalSyncMongoDB from '../../../docs/shared/commands/LocalSyncMongoDB.mdx'
 import LocalSyncWithStateMongoDB from '../../../docs/shared/commands/LocalSyncWithStateMongoDB.mdx'
@@ -32,6 +35,9 @@ import LocalSyncWithStateMySQL from '../../../docs/shared/commands/LocalSyncWith
 import LocalDiscoverPostgres from '../../../docs/shared/commands/LocalDiscoverPostgres.mdx'
 import LocalSyncPostgres from '../../../docs/shared/commands/LocalSyncPostgres.mdx'
 import LocalSyncWithStatePostgres from '../../../docs/shared/commands/LocalSyncWithStatePostgres.mdx'
+
+import LocalDiscoverOracle from '../../../docs/shared/commands/LocalDiscoverOracle.mdx'
+import LocalSyncOracle from '../../../docs/shared/commands/LocalSyncOracle.mdx'
 
 import MongoDBSourceConfig from '../../../docs/shared/config/MongoDBSourceConfig.mdx'
 import MongoDBSourceConfigWithSRV from '../../../docs/shared/config/MongoDBSourceConfigWithSRV.mdx'
@@ -48,6 +54,9 @@ import PostgresSourceConfig from '../../../docs/shared/config/PostgresSourceConf
 import PostgresSourceConfigDetails from '../../../docs/shared/config/PostgresSourceConfigDetails.mdx'
 import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig.mdx'
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
+
+import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.mdx'
+import OracleSourceConfigDetails from '../../../docs/shared/config/OracleSourceConfigDetails.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
@@ -86,6 +95,10 @@ import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
 import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
 import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
 
+import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
+import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
+
+
 const MDXComponents = {
   ...InitialComponents,
   Badge,
@@ -112,6 +125,9 @@ const MDXComponents = {
   DockerSyncPostgres,
   DockerSyncWithStatePostgres,
 
+  DockerDiscoverOracle,
+  DockerSyncOracle,
+
   LocalDiscoverMongoDB,
   LocalSyncMongoDB,
   LocalSyncWithStateMongoDB,
@@ -123,6 +139,9 @@ const MDXComponents = {
   LocalDiscoverPostgres,
   LocalSyncPostgres,
   LocalSyncWithStatePostgres,
+
+  LocalDiscoverOracle,
+  LocalSyncOracle,
 
   MongoDBSourceConfig,
   MongoDBSourceConfigWithSRV,
@@ -139,6 +158,9 @@ const MDXComponents = {
   PostgresSourceConfigDetails,
   PostgresStateConfig,
   PostgresStateConfigDetails,
+
+  OracleSourceConfig,
+  OracleSourceConfigDetails,
 
   S3Config,
   S3ConfigDetails,
@@ -175,7 +197,10 @@ const MDXComponents = {
   SelectedStreamsOnlyDetails,
   StreamsFull,
   StreamsOnly,
-  StreamsOnlyDetails
+  StreamsOnlyDetails,
+
+  OLakePathInfo,
+  StreamSelectionExample
 };
 
 export default MDXComponents;
