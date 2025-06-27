@@ -12,6 +12,7 @@ import { FaRegCalendarAlt } from 'react-icons/fa';
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
 const hosts = [
   {
@@ -102,9 +103,12 @@ const WebinarPage = () => {
 
           <Hr /> <br />
 
-          <div className="flex justify-center mb-12">
-            Video Coming soon!
-          </div>
+
+          <section className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="lKCrXyAEubU" className="max-w-6xl" />
+
+            {/* comming soon */}
+          </section>
 
           <WebinarOverview
             date="June 17, 2023 (PDT) | June 18, 2023 (IST)"

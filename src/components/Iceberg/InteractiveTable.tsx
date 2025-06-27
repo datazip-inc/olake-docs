@@ -3,6 +3,10 @@ import React, { useState } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Transition } from '@headlessui/react';
 
+import { useLocation } from "react-router-dom";
+import useBaseUrl from "@docusaurus/useBaseUrl";
+
+
 export interface TableColumn {
   key: string;
   header: string;
@@ -31,12 +35,18 @@ export interface InteractiveTableProps {
   variant?: 'default' | 'compact' | 'spacious';
 }
 
+
+
+
+
 const badgeStyles = {
   success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
   warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
   error: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
   info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800'
 };
+
+
 
 export const InteractiveTable: React.FC<InteractiveTableProps> = ({
   columns,
@@ -47,14 +57,17 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
 }) => {
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: string } | null>(null);
   const [hoveredHeader, setHoveredHeader] = useState<string | null>(null);
-
+  const bugIconUrl = useBaseUrl("img/icon/bug-icon.svg");
   const paddingStyles = {
     default: 'px-6 py-4',
     compact: 'px-4 py-2',
     spacious: 'px-8 py-6'
   };
-
+  const location = useLocation();
   const padding = paddingStyles[variant];
+  const openDocIssueURL =
+    "https://github.com/datazip-inc/olake-docs/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with olake.io" +
+    location.pathname;
 
   return (
     <div className="w-full">
@@ -96,7 +109,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                           >
                             <InformationCircleIcon className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                           </button>
-                          
+
                           <Transition
                             show={hoveredHeader === column.key}
                             enter="transition ease-out duration-200"
@@ -133,9 +146,9 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                   {columns.map((column) => {
                     const cell = row[column.key];
                     if (!cell) return <td key={column.key} className={padding}></td>;
-                    
+
                     const isHovered = hoveredCell?.row === rowIndex && hoveredCell?.col === column.key;
-                    
+
                     return (
                       <td
                         key={column.key}
@@ -156,7 +169,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                             </span>
                           )}
                         </div>
-                        
+
                         <Transition
                           show={isHovered && !!cell.tooltip}
                           enter="transition ease-out duration-200"
@@ -184,7 +197,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
             </tbody>
           </table>
         </div>
-        
+
         {/* Table footer with summary */}
         <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
@@ -194,6 +207,16 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <span className="text-xs text-gray-500 dark:text-gray-400">Live data</span>
+              <a
+                href={openDocIssueURL}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
+              >
+                <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
+                <span className="text-gray-400">For issues, click here (GitHub)</span>
+              </a>
+              {/* <span className="text-xs text-gray-500 dark:text-gray-400">For any issues click here (GitHub)</span> */}
             </div>
           </div>
         </div>
