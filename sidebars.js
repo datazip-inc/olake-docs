@@ -212,6 +212,7 @@ const docSidebar = {
             'writers/iceberg/azure',
             'writers/iceberg/gcs',
             'writers/iceberg/s3-tables',
+            'writers/iceberg/unity-catalog',
             'writers/iceberg/partitioning',
             'writers/iceberg/docker-compose',
             'writers/iceberg/troubleshooting',

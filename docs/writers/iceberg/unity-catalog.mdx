@@ -1,0 +1,206 @@
+---
+title: Unity Catalog (Databricks)
+description: Unity Catalog support for Databricks with Iceberg REST API
+sidebar_position: 5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Unity Catalog (Databricks)
+
+OLake supports Databricks Unity Catalog as a REST catalog destination with token-based or OAuth2 authentication.
+
+## Important Limitations
+
+⚠️ **Current Unity Catalog Limitations:**
+- **Append Only**: At the time of creation of this documentation, Unity Catalog only supports **Append operations** (NO updates) for Iceberg writes
+- **Managed Tables**: Unity Catalog supports Iceberg writes only in its own managed Iceberg tables
+- **OAuth2 Status**: Currently, Personal Access Token authentication has been tested and works well. OAuth2 is available as an alternative but is experiencing issues (receiving internal server errors from Databricks during testing)
+
+For more details on Unity Catalog Iceberg support, refer to the [official Databricks documentation](https://docs.databricks.com/aws/en/iceberg/).
+
+This documentation is primarily focused on creating tokens for ingesting data into Unity/Databricks managed Iceberg tables using OLake.
+
+## Prerequisites
+
+- Admin access to Databricks workspace
+- Access to AWS S3 bucket (if using AWS for external storage)
+
+## Setup Instructions
+
+### Step 1: Create a New User & Token
+
+#### Create the User
+
+It is recommended to create a new user instead of using an existing one for security purposes.
+
+1. Go to top right corner user section → **Settings** → **Identity and Access** → **Users (Manage)**
+2. Add a new user with email address
+3. Go to **Settings** → **Advanced** → **Access Control**
+4. Turn on **Personal Access Tokens** if it's not already enabled
+   
+   ![Personal Access Tokens Settings](/img/docs/iceberg/catalog/unity/unity-catalog-personal-access-tokens.png)
+
+5. Go to **Permissions** and add the new user to allow token generation
+
+#### Create the Token
+
+1. Login with the new user credentials
+2. Go to **Settings** → **Developer** → **Access Tokens** → **Manage**
+3. Create a new token and set the appropriate validity period
+4. Copy and save the token immediately (it's only visible once)
+
+### Step 2: Create External Location for Data Storage
+
+1. Create a new external location as Unity Catalog Iceberg requires S3-based external storage (when using AWS).
+   
+   Navigate to the Catalog section and click on "Create an external location":
+   
+   ![Create External Location](/img/docs/iceberg/catalog/unity/unity-catalog-grant-permissions.png)
+
+2. Follow the recommended Databricks guide to add S3 bucket storage quickly and securely.
+
+### Step 3: Create Schema with Proper Permissions
+
+1. Create a new schema using the storage location created in Step 2
+   
+   ![Create New Schema Dialog](/img/docs/iceberg/catalog/unity/unity-catalog-create-external-location.png)
+
+2. Go to **Schema** → **Permissions**
+3. Grant the following permissions to the newly created user:
+   - `ALL PRIVILEGES`
+   - `EXTERNAL USE SCHEMA`
+   - `MANAGE`
+   
+   ![Grant Schema Permissions](/img/docs/iceberg/catalog/unity/unity-catalog-create-schema.png)
+
+## Configuration
+
+<Tabs>
+
+<TabItem value="unity-ui" label="OLake UI" default>
+
+Unity Catalog supports two authentication methods: **Token-based** (recommended) and **OAuth2** (alternative).
+
+### Common Configuration Fields
+
+These fields are required for both authentication methods:
+
+| Parameter | Sample Value | Description |
+|-----------|--------------|-------------|
+| **REST Catalog URL** | `https://adb-123456789.databricks.com/api/2.1/unity-catalog/iceberg-rest` | Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL. |
+| **Iceberg S3 Path (Warehouse)** | `workspace` | Name of the catalog in Unity Catalog (e.g., "workspace", "main"). This appears as `iceberg_s3_path` in JSON config. |
+| **Iceberg Database** | `default` | Namespace name inside the catalog (e.g., "default", "production"). This appears as `iceberg_db` in JSON config. |
+| **Normalization** | `true` | Enable data normalization for proper formatting in Unity Catalog. Recommended to keep enabled. |
+| **No Identifier Fields** | `true` | Required for Unity Catalog managed Iceberg tables that don't support equality delete-based updates. Must be enabled. |
+
+### Token-Based Authentication (Recommended)
+
+**✅ This method has been thoroughly tested and confirmed working**
+
+Additional field required for token-based authentication:
+
+| Parameter | Sample Value | Description |
+|-----------|--------------|-------------|
+| **Token** | `dapi1234567890abcdef...` | Databricks Personal Access Token for authentication. Created in Settings > Developer > Access Tokens. |
+
+### OAuth2 Authentication (Alternative)
+
+⚠️ **Note**: OAuth2 authentication is currently experiencing issues with internal server errors from Databricks during testing.
+
+Additional fields required for OAuth2 authentication:
+
+| Parameter | Sample Value | Description |
+|-----------|--------------|-------------|
+| **REST Auth Type** | `oauth2` | Set authentication type to OAuth2 |
+| **OAuth2 URI** | `https://adb-123456789.databricks.com/oidc/v1/token` | OAuth2 server URI for your Databricks workspace |
+| **Credential** | `client_id:client_secret` | Client ID and secret in format "id:secret" |
+| **Scope** | `sql offline_access` | OAuth2 scopes (space-separated) |
+
+</TabItem>
+
+<TabItem value="unity-cli" label="OLake CLI" default>
+
+### JSON Configuration
+
+Create a json for destination config (`destination.json`)
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "normalization": true,
+    "rest_catalog_url": "https://<DATABRICK_WORKSPACE_URL>/api/2.1/unity-catalog/iceberg-rest",
+    "iceberg_s3_path": "<CATALOG_NAME>",
+    "iceberg_db": "<NAMESPACE>",
+    "token": "<DATABRICK_USER_PERSONAL_ACCESS_TOKEN>",
+    "no_identifier_fields": true
+  }
+}
+```
+
+### Configuration Key Details
+
+Change the following placeholders in the above configuration with:
+
+- `DATABRICK_WORKSPACE_URL` -> Databricks workspace URL (URL that you use to access your Databricks console)
+- `CATALOG_NAME` -> Catalog name (e.g., "workspace")
+- `NAMESPACE` -> Namespace name inside catalog (e.g., "default")
+- `DATABRICK_USER_PERSONAL_ACCESS_TOKEN` -> Go to Settings > Developer > Create Personal Access Token
+- `no_identifier_fields` -> Set to `true` (Required for environments that don't support equality delete-based updates, such as Databricks Unity managed Iceberg tables)
+
+### OAuth2 Authentication (Alternative - Currently Having Issues)
+
+⚠️ **Note**: OAuth2 authentication is currently experiencing issues with internal server errors from Databricks during testing. Personal Access Token authentication is recommended until these issues are resolved.
+
+You can attempt OAuth2 authentication by modifying the configuration:
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "normalization": true,
+    "rest_catalog_url": "https://<DATABRICK_WORKSPACE_URL>/api/2.1/unity-catalog/iceberg-rest",
+    "iceberg_s3_path": "<CATALOG_NAME>",
+    "iceberg_db": "<NAMESPACE>",
+    "rest_auth_type": "oauth2",
+    "oauth2_uri": "<OAUTH2_SERVER_URI>",
+    "credential": "<CLIENT_ID>:<CLIENT_SECRET>",
+    "scope": "<OAUTH2_SCOPES>",
+    "no_identifier_fields": true
+  }
+}
+```
+
+Additional OAuth2 fields:
+- `rest_auth_type` -> Set to "oauth2"
+- `oauth2_uri` -> OAuth2 server URI for your Databricks workspace
+- `credential` -> Client ID and secret in format "id:secret"
+- `scope` -> OAuth2 scopes (space-separated)
+
+</TabItem>
+
+</Tabs>
+
+
+
+## Important Notes
+
+- **Unity Catalog Compatibility**: The `no_identifier_fields: true` setting is crucial for Unity Catalog managed Iceberg tables as they don't support equality delete-based updates
+- **Normalization**: Set `normalization: true` to ensure proper data formatting for Unity Catalog
+- **REST API**: Unity Catalog uses Iceberg's REST catalog API for table operations
+- **Permissions**: Ensure your user or service principal has appropriate permissions on the target catalog and schema
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication Errors**: Verify your Personal Access Token is valid and has the necessary permissions
+2. **Catalog Not Found**: Ensure the catalog name exists in your Unity Catalog
+3. **Schema Permissions**: Check that you have CREATE TABLE permissions on the target schema
+4. **Network Access**: Verify your OLake instance can reach the Databricks workspace URL
+
+For more general guidance on Iceberg integration, refer to the [Iceberg writer documentation](../overview). 
