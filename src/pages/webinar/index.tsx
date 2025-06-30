@@ -58,6 +58,30 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
+      subtitle: 'Introducing OLake v0.',
+      route: '/event/olake-v0-launch',
+      img: `/img/events/olake-v0-launch-cover.jpg`,
+      alt: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '26 June 2025',
+      // icon: FaVideo
+    },
+    {
+      title: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines]',
+      subtitle: 'This technical session examines real-world challenges and patterns in building distributed stream processing systems. We focus on scalability, fault tolerance, and latency trade-offs through a concrete case study, using specific frameworks like Apache Storm as supporting tools to illustrate production concepts',
+      route: '/webinar/w-8-distributed-stream-processing-in-practice',
+      img: `/img/webinars/w-8-distributed-stream-processing-in-practice-cover.jpg`,
+      alt: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '19 June 2025',
+      // icon: FaVideo
+    },
+     {
       title: 'From Source to Presto: Developer Playground for Fast Analytics',
       subtitle: 'This talk introduces a lightweight developer playground that demonstrates how to ingest change data from a transactional database (like Postgres or MySQL), register it via an open-source REST catalog (e.g., Polaris or LakeKeeper), and instantly make it queryable in Presto. The demo will walk through the setup, tools, and real-time experience of how quickly one can go from source data to interactive Presto queries using open standards and pluggable components. Ideal for developers and data engineers exploring modern lakehouse and federated query patterns',
       route: '/event/prestocon-day-2025',

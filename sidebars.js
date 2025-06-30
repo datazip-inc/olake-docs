@@ -38,6 +38,7 @@ const docSidebar = {
         'getting-started/postgres',
         'getting-started/mysql',
         'getting-started/mongodb',
+        'getting-started/oracle',
       ],
     },
 
