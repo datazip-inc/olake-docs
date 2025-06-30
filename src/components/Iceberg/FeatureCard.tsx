@@ -163,7 +163,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
               {icon}
             </div>
             {chip && (
-              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${colors.chip} shadow-sm`}>
+              <span className={`px-3 mx-12 py-1 text-xs font-semibold rounded-full ${colors.chip} shadow-sm`}>
                 {chip}
               </span>
             )}
@@ -229,7 +229,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                         </div>
                         <button
                           type="button"
-                          className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-sm"
+                          className="p-2 rounded-xl bg-white/10 hover:bg-white/20 border-none transition-colors backdrop-blur-sm cursor-pointer"
                           onClick={() => setIsOpen(false)}
                         >
                           <XMarkIcon className="h-6 w-6" />
@@ -255,7 +255,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                           <Tab
                             key={tab}
                             className={({ selected }) =>
-                              `flex items-center space-x-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all
+                              `flex items-center space-x-2 px-4 py-2.5 text-sm font-medium rounded-xl border-none transition-all
                               ${selected 
                                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' 
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'

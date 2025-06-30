@@ -107,14 +107,14 @@ import { impala } from './impala';
  */
 function validateAllEngines(engines: QueryEngine[]): void {
   const validationErrors: string[] = [];
-  
+
   engines.forEach(engine => {
     const validation = validateQueryEngine(engine);
     if (!validation.isValid) {
       validationErrors.push(`${engine.name}: ${validation.errors.join(', ')}`);
     }
   });
-  
+
   if (validationErrors.length > 0) {
     console.warn('Query Engine Validation Warnings:', validationErrors);
   }
@@ -127,16 +127,15 @@ function validateAllEngines(engines: QueryEngine[]): void {
 export const QUERY_ENGINES: QueryEngine[] = [
   spark,
   flink,
-  snowflake,
-  // Add the remaining engines here as you create them:
-  trino,
   hive,
+  trino,
   clickhouse,
   presto,
   dremio,
   starrocks,
   athena,
   bigquery,
+  snowflake,
   doris,
   duckdb,
   databricks,
@@ -153,15 +152,15 @@ if (process.env.NODE_ENV === 'development') {
 export {
   spark,
   flink,
-  snowflake,
-  trino,
   hive,
+  trino,
   clickhouse,
   presto,
   dremio,
   starrocks,
   athena,
   bigquery,
+  snowflake,
   doris,
   duckdb,
   databricks,
@@ -182,7 +181,7 @@ export const getEnginesByCategory = (category: QueryEngine['category']): QueryEn
 };
 
 export const getEnginesBySupportLevel = (
-  feature: keyof QueryEngine['features'], 
+  feature: keyof QueryEngine['features'],
   level: QueryEngine['features'][keyof QueryEngine['features']]['support']
 ): QueryEngine[] => {
   return QUERY_ENGINES.filter(engine => engine.features[feature].support === level);
@@ -201,7 +200,7 @@ export const getEnginesByFeatureSupport = (
 
 export const searchEngines = (query: string): QueryEngine[] => {
   const searchTerm = query.toLowerCase();
-  return QUERY_ENGINES.filter(engine => 
+  return QUERY_ENGINES.filter(engine =>
     engine.name.toLowerCase().includes(searchTerm) ||
     engine.description.toLowerCase().includes(searchTerm) ||
     engine.id.toLowerCase().includes(searchTerm)
@@ -214,12 +213,12 @@ export const getEngineStats = () => {
     byCategory: {} as Record<QueryEngine['category'], number>,
     bySupport: {} as Record<string, Record<string, number>>
   };
-  
+
   // Count by category
   QUERY_ENGINES.forEach(engine => {
     stats.byCategory[engine.category] = (stats.byCategory[engine.category] || 0) + 1;
   });
-  
+
   // Count by feature support
   Object.keys(QUERY_ENGINES[0]?.features || {}).forEach(feature => {
     stats.bySupport[feature] = { full: 0, partial: 0, preview: 0, none: 0 };
@@ -228,7 +227,7 @@ export const getEngineStats = () => {
       stats.bySupport[feature][support]++;
     });
   });
-  
+
   return stats;
 };
 
@@ -237,7 +236,7 @@ export const getEngineStats = () => {
  */
 export const ENGINE_CATEGORIES = [
   'general-purpose',
-  'streaming', 
+  'streaming',
   'analytics',
   'cloud-native',
   'embedded'
@@ -245,7 +244,7 @@ export const ENGINE_CATEGORIES = [
 
 export const SUPPORT_LEVELS = [
   'full',
-  'partial', 
+  'partial',
   'preview',
   'none'
 ] as const;

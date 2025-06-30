@@ -186,7 +186,10 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
                 onClick={() => handleTabClick(tab.id as ViewType)}
                 disabled={disabled}
                 className={`
-                  relative z-10 flex items-center justify-center space-x-2 px-6 py-3 text-sm font-medium border-none bg-gray-200 dark:bg-slate-700 rounded-lg transition-all duration-200 flex-1
+                  relative z-10 flex items-center justify-center space-x-2 px-6 py-3 text-sm font-medium border-none bg-gray-200 dark:bg-slate-700 rounded-lg transition-all duration-200 flex-1 cursor-pointer
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                  focus-visible:ring-offset-2
+                  focus-visible:ring-offset-gray-100 dark:focus-visible:ring-offset-gray-800
                   ${disabled 
                     ? 'cursor-not-allowed' 
                     : isActive

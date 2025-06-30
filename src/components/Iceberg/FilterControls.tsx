@@ -76,7 +76,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({
           {(filters.searchTerm || filters.category !== 'all') && (
             <button
               onClick={clearFilters}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors border-none rounded-lg px-3 py-1.5 mouse-hover:bg-blue-50 dark:mouse-hover:bg-blue-900 cursor-pointer"
+              style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' } /* Tailwind's bg-blue-100 */ }
             >
               Clear filters
             </button>

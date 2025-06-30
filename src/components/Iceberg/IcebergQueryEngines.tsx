@@ -386,7 +386,8 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
               <button
                 onClick={toggleComparisonMode}
                 className={`
-                  inline-flex items-center px-4 py-2 rounded-lg border font-medium transition-all duration-200
+                  inline-flex items-center px-4 py-2 rounded-lg border font-medium transition-all duration-200 border-gray-300 dark:border-gray-600
+                  hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer
                   ${isComparisonMode 
                     ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'

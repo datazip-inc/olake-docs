@@ -3,65 +3,160 @@ import { QueryEngine } from '../../types/iceberg';
 
 export const bigquery: QueryEngine = {
   id: 'bigquery',
-  name: 'bigquery',
-  description: 'Distributed SQL query engine for interactive analytics at scale',
-  category: 'analytics',
-  website: 'https://bigquery.io/',
-  documentation: 'https://bigquery.io/docs/current/connector/iceberg.html',
+  name: 'Google BigQuery',
+  description: 'Serverless Google Cloud data warehouse with managed Iceberg tables, automatic optimization, Storage Write API streaming, and deep GCP ecosystem integration',
+  category: 'general-purpose',
+  website: 'https://cloud.google.com/bigquery',
+  documentation: 'https://cloud.google.com/bigquery/docs/iceberg-tables',
   features: {
     catalogs: {
       support: 'partial',
-      details: 'Hive Metastore and Hadoop catalogs; limited REST support'
+      details: 'BigQuery-managed Iceberg (internal catalog) and BigLake external Iceberg (Dataplex, HMS, AWS Glue via GCS). No direct REST/Nessie support',
+      externalLinks: [
+        {
+          label: 'BigQuery Managed Iceberg Tables',
+          url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg'
+        },
+        {
+          label: 'Create External Iceberg Tables',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-external-tables'
+        }
+      ]
     },
     readWrite: {
-      support: 'full',
-      details: 'Full read support; writes via INSERT, CTAS, CREATE TABLE AS'
+      support: 'partial',
+      details: 'Managed tables: full CREATE, CTAS, INSERT, DML. External tables: SELECT + limited INSERT via Dataflow/Storage Write API',
+      externalLinks: [
+        {
+          label: 'BigQuery Iceberg DML Operations',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#dml'
+        },
+        {
+          label: 'Managed Iceberg Capabilities',
+          url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg'
+        }
+      ]
     },
     dml: {
       support: 'partial',
-      details: 'INSERT only; no UPDATE/DELETE/MERGE support'
+      details: 'Managed tables: INSERT, UPDATE, DELETE, MERGE with GoogleSQL semantics. External tables: limited INSERT support via Dataflow/Spark',
+      externalLinks: [
+        {
+          label: 'Data Manipulation Language DML',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#dml'
+        }
+      ]
     },
     morCow: {
-      support: 'partial',
-      details: 'Read-only for Merge-on-Read; writes use Copy-on-Write'
+      support: 'full',
+      details: 'Operations generate position/equality delete files (MoR). Automatic compaction, clustering, and garbage collection (CoW) in background',
+      externalLinks: [
+        {
+          label: 'Automatic Storage Optimization',
+          url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg'
+        },
+        {
+          label: 'Merge-on-Read Support',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-external-tables'
+        }
+      ]
     },
     streaming: {
-      support: 'none',
-      details: 'Batch processing only; designed for interactive queries'
+      support: 'partial',
+      details: 'High-throughput streaming via Storage Write API (Preview) - Dataflow, Beam, Spark. No built-in CDC apply; use Datastream + Dataflow patterns',
+      externalLinks: [
+        {
+          label: 'Storage Write API Streaming',
+          url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg'
+        }
+      ]
     },
     formatV3: {
       support: 'none',
-      details: 'Supports Iceberg v1/v2; v3 features not available'
+      details: 'Not yet supported. v2 required for managed tables, recommended for external. v3 evaluation planned for 2025 on public roadmap',
+      externalLinks: [
+        {
+          label: 'Iceberg Specification Support',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-external-tables'
+        }
+      ]
     },
     timeTravel: {
       support: 'partial',
-      details: 'Snapshot queries via @snapshot_id syntax'
+      details: 'Managed tables: FOR SYSTEM_TIME AS OF syntax translating to snapshots. External BigLake tables: no SQL time travel currently',
+      externalLinks: [
+        {
+          label: 'Time Travel for Historical Data',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#time_travel'
+        }
+      ]
     },
     security: {
       support: 'full',
-      details: 'File-based access control; integration with Ranger/Sentry'
+      details: 'IAM permissions like native BigQuery tables. Column-level security & masking on managed Iceberg. External via BigLake/Dataplex policy tags',
+      externalLinks: [
+        {
+          label: 'Column-level Security and Data Masking',
+          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#security'
+        },
+        {
+          label: 'Fine-grained Security Policies',
+          url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg'
+        }
+      ]
     }
   },
-  quickStart: `-- Configure Iceberg connector in bigquery
--- In catalog/iceberg.properties:
-connector.name=iceberg
-hive.metastore.uri=thrift://localhost:9083
-iceberg.file-format=PARQUET
+  quickStart: `-- Create managed Iceberg table in BigQuery
+CREATE TABLE iceberg_dataset.sales_data (
+  order_id INT64,
+  customer_id INT64,
+  order_date DATE,
+  total_amount NUMERIC
+)
+OPTIONS (
+  storage_format = 'ICEBERG',
+  file_format = 'PARQUET'
+)
+CLUSTER BY customer_id;
 
--- Query Iceberg table
-SELECT * FROM iceberg.db.table
-WHERE date = DATE '2024-01-15';
+-- Insert data
+INSERT INTO iceberg_dataset.sales_data 
+VALUES (1, 100, DATE '2024-01-15', 99.99);
 
--- Create new table
-CREATE TABLE iceberg.db.new_table AS
-SELECT * FROM source_table
-WITH (format = 'PARQUET');`,
+-- MERGE operation with GoogleSQL semantics
+MERGE iceberg_dataset.sales_data AS target
+USING (
+  SELECT 1 as order_id, 150.00 as new_amount
+) AS source
+ON target.order_id = source.order_id
+WHEN MATCHED THEN 
+  UPDATE SET total_amount = source.new_amount
+WHEN NOT MATCHED THEN 
+  INSERT VALUES (source.order_id, 200, DATE '2024-01-16', source.new_amount);
+
+-- Time travel query
+SELECT * FROM iceberg_dataset.sales_data 
+FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR);`,
   bestPractices: [
-    'Use cost-based optimizer for complex queries',
-    'Enable dynamic filtering for better performance',
-    'Configure appropriate memory settings per query',
-    'Use columnar formats (Parquet/ORC) for best performance',
-    'Consider Trino for newer features and better Iceberg support',
-    'Monitor query performance with built-in UI'
+    'Enable Iceberg Tables Preview or BigLake Iceberg in your GCP project for access',
+    'Use managed Iceberg tables for full DML capabilities and automatic optimization',
+    'Leverage BigLake external tables for querying existing Iceberg data in GCS',
+    'Take advantage of automatic compaction, clustering, and garbage collection - no manual OPTIMIZE/VACUUM needed',
+    'Use Storage Write API for high-throughput streaming ingestion from Dataflow, Beam, or Spark',
+    'Configure CLUSTER BY columns (up to 4) for extra data locality and query performance',
+    'Implement column-level security and data masking using BigQuery IAM and policy tags',
+    'Use FOR SYSTEM_TIME AS OF syntax for time travel on managed Iceberg tables',
+    'Integrate with BigQuery ML for machine learning on Iceberg data',
+    'Leverage Dataform for transformation workflows on Iceberg tables',
+    'Use BigQuery Omni for cross-cloud queries on Iceberg data',
+    'Store managed Iceberg data in customer GCS buckets for multi-engine access',
+    'Monitor metadata cache hit/miss rates for BigLake external tables',
+    'Use Datastream + Dataflow patterns for CDC processing into Iceberg tables',
+    'Be aware of Parquet-only limitation - ORC and Avro not yet supported',
+    'Plan for v2 format requirement - v3 not yet supported but planned for 2025',
+    'Use Dataplex APIs or EXPORT TABLE METADATA for snapshot inspection',
+    'Consider concurrency limitations with Iceberg optimistic locking for heavy MERGE workloads',
+    'Leverage end-to-end lineage through Dataplex integration',
+    'Use external table writes via Dataflow/Spark when BigQuery-native DML is insufficient'
   ]
 };

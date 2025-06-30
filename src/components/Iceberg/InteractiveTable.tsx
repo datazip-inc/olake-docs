@@ -94,7 +94,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                     className={`${padding} text-${column.align || 'left'} ${column.width || ''} relative group`}
                   >
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">
                         {column.header}
                       </span>
                       {column.tooltip && (
@@ -159,7 +159,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                           </span>
                           {cell.badge && (
                             <span className={`
-                              inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                              inline-flex items-center px-2.5 py-0.5  text-xs font-medium border
                               ${badgeStyles[cell.badge.variant]}
                             `}>
                               {cell.badge.text}

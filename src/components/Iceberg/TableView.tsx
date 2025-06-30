@@ -289,7 +289,7 @@ const TableView: React.FC<TableViewProps> = ({
                 )}
                 <th className="px-6 py-4 text-left">
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                    <span className="text-sm font-semibold text-white dark:text-gray-100 uppercase tracking-wider">
                       Query Engine
                     </span>
                   </div>
@@ -297,7 +297,7 @@ const TableView: React.FC<TableViewProps> = ({
                 {featureKeys.map((feature) => (
                   <th key={feature} className="px-3 py-4 text-center min-w-[100px]">
                     <div className="group/tooltip relative">
-                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider cursor-help">
+                      <span className="text-xs font-semibold text-gray-100 uppercase tracking-wider cursor-help">
                         {FEATURE_SHORT_NAMES[feature as keyof QueryEngine['features']]}
                       </span>
                       <div className={TOOLTIP.CONTAINER}>
