@@ -36,9 +36,6 @@ export interface InteractiveTableProps {
 }
 
 
-
-
-
 const badgeStyles = {
   success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
   warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
@@ -105,9 +102,9 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                           <button
                             onMouseEnter={() => setHoveredHeader(column.key)}
                             onMouseLeave={() => setHoveredHeader(null)}
-                            className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border-none"
                           >
-                            <InformationCircleIcon className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                            <InformationCircleIcon className="w-4 h-4 text-blue-400 hover:text-gray-600 dark:hover:text-gray-300" />
                           </button>
 
                           <Transition

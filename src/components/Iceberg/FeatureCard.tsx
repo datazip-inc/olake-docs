@@ -53,7 +53,7 @@ export interface FeatureCardProps {
   description: string;
   icon: React.ReactNode;
   details: FeatureDetail;
-  color?: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'yellow';
   score?: number; // 0-100
 }
 

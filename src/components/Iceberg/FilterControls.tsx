@@ -39,7 +39,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         {/* Search Input */}
         <div className="flex-1 relative">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <MagnifyingGlassIcon className="absolute  left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search query engines..."

@@ -85,13 +85,13 @@ const WebinarPage = () => {
         <br />
 
 
-        <div className="flex justify-center mb-12">
-          Video Coming soon!
-        </div>
-
         {/* <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="xxx" className="max-w-6xl" />
+          Video Coming soon!
         </div> */}
+
+        <div className="flex justify-center mb-12">
+          <YouTubeEmbed videoId="urLdGYaMadM" className="max-w-6xl" />
+        </div>
 
 
         <WebinarOverview

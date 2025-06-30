@@ -154,7 +154,24 @@ const config = {
           { to: '/docs', label: 'Docs', position: 'right' },
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
-          { to: '/webinar', label: 'Webinars & Events', position: 'right' },
+          // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
+
+          {
+            // Dropdown menu in the navbar for "Learn" section
+            type: "dropdown",
+            position: "right",
+            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
+            label: "Resources",
+            items: [
+              {
+                label: "Query Engine",
+                // type: 'link',
+                href: `/iceberg/query-engine`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+
+            ],
+          },
 
           {
             // Dropdown menu in the navbar for "Learn" section
@@ -163,6 +180,12 @@ const config = {
             // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
             label: "Community",
             items: [
+              {
+                label: "Webinars & Events",
+                // type: 'link',
+                href: `/webinar`,
+                // activeBaseRegex: 'docs/zenith',
+              },
               {
                 label: "OLake Community",
                 // type: 'link',

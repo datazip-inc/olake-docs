@@ -1,5 +1,5 @@
 // types/iceberg.ts
-export type SupportLevel = 'full' | 'partial' | 'preview' | 'none';
+export type SupportLevel = 'full' | 'partial' | 'preview' | 'none' | string;
 
 export interface ExternalLink {
   label: string;
@@ -16,7 +16,7 @@ export interface QueryEngine {
   id: string;
   name: string;
   description: string;
-  category: 'general-purpose' | 'streaming' | 'analytics' | 'cloud-native' | 'embedded';
+  category: 'general-purpose' | 'streaming' | 'analytics' | 'cloud-native' | 'embedded' | string;
   website: string;
   documentation: string;
   features: {

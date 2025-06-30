@@ -16,7 +16,7 @@ export interface CodeExample {
   title: string;
   description?: string;
   language: string;
-  code: string;
+  // code?: string;
 }
 
 export interface UseCase {
@@ -31,7 +31,7 @@ export interface QueryEngineLayoutProps {
   description: string;
   features: FeatureCardProps[];
   tableData: InteractiveTableProps;
-  codeExamples: CodeExample[];
+  // codeExamples?: CodeExample[];
   useCases: UseCase[];
   officialDocs: string;
   gettingStarted: string;
@@ -70,7 +70,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
   description,
   features,
   tableData,
-  codeExamples,
+  // codeExamples,
   useCases,
   officialDocs,
   gettingStarted,
@@ -116,14 +116,14 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         </section>
 
         {/* Code Examples Section */}
-        <section className="mb-20">
+        {/*<section className="mb-20">
           <div className="flex items-center mb-8">
             <CodeBracketIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
             <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
               Code Examples
             </h2>
           </div>
-          <div className="space-y-6">
+           <div className="space-y-6">
             {codeExamples.map((example, idx) => (
               <div key={idx} className="overflow-hidden rounded-2xl bg-gray-900 shadow-xl">
                 <div className="bg-gradient-to-r from-gray-800 to-gray-850 px-6 py-4 border-b border-gray-700">
@@ -171,8 +171,8 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                 </div>
               </div>
             ))}
-          </div>
-        </section>
+          </div> 
+        </section>*/}
 
         {/* Use Cases Section */}
         <section className="mb-20">
