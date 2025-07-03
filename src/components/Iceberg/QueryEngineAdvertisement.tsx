@@ -76,7 +76,7 @@ function QueryEngineAdvertisement() {
               {/* Main CTA Button */}
               <Link
                 to="/iceberg/query-engine"
-                className="group inline-flex w-full sm:w-auto lg:w-full items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                className="group inline-flex w-full sm:w-auto lg:w-full items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 hover:text-white text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
               >
                 <span>Explore Query Engines</span>
                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
