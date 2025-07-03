@@ -66,10 +66,7 @@ const WebinarGrid: React.FC<WebinarGridProps> = ({ webinars }) => {
                 </div>
               </div>
               
-              {/* Status Badge - Positioned on image */}
-              <div className="absolute top-4 right-4">
-                <StatusBadge status={webinar.CTA} />
-              </div>
+              
             </div>
 
             {/* Enhanced Content Section */}
