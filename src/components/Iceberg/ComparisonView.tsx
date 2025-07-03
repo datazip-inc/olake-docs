@@ -117,7 +117,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({
               <button
                 key={engine.id}
                 onClick={() => onEngineSelect(engine.id, false)}
-                className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors border-none cursor-pointer"
               >
                 {engine.name}
                 <XCircleIcon className="w-4 h-4 ml-2" />
@@ -133,11 +133,11 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({
               Add more engines (up to {maxComparisons}):
             </h4>
             <div className="flex flex-wrap gap-2">
-              {availableEngines.slice(0, 6).map((engine) => (
+              {availableEngines.slice(0, 16).map((engine) => (
                 <button
                   key={engine.id}
                   onClick={() => onEngineSelect(engine.id, true)}
-                  className="inline-flex items-center px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="inline-flex items-center px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border-none cursor-pointer"
                 >
                   <PlusIcon className="w-3 h-3 mr-1" />
                   {engine.name}
@@ -165,7 +165,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({
                     <div className="space-y-2">
                       <button
                         onClick={() => handleEngineClick(engine.id)}
-                        className="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center space-x-2"
+                        className="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center space-x-2 border-none cursor-pointer"
                       >
                         <span>{engine.name}</span>
                         <ArrowTopRightOnSquareIcon className="w-4 h-4" />

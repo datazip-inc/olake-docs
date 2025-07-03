@@ -239,7 +239,7 @@ const WebinarsPage = () => {
                 <div className="flex items-center justify-center w-16 h-16 bg-purple-100 dark:bg-purple-950/30 rounded-full mx-auto mb-4">
                   <FaUsers className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 </div>
-                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">5K+</div>
+                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">250+</div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Community Members</div>
               </div>
               <div className="text-center">
@@ -308,38 +308,6 @@ const WebinarsPage = () => {
             </div>
           </section>
 
-          {/* Call to Action Section */}
-          <section className="text-center">
-            <div className="bg-gradient-to-r from-[#193ae6] to-blue-600 rounded-2xl p-8 lg:p-12 text-white relative overflow-hidden">
-              {/* Background pattern */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-32 -translate-x-32"></div>
-              
-              <div className="relative space-y-6">
-                <h3 className="text-2xl sm:text-3xl font-bold">
-                  Don't Miss Our Next Event
-                </h3>
-                <p className="text-lg text-blue-100 max-w-2xl mx-auto">
-                  Subscribe to our newsletter to get notified about upcoming webinars, 
-                  community meetups, and exclusive content
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 items-center justify-center max-w-md mx-auto">
-                  <input
-                    type="email"
-                    placeholder="Enter your email"
-                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  />
-                  <button className="w-full sm:w-auto px-6 py-3 bg-white text-[#193ae6] font-semibold rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap">
-                    Subscribe Now
-                  </button>
-                </div>
-                <p className="text-sm text-blue-200">
-                  Join 5,000+ data engineers in our community
-                </p>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
     </Layout>

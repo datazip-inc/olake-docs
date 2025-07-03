@@ -157,8 +157,8 @@ interface TableViewProps {
   onEngineSelect?: (engineId: string, selected: boolean) => void;
 }
 
-const TableView: React.FC<TableViewProps> = ({ 
-  engines, 
+const TableView: React.FC<TableViewProps> = ({
+  engines,
   fullWidth = false,
   selectionMode = false,
   selectedEngines = [],
@@ -202,8 +202,8 @@ const TableView: React.FC<TableViewProps> = ({
                 key={engine.id}
                 className={`
                   border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-all duration-200
-                  ${selectionMode && selectedEngines.includes(engine.id) 
-                    ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-600' 
+                  ${selectionMode && selectedEngines.includes(engine.id)
+                    ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-600'
                     : 'bg-white dark:bg-gray-800 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700'
                   }
                   ${selectionMode ? 'cursor-pointer' : ''}
@@ -238,11 +238,11 @@ const TableView: React.FC<TableViewProps> = ({
                     <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400" />
                   )}
                 </div>
-                
+
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   {engine.description}
                 </p>
-                
+
                 {/* Feature Summary for Mobile */}
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {featureKeys.slice(0, 6).map((feature) => (
@@ -254,7 +254,7 @@ const TableView: React.FC<TableViewProps> = ({
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Score */}
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Support Score</span>
@@ -263,7 +263,7 @@ const TableView: React.FC<TableViewProps> = ({
                       {calculateSupportScore(engine)}/32
                     </span>
                     <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full"
                         style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
                       />
@@ -300,9 +300,9 @@ const TableView: React.FC<TableViewProps> = ({
                       <span className="text-xs font-semibold text-gray-100 uppercase tracking-wider cursor-help">
                         {FEATURE_SHORT_NAMES[feature as keyof QueryEngine['features']]}
                       </span>
-                      <div className={TOOLTIP.CONTAINER}>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg min-w-max max-w-xs whitespace-normal break-words">
                         {FEATURE_NAMES[feature as keyof QueryEngine['features']]}
-                        <div className={TOOLTIP.ARROW}></div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
                       </div>
                     </div>
                   </th>
@@ -316,13 +316,13 @@ const TableView: React.FC<TableViewProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {engines.map((engine, index) => (
-                <tr 
-                  key={engine.id} 
+                <tr
+                  key={engine.id}
                   className={`
                     ${ANIMATIONS.TABLE_ROW_HOVER} 
                     ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/50 dark:bg-gray-800/50'}
-                    ${selectionMode && selectedEngines.includes(engine.id) 
-                      ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-700' 
+                    ${selectionMode && selectedEngines.includes(engine.id)
+                      ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-700'
                       : ''
                     }
                   `}
@@ -365,22 +365,24 @@ const TableView: React.FC<TableViewProps> = ({
                       </div>
                     </div>
                   </td>
+
                   {featureKeys.map((feature) => (
                     <td key={feature} className="px-3 py-4 text-center">
                       <div className="group/tooltip relative">
                         <SupportIcon level={engine.features[feature as keyof QueryEngine['features']].support} />
-                        <div className={TOOLTIP.CONTAINER}>
-                          <div className="font-medium mb-1">
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg whitespace-normal break-words leading-relaxed">
+                          <div className="font-medium mb-1 text-gray-100">
                             {FEATURE_NAMES[feature as keyof QueryEngine['features']]}
                           </div>
-                          <div className="text-xs">
+                          <div className="text-gray-300 dark:text-gray-400">
                             {engine.features[feature as keyof QueryEngine['features']].details}
                           </div>
-                          <div className={TOOLTIP.ARROW}></div>
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
                         </div>
                       </div>
                     </td>
                   ))}
+
                   <td className="px-4 py-4 text-center">
                     <div className="flex flex-col items-center space-y-1">
                       <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -390,7 +392,7 @@ const TableView: React.FC<TableViewProps> = ({
                         / 32
                       </div>
                       <div className="w-12 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
                         />
