@@ -7,8 +7,10 @@ import SearchMetadata from '@theme/SearchMetadata'
 import BlogPostItems from '@theme/BlogPostItems'
 import Image from '@theme/IdealImage'
 import useBaseUrl from '@docusaurus/useBaseUrl'
+import { useLocation } from '@docusaurus/router'
 
 import { BlogPagination } from '../BlogPagination'
+import QueryEngineAdvertisement from '../../components/Iceberg/QueryEngineAdvertisement'
 
 function BlogListPageMetadata(props) {
   const { metadata } = props
@@ -72,17 +74,37 @@ function BlogHomepageBanner(props) {
   )
 }
 
+// function BlogListPageContent(props) {
+//   const { metadata, items, sidebar } = props
+
+//   return (
+//     <BlogLayout sidebar={sidebar}>
+//       <BlogHomepageBanner {...props} />
+//       <BlogPostItems items={items} />
+//       <BlogPagination metadata={metadata} />
+//     </BlogLayout>
+//   )
+// }
+
+// Updated BlogListPageContent with conditional advertisement
 function BlogListPageContent(props) {
   const { metadata, items, sidebar } = props
+  const location = useLocation()
+  
+  // Check if we're on the iceberg route
+  const isIcebergRoute = location.pathname === '/iceberg' || location.pathname === '/iceberg/'
 
   return (
     <BlogLayout sidebar={sidebar}>
       <BlogHomepageBanner {...props} />
+      {/* Conditionally render Query Engine Advertisement */}
+      {isIcebergRoute && <QueryEngineAdvertisement />}
       <BlogPostItems items={items} />
       <BlogPagination metadata={metadata} />
     </BlogLayout>
   )
 }
+
 
 export default function BlogListPage(props) {
   return (
@@ -94,3 +116,7 @@ export default function BlogListPage(props) {
     </HtmlClassNameProvider>
   )
 }
+
+
+
+
