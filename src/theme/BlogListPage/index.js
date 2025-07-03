@@ -74,12 +74,11 @@ function BlogHomepageBanner(props) {
   )
 }
 
-
 // Updated BlogListPageContent with conditional advertisement
 function BlogListPageContent(props) {
   const { metadata, items, sidebar } = props
   const location = useLocation()
-  
+
   // Check if we're on the iceberg route
   const isIcebergRoute = location.pathname === '/iceberg' || location.pathname === '/iceberg/'
 
