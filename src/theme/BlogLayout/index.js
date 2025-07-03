@@ -133,18 +133,12 @@ export default function BlogLayout(props) {
           <div className=" max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-8 lg:gap-12">
               {/* Main content area */}
-              {/* <main className={clsx(
-                "flex-1",
-                {
-                  "max-w-4xl mx-auto": !toc,
-                  "max-w-none": toc,
-                }
-              )}> */}
-                <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                  <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
-                    {children}
-                  </div>
-                </article>
+
+              <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
+                  {children}
+                </div>
+              </article>
               {/* </main> */}
 
               {/* Enhanced TOC Sidebar - Like comparison sites */}

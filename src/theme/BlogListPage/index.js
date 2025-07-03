@@ -74,17 +74,6 @@ function BlogHomepageBanner(props) {
   )
 }
 
-// function BlogListPageContent(props) {
-//   const { metadata, items, sidebar } = props
-
-//   return (
-//     <BlogLayout sidebar={sidebar}>
-//       <BlogHomepageBanner {...props} />
-//       <BlogPostItems items={items} />
-//       <BlogPagination metadata={metadata} />
-//     </BlogLayout>
-//   )
-// }
 
 // Updated BlogListPageContent with conditional advertisement
 function BlogListPageContent(props) {

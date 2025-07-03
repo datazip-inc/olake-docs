@@ -7,16 +7,6 @@ function QueryEngineAdvertisement() {
     <div className="mx-auto max-w-8xl mb-12">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-800 dark:to-slate-900 border border-blue-200 dark:border-slate-700 shadow-lg">
         {/* Background Pattern */}
-        {/* <div className="absolute inset-0 opacity-10 dark:opacity-5">
-          <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <pattern id="grid" width="8" height="8" patternUnits="userSpaceOnUse">
-                <path d="M 8 0 L 0 0 0 8" fill="none" stroke="currentColor" strokeWidth="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="100" height="100" fill="url(#grid)" />
-          </svg>
-        </div> */}
 
         <div className="relative px-6 py-8 sm:px-8 lg:px-12 lg:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
@@ -38,7 +28,7 @@ function QueryEngineAdvertisement() {
 
               {/* Description */}
               <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
-                Discover comprehensive guides for Apache Spark, Trino, Flink, DuckDB, and more. 
+                Discover comprehensive guides for Apache Spark, Trino, Flink, DuckDB, and more.
                 Compare features, capabilities, and find the perfect engine for your data workloads.
               </p>
 
