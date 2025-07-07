@@ -282,14 +282,6 @@ const config = {
         },
       ],
 
-      announcementBar: {
-        content:
-        'Support us by giving us a ⭐️ on <a target="_blank" rel="noopener noreferrer" href="https://github.com/datazip-inc/olake">GitHub</a>! ',
-        backgroundColor: 'white',
-        textColor: 'black',
-        isCloseable: true,
-      },
-
       colorMode: {
         defaultMode: "light", // dark or light
         disableSwitch: false,
