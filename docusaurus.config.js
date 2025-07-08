@@ -282,14 +282,6 @@ const config = {
         },
       ],
 
-      announcementBar: {
-        content:
-          '<strong>OLake launch happening 5th July 2025</strong>&nbsp;&nbsp;&nbsp;<a target="_blank" rel="noopener noreferrer" href="https://lu.ma/8af1z837" style="color: white; font-weight: bold;">REGISTER NOW</a>',
-        backgroundColor: '#193AE6',
-        textColor: 'white',
-        isCloseable: true,
-      },
-
       colorMode: {
         defaultMode: "light", // dark or light
         disableSwitch: false,
