@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react'
+import { CheckCircleOutlined } from '@ant-design/icons'
 
 const FEATURE_BADGES = [
-  'Proactive Reliability',
-  'Reduced Costs',
-  'Operational Efficiency',
-  'Optimised Performance'
+  'Built for teams looking to modernize without rewriting',
+  'Transformations auto-mapped, validated, and production-ready',
+  'Support for HiveQL, PySpark, SQL, and CDC pipelines'
 ] as const
 
 interface GlaceProps {
@@ -33,57 +33,66 @@ const TallyForm: React.FC<TallyFormProps> = ({ src, title }) => {
     <iframe
       data-tally-src={src}
       width='100%'
-      height='500'
+      height='700'
       frameBorder='0'
       title={title}
-      className='w-full'
-      style={{ border: 'none', minHeight: '500px', margin: 0 }}
+      className='w-full rounded-xl'
+      style={{ border: 'none', minHeight: '600px', margin: 0 }}
     />
   )
 }
 
 const Glace: React.FC<GlaceProps> = ({
-  subtitle = 'See inside your Iceberg tables — snapshots, small files, and storage waste — before it costs you.'
+  subtitle = 'Join the waitlist for our AI-powered Hive, Snowflake & Databricks migration service.'
 }) => {
   return (
     <div className='min-h-screen w-full bg-[#A9E2FF] bg-opacity-40 p-4 dark:bg-blue-950/30 md:p-8 lg:p-12'>
       <div className='mx-auto rounded-3xl bg-white p-6 shadow-lg dark:bg-gray-900 md:p-8 lg:p-12'>
-        <div className='flex w-full flex-col items-center justify-center'>
-          {/* Hero Image */}
-          <div className='mb-8 flex w-full items-center justify-center'>
-            <img src='/img/site/glace-cards.svg' alt='Glace Illustration' />
+        <div className='flex w-full flex-col items-center justify-between gap-8 lg:flex-row lg:items-start'>
+          {/* Left Column - Content */}
+          <div className='flex w-full flex-col items-center lg:w-1/2 lg:items-start lg:pr-8'>
+            {/* Coming Soon Badge */}
+            <div className='mb-4 flex items-center justify-center lg:justify-start'>
+              <span className='bg-gradient-to-r from-[#009fee] to-[#bce9ff] bg-clip-text text-xl font-bold text-transparent'>
+                AILake is Coming Soon
+              </span>
+            </div>
+
+            {/* Main Heading */}
+            <h4 className='mb-4 text-center text-3xl font-bold text-gray-900 dark:text-white md:text-4xl lg:text-left lg:text-5xl'>
+              <span className='font-thin'>Migrate to Iceberg </span> In Days, Not Months
+            </h4>
+
+            {/* Subtitle */}
+            <p className='mb-8 text-center text-lg text-[#000000] dark:text-gray-300 lg:text-left'>
+              {subtitle}
+            </p>
+
+            {/* Hero Image */}
+            <div className='mb-8 flex w-full items-center justify-center'>
+              <img
+                src='/img/site/glace-cards.svg'
+                alt='Glace Illustration'
+                className='max-w-full lg:max-w-[90%]'
+              />
+            </div>
+
+            {/* Feature List */}
+            <div className='w-full space-y-4 px-4'>
+              {FEATURE_BADGES.map((feature, index) => (
+                <div key={feature} className='flex items-center justify-center space-x-3'>
+                  <CheckCircleOutlined />
+                  <span className='text-lg text-gray-800 dark:text-gray-200'>{feature}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Coming Soon Badge */}
-          <div className='mb-4 flex items-center justify-center'>
-            <span className='bg-gradient-to-r from-[#009fee] to-[#bce9ff] bg-clip-text text-xl font-bold text-transparent'>
-              Glace is Coming Soon
-            </span>
-          </div>
-
-          {/* Main Heading */}
-          <h4 className='mb-4 text-center text-3xl font-bold text-gray-900 dark:text-white md:text-4xl lg:text-5xl'>
-            <span className='font-thin'>Observability</span> for Apache Iceberg Tables
-          </h4>
-
-          {/* Subtitle */}
-          <p className='text-center text-lg text-[#000000] dark:text-gray-300'>{subtitle}</p>
-
-          {/* Waitlist Form */}
-          <div className='mb-12 w-full max-w-xl'>
-            <TallyForm src='https://tally.so/r/nrQ8gX' title='Join Waitlist' />
-          </div>
-
-          {/* Feature Badges */}
-          <div className='flex flex-wrap items-center justify-center gap-2 font-bold text-[#363636] dark:text-gray-400'>
-            {FEATURE_BADGES.map((badge, index) => (
-              <React.Fragment key={badge}>
-                <span className='rounded-full px-4 py-2 dark:bg-gray-800'>{badge}</span>
-                {index < FEATURE_BADGES.length - 1 && (
-                  <span className='hidden size-[9px] rounded-full bg-[#e5e5e5] md:block' />
-                )}
-              </React.Fragment>
-            ))}
+          {/* Right Column - Form */}
+          <div className='w-full lg:w-1/2'>
+            <div className='rounded-xl bg-[#f5f5f5] p-4 dark:bg-gray-800/50'>
+              <TallyForm src='https://tally.so/r/nrQ8gX' title='Join Waitlist' />
+            </div>
           </div>
         </div>
       </div>
