@@ -153,6 +153,7 @@ const config = {
 
           { to: '/docs', label: 'Docs', position: 'right' },
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
+          { to: '/ai-lake', label: 'AILake', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
           // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
 
