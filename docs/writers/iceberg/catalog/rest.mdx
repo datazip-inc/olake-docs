@@ -93,8 +93,138 @@ Click [here](../s3-tables)
 Coming soon!
 
 ### Using Nessie
+This guide helps you set up and use Project Nessie as an Iceberg REST catalog with OLake. It uses Docker Compose to spin up Nessie, MinIO (S3-compatible object store), and Postgres (for Nessie metadata storage).
 
-Coming soon!
+## Assumption: 
+All services involved in the sync process — including the OLake source image, Nessie, MinIO, and any other dependencies — must be part of the same Docker network.
+
+####  Setup Steps:
+1. Save the following as `docker-compose.yml`:
+
+```yaml
+
+services:
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    container_name: nessie
+    ports:
+      - "19120:19120"
+    environment:
+      - nessie.version.store.type=JDBC
+      - quarkus.datasource.db-kind=postgresql
+      - quarkus.datasource.jdbc.url=jdbc:postgresql://postgres:5432/nessie_db
+      - quarkus.datasource.username=nessie
+      - quarkus.datasource.password=nessie
+      - nessie.catalog.default-warehouse=warehouse
+      - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
+      - nessie.catalog.service.s3.default-options.region=us-east-1
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
+      - nessie.catalog.service.s3.default-options.external-endpoint=http://host.docker.internal:9000/
+      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+      - nessie.catalog.secrets.access-key.name=minio
+      - nessie.catalog.secrets.access-key.secret=minio123
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mc:
+        condition: service_completed_successfully
+    networks:
+      - nessie-network
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ADDRESS: ":9000"
+      MINIO_CONSOLE_ADDRESS: ":9090"
+    volumes:
+      - minio-data:/data
+    command: server /data
+    networks:
+      - nessie-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+
+  mc:
+    image: quay.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
+    container_name: mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    restart: "no"
+    command: >
+      -c "mc alias set myminio http://minio:9000/ minio minio123 && 
+           mc mb myminio/warehouse --ignore-existing"
+    networks:
+      - nessie-network
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: nessie
+      POSTGRES_PASSWORD: nessie
+      POSTGRES_DB: nessie_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/data
+    networks:
+      - nessie-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nessie"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+volumes:
+  minio-data:
+  postgres-data:
+
+networks:
+  nessie-network:
+    driver: bridge
+```
+
+2. Start the services:
+
+```bash
+docker-compose up -d
+```
+
+#### Nessie Catalog Configuration in OLake
+To make OLake use Nessie as the catalog, you'll need to point OLake to the REST endpoint provided by Nessie (`http://host.docker.interanl:19120/iceberg/`), and configure it to write data to MinIO under the warehouse bucket.
+
+**Example: `writer.json`**
+Save the following config as `writer.json` or your equivalent config file:
+
+```json
+{
+  "type": "ICEBERG",
+  "catalog": "rest",
+  "writer": {
+    "catalog_type": "rest",
+      "rest_catalog_url": "http://host.docker.interanl:19120/iceberg/",
+      "iceberg_s3_path": "s3://warehouse/",
+      "iceberg_db": "iceberg_db",
+      "s3_endpoint": "http://host.docker.internal:9000",
+      "aws_access_key": "minio",
+      "aws_secret_key": "minio123",
+      "aws_region": "us-east-1",
+      "no_identifier_fields": true
+  }
+}
+```
 
 ### Using Polaris
 
