@@ -6,24 +6,22 @@ sidebar_position: 1
 
 # Aurora MySQL CDC Setup Guide
 
-Amazon Aurora MySQL (MySQL-compatible edition of Aurora) can be configured for CDC by enabling MySQL binary logging. Aurora MySQL does not have binary logging enabled by default for write scaling (unless read replicas are in use). To capture data changes, you must turn on binary logging with the appropriate format.
-
 **Prerequisites:**
 
 - An Amazon Aurora MySQL cluster (with a writer endpoint and password). Ensure the engine is MySQL (5.7 or MySQL 8.0 compatible).
 - A custom **Cluster Parameter Group** for the Aurora cluster (since binlog settings are cluster-wide).
 - Ability to reboot the Aurora cluster's writer instance to apply static parameter changes.
-- The cluster should have **Backups enabled** (Aurora usually has continuous backups by default). This is important because binlog retention in Aurora is tied to backup retention; also we will set a retention via an RDS procedure.
+- The cluster should have **Backups enabled** (Aurora usually has continuous backups by default). This is important because binlog retention in Aurora is tied to backup retention.
 
 :::caution
 With MySQL 8.0.34, MySQL deprecated the `binlog_format` parameter. Read more [here.](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_LogAccess.MySQL.BinaryFormat.html)
 :::
 
-### Enable Binary Logging and Row Format 
+## Enable Binary Logging and Row Format 
 
 In the AWS RDS console, go to *Parameter Groups* and create a new **Cluster Parameter Group** for your Aurora MySQL cluster (choose the appropriate Aurora MySQL family, e.g., aurora-mysql5.7 or aurora-mysql8.0). 
 
-![mysql-aurora-pg-1](/img/docs/cdc/mysql/mysql-aurora-pg-1.png)
+![mysql-aurora-pg-1](/static/img/docs/cdc/mysql/mysql-aurora-pg-1.png)
 
 Edit the cluster parameter group:
    - Set `binlog_format = ROW`. 
@@ -38,36 +36,30 @@ Edit the cluster parameter group:
       
       The `binlog_row_metadata` option was introduced in MySQL `v8.0` and is not available in MySQL `v5.7`. This option controls the level of table metadata included in the binary log. In MySQL `v5.7`, the metadata level is fixed and cannot be adjusted using a separate variable.
 
-   - Ensure `log_bin` is effectively enabled. 
-   
-      Aurora doesn't have an explicit `log_bin` parameter (it manages binlog internally). Setting `binlog_format` to any value other than OFF essentially enables `log_bin`. If there is a parameter `binlog_format = OFF` (which is possible to turn off binlog), we definitely want it ON (ROW).
-
-![mysql-aurora-pg-2](/img/docs/cdc/mysql/mysql-aurora-pg-2.png)
-
-:::info
-   - (Optional) If you plan to use Global Transaction Identifiers (GTIDs) for replication consistency, also set `gtid-mode = ON` and `enforce_gtid_consistency = ON`. This can help if you have failovers or want to use GTID position for CDC resume. Aurora MySQL v5.7/v8.0 do support GTID.
-:::
+![mysql-aurora-pg-2](/static/img/docs/cdc/mysql/mysql-aurora-pg-2.png)
 
    - Save the parameter group changes.
 
-
-![mysql-aurora-pg-3](/img/docs/cdc/mysql/mysql-aurora-pg-3.png)
+![mysql-aurora-pg-3](/static/img/docs/cdc/mysql/mysql-aurora-pg-3.png)
 
 
 ## Associate this new cluster parameter group with your Aurora cluster
-In the RDS console, modify the Aurora cluster to use the new cluster parameter group. Also ensure the instance parameter group (if separate) does not override these settings (Aurora MySQL’s `binlog_format` is cluster-level).
+In the RDS console, modify the Aurora cluster to use the new cluster parameter group.
+   - Select the DB cluster to modify.
+   - Choose Modify. The Modify DB cluster page appears.
+   - Change the DB cluster parameter group setting.
+   - Choose Continue and check the summary of modifications.
+   - On the confirmation page, review your changes. If they are correct, choose Modify cluster to save your changes.
 
-
-
-### Reboot the Writer Instance:
-Because `binlog_format` is static for the cluster, reboot the Aurora cluster’s primary instance (writer). After reboot, the binary log will start recording transactions. Verify the settings on the Aurora MySQL instance:
+## Reboot the Writer Instance:
+Because `binlog_format` is static property for the cluster, reboot the Aurora cluster’s primary instance (writer). After reboot, the binary log will start recording transactions. Verify the settings on the Aurora MySQL instance:
    ```sql
    SHOW VARIABLES LIKE 'binlog_format';
    SHOW VARIABLES LIKE 'binlog_row_image';
    ```
    They should show `ROW` and `FULL` respectively. You can also check `SHOW VARIABLES LIKE 'log_bin';` which should be "ON".
 
-### Increase Binlog Retention Period:
+## Increase Binlog Retention Period (Optional):
 By default, Aurora MySQL has a “lazy” binlog purge policy – it might keep around 24 hours of binlogs, or purge after a snapshot. To prevent losing changes if the CDC process lags or is down, set a longer retention. AWS provides an RDS procedure for Aurora MySQL:
    ```sql
    CALL mysql.rds_set_configuration('binlog retention hours', 168);
@@ -84,65 +76,28 @@ By default, Aurora MySQL has a “lazy” binlog purge policy – it might keep 
 The cluster’s storage will grow with retained binlogs – monitor free space. Aurora usually has lots of IO capacity, but storage isn’t infinite. 7 days of binlogs for a busy system could be large.
 :::
 
-![mysql-aurora-pg-4](/img/docs/cdc/mysql/mysql-aurora-pg-4.png)
+![mysql-aurora-pg-4](/static/img/docs/cdc/mysql/mysql-aurora-pg-4.png)
 
-### Create a CDC (Replication) User: 
+## Create a CDC (Replication) User: 
 
 It’s best not to use the master user for CDC. Create a dedicated user with replication privileges:
    ```sql
    CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'strongpassword';
    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
    GRANT SELECT ON *.* TO 'cdc_user'@'%';
-   ```
-   - The `REPLICATION SLAVE` privilege allows the user to connect and fetch the binlog (even though this is Aurora, the privilege is named after MySQL’s replication).
-   - `REPLICATION CLIENT` allows the user to see the master status and binlog events.
-   - `SELECT ON *.*` is added to get snapshot data from tables or perform any selects (OLake will do an initial snapshot by default, hence read access is required).
-   - (optional) In Aurora (and MySQL in general), you might also consider `SHOW VIEW` if your tables include views and the CDC needs them, and possibly `LOCK TABLES` . For example, to be safe, you could do: 
-     ```sql
-     GRANT LOCK TABLES, RELOAD ON *.* TO 'cdc_user'@'%';
-     ```
-
-   - Flush privileges: `FLUSH PRIVILEGES;`.
-
-   Ensure `'%'` host or the specific host of your CDC server is allowed in the user definition. `'%'` is convenient for broad access (it means the user can connect from anywhere, assuming security group allows). If you want tighter security, specify the exact host or IP.
-
-5. **Verify Binary Log is Active:** On the Aurora cluster, run:
-   ```sql
-   SHOW BINARY LOGS;
-   ```
-   You should see a list of binlog files (e.g., `mysql-bin-changelog.000001`, etc.) with file sizes. If you get an error **"you are not using binary logging"**, then binary logging is not yet active – double-check steps 1–2 (perhaps the parameter group didn’t apply or the reboot hasn’t occurred).
-
-   Also check:
-   ```sql
-   SHOW MASTER STATUS;
+   FLUSH PRIVILEGES;
    ```
 
-   If you are on v8.4, use `SHOW BINARY LOG STATUS;` instead.
-
-   This will show the current binlog file and position on the writer. This confirms that the binlog is tracking transactions.
-
-   To further test, you can create a test table and insert a row:
-   ```sql
-   CREATE TABLE test_cdc (id INT PRIMARY KEY, val VARCHAR(100));
-   INSERT INTO test_cdc VALUES (1, 'test');
-   SHOW BINLOG EVENTS IN 'mysql-bin-changelog.000001' LIMIT 5;
-   ```
-   The `SHOW BINLOG EVENTS` should display some events including the insertion (if the limit covers it). This is just to sanity check that the events are indeed being logged.
-
-6. **Connect to OLake:**
+## Connect to OLake:
    - Use the **writer endpoint** of the Aurora cluster (Aurora’s cluster endpoint for writes). Do not use a reader endpoint for CDC, because read replicas in Aurora **do not have the full binlog** accessible; the binlog is generated on the writer and that’s where CDC must connect.
    - Connection details: host, port (3306, unless changed), user = `cdc_user`, password.
-   - OLake will connect and perform an initial snapshot and then start reading the binlog. Because we set `binlog_format=ROW` and `binlog_row_image=FULL`, the changes will be captured completely. 
-   
-   {/* - If the connector supports GTID and you enabled GTID, you can configure it to use GTID for positioning*/}
+   - OLake will connect and perform an initial snapshot and then start reading the binlog. Because we set `binlog_format=ROW` and `binlog_row_image=FULL`, the changes will be captured completely.
 
-   At startup, the connector might execute a `SHOW MASTER STATUS` to get the current binlog coordinates, and then stream from there or from the beginning of available logs depending on configuration.
-
-**Troubleshooting:**
+## Troubleshooting:
 
 - **No Binlog Files / “Not using binary logging”:** If `SHOW BINARY LOGS` returns empty or an error that binary logging is off, revisit the parameter group. Aurora MySQL requires a **cluster parameter group** change (instance-level param group won’t control binlog_format in Aurora; it must be cluster-level). Also ensure the cluster parameter group family is correct (Aurora MySQL 5.7 vs 8.0). After setting, you *must* reboot the cluster’s writer node.
 
-- **Binlog_format remains MIXED:** Some Aurora MySQL versions default to MIXED. If after reboot you still see `binlog_format = MIXED`, it could be that the parameter group wasn’t applied or a conflicting parameter was set. Make sure no parameter sets it to MIXED in either cluster or instance param group. Set it explicitly to ROW in the cluster param group and reboot.
+- **Binlog_format remains MIXED:** Some Aurora MySQL versions default to MIXED. If after reboot you still see `binlog_format = MIXED`, it could be that the Cluster Parameter Group wasn’t applied. Make sure no parameter sets it to MIXED in either cluster or instance param group. Set it explicitly to ROW in the cluster param group and reboot.
 
 - **Binlog retention not honored:** If you find that binlogs are getting purged sooner than expected:
   - Confirm that automated backups are enabled. Aurora usually has continuous backup, but if someone disabled it or set retention to 0, the system might purge binlogs aggressively. AWS DMS documentation notes that enabling backups is necessary for CDC on RDS because the binary logs are retained between snapshots only when backups are on.
@@ -162,8 +117,6 @@ It’s best not to use the master user for CDC. Create a dedicated user with rep
 - **Performance impact:** After enabling binlog, you might notice write throughput slightly impacted (higher IO, maybe a bit higher commit latency). This is expected. Aurora is quite performant, but monitor the **Write IOPS** and **ReplicationLag** (even though no external replica, Aurora uses this internally too). Usually it’s fine, but if you see a big impact, consider instance class upgrade or ensure heavy batch jobs are not generating gigantic binlogs that saturate disk.
 
 - **Failover handling:** If the Aurora cluster fails over to a replica (Aurora multi-AZ or multi-node will elect a new writer if the primary fails), your CDC connector will disconnect (since the writer endpoint now points to a new node). It should reconnect automatically to the cluster endpoint which will now route to the new writer. The binary log file name on the new writer will be different (Aurora will promote a read replica which has its own binlog series). 
-
-{/* If you have **GTID enabled**, this makes it seamless for the connector to continue via GTID position.  */}
 
 - **Monitoring:** Use CloudWatch metrics:
   - **BinLogDiskUsage** (RDS/Aurora metric) – how much space the retained binlogs use. This corresponds to our retention setting. If this grows near to the instance storage, consider reducing retention or ensure your CDC is catching up.
