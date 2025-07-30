@@ -78,7 +78,7 @@ import RESTIcebergWriterUIConfigDetails from '../../../docs/shared/config/RESTIc
 import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWriterConfig.mdx'
 import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
 import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIcebergWriterUIConfigDetails.mdx'
-import HiveIcebergWriterGCPConfig from '../../../docs/shared/config/HiveIcebergWriterGCPConfig.mdx'
+import HiveIcebergWriterGCP from '../../../docs/shared/HiveIcebergWriterGCP.mdx'
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
@@ -183,7 +183,7 @@ const MDXComponents = {
   HiveIcebergWriterConfig,
   HiveIcebergWriterConfigDetails,
   HiveIcebergWriterUIConfigDetails,
-  HiveIcebergWriterGCPConfig,
+  HiveIcebergWriterGCP,
 
   AdditionalReferences,
   CatalogQuery,
