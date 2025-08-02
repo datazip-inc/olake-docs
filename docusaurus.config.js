@@ -93,6 +93,10 @@ const config = {
 
   scripts: [
     {
+      src: '/suppress-resize-observer.js', // Suppress ResizeObserver warnings
+      defer: true,
+    },
+    {
       id: "runllm-widget-script",
       type: "module",
       src: "https://widget.runllm.com",
