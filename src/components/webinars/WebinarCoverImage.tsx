@@ -12,7 +12,6 @@ const WebinarCoverImage: React.FC<WebinarHeroProps> = ({ src, alt }) => {
       <Image
         img={src}
         alt={alt}
-        priority
         className="w-full h-full"
       />
     </div>

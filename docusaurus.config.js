@@ -47,18 +47,19 @@ const config = {
       'classic',
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
-        docs: {
-          routeBasePath: '/docs',
-          sidebarPath: './sidebars.js',
-          showLastUpdateAuthor: true,
-          showLastUpdateTime: true,
-          rehypePlugins: [imageFetchPriorityRehypePlugin],
+        docs: false,
+        // {
+        //   routeBasePath: '/docs',
+        //   sidebarPath: './sidebars.js',
+        //   showLastUpdateAuthor: true,
+        //   showLastUpdateTime: true,
+        //   rehypePlugins: [imageFetchPriorityRehypePlugin],
 
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/datazip-inc/olake-docs/tree/master/',
-        },
+        //   // Please change this to your repo.
+        //   // Remove this to remove the "edit this page" links.
+        //   editUrl:
+        //     'https://github.com/datazip-inc/olake-docs/tree/master/',
+        // },
 
         theme: {
           customCss: './src/css/custom.css',
@@ -150,10 +151,62 @@ const config = {
           // },
 
 
-          { to: '/docs', label: 'Docs', position: 'left' },
+          { to: '/docs', label: 'Docs', position: 'right' },
           { to: '/iceberg', label: 'Iceberg', position: 'right' },
+          { to: '/ai-lake', label: 'AILake', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
-          { to: '/webinar', label: 'Webinars & Events', position: 'right' },
+          // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
+
+          {
+            // Dropdown menu in the navbar for "Learn" section
+            type: "dropdown",
+            position: "right",
+            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
+            label: "Resources",
+            items: [
+              {
+                label: "Query Engine",
+                // type: 'link',
+                href: `/iceberg/query-engine`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+
+            ],
+          },
+
+          {
+            // Dropdown menu in the navbar for "Learn" section
+            type: "dropdown",
+            position: "right",
+            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
+            label: "Community",
+            items: [
+              {
+                label: "Webinars & Events",
+                // type: 'link',
+                href: `/webinar`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+              {
+                label: "OLake Community",
+                // type: 'link',
+                href: `/community`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+              {
+                label: "Top Contributors",
+                // type: 'link',
+                href: `/community/contributors`,
+                // activeBaseRegex: 'docs/zenith',
+              },
+              {
+                label: "Contributor's Program",
+                // type: 'link',
+                href: `/community/contributor-program`,
+                // activeBaseRegex: 'docs/catena',
+              },
+            ],
+          },
 
           // {
           //   type: 'html',
@@ -230,16 +283,8 @@ const config = {
         },
       ],
 
-      announcementBar: {
-        content:
-          'Support us by giving us a ⭐️ on <a target="_blank" rel="noopener noreferrer" href="https://github.com/datazip-inc/olake">GitHub</a>! ',
-        backgroundColor: 'white',
-        textColor: 'black',
-        isCloseable: true,
-      },
-
       colorMode: {
-        defaultMode: "dark",
+        defaultMode: "light", // dark or light
         disableSwitch: false,
         respectPrefersColorScheme: false,
       },
@@ -291,114 +336,119 @@ const config = {
         //   //... other Algolia params
       },
 
-      footer: {
-        style: 'dark',
-        links: [
-          {
-            title: 'Socials',
-            items: [
-              {
-                label: 'LinkedIn',
-                href: 'https://www.linkedin.com/company/datazipio',
-              },
-              {
-                label: 'X (Twitter)',
-                href: 'https://x.com/_olake',
-              },
-              {
-                label: 'YouTube',
-                href: 'https://www.youtube.com/@olakeio',
-              },
-              {
-                label: 'Slack Community',
-                href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
-              },
-              {
-                label: 'Instagram',
-                href: 'https://instagram.com/olake_io',
-              },
-            ],
-          },
-          {
-            title: 'Resources',
-            items: [
-              {
-                label: 'Docs',
-                to: '/docs',
-              },
-              {
-                label: 'Blogs',
-                to: '/blog',
-              },
-              {
-                label: 'Search',
-                to: '/search',
-              },
-              {
-                label: 'Slack Archive',
-                href: 'https://meetwaves.com/library/olake',
-              },
-            ],
-          },
-          {
-            title: 'Top Reads',
-            items: [
-              {
-                label: 'Issues with Debezium ',
-                to: '/blog/issues-debezium-kafka',
-              },
-              {
-                label: 'OLake Architecture',
-                to: '/blog/olake-architecture',
-              },
-            ],
-          },
-          {
-            title: 'Company',
-            items: [
-              {
-                label: 'About us',
-                to: '/about-us',
-              },
-              {
-                label: 'Contact us',
-                to: '/contact',
-              },
-              {
-                label: 'Branding',
-                to: '/branding',
-              },
-              {
-                label: 'Terms of Use',
-                href: 'https://datazip.io/terms-of-use',
-              },
-              {
-                label: 'Privacy (Visitors)',
-                href: 'https://datazip.io/privacy-policy',
-              },
-              {
-                label: 'Privacy (Customers)',
-                href: 'https://datazip.io/privacy-policy-customer',
-              },
-            ],
-          },
-        ],
-        // logo: {
-        //   alt: 'name',
-        //   src: 'img/logo-blue.svg',
-        //   srcDark: 'img/logo-white.svg',
-        //   width: 200,
-        // },
-        copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
-      },
-      prism: {
-        theme: prismThemes.github,
-        darkTheme: prismThemes.dracula,
-        additionalLanguages: ['java', 'bash', 'yaml', 'regex', 'mongodb', 'docker'],
+      // footer: {
+      //   style: 'dark',
+      //   links: [
+      //     {
+      //       title: 'Socials',
+      //       items: [
+      //         {
+      //           label: 'LinkedIn',
+      //           href: 'https://www.linkedin.com/company/datazipio',
+      //         },
+      //         {
+      //           label: 'X (Twitter)',
+      //           href: 'https://x.com/_olake',
+      //         },
+      //         {
+      //           label: 'YouTube',
+      //           href: 'https://www.youtube.com/@olakeio',
+      //         },
+      //         {
+      //           label: 'Slack Community',
+      //           href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+      //         },
+      //         {
+      //           label: 'Instagram',
+      //           href: 'https://instagram.com/olake_io',
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       title: 'Resources',
+      //       items: [
+      //         {
+      //           label: 'Docs',
+      //           to: '/docs',
+      //         },
+      //         {
+      //           label: 'Blogs',
+      //           to: '/blog',
+      //         },
+      //         {
+      //           label: 'Search',
+      //           to: '/search',
+      //         },
+      //         {
+      //           label: 'Slack Archive',
+      //           href: 'https://meetwaves.com/library/olake',
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       title: 'Top Reads',
+      //       items: [
+      //         {
+      //           label: 'Issues with Debezium ',
+      //           to: '/blog/issues-debezium-kafka',
+      //         },
+      //         {
+      //           label: 'OLake Architecture',
+      //           to: '/blog/olake-architecture',
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       title: 'Company',
+      //       items: [
+      //         {
+      //           label: 'About us',
+      //           to: '/about-us',
+      //         },
+      //         {
+      //           label: 'Contact us',
+      //           to: '/contact',
+      //         },
+      //         {
+      //           label: 'Branding',
+      //           to: '/branding',
+      //         },
+      //         {
+      //           label: 'Terms of Use',
+      //           href: 'https://datazip.io/terms-of-use',
+      //         },
+      //         {
+      //           label: 'Privacy (Visitors)',
+      //           href: 'https://datazip.io/privacy-policy',
+      //         },
+      //         {
+      //           label: 'Privacy (Customers)',
+      //           href: 'https://datazip.io/privacy-policy-customer',
+      //         },
+      //       ],
+      //     },
+      //   ],
+      //   // logo: {
+      //   //   alt: 'name',
+      //   //   src: 'img/logo-blue.svg',
+      //   //   srcDark: 'img/logo-white.svg',
+      //   //   width: 200,
+      //   // },
+      //   copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
+      // },
+      // prism: {
+      //   theme: prismThemes.github,
+      //   darkTheme: prismThemes.dracula,
+      //   additionalLanguages: ['java', 'bash', 'yaml', 'regex', 'mongodb', 'docker'],
 
-      },
+      // },
     }),
   // satisfies Preset.ThemeConfig,
+
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
 
   // themes: [
   //   [
@@ -421,7 +471,11 @@ const config = {
     'plugin-image-zoom',
     // 'docusaurus-plugin-sass',
     // tailwindPlugin,
-    ['./src/plugins/tailwind-config.js', {}],
+
+    [
+      './src/plugins/tailwind-config.js', {}
+    ],
+
     [
       'ideal-image',
       /** @type {import('@docusaurus/plugin-ideal-image').PluginOptions} */
@@ -434,14 +488,42 @@ const config = {
         disableInDev: true
       })
     ],
+
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'main-docs',             // must be unique
+        path: 'docs',                // folder on disk
+        routeBasePath: 'docs',       // URL => /docs/…
+        sidebarPath: require.resolve('./sidebars.js'),
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
+      },
+    ],
+
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'iceberg-query-engine',
+        path: 'docs-iceberg-query-engine',      // new folder on disk
+        routeBasePath: 'iceberg/query-engine',  // final URL → /iceberg/query-engine/*
+        sidebarPath: require.resolve('./sidebarsIcebergQE.js'),
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/docs-iceberg-query-engine/',
+      },
+    ],
+
     [
       './src/plugins/blog-plugin',
       {
         path: 'blog',
         id: 'olake-blog',
         editLocalizedFiles: false,
-        blogTitle: 'Blog',
-        blogDescription: 'Blogs on Database CDC, Debezium, CDC strategies, JSON Flattening ...',
+        blogTitle: 'Blogs on OLake',
+        blogDescription: '',
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'List blog',
         routeBasePath: 'blog',
@@ -458,12 +540,13 @@ const config = {
         onUntruncatedBlogPosts: 'ignore',
         // Remove this to remove the "edit this page" links.
         editUrl:
-          'https://github.com/datazip-inc/olake/tree/master/',
+          'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
         rehypePlugins: [imageFetchPriorityRehypePlugin],
 
       }
     ],
+
     [
       './src/plugins/blog-plugin',
       {
@@ -471,7 +554,7 @@ const config = {
         id: 'iceberg-blog',
         editLocalizedFiles: false,
         blogTitle: 'Blogs on Apache Iceberg',
-        blogDescription: 'Blogs on everything related to Apache Iceberg',
+        blogDescription: '',
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'List Iceberg blog',
         routeBasePath: 'iceberg',
@@ -488,7 +571,7 @@ const config = {
         onUntruncatedBlogPosts: 'ignore',
         // Remove this to remove the "edit this page" links.
         editUrl:
-          'https://github.com/datazip-inc/olake/tree/master/',
+          'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
         rehypePlugins: [imageFetchPriorityRehypePlugin],
 
@@ -563,7 +646,7 @@ const config = {
             from: '/img/blog/2024/11/issues-debezium-kafka-cover.webp',
           },
           {
-            to: '/docs/writers/s3/config',
+            to: '/docs/writers/parquet/config',
             from: '/docs/configs/s3',
           },
           {
@@ -577,10 +660,6 @@ const config = {
           {
             to: '/',
             from: '/docs/community/sheet',
-          },
-          {
-            to: '/docs/faqs',
-            from: '/docs/faqs/',
           },
           {
             to: '/docs/writers/iceberg/catalog/overview',
@@ -598,6 +677,260 @@ const config = {
             to: '/docs/connectors/mysql/setup/local',
             from: '/docs/connectors/mysql/docker-compose',
           },
+          {
+            to: '/docs/writers/iceberg/overview',
+            from: '/docs/category/apache-iceberg',
+          },
+          {
+            to: '/docs/connectors/mongodb/overview',
+            from: '/docs/category/mongodb',
+          },
+
+          {
+            to: '/docs/connectors/postgres/overview',
+            from: '/docs/category/postgres',
+          },
+
+          {
+            to: '/docs/connectors/mysql/overview',
+            from: '/docs/category/mysql',
+          },
+
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/getting-started',
+          },
+
+
+
+          // recent destination doc re-structuring redirects
+
+          {
+            to: '/docs/writers/iceberg/azure',
+            from: '/docs/writers/azure-adls/overview',
+          },
+
+          {
+            to: '/docs/writers/iceberg/gcs',
+            from: '/docs/writers/gcs/overview',
+          },
+
+          {
+            to: '/docs/writers/parquet/s3',
+            from: '/docs/writers/s3/overview',
+          },
+
+          {
+            to: '/docs/writers/parquet/config',
+            from: '/docs/writers/s3/config',
+          },
+
+          {
+            to: '/docs/writers/parquet/partitioning',
+            from: '/docs/writers/s3/partitioning',
+          },
+
+          {
+            to: '/docs/writers/parquet/local',
+            from: '/docs/writers/local',
+          },
+
+
+          // END
+
+          // START - 404 redirects
+
+          {
+            to: '/docs/core/architecture',
+            from: '/docs/category/understanding-olake',
+          },
+
+          {
+            to: '/docs/features/overview',
+            from: '/docs/category/features',
+          },
+
+          {
+            to: '/docs/core/configs/catalog',
+            from: '/docs/configs/catalog',
+          },
+          {
+            to: '/blog/tags',
+            from: '/blog/tags/nosql',
+          },
+          {
+            to: '/docs/connectors/mongodb/config',
+            from: '/docs/connectors/mongodb/catalog',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/connectors/intro',
+          },
+
+          {
+            to: '/iceberg/paimon-vs-iceberg',
+            from: '/blog/paimon-vs-iceberg',
+          },
+          {
+            to: '/docs/writers/parquet/s3',
+            from: '/docs/category/aws-s3',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/olake/drivers',
+          },
+          {
+            to: '/docs/connectors/mongodb/overview',
+            from: '/docs/olake/drivers/mongodb-poc',
+          },
+          {
+            to: '/docs/connectors/mongodb/overview',
+            from: '/docs/olake/mongodb/colake-connectors-for-olake',
+          },
+          {
+            to: '/docs/core/configs/catalog',
+            from: '/core/configs/catalog',
+          },
+          {
+            to: '/docs/core/configs/source',
+            from: '/core/configs/source',
+          },
+          {
+            to: '/docs/core/configs/state',
+            from: '/core/configs/state',
+          },
+          {
+            to: '/docs/core/configs/writer',
+            from: '/core/configs/writer',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/overview',
+            from: '/docs/category/catalogs',
+          },
+          {
+            to: '/community',
+            from: '/docs/category/community',
+          },
+          {
+            to: '/docs/core/configs/source',
+            from: '/docs/category/configurations',
+          },
+          {
+            to: '/docs/community/contributing',
+            from: '/docs/category/contributing',
+          },
+          {
+            to: '/docs/core/architecture',
+            from: '/docs/category/core',
+          },
+          {
+            to: '/docs/writers/overview',
+            from: '/docs/category/destinations-writers',
+          },
+          {
+            to: '/docs/install/setup',
+            from: '/docs/category/install',
+          },
+          {
+            to: '/docs/resources/olake-terminologies',
+            from: '/docs/category/resources',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/setup',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/setup-1',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/category/setup-2',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/category/sources',
+          },
+          {
+            to: '/docs/connectors/overview',
+            from: '/docs/category/sources-connectors',
+          },
+          {
+            to: '/docs/writers/overview',
+            from: '/docs/category/writers-destinations',
+          },
+          {
+            to: '/docs/core/configs/source',
+            from: '/docs/configs/source',
+          },
+          {
+            to: '/docs/core/configs/state',
+            from: '/docs/configs/state',
+          },
+          {
+            to: '/docs/core/configs/writer',
+            from: '/docs/configs/writer',
+          },
+          {
+            to: '/docs/connectors/mongodb/config',
+            from: '/docs/connectors/mongodb/state',
+          },
+          {
+            to: '/docs/release/overview',
+            from: '/docs/release-notes',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/DockerDiscover',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/DockerSync',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/DockerSyncWithState',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/LocalDiscover',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/LocalSync',
+          },
+          {
+            to: '/docs',
+            from: '/shared/commands/LocalSyncWithState',
+          },
+          {
+            to: '/docs',
+            from: '/docs/troubleshooting',
+          },
+
+          {
+            to: '/docs/writers/iceberg/catalog/overview',
+            from: '/docs/writers/catalog/overview',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            from: '/docs/writers/getting-started/overview',
+          },
+          {
+            to: '/docs/writers/iceberg/overview',
+            from: '/docs/writers/iceberg/',
+          },
+          {
+            to: '/docs/writers/parquet/partitioning',
+            from: '/docs/writers/parquet/s3/partitioning',
+          },
+          {
+            to: '/docs/writers/parquet/s3',
+            from: '/docs/writers/s3/',
+          },
+
+          // END
+
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
             from: '/slack',

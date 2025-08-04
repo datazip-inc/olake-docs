@@ -23,6 +23,9 @@ import DockerDiscoverPostgres from '../../../docs/shared/commands/DockerDiscover
 import DockerSyncPostgres from '../../../docs/shared/commands/DockerSyncPostgres.mdx'
 import DockerSyncWithStatePostgres from '../../../docs/shared/commands/DockerSyncWithStatePostgres.mdx'
 
+import DockerDiscoverOracle from '../../../docs/shared/commands/DockerDiscoverOracle.mdx'
+import DockerSyncOracle from '../../../docs/shared/commands/DockerSyncOracle.mdx'
+
 import LocalDiscoverMongoDB from '../../../docs/shared/commands/LocalDiscoverMongoDB.mdx'
 import LocalSyncMongoDB from '../../../docs/shared/commands/LocalSyncMongoDB.mdx'
 import LocalSyncWithStateMongoDB from '../../../docs/shared/commands/LocalSyncWithStateMongoDB.mdx'
@@ -34,6 +37,9 @@ import LocalSyncWithStateMySQL from '../../../docs/shared/commands/LocalSyncWith
 import LocalDiscoverPostgres from '../../../docs/shared/commands/LocalDiscoverPostgres.mdx'
 import LocalSyncPostgres from '../../../docs/shared/commands/LocalSyncPostgres.mdx'
 import LocalSyncWithStatePostgres from '../../../docs/shared/commands/LocalSyncWithStatePostgres.mdx'
+
+import LocalDiscoverOracle from '../../../docs/shared/commands/LocalDiscoverOracle.mdx'
+import LocalSyncOracle from '../../../docs/shared/commands/LocalSyncOracle.mdx'
 
 import MongoDBSourceConfig from '../../../docs/shared/config/MongoDBSourceConfig.mdx'
 import MongoDBSourceConfigWithSRV from '../../../docs/shared/config/MongoDBSourceConfigWithSRV.mdx'
@@ -51,25 +57,49 @@ import PostgresSourceConfigDetails from '../../../docs/shared/config/PostgresSou
 import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig.mdx'
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
 
-import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
-import LocalParquetConfigDetails from '../../../docs/shared/config/LocalParquetConfigDetails.mdx'
+import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.mdx'
+import OracleSourceConfigDetails from '../../../docs/shared/config/OracleSourceConfigDetails.mdx'
 
+import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
+import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
+import S3ConfigUIDetails from '../../../docs/shared/config/S3ConfigUIDetails.mdx'
 
 import GlueIcebergWriterConfig from '../../../docs/shared/config/GlueIcebergWriterConfig.mdx'
 import MinioJDBCIcebergWriterConfigLocal from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocal.mdx'
 import GlueIcebergWriterConfigDetails from '../../../docs/shared/config/GlueIcebergWriterConfigDetails.mdx'
+import GlueIcebergWriterUIConfigDetails from '../../../docs/shared/config/GlueIcebergWriterUIConfigDetails.mdx'
 import MinioJDBCIcebergWriterConfigLocalDetails from '../../../docs/shared/config/MinioJDBCIcebergWriterConfigLocalDetails.mdx'
+import MinioJDBCIcebergWriterUIConfigLocalDetails from '../../../docs/shared/config/MinioJDBCIcebergWriterUIConfigLocalDetails.mdx'
 
 import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWriterConfig.mdx'
 import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
+import RESTIcebergWriterUIConfigDetails from '../../../docs/shared/config/RESTIcebergWriterUIConfigDetails.mdx'
 
 import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWriterConfig.mdx'
 import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
+import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIcebergWriterUIConfigDetails.mdx'
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed'
+import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
+
+import OLakeFeaturesTLDR from '../../../docs/shared/OLakeFeaturesTLDR.mdx'
+import SupportedSources from '../../../docs/shared/SupportedSources.mdx'
+import SupportedDestinations from '../../../docs/shared/SupportedDestinations.mdx'
+import SupportedIcebergCatalogs from '../../../docs/shared/SupportedIcebergCatalogs.mdx'
+
+import SelectedStreamsOnly from '../../../docs/shared/streams/SelectedStreamsOnly.mdx'
+import SelectedStreamsOnlyDetails from '../../../docs/shared/streams/SelectedStreamsOnlyDetails.mdx'
+import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
+import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
+import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
+
+import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
+import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
+
 
 const MDXComponents = {
   ...InitialComponents,
@@ -97,6 +127,9 @@ const MDXComponents = {
   DockerSyncPostgres,
   DockerSyncWithStatePostgres,
 
+  DockerDiscoverOracle,
+  DockerSyncOracle,
+
   LocalDiscoverMongoDB,
   LocalSyncMongoDB,
   LocalSyncWithStateMongoDB,
@@ -108,6 +141,9 @@ const MDXComponents = {
   LocalDiscoverPostgres,
   LocalSyncPostgres,
   LocalSyncWithStatePostgres,
+
+  LocalDiscoverOracle,
+  LocalSyncOracle,
 
   MongoDBSourceConfig,
   MongoDBSourceConfigWithSRV,
@@ -125,27 +161,48 @@ const MDXComponents = {
   PostgresStateConfig,
   PostgresStateConfigDetails,
 
+  OracleSourceConfig,
+  OracleSourceConfigDetails,
+
   S3Config,
   S3ConfigDetails,
-
+  S3ConfigUIDetails,
   LocalParquetConfig,
-  LocalParquetConfigDetails,
+  DockerParquetConfig,
 
   GlueIcebergWriterConfig,
   MinioJDBCIcebergWriterConfigLocal,
   GlueIcebergWriterConfigDetails,
+  GlueIcebergWriterUIConfigDetails,
   MinioJDBCIcebergWriterConfigLocalDetails,
+  MinioJDBCIcebergWriterUIConfigLocalDetails,
 
   RESTIcebergWriterConfig,
   RESTIcebergWriterConfigDetails,
+  RESTIcebergWriterUIConfigDetails,
 
   HiveIcebergWriterConfig,
   HiveIcebergWriterConfigDetails,
+  HiveIcebergWriterUIConfigDetails,
 
   AdditionalReferences,
   CatalogQuery,
-  
-  YouTubeEmbed
+  YouTubeEmbed,
+  IcebergQueryEngines,
+
+  OLakeFeaturesTLDR,
+  SupportedSources,
+  SupportedDestinations,
+  SupportedIcebergCatalogs,
+
+  SelectedStreamsOnly,
+  SelectedStreamsOnlyDetails,
+  StreamsFull,
+  StreamsOnly,
+  StreamsOnlyDetails,
+
+  OLakePathInfo,
+  StreamSelectionExample
 };
 
 export default MDXComponents;

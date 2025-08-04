@@ -5,8 +5,9 @@ import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarForm from '../../components/forms/WebinarForm';
 import Layout from '@theme/Layout';
-import React = require('react');
+import React from "react";
 import Hr from '../../components/Hr';
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
 const hosts = [
   {
@@ -63,16 +64,22 @@ const WebinarPage = () => {
             <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
           </div>
 
-          <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
             <WebinarForm
               source="w2-best-practices-iceberg"
               nexturl="w-2-best-practices-iceberg-confirmation"
             />
-          </div>
+          </div> */}
         </div>
 
         <Hr />
         <br />
+
+        <div className="flex justify-center mb-12">
+          <YouTubeEmbed videoId="8gnkqmrbGeY" className="max-w-6xl" />
+
+          {/* comming soon */}
+        </div>
 
         <WebinarOverview
           date="December 15, 2024"

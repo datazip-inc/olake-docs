@@ -35,7 +35,7 @@ const SlackChannels = [
       <div className='flex flex-col items-center justify-center space-y-6 text-center'>
         <div className=''> </div>
         <h1>Join the data engineering <span className='text-blue-500'>community</span>  on Slack</h1>
-        <h6 className='font-semibold text-[20px]'>Join over 20,000+ passionate data engineering practitioners like you.
+        <h6 className='font-semibold text-[20px]'>Join over 205+ passionate data engineering practitioners like you.
             Share ideas and get advice. Below are some popular channels. We can't wait to sea you out there!
         </h6>
         <div className="grid grid-cols-3 gap-4 mt-8">

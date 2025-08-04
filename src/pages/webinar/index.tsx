@@ -1,14 +1,22 @@
-import WebinarGrid from '../../components/webinars/WebinarGrid';
-
-import React = require('react');
+import React from "react";
 import Layout from '@theme/Layout';
-
-import { FaFileVideo, FaVideo } from 'react-icons/fa';
-// Define the webinar type directly here if not using a separate types file
+import WebinarGrid from '../../components/webinars/WebinarGrid';
+import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
 
 const WebinarsPage = () => {
-
   const communityMeets = [
+    {
+      title: 'OLake 6th Community Meetup',
+      subtitle: 'Join us ',
+      route: '/community/6th-community-meetup',
+      img: `/img/community/6th-community-meetup-cover.png`,
+      alt: 'OLake 6th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 April 2025',
+      icon: FaVideo
+    },
     {
       title: 'OLake 5th Community Meetup',
       subtitle: 'Join us ',
@@ -49,16 +57,88 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
+      subtitle: 'Introducing OLake v0.',
+      route: '/event/olake-v0-launch',
+      img: `/img/events/olake-v0-launch-cover.jpg`,
+      alt: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '26 June 2025',
+      // icon: FaVideo
+    },
+    {
+      title: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines]',
+      subtitle: 'This technical session examines real-world challenges and patterns in building distributed stream processing systems. We focus on scalability, fault tolerance, and latency trade-offs through a concrete case study, using specific frameworks like Apache Storm as supporting tools to illustrate production concepts',
+      route: '/webinar/w-8-distributed-stream-processing-in-practice',
+      img: `/img/webinars/w-8-distributed-stream-processing-in-practice-cover.jpg`,
+      alt: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '19 June 2025',
+      // icon: FaVideo
+    },
+     {
+      title: 'From Source to Presto: Developer Playground for Fast Analytics',
+      subtitle: 'This talk introduces a lightweight developer playground that demonstrates how to ingest change data from a transactional database (like Postgres or MySQL), register it via an open-source REST catalog (e.g., Polaris or LakeKeeper), and instantly make it queryable in Presto. The demo will walk through the setup, tools, and real-time experience of how quickly one can go from source data to interactive Presto queries using open standards and pluggable components. Ideal for developers and data engineers exploring modern lakehouse and federated query patterns',
+      route: '/event/prestocon-day-2025',
+      img: `/img/events/prestocon-day-2025-cover.jpg`,
+      alt: 'From Source to Presto: Developer Playground for Fast Analytics',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '17 June 2025',
+      // icon: FaVideo
+    },
+    {
+      title: 'Demystifying Lakehouse Architecture: From Theory to Practice',
+      subtitle: 'Join Akshat Mathur, Senior Software Engineer at Cloudera and Apache Hive contributor, as he delivers a comprehensive technical exploration of lakehouse architecture. This session will bridge theoretical concepts with practical implementation strategies based on Akshats extensive experience with Apache Iceberg and data platform optimization',
+      route: '/webinar/w-7-demystifying-lakehouse-architecture',
+      img: `/img/webinars/w-7-demystifying-lakehouse-architecture-cover.png`,
+      alt: 'Demystifying Lakehouse Architecture: From Theory to Practice',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '29 May 2025',
+      // icon: FaVideo
+    },
+    {
+      title: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
+      subtitle: 'Join Viktor Kessler, co-founder of Vakamo and former technical leader at MongoDB and Dremio, for an in-depth technical exploration of how Apache Iceberg is fundamentally transforming the data engineering landscape',
+      route: '/webinar/w-6-iceberg-lakehouse-architecture-lakekeeper',
+      img: `/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.png`,
+      alt: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '15 May 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'Women in Data: Building Technical Expertise and Career Pathways in Data Engineering',
+      subtitle: 'Join us for an in-depth technical discussion with six accomplished women data engineers who are architecting the backbone of modern data-driven organizations. This 60-minute session brings together specialists from healthcare, retail, cloud platforms, and enterprise data systems to share their technical approaches to solving complex data engineering challenges',
+      route: '/webinar/w-5-women-in-data-engineering',
+      img: `/img/webinars/w-5-women-in-data-engineering-cover.png`,
+      alt: 'Women in Data Engineering',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '30 April 2025',
+      icon: FaVideo
+    },
+    {
       title: 'Pratical Session on Apache Iceberg by Sachin Tripathi',
       subtitle: 'Join us on Friday, March 28th at 4 PM IST for a technical session on Apache Iceberg with Sachin Tripathi, Senior Data Engineer at EarnIn. The session will examine Icebergs ACID-like transaction model, time travel capabilities, schema evolution mechanisms, hidden partitioning system, and catalog architecture',
       route: '/webinar/w-4-pratical-session-on-apache-iceberg',
       img: `/img/webinars/w-4-pratical-session-on-apache-iceberg-cover.webp`,
       alt: 'Pratical Session on Apache Iceberg by Sachin Tripathi Webinar',
-      status: 'upcoming',
-      button: 'primary',
-      CTA: 'Register Now',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
       date: '28 March 2025',
-      // icon: FaVideo
+      icon: FaVideo
     },
     {
       title: 'CDC Unplugged - Modern Data Integration with Real World Insights',
@@ -115,22 +195,123 @@ const WebinarsPage = () => {
 
   return (
     <Layout
-      title='OLake Webinars'
-      description='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg and more'
+      title='OLake Events & Webinars'
+      description='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices'
     >
+      {/* Hero Section */}
+      <section className="relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-950/20 py-16 lg:py-24">
+        {/* Background decorative elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-32 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div className="relative container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-8">
+            {/* Main heading */}
+            <div className="space-y-4">
+              <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 rounded-full text-sm font-medium">
+                <FaBroadcastTower className="w-4 h-4 mr-2" />
+                Learn from Industry Experts
+              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-50 leading-tight">
+                <span className="block">Events &</span>
+                <span className="bg-gradient-to-r from-[#193ae6] via-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Webinars
+                </span>
+              </h1>
+              <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+                Join our community of data engineers and learn about the latest in Apache Iceberg, 
+                Change Data Capture, and modern data architecture practices
+              </p>
+            </div>
 
-      <div className="container items-center mx-auto py-12 px-12">
-        <h1 className="text-4xl font-bold mb-8">Community Meetups</h1>
-        <WebinarGrid webinars={communityMeets} />
-        <br />
-        <h1 className="text-4xl font-bold mb-8">Events & Webinars</h1>
-        <WebinarGrid webinars={webinars} />
+            {/* Stats Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 pt-8">
+              <div className="text-center">
+                <div className="flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-950/30 rounded-full mx-auto mb-4">
+                  <FaPlay className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">25+</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Technical Sessions</div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center w-16 h-16 bg-purple-100 dark:bg-purple-950/30 rounded-full mx-auto mb-4">
+                  <FaUsers className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">250+</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Community Members</div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-950/30 rounded-full mx-auto mb-4">
+                  <FaCalendarAlt className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">12+</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Months Running</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
+      {/* Main Content */}
+      <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
+        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+          
+          {/* Featured Events & Webinars Section */}
+          <section className="mb-20">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center px-4 py-2 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium mb-4">
+                <FaVideo className="w-4 h-4 mr-2" />
+                Technical Sessions
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Featured Events & Webinars
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                Deep dive into Apache Iceberg, CDC strategies, and modern data engineering practices 
+                with industry experts and practitioners
+              </p>
+            </div>
+            
+            <div className="relative">
+              {/* Background decoration */}
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-3xl -m-4"></div>
+              <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
+                <WebinarGrid webinars={webinars} />
+              </div>
+            </div>
+          </section>
+
+          {/* Community Meetups Section */}
+          <section className="mb-20">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center px-4 py-2 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium mb-4">
+                <FaUsers className="w-4 h-4 mr-2" />
+                Community Driven
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Community Meetups
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                Join our regular community meetups where we discuss real-world challenges, 
+                share experiences, and learn from each other
+              </p>
+            </div>
+            
+            <div className="relative">
+              {/* Background decoration */}
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-3xl -m-4"></div>
+              <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
+                <WebinarGrid webinars={communityMeets} />
+              </div>
+            </div>
+          </section>
+
+        </div>
       </div>
     </Layout>
-
   );
 };
 
-
-export default WebinarsPage;
+export default WebinarsPage;  

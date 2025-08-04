@@ -13,6 +13,18 @@ import {
 export const BlogPagination = ({ metadata }) => {
   const history = useHistory()
 
+  const getBasePath = () => {
+    const path = history.location.pathname
+    // Check if we're on /iceberg or /blog
+    if (path.includes('/iceberg')) {
+      return '/iceberg'
+    } else if (path.includes('/blog')) {
+      return '/blog'
+    }
+    // Default fallback
+    return '/blog'
+  }
+
   const handleParams = () => {
     const path = history.location.pathname
     const parts = path.split('/')
@@ -21,12 +33,16 @@ export const BlogPagination = ({ metadata }) => {
   }
 
   const page = handleParams()
+  const basePath = getBasePath()
+
 
   const handlePageChange = (value) => {
     if (value === page) {
       return
     }
-    const newPagePath = value === 1 ? '/blog' : `/blog/page/${value}`
+    // const newPagePath = value === 1 ? '/blog' : `/blog/page/${value}`
+    const newPagePath = value === 1 ? basePath : `${basePath}/page/${value}`
+
     history.push(newPagePath)
   }
 

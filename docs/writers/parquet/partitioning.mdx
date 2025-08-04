@@ -1,0 +1,284 @@
+---
+title: Data Partitioning
+description: AWS S3 Partitioning description
+sidebar_position: 3
+---
+
+# Data Partitioning
+
+OLake supports data partitioning when writing to S3. After the initial schema discovery, you can define a `partition_regex` within your `streams.json` file. This regex determines how data is partitioned into folders within your S3 bucket. Partitioning is defined on a per-stream (table or collection) basis.
+
+### Sample `streams.json` with Partitioning
+
+```json
+{
+  "selected_streams": {
+    "namespace": [
+      {
+        "stream_name": "table1",
+        "partition_regex": "/{column_name, default_value, granularity}",
+        "normalization": false,
+        "append_only": false,
+        "chunk_column": "",         //column name to be specified
+      },
+      {
+        "stream_name": "table2",
+        "partition_regex": "",
+        "normalization": false,
+        "append_only": false,
+        "chunk_column": "",         //column name to be specified
+      }
+    ]
+  },
+  "streams": [
+    {
+      "stream": {
+        "name": "table1",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    },
+    {
+      "stream": {
+        "name": "table2",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    }
+  ]
+}
+```
+
+:::info
+- The `partition_regex` is a stream-level property; you can define different patterns for each stream.  
+- For example, the following sample demonstrates partitioning for a namespace named `otter_db`:
+  ```json
+  {
+    "selected_streams": {
+      "otter_db": [
+        {
+          "stream_name": "stream_8",
+          "partition_regex": "{title,,}/{now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}/{latest_revision,,}",
+          "normalization": false,
+          "append_only": false,
+          "chunk_column": "",         //column name to be specified
+        },
+        {
+          "stream_name": "stream_0",
+          "partition_regex": "{now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}/{string_change_language,,}",
+          "normalization": false,
+          "append_only": false,
+          "chunk_column": "",         //column name to be specified
+        }
+      ]
+    }
+    // Additional configuration...
+  }
+  ```
+In this context, `title` and `latest_revision` are column names. The partition is dynamically generated based on the column values as well as the current date.
+:::
+
+When the partitioning is applied, the resulting S3 folder structure will include the database name and the table/collection name. For instance, if your table is named `table1` in a database called `test_db`, the generated path might look like:
+
+```text
+olake-s3-test/data-s3/test_db/table1/<value_of_the_partition_column1>/YYYY-MM-DD/<value_of_latest_version>
+```
+
+
+## Partition Regex Attributes
+
+You can partition data based on column values using the `partition_regex`. A typical partition pattern looks like:
+
+```json
+"partition_regex": "/{column_name, default_value, granularity}"
+```
+
+- **column_name:**  
+  *(Required)* The name of the column whose value will determine the partition folder. You can also use the `now()` function to represent the current date.
+- **default_value:**  
+  *(Optional)* If the column value is null or unparseable, a default value (prefixed with `default_`) will be used. Default value is a fallback value.
+- **granularity:**  
+  *(Optional)* For time-based columns, you can specify the granularity. Supported values include `HH` (hour), `DD` (day), `WW` (week), `MM` (month), and `YYYY` (year). `granularity` is not needed if the `column_name` is not a timestamp field and can be left empty.
+
+:::info
+1. Each segment enclosed between slashes (`/.../`) in the partition regex can include up to three parameters.
+2. You can define as many directory path partitions as you wish to.
+3. Path name other than english are also supported (as long as they are `STRING` values).
+:::
+
+
+## Supported Regex Patterns
+
+The partition regex supports several patterns to handle both column values and timestamps. Below is a summary of the supported patterns:
+
+| **Pattern**  | **Description**| **Example**|
+|-------------|------------------|---------------------|
+| `now()`                          | Uses the current local timestamp to extract date components such as day (DD), month (MM), or year (YYYY).                                                                           | –                            |
+| `default`                        | If a specified column does not exist, the value is treated as a constant string prefixed with `default_`.                                                                         | –                            |
+| `{col_name}`                     | Inserts the value of the specified column.                                                                                                                                       | –                            |
+| `{now(),2025,YYYY}`                | Extracts only the year part of the current timestamp.                                                                                                                            | `2025`                       |
+| `{now(),2025,MM}`                | Extracts only the month part of the current timestamp.                                                                                                                           | `1`, `12`                    |
+| `{now(),2025,DD}`                | Extracts only the day part of the current timestamp.                                                                                                                             | `1`, `31`                    |
+| `{now(),2025,YYYY}-{now(),06,MM}` | Combines year and month from the current timestamp.                                                                                                                              | `2025-02`                    |
+| `{now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}` | Combines year, month, and day from the current timestamp.                                                                                                         | `2025-02-13`, `2025-12-31`     |
+
+**Usage Examples:**
+
+- **Correct:** ✅
+  - `"partition_regex": "/{title,,}/{now(),2025,DD}/{latest_version,,}"`
+  - `"partition_regex": "{title,,}/{now(),2025,DD}/{latest_version,,}"`
+
+- **Incorrect:** ❌
+  - `"partition_regex": "{title},,}/{now(),2025,DD}/{latest_version,,}"`  
+    *(Note the misplaced comma and bracket.)*
+
+
+### Default value vs Parsed value
+
+![Default value vs Parsed value](/img/docs/s3/s3-default-vs-parsed.png)
+
+## Handling Special Characters in Column Values
+
+When data is converted to Parquet format, escape characters or special symbols (e.g., `\u0026` for `&`) are converted to their corresponding characters while constructing the folder name. However, if a column value contains the `/` character, it will be interpreted as a directory separator, thus creating additional nested folders.
+
+For example, consider a column named `title` with the value:
+
+```text
+Hi/my name is / priyansh
+```
+
+This value will generate a nested directory structure as shown below:
+
+```
+olake-s3-test
+└── data-s3
+    └── test_db
+        └── table1
+            └── Hi
+                └── my name is 
+                    └── priyansh
+                        └── 423878fsd87fsd78XXXXXX.parquet
+```
+:::note
+If you intend the entire value to be treated as a single folder name, ensure that the data does not include the `/` character or consider sanitizing your column values before ingestion.
+:::
+
+
+## Supported Timestamp Formats for Partitioning
+
+OLake attempts to parse a wide range of timestamp formats when generating partition folders. The following formats are currently supported:
+
+```text
+"2006-01-02",
+"2006-01-02 15:04:05",
+"2006-01-02 15:04:05 -07:00",
+"2006-01-02 15:04:05-07:00",
+"2006-01-02T15:04:05",
+"2006-01-02T15:04:05.000000",
+"2006-01-02T15:04:05.999999999Z07:00",
+"2006-01-02T15:04:05+0000",
+"2020-08-17T05:50:22.895Z",
+"2006-01-02 15:04:05.999999-07",
+"2006-01-02 15:04:05.999999+00"
+```
+
+For the latest updates or to add support for additional timestamp formats, please refer to the [implementation code](https://github.com/datazip-inc/olake/blob/master/utils/typeutils/reformat.go) or [create an issue](https://github.com/datazip-inc/olake/issues).
+
+
+For a column mname that is a timestamp, replace `now()` with the name of the column and specify which value you want to extract from the timestamp field.
+```json
+{
+    "selected_streams": {
+        "otter_db": [
+            {
+                "partition_regex": "{timestamp_column,2025,YYYY}-{timestamp_column,12,MM}-{timestamp_column,13,DD}",
+                "stream_name": "stream_0",
+                "normalization": false,
+                "append_only": false,
+                "chunk_column": "",         //column name to be specified
+            }
+        ]
+    },
+    "streams": [
+        ...
+}
+```
+
+### Key-Value Format Partitioning
+
+In addition to our dynamic timestamp-based partitioning, we also support key-value style partitioning—a format commonly used in the data engineering industry. This allows you to create directory structures that directly reflect attribute values from your data records. For example, you can have partitions that look like:
+
+```
+age=26/city=delhi/type=new
+```
+
+This is achieved by combining static text (like `age=`, `city=`, and `type=`) with dynamic column value extraction via the `partition_regex`. The general pattern we support is:
+
+```json
+"partition_regex": "/{column_name, default_value, granularity}"
+```
+
+To create key-value formatted partitions, you simply embed your column placeholders within the desired key format. For instance, you can configure your partitioning as follows:
+
+```json
+"partition_regex": "/age={age_column, default_age,}/city={city_column, default_city,}/type={type_column, default_type,}"
+```
+
+In this example:
+- `age={age_column, default_age,}` extracts the value from the column representing age. If the value is missing, it falls back to `default_age`.
+- `city={city_column, default_city,}` does the same for city.
+- `type={type_column, default_type,}` does the same for type.
+
+#### Examples
+
+1. **Partitioning with Mixed Static and Dynamic Text**
+
+   You can also mix static text with dynamic values to create clearer partition names. For example:
+
+   ```json
+   "partition_regex": "/age={age,unknown,}/location=city-{city,unknown,}/type={type,default,}"
+   ```
+
+   For a record like:
+   ```json
+   {
+     "age": "30",
+     "city": "mumbai",
+     "type": "existing"
+   }
+   ```
+   the path will be:
+   ```
+   s3://your_bucket/age=30/location=city-mumbai/type=existing/<filename>.parquet
+   ```
+
+2. **Composite Partitions Including Date**
+
+   It’s also possible to combine key-value pairs with date-based partitioning. For instance:
+
+   ```json
+   "partition_regex": "/dt={now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}/country={country,default_country,}/city={city,default_city,}"
+   ```
+
+   This would produce paths like:
+   ```
+   s3://your_bucket/dt=2025-02-18/country=USA/city=NewYork/<filename>.parquet
+   ```
+
+#### Common Patterns in the Industry
+
+- **Date-Based Partitions:**
+  - Format: `/dt={now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}`
+  - Use case: Simplifies range queries by maintaining ISO8601 date order.
+  
+- **Categorical Partitions:**
+  - Format: `/country={country,default_country,}/state={state,default_state,}`
+  - Use case: Effective for geo-segmentation and filtering data by regions.
+  
+- **Composite Attribute Partitions:**
+  - Format: `/age={age,default_age,}/city={city,default_city,}/type={type,default_type,}`
+  - Use case: Offers detailed segmentation based on multiple attributes, which can enhance query performance and improve data organization.
+
+:::note
+In the above examples, the third key is empty denoting its optional for column types that are non `TIMESTAMP` based.
+:::

@@ -54,6 +54,11 @@ function DocsInfo({ docsPluginId, ...props }) {
 
         {/* Right group: Issue buttons & Share button */}
         <div className="flex items-center space-x-4">
+
+          {/* Share Button */}
+          <div>
+            <ShareButton title={props.title} />
+          </div>
           {/* Open OLake Issue */}
           <a
             href={openOLakeIssueURL}
@@ -77,9 +82,9 @@ function DocsInfo({ docsPluginId, ...props }) {
           </a>
 
           {/* Share Button */}
-          <div>
+          {/* <div>
             <ShareButton title={props.title} />
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

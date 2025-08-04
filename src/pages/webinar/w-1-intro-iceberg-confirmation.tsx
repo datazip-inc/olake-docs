@@ -4,7 +4,7 @@ import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 import Layout from '@theme/Layout';
-import React = require('react');
+import React from "react";
 import Hr from '../../components/Hr';
 
 const hosts = [
@@ -57,7 +57,7 @@ const WebinarPage = () => {
         </section>
 
         <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="3TQgSfbTrn0" className="max-w-6xl" />
+          <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
         </section>
 
         <WebinarOverview

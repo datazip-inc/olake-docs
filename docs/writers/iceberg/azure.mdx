@@ -1,0 +1,134 @@
+---
+title: Azure
+description: OLake Azure ADLS writer description
+sidebar_position: 2
+---
+
+## Iceberg Lakehouse on Azure: A Step-by-Step Guide with OLake and Lakekeeper
+Running Iceberg on Azure usually means gluing together storage, catalogs, and data-loading scripts yourself. OLake does that for you: it streams database changes, writes Iceberg-compatible Parquet files directly to ADLS Gen2, and updates the catalog automatically. 
+
+The result is a query-ready Iceberg table on Azure with almost zero manual setup.   
+
+In this guide, we will demonstrate how OLake makes it easy to build a production-ready data pipeline on Azure. We will use OLake to orchestrate a best-in-class open-source stack: 
+
+* **Lakekeeper:** As our open-source Iceberg REST Catalog to manage table metadata.   
+* **Apache Iceberg:** As the open table format for reliability and performance.   
+* **Azure Data Lake Storage (ADLS) Gen2:** As the scalable storage layer for our data. 
+
+By following these steps, you will see firsthand how OLake can help you set up a fully functional pipeline, writing data into a query-ready Iceberg table on your Azure subscription with minimal friction.   
+
+## Architecture Overview
+Before we begin, it's important to understand how these components interact: 
+
+* **OLake (The Writer):** Connects to your source database, reads data, formats it into Parquet files, and writes those files directly to Azure ADLS Gen2.   
+* **Lakekeeper (The Catalog):** Manages the metadata for our Iceberg tables. OLake communicates with Lakekeeper's REST API to commit new data files and update table versions. It does **not** store the data itself.   
+* **Azure ADLS Gen2 (The Storage):** This is the durable, scalable storage layer in Azure where all the actual Iceberg data (Parquet files) will reside. 
+
+## Prerequisites
+To follow this guide, you will need: 
+
+* An active Azure subscription with permissions to create resources.   
+* Docker and Docker Compose installed on your local machine.   
+* Git for cloning the required repositories. 
+
+### Step 1: Prepare Azure Resources (via the Azure Portal)
+First, we need to set up the storage foundation and credentials on Azure. All these steps are performed in the Azure Portal. 
+
+1. **Create Service Principal:** Create a new **App Registration**. This will be our application's identity.   
+    **Name**: `Olake Warehouse (Development)`   
+    **Redirect URI**: Leave empty   
+
+    a. When the App Registration is created, select "**Manage**" -> "**Certificates & secrets**" and create a "**New client secret**". Note down the secrets "**Value**".   
+
+    b. In the "**Overview**" page of the "**App Registration**" note down the `Application (client) ID` and the `Directory (tenant) ID`. 
+
+{/* ![azure-adls-1](/img/docs/adls/azure-adls-1.png) */}
+
+<img src="/img/docs/adls/azure-adls-1.png" width={680}  alt="Lakekeeper Warehouse Configuration" />
+
+
+2. **Create Storage Account:** Create a new storage account with name "**olakehouse**". On the "Advanced" tab during creation, ensure you enable the **"Hierarchical namespace"** option to make it an ADLS Gen2 account.   
+      
+![azure-adls-2](/img/docs/adls/azure-adls-2.png)
+
+3. **Create Storage Container:** Inside your new storage account, create a container by heading over to "Data Storage" → "Containers" → "Add container". We will name it `warehouse-dev` for this guide.   
+      
+![azure-adls-3](/img/docs/adls/azure-adls-3.png)
+
+4. **Assign Permissions:** The Service Principal needs permission to manage data in the storage account. Navigate to your storage account's **Access Control (IAM)** page and add **two** separate role assignments for the Service Principal you just created:   
+    1. **Role 1:** Storage Blob Data Owner: This grants essential permissions to read, write, and delete data files, which Iceberg needs for managing table content.   
+    2. **Role 2:** Storage Blob Delegator: Allows the service principal to generate user delegation SAS tokens, a secure mechanism used by some libraries for granting temporary access. 
+
+    
+![azure-adls-4](/img/docs/adls/azure-adls-4.png)
+
+### Step 2: Set Up the Lakekeeper Environment
+Now, let's get the Lakekeeper REST Catalog running using its official Docker Compose setup. 
+
+1. **Get the Lakekeeper Docker Compose file:** Follow the instructions at the [Lakekeeper Getting Started Guide](https://docs.lakekeeper.io/getting-started/) to get their `docker-compose.yml` file. This will typically involve cloning their repository.   
+2. **Start Lakekeeper:** In the directory containing the Lakekeeper docker-compose.yml, run the following command:   
+   
+   ```sh
+   docker compose up -d   
+   ```
+
+   This will start the Lakekeeper REST catalog service and its required PostgreSQL backend. Lakekeeper's API will now be available on your local machine at `http://localhost:8181`. 
+
+### Step 3: Add the Azure Warehouse to Lakekeeper
+Before Olake can use Lakekeeper, we must configure Lakekeeper to be aware of our ADLS Gen2 storage. 
+
+1. **Access the Lakekeeper UI:** Open your browser and navigate to `http://localhost:8181`.   
+2. **Add a New Warehouse:** Find the section for adding a new storage profile or warehouse.   
+3. **Configure the ADLS Gen2 Profile:**   
+    * **Warehouse Name:** `olake_warehouse`   
+    * **Storage Type:** Select "Azure".   
+    * **Credential Type:** Select "Client Credentials".   
+    * **Client ID:** The `Application (client) ID` of the `Olake Warehouse (Development)` App Registration from Step 1.   
+    * **Client Secret:** The "Value" of the client secret that we noted down previously in Step 1.   
+    * **Tenant ID:** The `Directory (tenant) ID` from the Applications Overview page from Step 1.   
+    * **Account Name:** olakehouse   
+    * **Filesystem:** Name of the container previously created. In our example its `warehouse-dev`.   
+4. **Save the Warehouse Profile.** Lakekeeper is now connected to your Azure storage.   
+
+
+<img src="/img/docs/adls/azure-adls-5.png" width={630} alt="Lakekeeper Warehouse Configuration" />
+
+### Step 4: Set Up the OLake Environment
+Now, let's get the Olake UI running using its official Docker Compose setup. 
+
+1. **Get the OLake Docker Compose file:** Follow the instructions at the [OLake Getting Started](https://olake.io/docs/getting-started/olake-ui) to get the `docker-compose.yml` file.   
+2. **Start OLake:** Follow the steps from the docs and remember to modify the directory in `docker-compose.yml` where OLake's persistent data and configuration will be stored, once done, run the following command:   
+    
+    ```sh
+    docker compose up -d   
+    ```
+   
+   This will start the OLake UI along with Temporal and PostgreSQL services. OLake’s UI will now be available on your local machine at http://localhost:8000. 
+
+### Step 5: Configure the Iceberg Destination in the Olake UI
+With all services running, we will now connect Olake to Lakekeeper and Azure. 
+
+1. **Log in to Olake UI:** Open your browser and navigate to http://localhost:8000.   
+2. **Navigate to Destinations:** Go to the **Destinations** page and click **"Create Destination"**, then select **Apache Iceberg**.   
+3. **Fill in the Endpoint config:**   
+    * **Catalog Type**: `REST Catalog`   
+    * **REST Catalog URL**: `http://host.docker.internal:8181/catalog`   
+    * **Iceberg S3 Path**: `olake_warehouse`   
+    * **Iceberg Database**: `my_azure_db` (or any name you prefer).   
+    * **S3 Endpoint**: `https://olakehouse.dfs.core.windows.net`   
+    * **AWS Access Key**: Leave empty.   
+    * **AWS Secret Key**: Leave empty.   
+4. **Save and Test** the destination to ensure Olake can communicate with both Lakekeeper and Azure.   
+
+![azure-adls-6](/img/docs/adls/azure-adls-6.png)
+
+### Step 6: Create and Run a Sync Job
+You are now ready to replicate data! 
+
+1. **Set up a Job** by following this documentation [official documentation on creating jobs](https://olake.io/docs/jobs/create-jobs).   
+2. Under the **"Set up your destination"** select **"Use an existing destination"** and choose the destination you set up in Step 5. 
+
+## Conclusion
+Congratulations! You have successfully configured a complete, end-to-end pipeline to replicate data into a modern, open data lakehouse on Azure. This setup provides a powerful and scalable foundation for all your analytics and data science needs.   
+
+From here, you can connect powerful query engines like **Spark, Trino, or Dremio** to your Lakekeeper catalog to analyze your newly ingested data directly in the lakehouse.   

@@ -9,22 +9,28 @@ tags: [olake]
 
 ![olake-architecture-deep-dive-cover](/img/blog/cover/olake-architecture-deep-dive-cover.png)
 
-OLake is an open-source tool designed for efficiently replicating databases to data lakes in Open table formats like Apache Iceberg. It provides a high-performance, scalable solution for data ingestion, enabling real-time analytics by efficiently moving data from operational databases to analytical storage systems. With OLake, organizations can seamlessly bridge their operational databases with analytics platforms, unlocking deeper insights faster than traditional methods.In this blog post, we'll dive deep into OLake's architecture and explain how it works under the hood.
+OLake is an open-source tool designed for efficiently replicating databases to data lakes in Open table formats like Apache Iceberg. It provides a high-performance, scalable solution for data ingestion, enabling real-time analytics by efficiently moving data from operational databases to analytical storage systems. 
+
+With OLake, organizations can seamlessly bridge their operational databases with analytics platforms, unlocking deeper insights faster than traditional methods.
+
+In this blog post, we'll dive deep into OLake's architecture and explain how it works under the hood.
 
 
 ## The Problem OLake Solves
 
 Before diving into the architecture, let's understand the problem OLake addresses. Organizations often need to:
 
+1. Replicate data from operational databases ([MongoDB](https://olake.io/docs/connectors/mongodb/overview), [PostgreSQL](https://olake.io/docs/connectors/postgres/overview), [MySQL](https://olake.io/docs/connectors/mysql/overview)) to data Lakehouses ([Apache Iceberg](https://olake.io/docs/writers/iceberg/overview)), with supoort of sources like AWS S3 and Kafka comming soon.
+2. Supports backfills (full data refreshes) and real-time change data capture (CDC).
+3. Handle schema evolution and type conversions as Apache Iceberg supports. Read more about it [here](https://olake.io/docs/features/schema).
+4. The architecture is designed to scale efficiently with large datasets.
+5. Maintain data consistency and data partitioning ([AWS S3 Partitioning](https://olake.io/docs/writers/parquet/partitioning) and [Iceberg Partitioning](https://olake.io/docs/writers/iceberg/partitioning)) 
 
+Traditional ETL tools often struggle with these requirements, especially when dealing with real-time data changes and large volumes. They typically introduce latency, schema compatibility issues, and scalability challenges. 
 
-1. Replicate data from operational databases (MongoDB, PostgreSQL, MySQL) to data lakehouses
-2. Supports backfills (full data refreshes) and real-time change data capture (CDC)
-3. Handle schema evolution and type conversions as Apache Iceberg supports *(Upcoming)* 
-4. The architecture is designed to scale efficiently with large datasets
-5. Maintain data consistency and data partitioning (Iceberg style partitioning) *(Coming soon)*
+OLake was built specifically to address these challenges. OLake natively supports replicating advanced data types, giving better performance like resulting in 4x to 10x faster large data loads. See detailed benchmarks [here](https://olake.io/docs/connectors/postgres/benchmarks).
 
-Traditional ETL tools often struggle with these requirements, especially when dealing with real-time data changes and large volumes. They typically introduce latency, schema compatibility issues, and scalability challenges. OLake was built specifically to address these challenges. OLake will natively support replicating advanced data types, giving better performance like resulting in 4x to 10x faster large data loads. Its tailored optimizations and resilience mechanisms ensure stable and efficient operations even under high-load conditions. OLake will implement optimizations and resilience features that cater to the specific nuances of databases like PostgreSQL, potentially offering faster and more reliable data integration.
+Its tailored optimizations and resilience mechanisms ensure stable and efficient operations even under high-load conditions. 
 
 
 ## High-Level Architecture
@@ -36,11 +42,7 @@ Traditional ETL tools often struggle with these requirements, especially when de
   style={{ width: '80%', maxWidth: '500px', margin: '2rem auto', display: 'block' }}
 />
 
-
-
 OLake follows a modular, plugin-based architecture with clear separation of concerns. At its core, OLake consists of:
-
-
 
 1. **Core Framework:** The central component that orchestrates the entire data flow
 2. **Drivers (Sources)**: Connectors to source databases like MongoDB, PostgreSQL, and MySQL
@@ -61,19 +63,17 @@ Let's explore each of these components in detail.
 
 
 The core framework is the heart of OLake, providing:
-
-
-* Command-Line Interface: Built using Cobra, it exposes commands like `spec`, `check`, `discover`, and `sync`
-* Configuration Management: Handles source, destination, catalog, and state configurations
-* Concurrency Management: Orchestrates parallel processing for efficient data extraction and loading
-* State Management: Tracks synchronization progress for resumable operations
-* Monitoring: Exposes metrics and statistics about running syncs
+* **Modular Architecture**: Each component (drivers, writers) is designed to be modular and extensible.
+* **Command-Line Interface**: Built using Cobra, it exposes commands like `spec`, `check`, `discover`, and `sync`
+* **Configuration Management**: Handles source, destination, streams, and state configurations
+* **Concurrency Management**: Orchestrates parallel processing for efficient data extraction and loading
+* **State Management**: Tracks synchronization progress for resumable operations
+* **Monitoring**: Exposes metrics and statistics about running syncs in `stats.json` file in CLI mode. 
 
 This modularity allows developers to quickly introduce new sources or destinations without altering existing components, significantly reducing integration effort and potential bugs.
 
 
 ### Protocol Layer
-
 
 The protocol layer defines critical interfaces ensuring OLake's modularity and ease of extension. This design simplifies maintenance by clearly defining interaction points and responsibilities across components. Key interfaces include the Connector, Driver, and Writer interfaces, which standardize operations across sources and destinations.
 
@@ -115,27 +115,23 @@ type Writer interface {
 
 These interfaces ensure that all components adhere to a consistent contract, making the system more maintainable and extensible.
 
-
 ### Drivers (Sources)
-
 
 OLake supports multiple database sources through its driver architecture. Each driver implements the `Driver` interface and provides specific functionality for its database type.
 
 
 #### MongoDB Driver
 
-
 The MongoDB driver connects to MongoDB databases and supports:
 
-
-
-* Full Refresh Mode: Reads all data from collections in batches
-* CDC Mode: Uses MongoDB's change streams to capture real-time changes
-* Parallel Processing: Splits large collections into chunks for parallel processing
-* Schema Detection: Automatically detects and adapts to MongoDB's flexible schema
+* **Full Refresh Mode**: Reads all data from collections in batches
+* **CDC Mode**: Uses MongoDB's change streams to capture real-time changes (oplog).
+* **Parallel Processing**: Splits large collections into chunks for parallel processing
+* **Schema Detection**: Automatically detects and adapts to MongoDB's flexible schema
 
 The MongoDB driver handles MongoDB-specific data types and converts them to OLake's internal representation. For CDC, it uses MongoDB's change streams API to capture inserts, updates, and deletes in real-time.
 
+Refer -> [MongoDB documentation](https://olake.io/docs/connectors/mongodb/overview) for more details.
 
 ```go
 func (m *Mongo) changeStreamSync(stream protocol.Stream, pool *protocol.WriterPool) error {
@@ -182,19 +178,19 @@ func (m *Mongo) changeStreamSync(stream protocol.Stream, pool *protocol.WriterPo
 
 #### PostgreSQL Driver
 
-
-
 The PostgreSQL driver utilizes logical replication slots and the `pglogrepl` library for capturing real-time database changes. This approach ensures minimal performance impact on the PostgreSQL database while maintaining data integrity during replication.
 
 The PostgreSQL driver supports:
 
-* Full Refresh Mode: Reads all data from tables in batches
-* CDC Mode: Uses PostgreSQL's logical replication to capture changes
-* Parallel Processing: Splits tables into chunks based on primary keys or CTIDs
-* Schema Detection: Maps PostgreSQL data types to OLake's type system
+* **Full Refresh Mode**: Reads all data from tables in batches
+* **CDC Mode**: Uses PostgreSQL's logical replication to capture changes
+* **Parallel Processing**: Splits tables into chunks based on primary keys or CTIDs
+* **Schema Detection**: Maps PostgreSQL data types to OLake's type system
 
 As already mentioned, for CDC, the PostgreSQL driver uses the `pglogrepl` library to connect to PostgreSQL's logical replication slots and process WAL (Write-Ahead Log) entries using the wal2json plugin.
 
+
+Refer -> [Postgres documentation](https://olake.io/docs/connectors/postgres/overview) for more details.
 
 ```go
 func (p *Postgres) RunChangeStream(pool *protocol.WriterPool, streams ...protocol.Stream) (err error) {
@@ -238,25 +234,24 @@ The MySQL driver supports:
 
 For CDC, the MySQL driver uses the `go-mysql` library to connect to MySQL and process change events from binlogs.
 
+Refer -> [MySQL documentation](https://olake.io/docs/connectors/mysql/overview) for more details.
 
 ## Writers (Destinations)
 
-OLake supports multiple destination types through its writer architecture. Each writer implements the `Writer` interface and provides specific functionality for its destination type.
+OLake supports multiple destination (S3 and Apache Iceberg) types through its writer architecture. Each writer implements the `Writer` interface and provides specific functionality for its destination type.
 
 
 ### Parquet Writer
 
-The Parquet writer efficiently manages file rotation, naming, partitioning, and supports normalization (basic) and schema evolution (basic). It ensures optimized storage formats and retrieval speeds by partitioning data intelligently. 
+The Parquet writer efficiently manages file rotation, naming, partitioning, and supports normalization (basic, Level 1) and schema evolution (as supported by Iceberg v2 tables). 
 
-The Parquet writer writes data to Parquet files, either locally or on S3:
+The Parquet writer writes data to Parquet files, either locally or on AWS S3:
 
-
-
-* **Local File System**: Writes Parquet files to a local directory
+* **Local File System**: Writes Parquet files to a local directory.
 * **S3 Integration**: Uploads Parquet files to an S3 bucket
-* **Partitioning**: Supports partitioning data based on record fields
+* **Partitioning**: Supports partitioning data based on record fields. 
 * **Normalization**: OLake supports L1 (level 1) normalization
-* **Schema Evolution**: Handles schema changes by creating new .parquet files 
+* **Schema Evolution**: Handles schema changes by creating new `.parquet` files (for S3 and local dump only, not to Iceberg Database)
 
 
 ```go
@@ -298,12 +293,10 @@ The Iceberg writer leverages Java-based gRPC components to fully support Iceberg
 
 The Iceberg writer writes data to Apache Iceberg tables and offers the following:
 
-
-
-* Iceberg Integration: Writes data to Apache Iceberg tables
-* Catalog Support: Works with AWS Glue, JDBC, and other Iceberg catalogs
-* Java Integration: Uses a Java gRPC server for Iceberg operations
-* Batch Processing: Buffers records for efficient writing
+* **Iceberg Integration**: Writes data to Apache Iceberg tables
+* **Catalog Support**: Works with AWS Glue, JDBC, and other Iceberg catalogs
+* **Java Integration**: Uses a Java gRPC server for Iceberg operations
+* **Batch Processing**: Buffers records for efficient writing
 
 
 ```go
@@ -333,74 +326,58 @@ func (i *Iceberg) Write(_ context.Context, record types.RawRecord) error {
 }
 ```
 
-
-
 ## Data Flow in OLake
 
 Now that we understand the components, let's look at how data flows through OLake:
 
-
-
-1. Configuration: The user provides configuration files for the source, destination, catalog, and state
-2. Discovery: The driver discovers available streams (tables/collections) along with their detailed metadata like data types, indexed columns, etc
-3. Sync Execution:
-    * For full refresh: Executes a complete data replication, optimized through chunking and parallel processing.
-    * For CDC: Continuously captures and applies real-time database changes, ensuring data lake consistency and freshness.
-4. State Management: Sync state is maintained for resumable operations
-5. Monitoring: HTTP server exposes live stats about running syncs
-
-
-
+1. **Configuration**: The user provides configuration files for the source (`source.json`) and destination (`destination.json`) and OLake generates `streams.json`, and `state.json` file.
+2. **Discovery**: The driver discovers available streams (tables/collections) along with their detailed metadata like data types, indexed columns, etc
+3. **Sync Execution**:
+    * **For full refresh**: Executes a complete data replication, optimized through chunking and parallel processing.
+    * **For CDC**: Continuously captures and applies real-time database changes, ensuring data lake consistency and freshness.
+4. **State Management**: Sync state is maintained for resumable operations
+5. **Monitoring**: HTTP server exposes live stats about running syncs
 
 
 Let's walk through a typical sync operation:
 
-
 ### Full Refresh Sync
 
-
-
-1. The user runs the `sync` command without passing the state argument
-2. OLake initializes the driver and writer based on the configurations
-3. The driver discovers available streams and matches them with the catalog
+1. The user runs the `sync` command (without passing the `--state` argument for the first time).
+2. OLake initializes the driver and writer based on the configurations.
+3. The driver discovers available streams and matches them with the streams.
 4. For each selected stream, OLake:
     * Splits the data into chunks for parallel processing
     * Creates writer threads for the destination
     * Reads data from the source in batches
-    * Converts the data to OLake's internal format
+    * Converts the data type to OLake's supported Data types.
     * Writes the data to the destination
-    * Updates the state to track progress
-5. Once all streams are processed, OLake finalizes the sync and reports statistics
+    * Updates the state to track progress in `state.json` file and `stats.json` file.
+5. Once all streams are processed, OLake finalizes the sync and reports statistics.
 6. It automatically generates a state file which can be used later to initial incremental or CDC sync. So that it can only process the newly arrived data.
 
 
 ### CDC Sync
 
-
-
-1. The user runs the `sync` command with appropriate configuration files
-2. OLake initializes the driver and writer based on the configurations
-3. The driver discovers available streams and matches them with the catalog
+1. The user runs the `sync` command with appropriate configuration files with `--state` flag and state file (that stored the last sync state / pointer).
+2. OLake initializes the driver and writer based on the configurations.
+3. The driver discovers available streams (with new column or table addition / modifications for schema evolution or schema data type changes) and matches them with the catalog.
 4. For each selected stream with CDC mode, OLake:
     * Checks if a full refresh is needed (first run or incomplete previous run)
-    * If needed, performs a full refresh first
+    * If needed, performs a full refresh first (in case a new table is added or schema changes)
     * Sets up a change stream connection to the source database
     * Creates writer threads for the destination
-    * Continuously captures change events (inserts, updates, deletes)
-    * Converts the events to OLake's internal format
+    * Captures change events (inserts, updates, deletes) from the last processed state (as noted by the state file cursor or pointer) 
     * Writes the events to the destination
     * Updates the state to track progress
-5. The CDC process runs continuously until interrupted
+5. The CDC process ends if there are no new updates. Use Airflow on ec2 or k8s to schedule the sync process periodically. Related [docs](https://olake.io/docs/install/kubernetes) and blogs on running OLake on [AWS EC2](https://olake.io/blog/olake-airflow-on-ec2) and [Kubernetes](https://olake.io/blog/olake-airflow). 
 
 
 ## Sync Execution in OLake: Advanced Chunking Strategies and Parallel Processing
 
-
 To process large amounts of data efficiently, OLake employs DB specific chunking strategies. These strategies are critical for optimizing performance during Full Refresh (Backfill Mode) operations.
 
-
 ### Database-Specific Chunking Strategies
-
 
 #### PostgreSQL Chunking Strategies
 
@@ -414,7 +391,7 @@ To process large amounts of data efficiently, OLake employs DB specific chunking
 PostgreSQL supports three distinct chunking strategies, each optimized for different table structures:
 
 
-1. CTID-Based Chunking
+#### 1. CTID-Based Chunking
     * Uses PostgreSQL's physical row identifier (CTID)
     * Ideal for tables without primary keys or unique indexes
     * Divides tables based on physical storage locations
@@ -433,7 +410,7 @@ PostgreSQL supports three distinct chunking strategies, each optimized for diffe
     ```
 
 
-2. Primary Key Chunking
+#### 2. Primary Key Chunking
     * Uses table's primary key for chunking
     * Optimal for tables with integer primary keys
     * Creates evenly distributed chunks based on key ranges
@@ -459,7 +436,7 @@ PostgreSQL supports three distinct chunking strategies, each optimized for diffe
     ```
 
 
-3. User-Defined Column Chunking
+#### 3. User-Defined Column Chunking
     * Uses any indexed column specified by the user
     * Flexible approach for tables with non-standard structures
     * Supports both numeric and non-numeric columns
@@ -506,10 +483,10 @@ PostgreSQL supports three distinct chunking strategies, each optimized for diffe
 MongoDB implements specialized chunking strategies optimized for document collections:
 
 
-1. ObjectID-Based Chunking
-    * Leverages MongoDB's native ObjectID for time-based chunking
-    * Particularly efficient for collections with default _id field
-    * Creates chunks based on ObjectID timestamp component
+#### 1. ObjectID-Based Chunking
+    * Uses MongoDB's native `ObjectID` for time-based chunking
+    * Particularly efficient for collections with default `_id` field
+    * Creates chunks based on `ObjectID` timestamp component
 
     ```go
     func (m *Mongo) splitCollectionByObjectID(ctx 
@@ -534,12 +511,11 @@ MongoDB implements specialized chunking strategies optimized for document collec
     }
     ```
 
-
-2. Shard Key Chunking (SplitVector Strategy)
+#### 2. Shard Key Chunking (SplitVector Strategy)
 
     * Utilizes existing shard keys for distributed collections
     * Aligns with MongoDB's own sharding strategy for optimal performance
-    * Leverages MongoDB's splitVector command for intelligent chunking
+    * Leverages MongoDB's `splitVector` command for intelligent chunking
 
     ```go
     func (m *Mongo) splitCollectionByShardKey(ctx 
@@ -566,7 +542,7 @@ MongoDB implements specialized chunking strategies optimized for document collec
     ```
 
 
-3. Adaptive Sampling Chunking
+#### 3. Adaptive Sampling Chunking
     * Uses statistical sampling for collections without obvious chunk keys
     * Analyzes data distribution to create balanced chunks
     * Adapts to varying document sizes and collection characteristics
@@ -606,7 +582,7 @@ MongoDB implements specialized chunking strategies optimized for document collec
 MySQL implements efficient chunking strategies tailored to its storage engine characteristics:
 
 
-1. Auto-Increment Primary Key Chunking
+#### 1. Auto-Increment Primary Key Chunking
     * Optimized for MySQL's common auto-increment pattern
     * Creates evenly sized chunks based on key ranges
     * Particularly efficient with InnoDB storage engine
@@ -635,7 +611,7 @@ MySQL implements efficient chunking strategies tailored to its storage engine ch
     ```
 
 
-2. Indexed Column Chunking
+#### 2. Indexed Column Chunking
     * Uses any indexed column for tables without auto-increment PKs
     * Supports both numeric and string indexes
     * Adapts chunk size based on column cardinality
@@ -671,7 +647,7 @@ MySQL implements efficient chunking strategies tailored to its storage engine ch
     ```
 
 
-3. Partition-Aware Chunking
+#### 3. Partition-Aware Chunking
     * Leverages MySQL's native partitioning for chunking
     * Creates chunks aligned with existing table partitions
     * Optimizes for already partitioned tables
@@ -719,10 +695,7 @@ MySQL implements efficient chunking strategies tailored to its storage engine ch
 
 Once chunks are created, OLake processes them in parallel:
 
-
 The parallel processing system includes:
-
-
 
 1. Dynamic Thread Pool Management
     * Allocates worker threads based on available system resources
@@ -756,7 +729,6 @@ MaxThreads, processChunk)
 
 OLake's chunking and parallel processing approach includes several key optimizations:
 
-
 1. Memory-Aware Chunk Sizing
     * Adjusts chunk sizes based on available system memory
     * Prevents out-of-memory errors during processing
@@ -777,29 +749,82 @@ OLake's chunking and parallel processing approach includes several key optimizat
 
 ### Configuration Options
 
-The chunking behavior can be configured through several options:
+The chunking behavior can be configured through several options for DB specific chunking strategies:
 
-
-```go
+```json
 {
-  "max_threads": 50,
-  "partition_strategy": "AUTO",  // AUTO, PRIMARY_KEY, 
-  CTID, COLUMN
-  "partition_column": "created_at",  // When using COLUMN 
-  strategy
-  "chunk_size": 100000,  // Override automatic chunk sizing
-  "min_chunk_size": 10000,  // Minimum chunk size
-  "max_chunk_size": 1000000  // Maximum chunk size
+  "max_threads": 50, // max threads for parallel processing
+  "chunking_strategy": "",  // timestamp, default uses Split-Vector Strategy if left empty, 
+  "backoff_retry_count": 2, // number of retries for chunk processing
 }
 ```
 
+You can add how partitioning should be done in streams.json file for each stream. For example:
 
+### For AWS S3 Data Partitioning
+
+```json
+{
+  "selected_streams": {
+    "namespace": [
+      {
+        "stream_name": "table1",
+        "partition_regex": "/{column_name, default_value, granularity}",
+        "normalization": false,
+        "append_only": false
+      },
+      {
+        "stream_name": "table2",
+        "partition_regex": "",
+        "normalization": false,
+        "append_only": false
+      }
+    ]
+  },
+  "streams": [
+    {
+      "stream": {
+        "name": "table1",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    },
+    {
+      "stream": {
+        "name": "table2",
+        "namespace": "namespace",
+        "sync_mode": "cdc"
+      }
+    }
+  ]
+}
+```
+The `partition_regex` field in the stream configuration specifies how the data should be partitioned.
+
+[Supporting Docs](https://olake.io/docs/writers/parquet/partitioning)
+
+### For Apache Iceberg Data Partitioning
+
+```json
+{
+  "selected_streams": {
+    "my_namespace": [
+      {
+        "stream_name": "my_stream",
+        "partition_regex": "/{timestamp_col, day}/{region, identity}",
+        "normalization": false,
+        "append_only": false
+      }
+    ]
+  }
+}
+```
+
+[Supporting Docs](https://olake.io/docs/writers/iceberg/partitioning)
 
 Full refresh happens when the state file either is not provided or it is provided but the CDC cursor is outdated and expired by the DB.
 
 This chunking and parallel processing approach significantly improves performance by:
-
-
 
 * Maximizing throughput with concurrent processing
 * Optimizing memory usage by processing manageable chunks
@@ -808,9 +833,7 @@ This chunking and parallel processing approach significantly improves performanc
 
 This parallel chunking strategy is a key factor in OLake's high-performance data replication capabilities, especially for large datasets.
 
-
 ## Concurrency Model in OLake
-
 
 OLake implements a multi-level concurrency model that adapts to different sync modes and database types, optimizing performance while maintaining system stability.
 
@@ -824,37 +847,26 @@ OLake implements a multi-level concurrency model that adapts to different sync m
 />
 
 
-
 OLake's concurrency model strategically manages resources across three levels—Global, Stream-Level, and Writer Pool—to optimize throughput without overwhelming systems.
 
-
 #### 1. Global Concurrency
-
-
 
 ```go
 // Global Stream concurrency group
 GlobalCxGroup = utils.NewCGroupWithLimit(context.Background
 (), concurrentStreamExecution)
-
 ```
 
-
-
-* Purpose: Controls the total number of concurrent database connections
-* Configuration: Set via `concurrent_stream_execution` parameter
-* Implementation: Uses a context-based concurrency group with limits
-* Benefit: Prevents overwhelming source databases with too many connections
-
+* **Purpose**: Controls the total number of concurrent database connections
+* **Configuration**: Set via `concurrent_stream_execution` parameter
+* **Implementation**: Uses a context-based concurrency group with limits
+* **Benefit**: Prevents overwhelming source databases with too many connections
 
 #### 2. Stream-Level Concurrency
 
-
-
-
-* Purpose: Manages parallel processing within individual streams
-* Implementation: Varies by sync mode (backfill vs. CDC) and database type
-* Benefit: Optimizes throughput for each stream based on its characteristics
+* **Purpose**: Manages parallel processing within individual streams
+* **Implementation**: Varies by sync mode (backfill vs. CDC) and database type
+* **Benefit**: Optimizes throughput for each stream based on its characteristics
 
 
 ```go
@@ -883,13 +895,11 @@ Stream) error {
 })
 ```
 
-
-
 #### 3. Writer Pool
 
-* Purpose: Manages concurrent writing to destinations
-* Implementation: Thread pool with dynamic scaling based on workload
-* Benefit: Ensures writing doesn't become a bottleneck, even during high-volume operations
+* **Purpose**: Manages concurrent writing to destinations
+* **Implementation**: Thread pool with dynamic scaling based on workload
+* **Benefit**: Ensures writing doesn't become a bottleneck, even during high-volume operations
 
 
 ```go
@@ -924,10 +934,10 @@ For backfill operations, OLake implements a chunking-based concurrency model:
 
 
 
-* Chunking: Divides data into logical chunks as described in the chunking strategies
-* Thread Pool: Processes chunks in parallel up to `max_threads` limit
-* Load Balancing: Dynamically adjusts chunk allocation to balance worker loads
-* State Tracking: Maintains progress of each chunk for resumability
+* **Chunking**: Divides data into logical chunks as described in the chunking strategies
+* **Thread Pool**: Processes chunks in parallel up to `max_threads` limit
+* **Load Balancing**: Dynamically adjusts chunk allocation to balance worker loads
+* **State Tracking**: Maintains progress of each chunk for resumability
 
 
 ```go
@@ -940,21 +950,18 @@ MaxThreads, processChunk)
 
 #### CDC (Change Data Capture) Concurrency
 
-
 CDC concurrency models vary significantly by database type:
 
-
 ##### MongoDB CDC Concurrency
-
 
 MongoDB CDC implements a multi-threaded, stream-parallel approach:
 
 
 
-* Per-Stream Parallelism: Each MongoDB stream can have multiple reader threads
-* Change Stream Sharding: Distributes change events across multiple threads
-* Pipeline Filtering: Uses MongoDB's aggregation pipeline for efficient filtering
-* Resume Token Management: Coordinates resume tokens across parallel readers
+* **Per-Stream Parallelism**: Each MongoDB stream can have multiple reader threads
+* **Change Stream Sharding**: Distributes change events across multiple threads
+* **Pipeline Filtering**: Uses MongoDB's aggregation pipeline for efficient filtering
+* **Resume Token Management**: Coordinates resume tokens across parallel readers
 
 
 ```go
@@ -985,11 +992,11 @@ PostgreSQL CDC uses a single-reader, multi-writer architecture:
 
 
 
-* Single WAL Reader: One thread reads the PostgreSQL Write-Ahead Log
-* Logical Replication Slot: Uses PostgreSQL's logical replication infrastructure
-* Multi-Stream Demultiplexing: Routes changes to appropriate stream writers
-* Parallel Writers: Multiple writer threads process changes for different streams
-* Transaction Grouping: Maintains transaction boundaries for consistency
+* **Single WAL Reader**: One thread reads the PostgreSQL Write-Ahead Log
+* **Logical Replication Slot**: Uses PostgreSQL's logical replication infrastructure
+* **Multi-Stream Demultiplexing**: Routes changes to appropriate stream writers
+* **Parallel Writers**: Multiple writer threads process changes for different streams
+* **Transaction Grouping**: Maintains transaction boundaries for consistency
 
 
 ```go
@@ -1033,11 +1040,11 @@ MySQL CDC also employs a single-reader, multi-writer pattern:
 
 
 
-* Single Binlog Reader: One thread reads the MySQL binary log
-* Binlog Position Tracking: Maintains precise position for resumability
-* Table Filtering: Efficiently filters events by table at the binlog level
-* Parallel Writers: Multiple writer threads for different streams
-* Transaction Boundary Preservation: Maintains transaction integrity
+* **Single Binlog Reader**: One thread reads the MySQL binary log
+* **Binlog Position Tracking**: Maintains precise position for resumability
+* **Table Filtering**: Efficiently filters events by table at the binlog level
+* **Parallel Writers**: Multiple writer threads for different streams
+* **Transaction Boundary** Preservation: Maintains transaction integrity
 
 
 ```go
@@ -1088,10 +1095,10 @@ OLake implements adaptive concurrency that responds to system conditions:
 
 
 
-* System Load Monitoring: Tracks CPU, memory, and I/O utilization
-* Dynamic Adjustment: Increases or decreases concurrency based on system load
-* Backpressure Mechanism: Slows down processing when system is overloaded
-* Resource Optimization: Maximizes throughput while preventing resource exhaustion
+* **System Load Monitoring**: Tracks CPU, memory, and I/O utilization
+* **Dynamic Adjustment**: Increases or decreases concurrency based on system load
+* **Backpressure Mechanism**: Slows down processing when system is overloaded
+* **Resource Optimization**: Maximizes throughput while preventing resource exhaustion
 
 
 ```go
@@ -1146,10 +1153,10 @@ err = connector.RunChangeStream(pool, cdcStreams...)
 
 
 
-* Sequential Execution: Completes backfill before starting CDC
-* State Coordination: Ensures CDC starts from the correct position
-* Resource Sharing: Efficiently transitions resources from backfill to CDC
-* Consistency Guarantee: Maintains data consistency during the transition
+* **Sequential Execution**: Completes backfill before starting CDC
+* **State Coordination**: Ensures CDC starts from the correct position
+* **Resource Sharing**: Efficiently transitions resources from backfill to CDC
+* **Consistency Guarantee**: Maintains data consistency during the transition
 
 
 #### Writer Pool Optimization
@@ -1204,38 +1211,10 @@ error) {
 
 
 
-* Thread-Local Buffering: Each writer thread maintains its own buffer
-* Non-Blocking Channels: Uses buffered channels for efficient communication
-* Backpressure Mechanism: Slows down producers when writers can't keep up
-* Graceful Shutdown: Ensures all buffered records are processed before closing
-
-
-### Concurrency Configuration
-
-OLake provides fine-grained control over concurrency through configuration:
-
-
-```go
-{
-  "max_threads": 50,                // Maximum threads for 
-  backfill operations
-  "max_cdc_threads": 10,            // Maximum threads for 
-  CDC operations (MongoDB)
-  "concurrent_stream_execution": 5, // Global concurrent 
-  stream limit
-  "writer_buffer_size": 10000,      // Buffer size for 
-  writer threads
-  "adaptive_concurrency": true,     // Enable adaptive 
-  concurrency control
-  "min_concurrency": 1,             // Minimum concurrency 
-  limit
-  "max_concurrency": 100            // Maximum concurrency 
-  limit
-}
-```
-
-
-This concurrency model allows OLake to efficiently utilize system resources while maintaining control over resource consumption, adapting to different sync modes and database types to achieve optimal performance.
+* **Thread-Local Buffering**: Each writer thread maintains its own buffer
+* **Non-Blocking Channels**: Uses buffered channels for efficient communication
+* **Backpressure Mechanism**: Slows down producers when writers can't keep up
+* **Graceful Shutdown**: Ensures all buffered records are processed before closing
 
 
 ## State Management
@@ -1250,9 +1229,9 @@ This concurrency model allows OLake to efficiently utilize system resources whil
 OLake uses a state management system to track sync progress and enable resumable operations:
 
 
-1. Stream-Level State: Tracks progress for individual streams
-2. Global State: Maintains global state for CDC operations
-3. Chunk Tracking: Tracks which chunks have been processed for resumable operations
+1. **Stream-Level State**: Tracks progress for individual streams
+2. **Global State**: Maintains global state for CDC operations
+3. **Chunk Tracking**: Tracks which chunks have been processed for resumable operations
 
 
 
@@ -1267,9 +1246,10 @@ type State interface {
     RemoveChunk(stream *types.ConfiguredStream, chunk types.Chunk)
     SetGlobalState(globalState any)
 }
+```
 
-state.json:
 
+```json title="state.json"
 {
     "type": "STREAM",
     "streams": [
@@ -1296,14 +1276,13 @@ OLake's architecture is guided by several key design principles:
 
 
 
-1. Integrated Writers: Writers are directly integrated with drivers to avoid blocking reads
-2. Connector Autonomy: Each connector is autonomous and can operate independently. (dependencies are separate for each connector to keep the whole executable smaller in size.)
-3. Efficiency Focus: Fast read and write operations that don't contribute to increasing record throughput are avoided
-4. Modularity: Clear separation of concerns through well-defined interfaces
-5. Extensibility: Easy to add new drivers and writers through the plugin architecture
+1. **Integrated Writers**: Writers are directly integrated with drivers to avoid blocking reads
+2. **Connector Autonomy**: Each connector is autonomous and can operate independently. (dependencies are separate for each connector to keep the whole executable smaller in size.)
+3. **Efficiency Focus**: Fast read and write operations that don't contribute to increasing record throughput are avoided
+4. **Modularity**: Clear separation of concerns through well-defined interfaces
+5. **Extensibility**: Easy to add new drivers and writers through the plugin architecture
 
 These principles ensure that OLake remains efficient, maintainable, and extensible as it evolves.
-
 
 
 ## Conclusion

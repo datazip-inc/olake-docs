@@ -4,9 +4,10 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarForm from "../../components/forms/WebinarForm";
-import React = require('react');
+import React from "react";
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';
+import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
 
 const hosts = [
@@ -55,12 +56,12 @@ const WebinarPage = () => {
             <WebinarCoverImage src="/img/webinars/webinar-intro-iceberg.webp" alt="Webinar Cover Image" />
           </div>
 
-          <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
             <WebinarForm
               source="w-1-intro-iceberg"
               nexturl="w-1-intro-iceberg-confirmation"
             />
-          </div>
+          </div> */}
         </div>
 
 
@@ -68,6 +69,13 @@ const WebinarPage = () => {
 
         <br />
 
+        <div className="flex justify-center mb-12">
+          <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
+
+          {/* comming soon */}
+        </div>
+
+        
         <WebinarOverview
           date="October 03, 2024"
           time="08:30 PM - 09:30 PM IST"
