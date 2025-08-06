@@ -34,28 +34,37 @@
     link.rel = 'noopener noreferrer';
     link.className = 'github-stars-link';
     
-    const iconBox = document.createElement('div');
-    iconBox.className = 'github-icon-box';
+    // Left section with GitHub icon and "Star" text
+    const leftSection = document.createElement('div');
+    leftSection.className = 'github-stars-left';
     
     const icon = document.createElement('div');
     icon.className = 'github-icon';
     
-    const starsSection = document.createElement('div');
-    starsSection.className = 'stars-section';
+    const starText = document.createElement('span');
+    starText.className = 'star-text';
+    starText.textContent = 'Star';
     
-    const starEmoji = document.createElement('span');
-    starEmoji.className = 'star-emoji';
-    starEmoji.textContent = '⭐';
+    leftSection.appendChild(icon);
+    leftSection.appendChild(starText);
+    
+    // Separator line
+    const separator = document.createElement('div');
+    separator.className = 'github-stars-separator';
+    
+    // Right section with star count
+    const rightSection = document.createElement('div');
+    rightSection.className = 'github-stars-right';
     
     const countSpan = document.createElement('span');
     countSpan.className = 'stars-count';
     countSpan.textContent = '...';
     
-    iconBox.appendChild(icon);
-    starsSection.appendChild(starEmoji);
-    starsSection.appendChild(countSpan);
-    link.appendChild(iconBox);
-    link.appendChild(starsSection);
+    rightSection.appendChild(countSpan);
+    
+    link.appendChild(leftSection);
+    link.appendChild(separator);
+    link.appendChild(rightSection);
     container.appendChild(link);
     
     return { container, countSpan };
@@ -101,11 +110,8 @@
       if (starCount !== null && starCount > 0) {
         countSpan.textContent = starCount.toLocaleString();
       } else {
-        // Hide stars section if no stars or error
-        const starsSection = container.querySelector('.stars-section');
-        if (starsSection) {
-          starsSection.style.display = 'none';
-        }
+        // Hide the entire component if no stars or error
+        container.style.display = 'none';
       }
     } catch (err) {
       console.error('Failed to initialize GitHub stars:', err);
