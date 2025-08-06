@@ -1,0 +1,156 @@
+---
+title: 5. Google Cloud SQL for PostgreSQL
+description: Google Cloud SQL for PostgreSQL
+sidebar_position: 5
+---
+
+# Google Cloud SQL for PostgreSQL CDC Setup Guide
+
+Google Cloud SQL for PostgreSQL supports CDC through logical replication using the `wal2json` plugin. The service provides managed PostgreSQL with built-in support for logical decoding.
+
+**Prerequisites:**
+
+- Google Cloud SQL for PostgreSQL instance (PostgreSQL version 10+)
+- `cloudsqlsuperuser` privileges (default `postgres` user)
+- Access to Google Cloud Console for configuration
+- TLS enabled if connecting directly
+
+:::info Read Replica Support
+**PostgreSQL 16+:** Google Cloud SQL supports logical replication on read replicas, but with limitations. Row deletions and vacuum operations on the primary may invalidate logical replication slots on read replicas, causing inconsistencies.
+
+**PostgreSQL 15 and earlier:** Read replicas cannot act as publishers for logical replication. Use the **primary instance** for CDC functionality.
+
+**Recommendation:** For production CDC workloads, connect OLake to the **primary instance** to avoid potential slot invalidation issues.
+:::
+
+**Steps:**
+
+1. **Enable Logical Decoding:** In Google Cloud Console, navigate to your Cloud SQL instance and enable the logical decoding flag:
+
+   1. Go to **Cloud SQL** → Select your instance
+   2. Click **Edit** → **Flags**
+   3. Add flag: `cloudsql.logical_decoding = on`
+   4. **Save** and **Restart** the instance
+
+   ![gcp-logical-decoding](/img/docs/cdc/postgres/gcp-logical-decoding.png)
+
+   Verify the setting after restart:
+   ```sql
+   SHOW cloudsql.logical_decoding;
+   ```
+
+2. **Configure Network Access:** Set up connectivity for OLake:
+
+   **Option A: Direct Connection (Requires TLS)**
+   1. Go to **Connections** → **Networking**
+   2. Click **Add network**
+   3. Add OLake's IP addresses with `/32` CIDR
+   4. **Save** the configuration
+
+   **Option B: Private IP**
+   Configure Private Service Connect or VPC peering for secure connectivity.
+
+   ![gcp-network-config](/img/docs/cdc/postgres/gcp-network-config.png)
+
+3. **Create Replication User:** Connect as `cloudsqlsuperuser` (usually `postgres`) and create a dedicated CDC user:
+
+   ```sql
+   CREATE USER cdc_user WITH PASSWORD 'strongpassword';
+   ALTER ROLE cdc_user WITH REPLICATION;
+   ```
+
+   :::info Superuser Requirements
+   The `postgres` user in Cloud SQL has `cloudsqlsuperuser` privileges, which includes replication permissions by default.
+   :::
+
+   **Optional: Read-only Access for Initial Snapshot**
+
+   Grant explicit read permissions for stricter security:
+
+   ```sql
+   -- Example for the "public" schema in database mydb
+   GRANT CONNECT ON DATABASE mydb TO cdc_user;
+   GRANT USAGE ON SCHEMA public TO cdc_user;
+   GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+   -- Ensure future tables are covered automatically
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
+   ```
+
+4. **Create Replication Slot:** Set up logical replication slot for wal2json:
+
+   :::important Slot Name Configuration
+   Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+   :::
+
+   ```sql
+   -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
+   SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json');
+   ```
+
+   **Verify Configuration:**
+   ```sql
+   -- Check replication slots
+   SELECT * FROM pg_replication_slots;
+   ```
+
+5. **Test Replication:** Verify that CDC is working correctly:
+
+   ```sql
+   -- Create test data
+   INSERT INTO test_table (data) VALUES ('GCP CDC test');
+   
+   -- Check for changes (as the CDC user) - replace with your actual slot name
+   SELECT data FROM pg_logical_slot_get_changes(
+       'your_olake_slot_name', null, null, 
+       'pretty-print', '1'
+   );
+   ```
+
+   ✅ **Success:** Returns JSON change records from wal2json  
+   ❌ **Permission denied:** Check user has `REPLICATION` role
+
+
+Now that you have configured the Google Cloud database and created the CDC user, you can add the PostgreSQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [PostgreSQL connector overview](/docs/connectors/postgres/overview) for a high-level walkthrough.
+
+## Troubleshooting
+
+- **Flag Not Applied:** If `cloudsql.logical_decoding` shows as `off` after restart, verify that:
+  - You're connected to the correct database instance
+  - The flag was saved before restarting
+  - The instance has fully restarted (check Cloud SQL logs)
+
+- **Permission Errors:** If you see `ERROR: permission denied to create replication slot`:
+  - Use the `postgres` user (which has `cloudsqlsuperuser` role)
+  - Ensure the user has `REPLICATION` privileges: `ALTER ROLE user WITH REPLICATION;`
+  - Verify the user can connect to the specific database
+
+- **Network Connectivity:** If OLake cannot connect:
+  - Check that the instance has a **public IP** or proper **private connectivity**
+  - Verify **authorized networks** include OLake's IP addresses
+  - Ensure **SSL/TLS** is configured if required
+  - Test connectivity: `telnet your-instance-ip 5432`
+
+- **Replication Slot Issues:**
+  - Slot names cannot start with numbers
+  - Each OLake connection needs a unique slot name
+  - Cloud SQL supports the `wal2json` plugin. Make sure the replication slot is created with `wal2json`.
+  - Monitor slot lag: `SELECT * FROM pg_replication_slots;`
+
+- **Read Replica Limitations:**
+  :::caution Read Replica Requirements
+  Logical replication on read replicas requires PostgreSQL 16+. For earlier versions, connect OLake to the primary instance only.
+  :::
+
+- **WAL Retention:** Monitor storage usage as inactive replication slots retain WAL files:
+  - Set up **Cloud Monitoring** alerts for disk usage
+  - Drop unused slots: `SELECT pg_drop_replication_slot('slot_name');`
+  - Consider setting `max_slot_wal_keep_size` to prevent runaway storage growth
+
+- **Statement Timeout:** Ensure `statement_timeout` is `0` or greater than 5 minutes to avoid interrupting long-running snapshot queries.
+
+- **SSL Configuration:** Cloud SQL enforces SSL by default. If connecting directly:
+  - Use `sslmode=require` in connection strings
+  - For client certificates, use `sslmode=verify-full`
+  - Download the server CA certificate if needed
+
+Google Cloud SQL provides a robust managed PostgreSQL service with comprehensive CDC capabilities. The platform handles most operational concerns while providing the flexibility needed for real-time data integration.

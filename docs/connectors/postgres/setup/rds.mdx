@@ -13,7 +13,7 @@ This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS
 - An Amazon RDS for PostgreSQL instance (PostgreSQL 10+).
 - A custom **DB parameter group** for this instance (the default parameter group cannot be modified).
 - The RDS master user or another user with the `rds_superuser` and `rds_replication` roles.
-- Automated backups enabled (backup retention > 0) – this is needed for long-term binlog retention on RDS 
+- Automated backups enabled (backup retention > 0) – this is needed for long-term WAL retention on RDS 
 
 **Steps:**
 
@@ -21,13 +21,23 @@ This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS
 
 ![postgres-rds-pg-1](/img/docs/cdc/postgres/postgres-rds-pg-1.png)
 
-Select your database instance and **Associate** the new parameter group with it. Edit the parameters:
-   - Set **`rds.logical_replication` = 1**. This enables logical replication (logical decoding) on RDS.
-   - This parameter in RDS implicitly requires `wal_level=logical`. On some versions, setting `rds.logical_replication` may automatically set `wal_level=logical` for you, but it’s good to verify or set it explicitly if available.
-   - Also, increase `max_replication_slots` and `max_wal_senders` if you plan to have multiple CDC slots or connections concurrently. For example, set them to at least the number of CDC connectors you will run (plus any existing replicas).
-   - Save the parameter group changes.
+**Associate** the parameter group with your database instance and configure:
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `rds.logical_replication` | `1` | Enables logical replication and wal2json |
+| `wal_level` | `logical` | Usually set automatically by above |
+| `max_replication_slots` | `≥5` | Number of concurrent CDC connections |
+| `max_wal_senders` | `≥7` | Should exceed replication slots |
+| `wal_sender_timeout` | `0` | *(Optional)* Prevents snapshot timeouts |
+
+Save the parameter group changes.
 
 ![postgres-rds-pg-2](/img/docs/cdc/postgres/postgres-rds-pg-2.png)
+
+:::caution
+`rds.logical_replication` can only be turned on for **read-replica** instances that are running PostgreSQL 16 or later. If your replica is on an earlier major version the parameter will be ignored and logical decoding will NOT be available on that replica. Either upgrade the replica to v16+ or enable logical decoding only on the primary.
+:::
 
 2. **Reboot the RDS Instance:** Reboot the database instance so that the static parameters take effect. After reboot, confirm the settings:
    ```sql
@@ -37,43 +47,68 @@ Select your database instance and **Associate** the new parameter group with it.
    ```
    The query should show `rds.logical_replication` = on, and `wal_level` = logical.
 
-3. **Set Up a Replication User:** The RDS master user automatically has the needed roles (`rds_superuser` which includes logical replication privileges, and `rds_replication`). You can use it for CDC, or create a dedicated user:
+3. **Set Up a Replication User:** 
+
+   **Option A: Use Master User** *(Recommended for simplicity)*  
+   The RDS master user already has `rds_superuser` and `rds_replication` roles.
+
+   **Option B: Create Dedicated User**
    ```sql
    CREATE USER cdc_user WITH PASSWORD 'strongpassword';
    GRANT rds_replication TO cdc_user;
+   GRANT ALL ON SCHEMA public TO cdc_user;  -- Prevents schema permission errors
    ```
-   RDS does not allow granting full superuser, but granting the `rds_replication` role should allow the user to create and use logical replication slots. (You might also grant `rds_superuser` if RDS allows, but typically only the master user has that privilege. Alternatively, use the master user for simplicity.)
 
-   If using a new user, ensure it has usage rights on the databases/schemas you need. For example:
+   **Optional: Read-only Privileges for Initial Snapshot**
+   
+   For stricter security, grant only read access instead of `ALL`:
+
    ```sql
-   GRANT ALL ON SCHEMA public TO cdc_user;
+   -- Example for the "public" schema in database mydb
+   GRANT CONNECT ON DATABASE mydb TO cdc_user;
+   GRANT USAGE ON SCHEMA public TO cdc_user;
+   GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+   -- Ensure future tables are covered automatically
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
    ```
-   This prevents errors like "permission denied for schema" during decoding.
 
-4. **Create a Logical Replication Slot:** You can let the CDC application create the slot, but to test or manually create one:
+4. **Create a Logical Replication Slot:** 
+
+   :::important Slot Name Configuration
+   Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+   :::
+
+   You can let OLake create the slot automatically, or manually create one for testing:
    ```sql
+   -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
    SELECT * 
-   FROM pg_create_logical_replication_slot('cdc_slot', 'wal2json');
+   FROM pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json');
    ```
-   RDS supports the `wal2json` plugin (as well as `test_decoding`) out of the box. This command should succeed if everything is configured. If it fails with an error, check the error:
-   - **“must be superuser or replication role to use replication slots”** – the user isn’t permitted (fix by using the master user or granting `rds_replication`).
-   - **“logical decoding requires wal_level >= logical”** – the wal_level is not logical (fix by steps 1–2).
-   - **Plugin not found** – ensure `rds.logical_replication` is on (which loads wal2json).
+   **Common Errors:**
+   
+   | Error | Solution |
+   |-------|----------|
+   | "must be superuser or replication role" | Use master user or grant `rds_replication` |
+   | "logical decoding requires wal_level >= logical" | Check parameter group configuration |
+   | "plugin not found" | Ensure `rds.logical_replication = 1` |
 
 
 
 5. **Test Decoding (Optional):** As a quick test, you can generate a change and read from the slot:
    ```sql
    INSERT INTO test_table(val) VALUES('rds cdc test');
-   SELECT data FROM pg_logical_slot_get_changes('cdc_slot', NULL, NULL, 'pretty-print', '1');
+   -- Replace 'your_olake_slot_name' with your actual slot name
+   SELECT data FROM pg_logical_slot_get_changes('your_olake_slot_name', NULL, NULL, 'pretty-print', '1');
    ```
-   You should see a JSON change record from wal2json. This confirms CDC is capturing changes.
+   You should see JSON change records from wal2json. This confirms CDC is capturing changes.
 
 6. **Connect Your CDC Connector:** Use the RDS endpoint, database name, and the replication user (`cdc_user` or master) in your OLake configuration. Specify the plugin as `wal2json`. The connector will stream changes via the logical slot.
 
    Make sure the network setup allows the connector to reach the RDS instance (RDS must be publicly accessible or your connector is in the same VPC/network).
 
-**Troubleshooting:**
+   Now that you have configured the database and created the CDC user, you can add the PostgreSQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [PostgreSQL connector overview](/docs/connectors/postgres/overview) for a high-level walkthrough.
+
+## Troubleshooting
 
 - **Parameter Group Not Applying:** If `rds.logical_replication` remains off after reboot, check that:
   - The instance is actually using your custom parameter group (in the RDS console, on the **Configuration** tab, verify the parameter group name).
@@ -87,7 +122,7 @@ Select your database instance and **Associate** the new parameter group with it.
   - If you see `ERROR: logical decoding requires wal_level "logical"`, it means wal_level is not logical – double-check the parameter group (maybe the DB is still running with the old param group).
   - If the error is about `wal2json` not found, ensure `rds.logical_replication` is enabled, as that is required to load wal2json on RDS.
 
-- **WAL buildup / Disk Full:** Similar to Aurora, an inactive logical slot on RDS will prevent WAL files from being purged. Monitor the **WAL storage** on RDS (CloudWatch metric "TransactionLogsDiskUsage"). If your CDC connector falls behind or is stopped for a while, the disk usage can grow. In extreme cases, you might get RDS events complaining that “The transaction logs have consumed XX% of storage”. To fix, either restart the CDC process to consume the backlog or drop the slot if you no longer need it. For example:
+- **WAL buildup / Disk-Full:** Similar to Aurora, an inactive logical slot on RDS will prevent WAL files from being purged. Monitor the **WAL storage** on RDS (CloudWatch metric "TransactionLogsDiskUsage"). If your CDC connector falls behind or is stopped for a while, the disk usage can grow. In extreme cases, you might get RDS events complaining that “The transaction logs have consumed XX% of storage”. To fix, either restart the CDC process to consume the backlog or drop the slot if you no longer need it. For example:
   ```sql
   SELECT pg_drop_replication_slot('cdc_slot');
   ```

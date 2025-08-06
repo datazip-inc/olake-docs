@@ -42,16 +42,28 @@ Edit the cluster parameter group:
 
    - Save the parameter group changes.
 
-![mysql-aurora-pg-3](/img/docs/cdc/mysql/mysql-aurora-pg-3.png)
 
+## Change parameters & security group
+In the RDS console, modify the Aurora cluster to use the new cluster parameter group and configure network access.
 
-## Associate this new cluster parameter group with your Aurora cluster
-In the RDS console, modify the Aurora cluster to use the new cluster parameter group.
+### Update Cluster Parameter Group
    - Select the DB cluster to modify.
    - Choose Modify. The Modify DB cluster page appears.
    - Change the DB cluster parameter group setting.
    - Choose Continue and check the summary of modifications.
    - On the confirmation page, review your changes. If they are correct, choose Modify cluster to save your changes.
+
+### Configure Security Group for OLake Access
+Ensure that the Aurora cluster is accessible from OLake by configuring the security group:
+   - In the Aurora cluster's security group, add an inbound rule to allow connections on port **3306** (MySQL port).
+   - For the source, specify:
+     - If OLake is running on EC2: Add the security group ID of the OLake instance or the specific IP address.
+     - If OLake is running externally: Add the public IP address or IP range from which OLake will connect.
+     - For development/testing: You can temporarily use `0.0.0.0/0` but this is not recommended for production.
+
+:::warning Security Best Practice
+Always use the most restrictive security group rules possible. Only allow access from the specific IP addresses or security groups where OLake is running.
+:::
 
 ## Reboot the Writer Instance:
 Because `binlog_format` is static property for the cluster, reboot the Aurora cluster’s primary instance (writer). After reboot, the binary log will start recording transactions. Verify the settings on the Aurora MySQL instance:
@@ -82,7 +94,7 @@ The cluster’s storage will grow with retained binlogs – monitor free space. 
 
 ## Create a CDC (Replication) User: 
 
-It’s best not to use the master user for CDC. Create a dedicated user with replication privileges:
+It's best not to use the master user for CDC. Create a dedicated user with replication privileges:
    ```sql
    CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'strongpassword';
    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
@@ -90,10 +102,27 @@ It’s best not to use the master user for CDC. Create a dedicated user with rep
    FLUSH PRIVILEGES;
    ```
 
+   **Optional: Restrict Database Access**
+
+   For stricter security, grant access only to specific databases:
+
+   ```sql
+   -- Grant access to specific database
+   GRANT SELECT ON mydb.* TO 'cdc_user'@'%';
+   FLUSH PRIVILEGES;
+   ```
+
 ## Connect to OLake:
-   - Use the **writer endpoint** of the Aurora cluster (Aurora’s cluster endpoint for writes). Do not use a reader endpoint for CDC, because read replicas in Aurora **do not have the full binlog** accessible; the binlog is generated on the writer and that’s where CDC must connect.
+   - Use the **writer endpoint** of the Aurora cluster (Aurora's cluster endpoint for writes). Do not use a reader endpoint for CDC, because read replicas in Aurora **do not have the full binlog** accessible; the binlog is generated on the writer and that's where CDC must connect.
    - Connection details: host, port (3306, unless changed), user = `cdc_user`, password.
+   
+   :::important Replica ID Configuration
+   When configuring OLake, use a **unique replica ID** that doesn't conflict with existing MySQL replicas. OLake will use a replica ID greater than 1000 by default, but you can specify your own in the source configuration.
+   :::
+   
    - OLake will connect and perform an initial snapshot and then start reading the binlog. Because we set `binlog_format=ROW` and `binlog_row_image=FULL`, the changes will be captured completely.
+
+Now that you have configured the Aurora database and created the CDC user, you can add the MySQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [MySQL connector overview](/docs/connectors/mysql/overview) for a high-level walkthrough.
 
 ## Troubleshooting:
 
