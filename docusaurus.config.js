@@ -123,6 +123,10 @@ const config = {
       // async: false,
       defer: true, // if the script must be executed in order, set async to false
     },
+    {
+      src: '/github-stars.js', // GitHub stars component script
+      defer: true,
+    },
   ],
 
   themeConfig:
@@ -234,12 +238,9 @@ const config = {
           //   position: 'left',
           // },
           {
-            href: 'https://github.com/datazip-inc/olake',
-            // label: 'GitHub',
+            type: 'html',
             position: 'right',
-            // position: 'right',
-            className: 'header-github-link',
-
+            value: '<div id="github-stars-container"></div>',
           },
           {
             label: 'Talk to us',
