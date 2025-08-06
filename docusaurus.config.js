@@ -123,6 +123,12 @@ const config = {
       // async: false,
       defer: true, // if the script must be executed in order, set async to false
     },
+    {
+      // Suppress noisy ResizeObserver loop errors that Chrome prints
+      src: '/ignore-resize-observer-error.js',
+      defer: true
+    }
+
   ],
 
   themeConfig:
