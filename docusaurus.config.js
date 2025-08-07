@@ -123,10 +123,7 @@ const config = {
       // async: false,
       defer: true, // if the script must be executed in order, set async to false
     },
-    {
-      src: '/github-stars.js', // GitHub stars component script
-      defer: true,
-    },
+
   ],
 
   themeConfig:
@@ -240,7 +237,7 @@ const config = {
           {
             type: 'html',
             position: 'right',
-            value: '<div id="github-stars-container"></div>',
+            value: '<div id="github-stars-react-container"></div>',
           },
           {
             label: 'Talk to us',
