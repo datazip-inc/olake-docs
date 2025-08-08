@@ -191,6 +191,13 @@ const docSidebar = {
           items: [
             'connectors/oracle/overview',
             'connectors/oracle/config',
+            {
+              type: 'category',
+              label: 'Setup',
+              items: [
+                'connectors/oracle/setup/generic',
+              ],
+            },
             'connectors/oracle/troubleshooting',
           ],
         },
