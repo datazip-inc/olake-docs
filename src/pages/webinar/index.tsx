@@ -1,9 +1,18 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import React from "react";
 import Layout from '@theme/Layout';
 import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
 
 const WebinarsPage = () => {
+  const pageData = {
+    title: 'OLake Events & Webinars',
+    summary: 'Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices. Deep dive into Apache Iceberg, CDC strategies, and modern data engineering practices with industry experts and practitioners.',
+    image_url: '/img/webinars/webinar-intro-iceberg.webp',
+    event_url: 'https://olake.io/webinar',
+  };
+
   const communityMeets = [
     {
       title: 'OLake 6th Community Meetup',
@@ -194,10 +203,36 @@ const WebinarsPage = () => {
   ];
 
   return (
-    <Layout
-      title='OLake Events & Webinars'
-      description='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices'
-    >
+    <>
+      <Head>
+        <title>{pageData.title}</title>
+
+        <meta name="description" content={pageData.summary} />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+
+        <meta property="og:title" content={pageData.title} />
+
+        <meta property="og:description" content={pageData.summary} />
+        <meta property="og:image" content={`https://olake.io${pageData.image_url}`} />
+
+        <meta property="og:url" content={pageData.event_url} />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={pageData.title} />
+
+        <meta name="twitter:description" content={pageData.summary} />
+
+        <meta name="twitter:image" content={`https://olake.io${pageData.image_url}`} />
+      </Head>
+
+      <Layout
+        title={pageData.title}
+        description={pageData.summary}
+      >
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-950/20 py-16 lg:py-24">
         {/* Background decorative elements */}
@@ -311,6 +346,7 @@ const WebinarsPage = () => {
         </div>
       </div>
     </Layout>
+    </>
   );
 };
 
