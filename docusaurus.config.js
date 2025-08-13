@@ -228,7 +228,7 @@ const config = {
 
 
           {
-            href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+            href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
             // label: 'Join Slack',
             position: 'right',
             className: 'header-slack-link',
@@ -366,7 +366,7 @@ const config = {
       //         },
       //         {
       //           label: 'Slack Community',
-      //           href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+      //           href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
       //         },
       //         {
       //           label: 'Instagram',
@@ -942,7 +942,7 @@ const config = {
           // END
 
           {
-            to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+            to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
             from: '/slack',
           },
           {
