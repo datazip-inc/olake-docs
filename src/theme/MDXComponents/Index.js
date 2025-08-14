@@ -63,6 +63,7 @@ import OracleSourceConfigDetails from '../../../docs/shared/config/OracleSourceC
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
+import S3ConfigGCS from '../../../docs/shared/config/S3ConfigGCS.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 import S3ConfigUIDetails from '../../../docs/shared/config/S3ConfigUIDetails.mdx'
 
@@ -165,6 +166,7 @@ const MDXComponents = {
   OracleSourceConfigDetails,
 
   S3Config,
+  S3ConfigGCS,
   S3ConfigDetails,
   S3ConfigUIDetails,
   LocalParquetConfig,
