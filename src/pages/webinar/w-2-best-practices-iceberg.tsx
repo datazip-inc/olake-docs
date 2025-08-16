@@ -1,3 +1,5 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
@@ -45,68 +47,97 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'Best Practices for Migrating to Apache Iceberg',
     summary: 'Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.',
+    image_url: '/img/webinars/webinar-iceberg.webp',
+    event_url: 'https://olake.io/webinar/w-2-best-practices-iceberg',
   };
 
   return (
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
+    <>
+      <Head>
+        <title>{webinarData.title}</title>
 
-      <main className="container mx-auto lg:px-36 py-12">
-        <WebinarTitle
-          title={webinarData.title}
-          tag="Webinar"
-        />
+        <meta name="description" content={webinarData.summary} />
 
-        <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
-          <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+
+        <meta property="og:title" content={webinarData.title} />
+
+        <meta property="og:description" content={webinarData.summary} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
+
+        <meta property="og:url" content={webinarData.event_url} />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={webinarData.title} />
+
+        <meta name="twitter:description" content={webinarData.summary} />
+
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
+      </Head>
+
+      <Layout
+        title={webinarData.title}
+        description={webinarData.summary}
+      >
+
+        <main className="container mx-auto lg:px-36 py-12">
+          <WebinarTitle
+            title={webinarData.title}
+            tag="Webinar"
+          />
+
+          <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
+            <div className="w-full md:w-2/3 flex justify-center">
+              <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
+            </div>
+
+            {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+              <WebinarForm
+                source="w2-best-practices-iceberg"
+                nexturl="w-2-best-practices-iceberg-confirmation"
+              />
+            </div> */}
           </div>
 
-          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
-            <WebinarForm
-              source="w2-best-practices-iceberg"
-              nexturl="w-2-best-practices-iceberg-confirmation"
-            />
-          </div> */}
-        </div>
+          <Hr />
+          <br />
 
-        <Hr />
-        <br />
+          <div className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="8gnkqmrbGeY" className="max-w-6xl" />
 
-        <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="8gnkqmrbGeY" className="max-w-6xl" />
+            {/* comming soon */}
+          </div>
 
-          {/* comming soon */}
-        </div>
+          <WebinarOverview
+            date="December 15, 2024"
+            time="10:00 AM - 11:30 AM"
+            duration="1.5 hours"
+            summary={webinarData.summary}
+            bulletPoints={[
+              "Understanding Apache Iceberg",
+              "Migration strategies and best practices",
+              "Tools and technologies involved",
+              "Common challenges and how to overcome them",
+              "Real-world case studies",
+            ]}
+          />
 
-        <WebinarOverview
-          date="December 15, 2024"
-          time="10:00 AM - 11:30 AM"
-          duration="1.5 hours"
-          summary={webinarData.summary}
-          bulletPoints={[
-            "Understanding Apache Iceberg",
-            "Migration strategies and best practices",
-            "Tools and technologies involved",
-            "Common challenges and how to overcome them",
-            "Real-world case studies",
-          ]}
-        />
+          <Hr />
+          <br />
 
-        <Hr />
-        <br />
+          <WebinarHosts hosts={hosts} />
 
-        <WebinarHosts hosts={hosts} />
+          <WebinarCTA
+            CTAText={"Ready to Join our next webinar?"}
+          />
 
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
+        </main>
 
-      </main>
-
-    </Layout>
+      </Layout>
+    </>
   );
 };
 
