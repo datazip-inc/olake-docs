@@ -1,0 +1,329 @@
+---
+title: 5. Google Cloud SQL for MySQL
+description: Google Cloud SQL for MySQL
+sidebar_position: 5
+---
+
+# Google Cloud SQL for MySQL CDC Setup Guide
+
+Google Cloud SQL for MySQL supports CDC through binary logging with comprehensive configuration options. The service provides managed MySQL with built-in support for binary log management and replication capabilities.
+
+**Prerequisites:**
+
+- Google Cloud SQL for MySQL instance (MySQL version 5.7+)
+- `cloudsqlsuperuser` privileges (default `root` user)
+- Access to Google Cloud Console for configuration
+- TLS enabled if connecting directly
+- Unique **replica ID** for OLake (any integer ≥ 1000 that does not collide with existing replicas)
+
+## Master vs Read Replica Connection
+
+**Both Primary and Read Replica Supported**
+
+You can connect OLake to either the master database or a read replica. The choice depends on your requirements:
+
+**Using Read Replica (Recommended for High-Load Systems):**
+- **Reduced load**: CDC operations don't impact your production workload
+- **Isolation**: CDC-related operations are isolated from your main database
+- **Requirements**: Read replica must have `log_slave_updates = ON` (enabled by default in GCP)
+- **Binary logs**: Read replicas maintain their own binary logs with all replicated events
+
+**Using Primary Database:**
+- **Simplicity**: Direct connection without additional replica setup
+- **Complete control**: All binary log events are immediately available
+- **Best for**: Low-traffic databases or when replica setup is not desired
+
+**Read Replica Requirements for CDC:**
+- **MySQL 8.0+**: Binary logging on read replicas supported with `log_slave_updates` enabled
+- **MySQL 5.7**: Read replicas can maintain binary logs if `log_slave_updates = ON`
+- User creation can be done on either primary or replica (unlike Azure)
+
+**Steps:**
+
+## 1. Create Read Replica for CDC (Optional)
+
+If you want to use a read replica (recommended for high-load systems), create one first:
+
+1. In Google Cloud Console, go to **SQL** → Select your MySQL instance
+2. Click **Create read replica**
+3. Configure the read replica:
+   - **Replica ID**: Choose a unique name
+   - **Region**: Same or different region as primary
+   - **Machine type**: Can be smaller than primary
+   - **Storage**: Will match primary initially
+4. **Advanced settings**:
+   - Ensure **Automated backups** are enabled
+   - Set appropriate **Database flags** (will inherit from primary)
+5. Click **Create replica**
+6. Wait for the replica to be created and show "Available" status
+
+:::tip GCP Read Replica Benefits
+GCP read replicas automatically have `log_slave_updates = ON` and maintain their own binary logs suitable for CDC. You can create the CDC user on either the primary or the replica.
+:::
+
+## 2. Verify Binary Logging
+
+In Google Cloud Console, open your Cloud SQL for MySQL instance and confirm that **Point-in-Time Recovery (PITR)** is enabled — this automatically turns **binary logging (`log_bin`) ON**. Then verify or set the following flags (via **Edit → Flags**):
+
+1. Go to **SQL** → Select your instance
+2. Click **Edit** → **Flags**
+3. Add/modify the following flags:
+   - (verify) `binlog_format` is set to `ROW` (Cloud SQL default)
+   - (verify) `binlog_row_image` is `FULL` (Cloud SQL default)
+   - (optional) `binlog_expire_logs_seconds = 604800` _(MySQL 8.0+)_ **or** `expire_logs_days = 7` _(MySQL 5.7)_
+4. **Save** and **Restart** the instance
+
+![gcp-mysql-flags](/img/docs/cdc/mysql/gcp-mysql-flags.png)
+
+Verify the settings after restart:
+```sql
+SHOW VARIABLES LIKE 'log_bin';
+SHOW VARIABLES LIKE 'binlog_format';
+SHOW VARIABLES LIKE 'binlog_row_image';
+```
+
+## 3. Configure Network Access
+
+Set up connectivity for OLake:
+
+**Option A: Direct Connection (Requires TLS)**
+1. Go to **Connections** → **Networking**
+2. Click **Add network**
+3. Add OLake's IP addresses with `/32` CIDR
+4. **Save** the configuration
+
+**Option B: Private IP**
+Configure Private Service Connect or VPC peering for secure connectivity.
+
+
+
+## 4. Create Replication User
+
+Connect to your MySQL instance (primary or read replica) as `cloudsqlsuperuser` (usually `root`) and create a dedicated CDC user:
+
+```sql
+CREATE USER 'cdc_user'@'%' IDENTIFIED WITH mysql_native_password BY 'strongpassword';
+GRANT SELECT, REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+:::info Superuser Requirements
+The `root` user in Cloud SQL has `cloudsqlsuperuser` privileges, which includes replication permissions by default.
+:::
+
+**Optional: Restrict Database Access**
+
+Grant access only to specific databases for stricter security:
+
+```sql
+-- Grant access to specific database
+CREATE USER 'cdc_user'@'%' IDENTIFIED WITH mysql_native_password BY 'strongpassword';
+GRANT SELECT ON mydb.* TO 'cdc_user'@'%';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+## 5. Test Binary Logging
+
+Verify that CDC is working correctly:
+
+```sql
+-- Check binary log status
+SHOW MASTER STATUS;
+
+-- List available binary logs
+SHOW BINARY LOGS;
+
+-- Create test data
+CREATE TABLE IF NOT EXISTS test_cdc (id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(100));
+INSERT INTO test_cdc (data) VALUES ('GCP MySQL CDC test');
+
+-- Verify recent binary log events
+SHOW BINLOG EVENTS LIMIT 10;
+```
+
+✅ **Success:** `SHOW MASTER STATUS` returns file name and position  
+✅ **Success:** `SHOW BINARY LOGS` lists available log files  
+❌ **Permission denied:** Check user has `REPLICATION CLIENT` role  
+❌ **Binary logging disabled:** Verify flags are set and instance restarted
+
+
+
+## 6. Configure Binary Log Retention
+
+Google Cloud SQL manages binary log retention automatically (default **7 days**). You can adjust it with the flags below:
+
+```sql
+-- Check current retention setting
+SHOW VARIABLES LIKE 'expire_logs_days';
+```
+
+For manual log management:
+
+```sql
+-- Manually purge old logs (use with caution)
+PURGE BINARY LOGS BEFORE DATE_SUB(NOW(), INTERVAL 3 DAY);
+
+-- Purge logs before specific log file
+PURGE BINARY LOGS TO 'mysql-bin.000010';
+```
+
+## Connect OLake to Your Database
+
+When configuring OLake:
+
+- **If using a read replica**: Use the **read replica connection name** (e.g., `project:region:replica-instance-name`)
+- **If using primary directly**: Use the **primary connection name** (e.g., `project:region:primary-instance-name`)
+- **Host**: The public or private IP address of your chosen instance
+- **Port**: Usually `3306`
+- **User**: The `cdc_user` you created
+- **Password**: The password for the CDC user
+
+:::tip GCP Flexibility
+Unlike Azure, GCP allows you to create the CDC user on either the primary or read replica. Both instances can serve as valid CDC sources with complete binary log access.
+:::
+
+:::important Replica ID Configuration
+When configuring OLake, use a **unique replica ID** that doesn't conflict with existing MySQL replicas. OLake will use a replica ID greater than 1000 by default, but you can specify your own in the source configuration.
+:::
+
+Now that you have configured the Google Cloud database and created the CDC user, you can add the MySQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [MySQL connector overview](/docs/connectors/mysql/overview) for a high-level walkthrough.
+
+## Troubleshooting
+
+### Configuration Issues
+
+- **Binary Logging Not Enabled:**
+  ```sql
+  SHOW VARIABLES LIKE 'log_bin';  -- Shows OFF
+  ```
+  **Solution:** Set `log_bin = ON` database flag and restart the instance.
+
+- **Wrong Binary Log Format:**
+  ```sql
+  SHOW VARIABLES LIKE 'binlog_format';  -- Shows STATEMENT or MIXED
+  ```
+  **Solution:** Set `binlog_format = ROW` database flag and restart.
+
+- **Flag Not Applied:** If flags don't take effect after restart:
+  - Verify you're connected to the correct database instance
+  - Check that the flag was saved before restarting
+  - Monitor the operation logs in Google Cloud Console
+
+### Permission Issues
+
+- **Replication Access Denied:**
+  ```sql
+  ERROR: Access denied; you need (at least one of) the REPLICATION SLAVE privilege(s)
+  ```
+  **Solution:** Grant proper privileges:
+  ```sql
+  GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
+  FLUSH PRIVILEGES;
+  ```
+
+- **Connection Denied:** If OLake cannot connect:
+  - Check **authorized networks** include OLake's IP addresses
+  - Verify the instance has a **public IP** or proper **private connectivity**
+  - Ensure **SSL/TLS** is configured if required
+
+### Network Connectivity
+
+- **Connection Timeout:**
+  - Verify **authorized networks** in Google Cloud Console
+  - Check that the instance has network connectivity enabled
+  - Test connectivity: `telnet your-instance-ip 3306`
+
+- **SSL/TLS Issues:** Cloud SQL enforces SSL by default for public connections:
+  - Use `sslmode=required` in OLake connection configuration
+  - Download Google Cloud's SSL certificates if needed
+  - For testing, SSL can be disabled (not recommended for production)
+
+### Performance and Monitoring
+
+- **Binary Log Disk Usage:** Monitor through Google Cloud Console:
+  - **Monitoring** → **Disk utilization**
+  - Set up alerts for high disk usage
+  - Consider reducing `expire_logs_days` if storage is limited
+
+- **Connection Limits:** Cloud SQL has connection limits based on instance size:
+  - Monitor active connections in Cloud Console
+  - Upgrade instance if more connections are needed
+
+- **Replication Lag:** Monitor binary log position:
+  ```sql
+  SHOW MASTER STATUS;
+  -- Compare with OLake's last processed position
+  ```
+
+### Google Cloud Specific Issues
+
+- **Instance Maintenance:** Google Cloud performs automatic maintenance:
+  - Plan CDC operations around maintenance windows
+  - Monitor for connection disruptions during maintenance
+  - Enable maintenance notifications
+
+- **Backup and Restore Impact:**
+  - Point-in-time recovery creates new instances
+  - Binary log positions reset after restore operations
+  - Plan for full resynchronization after restore
+
+- **High Availability (Regional Persistent Disks):**
+  - Failovers may briefly interrupt connections
+  - Binary log continuity is maintained with regional persistent disks
+  - Monitor for any CDC disruptions after failover events
+
+- **Read Replica Configuration:**
+  :::caution Read Replica Setup
+  To use read replicas for CDC, ensure `log_slave_updates = ON` is set on the replica. This allows the replica to write received changes to its own binary log.
+  :::
+
+### Monitoring and Alerting
+
+Set up Google Cloud Monitoring alerts for:
+
+1. **Disk Usage:** Alert when disk usage exceeds 80%
+2. **Connection Count:** Monitor active connections
+3. **CPU and Memory:** Track resource usage during CDC operations
+4. **Binary Log Events:** Monitor binary log generation rate
+
+**Example Alert Policy:**
+```yaml
+displayName: "High Disk Usage"
+conditions:
+  - displayName: "Disk utilization"
+    conditionThreshold:
+      filter: 'resource.type="cloudsql_database"'
+      comparison: COMPARISON_GT
+      thresholdValue: 0.8
+```
+
+### Security Best Practices
+
+1. **Network Security:** Use private IP and VPC peering when possible
+2. **Authorized Networks:** Restrict access to specific IP ranges
+3. **SSL/TLS:** Always use encrypted connections (enabled by default)
+4. **IAM Integration:** Use Google Cloud IAM for database access control
+5. **Audit Logging:** Enable Cloud Audit Logs for security compliance
+6. **Connection Security:** Use Cloud SQL Proxy for enhanced security
+
+
+**Performance Tuning:**
+
+Optimize for CDC workloads:
+
+```sql
+-- Add database flags for performance:
+-- innodb_buffer_pool_size = 70% of available memory
+-- binlog_cache_size = 32768
+-- max_binlog_cache_size = 2147483648
+```
+
+**Multi-Region Setup:**
+
+For cross-region CDC:
+- Use regional persistent disks for high availability
+- Configure cross-region VPC peering
+- Monitor network latency between regions
+
+Google Cloud SQL provides a robust managed MySQL service with comprehensive CDC capabilities. The platform handles most operational concerns while providing the flexibility needed for real-time data integration.

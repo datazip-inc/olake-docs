@@ -30,7 +30,7 @@ function LogoImage({ logo }: Props) {
           <a href="https://www.youtube.com/@olakeio" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
             <img src="/img/social/youtube.svg" alt="YouTube" />
           </a>
-          <a href="https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
+          <a href="https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
             <img src="/img/social/slack.svg" alt="Slack" />
           </a>
           <a href="https://instagram.com/olake_io" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">

@@ -1,0 +1,382 @@
+---
+title: 6. Generic MySQL Server
+description: Generic MySQL on EC2, VMs, or Bare Metal
+sidebar_position: 6
+---
+
+# Generic MySQL CDC Setup Guide
+
+This guide covers setting up Change Data Capture (CDC) for MySQL running on any server infrastructure including EC2 instances, virtual machines, bare metal servers, or on-premises installations. The setup uses MySQL binary logging with ROW format for real-time data streaming.
+
+**Prerequisites:**
+
+- MySQL version 5.5+ (version 5.7+ recommended for full binary logging support)
+- Superuser access or ability to modify `my.cnf` configuration
+- TLS/SSL enabled for secure connections (recommended)
+- Sufficient disk space for binary log retention
+- A unique replica ID for OLake (we provide guidance on setting this)
+
+:::info Read Replica Support
+**MySQL 8.0+:** Read replicas can be configured for binary logging if `log_slave_updates = ON` is set.
+
+**MySQL 5.7 and earlier:** Read replicas require `log_slave_updates = ON` to maintain their own binary logs for CDC functionality.
+
+**Recommendation:** For production CDC workloads, connect OLake to the **primary instance** to ensure complete binary log availability and avoid potential replication lag issues.
+:::
+
+**Steps:**
+
+## 1. Configure MySQL Binary Logging
+
+Edit your MySQL configuration file (usually `/etc/my.cnf`, `/etc/mysql/my.cnf`, or `/usr/local/mysql/etc/my.cnf`):
+
+```conf
+[mysqld]
+# Enable binary logging
+log-bin = mysql-bin
+server-id = 123456789
+
+# Set binary log format to ROW (required for CDC)
+binlog-format = ROW
+binlog-row-image = FULL
+
+# Binary log retention (adjust based on your needs)
+expire-logs-days = 7
+
+# For MySQL 8.0+, use binlog_expire_logs_seconds instead
+# binlog_expire_logs_seconds = 604800  # 7 days
+
+# Replication settings
+log-slave-updates = 1
+
+# Optional: Control binary log size
+max_binlog_size = 100M
+
+# Optional: For MySQL 8.0+, include table metadata
+binlog-row-metadata = FULL
+```
+
+| Parameter | Recommended Value | Purpose |
+|-----------|-------------------|---------|
+| `log-bin` | `mysql-bin` | Enable binary logging with file prefix |
+| `server-id` | `123456789` | Unique identifier (1-4294967295) |
+| `binlog-format` | `ROW` | Capture complete row changes |
+| `binlog-row-image` | `FULL` | Include all columns in binary log |
+| `expire-logs-days` | `7` | Retain logs for 7 days |
+| `log-slave-updates` | `1` | Enable if using read replicas |
+
+:::important Server ID Configuration
+Choose a unique `server-id` between 1 and 4294967295. This ID must be unique within your MySQL replication topology. OLake will use a replica ID greater than 1000 by default.
+:::
+
+## 2. Restart MySQL
+
+Apply configuration changes by restarting MySQL:
+
+```bash
+# Ubuntu/Debian
+sudo systemctl restart mysql
+
+# CentOS/RHEL
+sudo systemctl restart mysqld
+
+# Or using mysqld directly
+sudo service mysql restart
+```
+
+**Verify Configuration:**
+```sql
+SHOW VARIABLES LIKE 'log_bin';
+SHOW VARIABLES LIKE 'binlog_format';
+SHOW VARIABLES LIKE 'binlog_row_image';
+SHOW VARIABLES LIKE 'server_id';
+```
+
+## 3. Create Replication User
+
+Connect as root or a user with administrative privileges:
+
+```sql
+-- Create dedicated CDC user
+CREATE USER 'cdc_user'@'%' IDENTIFIED WITH mysql_native_password BY 'strongpassword';
+
+-- Grant replication privileges
+GRANT SELECT, REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
+
+-- Apply changes
+FLUSH PRIVILEGES;
+```
+
+:::important Replication Slot Configuration
+When configuring OLake, use a **unique replica ID** that doesn't conflict with existing MySQL replicas. OLake will use this ID to connect as a replication client.
+:::
+
+**Optional: Restrict Table Access**
+
+For stricter security, grant access only to specific databases/tables:
+
+```sql
+-- Grant access to specific database
+GRANT SELECT ON mydb.* TO 'cdc_user'@'%';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
+
+-- Grant access to specific tables
+GRANT SELECT ON mydb.table1 TO 'cdc_user'@'%';
+GRANT SELECT ON mydb.table2 TO 'cdc_user'@'%';
+```
+
+## 4. Configure Network Access
+
+Ensure MySQL port (default 3306) is accessible and configure authentication:
+
+**Firewall Configuration:**
+
+**Ubuntu/Debian (ufw):**
+```bash
+sudo ufw allow from 10.0.0.0/16 to any port 3306
+```
+
+**CentOS/RHEL (firewalld):**
+```bash
+sudo firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='10.0.0.0/16' port protocol='tcp' port='3306' accept"
+sudo firewall-cmd --reload
+```
+
+**AWS EC2 Security Groups:**
+- Add inbound rule for port 3306 from OLake's IP addresses
+- Ensure outbound rules allow MySQL responses
+
+## 5. Enable TLS/SSL (Recommended)
+
+For secure connections, configure SSL in `my.cnf`:
+
+```conf
+[mysqld]
+# Enable SSL
+ssl-cert = /path/to/server-cert.pem
+ssl-key = /path/to/server-key.pem
+ssl-ca = /path/to/ca-cert.pem
+
+# Require SSL for replication user
+require_secure_transport = ON
+```
+
+**Generate Self-signed Certificates (for testing):**
+```bash
+# Create SSL certificates directory
+sudo mkdir -p /var/lib/mysql-ssl
+cd /var/lib/mysql-ssl
+
+# Generate CA private key
+sudo openssl genrsa -out ca-key.pem 2048
+
+# Generate CA certificate
+sudo openssl req -new -x509 -nodes -days 365 -key ca-key.pem -out ca-cert.pem -subj "/CN=MySQL-CA"
+
+# Generate server private key
+sudo openssl genrsa -out server-key.pem 2048
+
+# Generate server certificate request
+sudo openssl req -new -key server-key.pem -out server-req.pem -subj "/CN=mysql-server"
+
+# Generate server certificate
+sudo openssl x509 -req -in server-req.pem -days 365 -CA ca-cert.pem -CAkey ca-key.pem -set_serial 01 -out server-cert.pem
+
+# Set appropriate permissions
+sudo chown mysql:mysql /var/lib/mysql-ssl/*
+sudo chmod 600 /var/lib/mysql-ssl/*-key.pem
+```
+
+## 6. Test Binary Logging
+
+Verify that CDC is working correctly:
+
+```sql
+-- Check binary log status
+SHOW MASTER STATUS;
+
+-- List available binary logs
+SHOW BINARY LOGS;
+
+-- Create test data
+CREATE TABLE IF NOT EXISTS test_cdc (id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(100));
+INSERT INTO test_cdc (data) VALUES ('Generic MySQL CDC test');
+
+-- Verify binary log events (replace with actual log file name)
+SHOW BINLOG EVENTS IN 'mysql-bin.000001' LIMIT 10;
+```
+
+✅ **Success:** `SHOW MASTER STATUS` returns file name and position  
+✅ **Success:** `SHOW BINARY LOGS` lists available log files  
+❌ **Binary logging disabled:** Check `log-bin` configuration and restart MySQL  
+❌ **Permission denied:** Ensure user has `REPLICATION CLIENT` privileges
+
+## 7. Configure Binary Log Retention
+
+Set appropriate retention to prevent disk space issues:
+
+```sql
+-- For MySQL 5.7 and earlier
+SET GLOBAL expire_logs_days = 7;
+
+-- For MySQL 8.0+
+SET GLOBAL binlog_expire_logs_seconds = 604800;  -- 7 days
+
+-- Manually purge old logs (if needed)
+PURGE BINARY LOGS BEFORE DATE_SUB(NOW(), INTERVAL 3 DAY);
+```
+
+Now that you have configured the MySQL server and created the CDC user, you can add the MySQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [MySQL connector overview](/docs/connectors/mysql/overview) for a high-level walkthrough.
+
+## Troubleshooting
+
+### Configuration Issues
+
+- **Binary Logging Not Enabled:**
+  ```sql
+  ERROR: You are not using binary logging
+  ```
+  **Solution:** Add `log-bin = mysql-bin` to `my.cnf` and restart MySQL.
+
+- **Wrong Binary Log Format:**
+  ```sql
+  SHOW VARIABLES LIKE 'binlog_format';  -- Shows STATEMENT or MIXED
+  ```
+  **Solution:** Set `binlog-format = ROW` in `my.cnf` and restart MySQL.
+
+- **Configuration File Not Found:** 
+  **Solution:** Locate your MySQL configuration file:
+  ```bash
+  mysql --help | grep "Default options" -A 1
+  # Or check common locations:
+  # /etc/my.cnf, /etc/mysql/my.cnf, /usr/local/mysql/etc/my.cnf
+  ```
+
+### Permission Issues
+
+- **Replication Access Denied:**
+  ```sql
+  ERROR: Access denied; you need (at least one of) the REPLICATION SLAVE privilege(s)
+  ```
+  **Solution:** Grant proper privileges:
+  ```sql
+  GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
+  FLUSH PRIVILEGES;
+  ```
+
+- **Table Access Denied:**
+  ```sql
+  ERROR: SELECT command denied to user 'cdc_user'@'%' for table 'some_table'
+  ```
+  **Solution:** Grant SELECT privileges:
+  ```sql
+  GRANT SELECT ON database.table TO 'cdc_user'@'%';
+  -- Or for all tables:
+  GRANT SELECT ON *.* TO 'cdc_user'@'%';
+  ```
+
+### Connection Issues
+
+- **Connection Refused:** Verify:
+  - MySQL is running: `sudo systemctl status mysql`
+  - Port 3306 is open: `netstat -tlnp | grep 3306`
+  - Firewall allows connections
+  - `bind-address` in `my.cnf` allows external connections (set to `0.0.0.0` or comment out)
+
+- **SSL/TLS Issues:**
+  - Ensure certificates have correct permissions and paths
+  - Verify certificate validity: `openssl x509 -in server-cert.pem -text -noout`
+  - Check MySQL SSL status: `SHOW STATUS LIKE 'Ssl_cipher';`
+
+### Performance and Monitoring
+
+- **Binary Log Disk Usage:** Monitor disk space:
+  ```sql
+  -- Check binary log sizes
+  SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 1) AS 'DB Size in MB' 
+  FROM information_schema.tables;
+  
+  -- Check binary log files
+  SHOW BINARY LOGS;
+  ```
+
+- **High CPU/Memory Usage:** Tune MySQL settings:
+  ```conf
+  [mysqld]
+  innodb_buffer_pool_size = 70% of RAM
+  innodb_log_file_size = 256M
+  max_connections = 200
+  ```
+
+- **Replication Lag:** Monitor binary log position:
+  ```sql
+  SHOW MASTER STATUS;
+  -- Compare with OLake's last processed position
+  ```
+
+### Binary Log Management
+
+- **Log File Rotation:** Control log file size:
+  ```conf
+  [mysqld]
+  max_binlog_size = 100M  # Rotate when file reaches 100MB
+  ```
+
+- **Automatic Cleanup:** Set retention policy:
+  ```conf
+  [mysqld]
+  expire_logs_days = 7  # MySQL 5.7
+  binlog_expire_logs_seconds = 604800  # MySQL 8.0+
+  ```
+
+- **Manual Cleanup:** Remove old logs safely:
+  ```sql
+  -- Purge logs older than 3 days
+  PURGE BINARY LOGS BEFORE DATE_SUB(NOW(), INTERVAL 3 DAY);
+  
+  -- Purge logs before specific log file
+  PURGE BINARY LOGS TO 'mysql-bin.000010';
+  ```
+
+## Security Best Practices
+
+1. **Use Dedicated User:** Create a specific user for CDC with minimal required privileges
+2. **Enable TLS:** Always use encrypted connections for production
+3. **Network Security:** Restrict access using firewalls and security groups
+4. **Regular Monitoring:** Set up alerts for binary log disk usage and replication lag
+5. **Password Security:** Use strong passwords and consider certificate-based authentication
+6. **Binary Log Security:** Protect binary log files with appropriate file system permissions
+
+## Advanced Configuration
+
+### Multi-Source Replication
+
+If you have multiple MySQL instances, ensure unique server IDs:
+
+```conf
+# Instance 1
+server-id = 1001
+
+# Instance 2  
+server-id = 1002
+```
+
+### Performance Tuning for CDC
+
+Optimize for CDC workloads:
+
+```conf
+[mysqld]
+# Binary log caching
+binlog_cache_size = 32K
+max_binlog_cache_size = 2G
+
+# InnoDB settings for write performance
+innodb_flush_log_at_trx_commit = 1
+innodb_support_xa = ON
+
+# Replication settings
+slave_pending_jobs_size_max = 128M
+```
+
+This setup provides a robust foundation for CDC from any MySQL server to OLake, enabling real-time data integration with your data lake infrastructure.
