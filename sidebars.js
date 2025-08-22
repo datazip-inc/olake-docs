@@ -34,7 +34,7 @@ const docSidebar = {
       label: 'Getting Started',      
       items: [
         'getting-started/overview',
-        'getting-started/olake-ui',
+        'getting-started/quickstart',
         'getting-started/postgres',
         'getting-started/mysql',
         'getting-started/mongodb',
