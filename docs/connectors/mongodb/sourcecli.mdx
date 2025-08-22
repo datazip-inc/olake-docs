@@ -1,0 +1,317 @@
+# MongoDB Source Documentation (CLI)
+
+## A. Setup Prerequisites
+
+Before beginning, ensure the following are installed and running:
+
+- Docker and Docker Compose (latest version)
+- MongoDB instance (local or remote) with credentials ready to act as the source
+
+### Required Components
+
+- **Olake Docker Image**: `olakego/source-mongodb:latest`
+- **Iceberg REST Catalog service**: http://host.docker.internal:8181/catalog
+- **MinIO/S3 bucket for storage**: http://host.docker.internal:9000
+- **Spark SQL or Trino** (with Iceberg Catalog configured) for querying
+
+### Additional Note: CDC Requirements for MongoDB
+
+If you want Olake to continuously capture new changes (CDC mode), MongoDB must:
+
+- Be started in replica set mode (`--replSet rs0`)
+- Have oplog enabled (automatic in replica sets)
+- Have a user with both:
+  - `readWrite` role on your database, and
+  - `read` role on the local database (to read oplog)
+
+### Steps for CDC Setup
+
+#### 1. Run MongoDB in Replica Set Mode
+
+By default, MongoDB runs as a standalone server → this does not have an oplog. You need to start it with Replica Set Name.
+
+**If MongoDB is running inside the Docker then execute:**
+
+```bash
+docker run -d --name mongodb \
+  -p 27017:27017 \
+  mongo:6.0 --replSet rs0
+```
+
+**If MongoDB is running outside Docker then execute:**
+
+```bash
+mongod --replSet rs0 --bind_ip_all
+```
+
+#### 2. Initialize Replica Set
+
+Once MongoDB is running, you must initialise the replica set (just starting with `--replSet` is not enough).
+
+Open a Mongo shell:
+
+```bash
+docker exec -it mongodb mongosh
+```
+
+Then run:
+
+```javascript
+rs.initiate()
+```
+
+You should see something like:
+
+```json
+{ "ok" : 1 }
+```
+
+✅ Now your MongoDB has a replica set and oplog enabled.
+
+#### 3. Create a User
+
+Olake needs a user that can:
+a. Read/write your application database (to ingest data)
+b. Read from the local database (where oplog is stored)
+
+Create the user in the admin database:
+
+```javascript
+use admin
+db.createUser({
+  user: "olake_user",
+  pwd: "your_password",
+  roles: [
+    { role: "readWrite", db: "your_db" },
+    { role: "read", db: "local" }
+  ]
+})
+```
+
+#### 4. Verify oplog
+
+Check that the oplog collection exists:
+
+```javascript
+use local
+show collections
+```
+
+To peek inside:
+
+```javascript
+db.oplog.rs.findOne()
+```
+
+If you see an entry, ✅ oplog is working.
+
+## B. Configuration
+
+### MongoDB Source Setup via Olake CLI
+
+#### A) Create config directory
+
+Create a folder (directory) where we will store `source.json` so everything is organised.
+
+You can create this directory in two ways:
+
+**Option 1:** You can manually create a folder.
+
+**Option 2:**
+
+```bash
+mkdir olake-mongodb
+cd olake-mongodb
+```
+
+#### B) Create a file named `source.json` with MongoDB connection details
+
+**Example:**
+
+```json
+{
+  "hosts": ["host1:27017", "host2:27017", "host3:27017"],
+  "username": "your_username",
+  "password": "your_password",
+  "authdb": "admin",
+  "replica_set": "rs0",
+  "read_preference": "secondaryPreferred",
+  "srv": false,
+  "database": "your_db",
+  "max_threads": 5,
+  "backoff_retry_count": 4,
+  "chunking_strategy": ""
+}
+```
+
+**Description of above parameters:**
+
+| Field | Description | Example Value | Data Type |
+|-------|-------------|---------------|-----------|
+| `hosts` | List of MongoDB hosts. Use DNS SRV if `srv = true`. | `x.xxx.xxx.120:27017`, `x.xxx.xxx.120:27017`, `x.xxx.xxx.133:27017` (can be multiple) | STRING[] |
+| `username`/`password` | Credentials for MongoDB authentication. | `"test"`/`"test"` | STRING |
+| `authdb` | Authentication database (often `admin`). | `"admin"` | STRING |
+| `replica_set` | Name of the replica set, if applicable. | `"rs0"` | STRING |
+| `read_preference` | Which node to read from (e.g., `secondaryPreferred`). | `"secondaryPreferred"` | STRING |
+| `srv` | If using DNS SRV connection strings, set to `true`. When `true`, there can only be 1 host in `hosts` field. | If `true`, the `hosts` key will have a value something like `["mongodatatest.pigiy.mongodb.net"]` | `true`, `false` | BOOL |
+| `database` | The MongoDB database name to replicate. | `"database_name"` | STRING |
+| `max_threads` | Maximum parallel threads for chunk-based snapshotting. | `5` | INT |
+| `backoff_retry_count` | Retries attempt to establish sync again if it fails, increases exponentially (in minutes - 1, 2, 4, 8, 16... depending upon the `backoff_retry_count` value) | defaults to 3, takes default value if set to -1 | INT |
+| `chunking_strategy` | The chunking strategy for backfill `timestamp`, uses `splitVector` strategy if the field is left empty. Refer [here] for more details. | `timestamp`, uses `splitVector` strategy if the field is left empty. Refer [here](../../../blog/2025-05-07-what-makes-olake-fast#mongodb) for more details. | |
+
+#### C) Run Discover Command
+
+The Discover command generates json content for `streams.json` file, which defines the schema of the collections to be synced.
+
+**Linux/macOS**
+
+```bash
+docker run --pull=always \
+  -v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+  olakego/source-mongodb:latest \
+  discover \
+  --config /mnt/config/source.json
+```
+
+**Windows (CMD)**
+
+```cmd
+docker run --pull=always ^
+  -v "%USERPROFILE%\PATH_TO_OLAKE_DIRECTORY:/mnt/config" ^
+  olakego/source-mongodb:latest ^
+  discover ^
+  --config /mnt/config/source.json
+```
+
+**Powershell**
+
+```powershell
+docker run --pull=always `
+  -v "$env:USERPROFILE\PATH_TO_OLAKE_DIRECTORY:/mnt/config" `
+  olakego/source-mongodb:latest `
+  discover `
+  --config /mnt/config/source.json
+```
+
+This file has two main sections:
+
+#### 1) selected_streams
+
+Lists the streams that have been chosen for processing. These are grouped by namespace. For example the configuration might look like this:
+
+```json
+"selected_streams": {
+  "otter_db": [
+    {
+      "partition_regex": "{now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}/{string_change_language,,}",
+      "stream_name": "stream_0",
+      "normalization": false,
+      "append_only": false,
+      "chunk_column": ""
+    }
+  ]
+}
+```
+
+**The details about the Selected Stream is mentioned below:**
+
+| Field | Type | Example | Description |
+|-------|------|---------|-------------|
+| `namespace` | String | `otter_db` | Groups streams by database. |
+| `stream_name` | String | `stream_0` | Must match stream defined in schema. |
+| `partition_regex` | String | `{now(),2025,YYYY}-{now(),06,MM}` | Defines partitioning (time-based, language, revision). |
+| `normalization` | Bool | `false` | Flatten JSON if true. |
+| `append_only` | Bool | `false` | If true, no deletes are applied (append-only). |
+| `chunk_column` | String | `""` | Column used to chunk data for parallel ingestion. |
+
+#### 2) streams
+
+Contains an array of stream definitions. Each stream holds details about its data schema, supported synchronization modes, primary keys, and other metadata. For example, one stream definition looks like this:
+
+```json
+{
+  "stream": {
+    "name": "stream_8",
+    "namespace": "otter_db",
+    "type_schema": {
+      "properties": {
+        "_id": { "type": ["string"] },
+        "authors": { "type": ["array"] },
+        "backreferences": { "type": ["array"] },
+        "birth_date": { "type": ["string", "null"], "format": "date-time" },
+        "title": { "type": ["string"] },
+        "upvotes": { "type": ["integer"] },
+        "tags": { "type": ["array"], "items": { "type": "string" } }
+      }
+    },
+    "supported_sync_modes": ["full_refresh", "incremental"],
+    "primary_key": ["_id"],
+    "cursor_field": ["birth_date"],
+    "source_defined_primary_key": true,
+    "source_defined_cursor": true
+  }
+}
+```
+
+**The details about the streams element are mentioned below:**
+
+| Field | Type | Example | Description |
+|-------|------|---------|-------------|
+| `name` | String | `stream_8` | Name of the stream (collection). |
+| `namespace` | String | `otter_db` | Database name. |
+| `type_schema` | Object | | Schema of fields | JSON schema of collection. |
+| `supported_sync_modes` | Array | `["full_refresh","incremental"]` | Supported replication methods. |
+| `primary_key` | Array | `["_id"]` | Primary key for deduplication. |
+| `cursor_field` | Array | `["birth_date"]` | Used for incremental sync. |
+| `source_defined_primary_key` | Boolean | `true` | If true, primary key comes from MongoDB. |
+| `source_defined_cursor` | Boolean | `true` | If true, cursor comes from MongoDB. |
+
+#### D) Running the Sync
+
+Once `source.json`, `streams.json`, and `destination.json` are ready, you can run the sync jobs.
+
+ℹ️ **Note:** Instructions for creating the `destination.json` file are provided in the MongoDB Destination Document.
+
+The Sync command fetches data from MongoDB and ingests it into the specified destination (e.g., Iceberg on MinIO/S3).
+
+##### 1. Full Data Sync (No State Tracking)
+
+This will ingest the entire dataset each time (no CDC or checkpointing).
+
+```bash
+docker run --pull=always \
+  -v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+  olakego/source-mongodb:latest \
+  sync \
+  --config /mnt/config/source.json \
+  --catalog /mnt/config/streams.json \
+  --destination /mnt/config/destination.json
+```
+
+##### 2. Incremental / CDC Sync (With State Tracking)
+
+This mode enables change data capture (CDC) or incremental syncs using a checkpoint file (`state.json`).
+
+It only syncs new/updated records since the last run.
+
+```bash
+docker run --pull=always \
+  -v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+  olakego/source-mongodb:latest \
+  sync \
+  --config /mnt/config/source.json \
+  --catalog /mnt/config/streams.json \
+  --destination /mnt/config/destination.json \
+  --state /mnt/config/state.json
+```
+
+## C. Troubleshooting
+
+| Issue | Possible Cause | Solution |
+|-------|----------------|----------|
+| Connection failed (UI/CLI) | Wrong host/port, Mongo not running | Check MongoDB is up and accessible. |
+| CDC not working (UI/CLI) | Mongo not in replica set / oplog not accessible | Verify replica set is active by running `rs.status()` |
+| File not found (CLI) | Not in correct directory while running commands | Make sure both `source.json` and `destination.json` are present in correct directory and the commands are executed while inside the directory. |
+
+## D. ChangeLogs
+
