@@ -1,0 +1,151 @@
+---
+title: 4. Azure Database for PostgreSQL
+description: Azure Database for PostgreSQL
+sidebar_position: 4
+---
+
+# Azure Database for PostgreSQL CDC Setup Guide
+
+Azure Database for PostgreSQL supports CDC through logical replication on **Flexible Server** deployments. The service provides built-in support for the `wal2json` plugin and logical decoding capabilities.
+
+**Prerequisites:**
+
+- **Azure Database for PostgreSQL - Flexible Server** (PostgreSQL version 11+)
+- Admin access to modify server parameters in Azure Portal
+- The admin user or a user with `azure_pg_admin` role
+- Automated backups enabled with appropriate retention period
+
+:::warning Single Server Limitation
+Azure Database for PostgreSQL **Single Server** has limited logical replication support and is being deprecated. Migrate to **Flexible Server** for full CDC capabilities.
+:::
+
+:::caution Read Replica Limitation
+Azure Database for PostgreSQL Flexible Server does **not support logical replication on read replicas**. Read replicas use physical replication and are read-only. OLake must connect to the **primary instance** for CDC functionality.
+:::
+
+**Steps:**
+
+1. **Configure Server Parameters:** In the Azure Portal, navigate to your PostgreSQL Flexible Server. Go to **Settings** → **Server parameters** and configure:
+
+   | Parameter | Value | Purpose |
+   |-----------|-------|---------|
+   | `wal_level` | `logical` | Enable logical replication |
+   | `max_replication_slots` | `≥5` | Number of concurrent CDC connections |
+   | `max_wal_senders` | `≥7` | Should exceed replication slots |
+   | `wal_sender_timeout` | `0` | *(Optional)* Prevents snapshot timeouts |
+
+   ![azure-server-parameters](/img/docs/cdc/postgres/azure-server-parameters.png)
+
+   :::caution Restart Required
+   Changes to `wal_level` require a server restart. Azure will prompt you to restart when you save these changes.
+   :::
+
+2. **Restart the Server:** After saving parameter changes, restart your Flexible Server to apply the configuration. Verify the settings after restart:
+
+   ```sql
+   SHOW wal_level;
+   SELECT name, setting FROM pg_settings WHERE name IN ('max_replication_slots','max_wal_senders');
+   ```
+
+3. **Create Replication User:** Azure admin users have the `azure_pg_admin` role by default. You can use the admin user or create a dedicated CDC user:
+
+   **Option A: Use Admin User** *(Recommended for simplicity)*
+   ```sql
+   ALTER ROLE myadmin WITH REPLICATION;
+   ```
+
+   **Option B: Create Dedicated User**
+   ```sql
+   CREATE ROLE cdc_user WITH LOGIN PASSWORD 'strongpassword';
+   GRANT azure_pg_admin TO cdc_user;
+   ALTER ROLE cdc_user WITH REPLICATION;
+   ```
+
+   :::info Azure Requirements
+   The user must be a member of `azure_pg_admin` role to have sufficient privileges for logical replication operations in Azure.
+   :::
+
+   **Optional: Read-only Access for Initial Snapshot**
+
+   For stricter security, grant explicit read permissions:
+
+   ```sql
+   -- Example for the "public" schema in database mydb
+   GRANT CONNECT ON DATABASE mydb TO cdc_user;
+   GRANT USAGE ON SCHEMA public TO cdc_user;
+   GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+   -- Ensure future tables are covered automatically
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
+   ```
+
+4. **Configure Network Access:** Configure Azure's networking to allow OLake connections:
+
+   **For Public Access (Flexible Server):**
+   1. In Azure Portal, go to your PostgreSQL Flexible Server
+   2. Navigate to **Settings** → **Networking**
+   3. Under **Firewall rules**, click **Add current client IP address** or **Add a firewall rule**
+   4. Enter OLake's IP address range (Start IP and End IP)
+   5. Click **Save**
+
+   **For Private Access (VNet Integration):**
+   1. Ensure OLake is deployed in the same VNet or a peered VNet
+   2. Configure appropriate Network Security Group (NSG) rules
+   3. Allow traffic on port 5432 from OLake's subnet
+
+   ![postgres-network-settings-azure](/img/docs/cdc/postgres/postgres-network-settings-azure.png)
+
+5. **Verify wal2json Plugin:** Azure Flexible Server includes `wal2json` by default. Test by creating a logical replication slot:
+
+   :::important Slot Name Configuration
+   Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+   :::
+
+   ```sql
+   -- For testing only - replace with your actual OLake slot name
+   SELECT * FROM pg_create_logical_replication_slot('test_slot', 'wal2json');
+   ```
+
+   ✅ **Success:** Returns slot name and LSN  
+   ❌ **Plugin not found:** Verify `wal_level = logical` and server restart
+
+   List existing slots: `SELECT * FROM pg_replication_slots;`
+
+6. **Test Logical Decoding (Optional):** Create sample data and verify CDC functionality:
+
+   ```sql
+   -- Create test table and insert data
+   CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);
+   INSERT INTO test_table (data) VALUES ('Azure CDC test');
+   
+   -- Read changes from the slot
+   SELECT data FROM pg_logical_slot_get_changes('test_slot', NULL, NULL, 'pretty-print', '1');
+   ```
+
+   Expected output: JSON representing the insert transaction.
+
+   :::warning Cleanup (Optional)
+   Drop test slots after verification: `SELECT pg_drop_replication_slot('test_slot');`
+   :::
+
+Now that you have configured the Azure database and created the CDC user, you can add the PostgreSQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [PostgreSQL connector overview](/docs/connectors/postgres/overview) for a high-level walkthrough.
+
+## Troubleshooting
+
+- **Permission Errors:** If you see `ERROR: permission denied to create replication slot`, ensure your user has both `azure_pg_admin` and `REPLICATION` roles. The admin user should work without additional configuration.
+
+- **Plugin Not Found:** If `wal2json` is not available, verify that `wal_level = logical` is set and the server has been restarted. Azure Flexible Server includes this plugin by default.
+
+- **Connection Issues:** Ensure your Azure firewall rules allow OLake's IP addresses. Also verify that the connection string includes the correct server name format: `servername.postgres.database.azure.com`.
+
+- **Microsoft Entra ID Authentication:** If using Entra ID (Azure AD), ensure the service principal is properly configured and has been added as a PostgreSQL user using `pgaadauth_create_principal()`.
+
+- **High Availability Limitations:** 
+  :::warning HA Failover Impact
+  Azure's High Availability feature does **not** preserve logical replication slots during failovers. After a failover, you'll need to recreate the replication slot and potentially re-sync data.
+  :::
+
+- **Storage and Monitoring:** Monitor Azure metrics for storage usage and transaction ID consumption. Unused logical slots can cause WAL accumulation and storage issues. Set up alerts for "Storage percent" and "Transaction log storage used" metrics.
+
+- **Single Server Migration:** If you're on the deprecated Single Server, the workaround was to create a read replica (which enabled logical replication on the primary). However, this is complex and unreliable - migrate to Flexible Server instead.
+
+Azure Database for PostgreSQL Flexible Server provides a robust platform for CDC when properly configured. The service handles most PostgreSQL management tasks while giving you the logical replication capabilities needed for real-time data integration.

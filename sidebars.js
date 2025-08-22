@@ -132,7 +132,12 @@ const docSidebar = {
               type: 'category',
               label: 'Setup',
               items: [
+                'connectors/postgres/setup/aurora',
+                'connectors/postgres/setup/rds',
                 'connectors/postgres/setup/local',
+                'connectors/postgres/setup/azure',
+                'connectors/postgres/setup/gcp',
+                'connectors/postgres/setup/generic',
               ],
             },
             'connectors/postgres/troubleshooting',
@@ -168,7 +173,12 @@ const docSidebar = {
               type: 'category',
               label: 'Setup',
               items: [
+                'connectors/mysql/setup/aurora',
+                'connectors/mysql/setup/rds',
                 'connectors/mysql/setup/local',
+                'connectors/mysql/setup/azure',
+                'connectors/mysql/setup/gcp',
+                'connectors/mysql/setup/generic',
               ],
             },
             'connectors/mysql/troubleshooting',
@@ -181,6 +191,13 @@ const docSidebar = {
           items: [
             'connectors/oracle/overview',
             'connectors/oracle/config',
+            {
+              type: 'category',
+              label: 'Setup',
+              items: [
+                'connectors/oracle/setup/generic',
+              ],
+            },
             'connectors/oracle/troubleshooting',
           ],
         },
