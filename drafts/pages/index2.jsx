@@ -242,7 +242,7 @@ const OLakeProduct = () => {
           mailButtonText='Mail us'
           callButtonText='Get on a Call '
           mail='hello@olake.io'
-          phone='+917978307903'
+          phone='+919748485583'
           containerClassName='my-8 max-w-[1000px]'
         />
       </div>

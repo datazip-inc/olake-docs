@@ -22,7 +22,7 @@ const CTAComponent: React.FC<CTAComponentProps> = ({
   mailButtonText = "Mail Us",
   callButtonText = "Call Us",
   mail = "hello@olake.io",
-  phone = "+917978307903",
+  phone = "+919748485583",
   containerClassName = "",
 }) => {
   return (
