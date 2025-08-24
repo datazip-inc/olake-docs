@@ -21,7 +21,7 @@ const decks: Slide[] = [
 const hosts = [
   {
     name: "Priyansh Khodiyar",
-    role: "DevRel and OLake Maintainer",
+    role: "Ex DevRel",
     bio: "",
     image: "/img/authors/priyansh.jpg",
     linkedin: "https://www.linkedin.com/in/zriyansh/",
