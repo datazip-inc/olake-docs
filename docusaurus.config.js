@@ -137,6 +137,14 @@ const config = {
       // Replace with your project's social card
       image: 'img/logo/olake-blue.svg',
 
+      announcementBar: {
+        content:
+          '<strong>Join OLake Community Week!🎉 </strong>&nbsp;&nbsp;&nbsp;<a target="_blank" rel="noopener noreferrer" href="https://lu.ma/olake" style="color: white; font-weight: bold;">REGISTER NOW</a>',
+        backgroundColor: '#193AE6',
+        textColor: 'white',
+        isCloseable: true,
+      },
+
       docs: {
         sidebar: {
           autoCollapseCategories: true,
