@@ -151,6 +151,7 @@ const docSidebar = {
             'connectors/mongodb/overview',
             'connectors/mongodb/config',
             'connectors/mongodb/benchmarks',
+            'connectors/mongodb/mongo_ui_cli',
             {
               type: 'category',
               label: 'Setup',
