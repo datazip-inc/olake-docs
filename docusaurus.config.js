@@ -597,6 +597,18 @@ const config = {
         // fromExtensions: ['html', 'htm'], // /myPage.html -> /myPage
         // toExtensions: ['exe', 'zip'], // /myAsset -> /myAsset.zip (if latter exists)
         redirects: [
+          {
+            to: '/docs/benchmarks?tab=mongodb',
+            from: '/docs/connectors/mongodb/benchmarks',
+          },
+          {
+            to: '/docs/benchmarks?tab=postgres',
+            from: '/docs/connectors/postgres/benchmarks',
+          },
+          {
+            to: '/docs/benchmarks?tab=mysql',
+            from: '/docs/connectors/mysql/benchmarks',
+          },
           // /docs/oldDoc -> /docs/newDoc
           // write path after the base path URL
           {
@@ -616,7 +628,7 @@ const config = {
             from: '/olake/mongodb/framework',
           },
           {
-            to: '/docs/connectors/mongodb/benchmarks',
+            to: '/docs/benchmarks?tab=mongodb',
             from: '/olake/mongodb/benchmark',
           },
           {
@@ -636,12 +648,16 @@ const config = {
             from: '/blog/top-mongodb-etl-tools-a-comprehensive-guide-to-syncing-your-nosql-data',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/getting-started/',
           },
           {
             to: '/docs',
             from: '/docs/',
+          },
+          {
+            to: '/docs/getting-started/playground',
+            from: '/docs/playground/olake-iceberg-presto',
           },
           {
             to: '/',
@@ -707,8 +723,24 @@ const config = {
           },
 
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/getting-started',
+          },
+          {
+            to: '/docs/install/docker-cli',
+            from: '/docs/install/docker',
+          },
+          {
+            to: '/docs/install/docker-cli',
+            from: '/docs/install/docker.mdx',
+          },
+          {
+            to: '/docs/install/cli-binary',
+            from: '/docs/install/setup',
+          },
+          {
+            to: '/docs/install/cli-binary',
+            from: '/docs/install/setup.mdx',
           },
 
 
@@ -838,7 +870,7 @@ const config = {
             from: '/docs/category/destinations-writers',
           },
           {
-            to: '/docs/install/setup',
+            to: '/docs/install/cli-binary',
             from: '/docs/category/install',
           },
           {
@@ -846,15 +878,15 @@ const config = {
             from: '/docs/category/resources',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup-1',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup-2',
           },
           {
@@ -923,7 +955,7 @@ const config = {
             from: '/docs/writers/catalog/overview',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/writers/getting-started/overview',
           },
           {
