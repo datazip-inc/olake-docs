@@ -22,8 +22,8 @@ const ContactPage = () => {
                                     </div>
                                     <div className="flex items-center space-x-4">
                                         <FaPhone className="text-2xl" />
-                                        <a href="tel:+917978307903" className="hover:underline">
-                                            +91 7978307903 | +91 9748485583
+                                        <a href="tel:+919748485583" className="hover:underline">
+                                            +91 9748485583
                                         </a>
                                     </div>
                                     <div className="flex items-start space-x-4">
@@ -54,18 +54,6 @@ const ContactPage = () => {
                         <div className="space-y-8">
                             <h2 className="text-2xl font-bold mb-3">Connect with Our Team on LinkedIn</h2>
                             <ul className="space-y-4">
-                                <li className="flex items-center space-x-4">
-                                    <FaLinkedin className="text-2xl" />
-                                    <a href="https://www.linkedin.com/in/zriyansh/" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        Priyansh
-                                    </a>
-                                </li>
-                                <li className="flex items-center space-x-4">
-                                    <FaLinkedin className="text-2xl" />
-                                    <a href="https://www.linkedin.com/in/hashcode-ankit/" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        Ankit
-                                    </a>
-                                </li>
                                 <li className="flex items-center space-x-4">
                                     <FaLinkedin className="text-2xl" />
                                     <a href="https://www.linkedin.com/in/sandeepdevarapalli/" target="_blank" rel="noopener noreferrer" className="hover:underline">
