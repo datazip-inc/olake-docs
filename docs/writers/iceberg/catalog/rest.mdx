@@ -6,38 +6,173 @@ sidebar_position: 2
 
 ## REST Catalog
 
+The REST catalog is a standardized API designed to simplify the management of Apache Iceberg tables across diverse engines and programming languages. By providing a unified client interface, it eliminates the need for separate catalog integrations for engines like Spark, Flink, Trino, or languages like Java. 
 
-<Tabs>
+Built on an OpenAPI specification, the REST catalog offers a modern, flexible alternative to the Hive Metastore’s Thrift interface, tailored specifically for Iceberg’s architecture.
 
-<TabItem value="generic" label="Generic">
 
+
+<Tabs queryString="rest-catalog">
+<TabItem value="generic" label="Generic" default>
+
+The Generic **REST Catalog** is the default implementation of the Apache Iceberg REST Catalog API. 
+It provides a standard, engine-agnostic way to manage Iceberg tables without depending on a specific catalog service like Nessie, Polaris, or Unity.
+
+This guide helps you set up and use Tabular REST as an Iceberg REST catalog with OLake.
+
+### Prerequisites
+1. Docker is installed and running on your machine.
+
+2. Required services:
+- **Object store (warehouse)** – e.g., S3, MinIO, or another S3-compatible storage for table data and metadata.
+- **Metadata database** – typically PostgreSQL, with a dedicated database and user for Iceberg.
+- **REST service** – the iceberg-rest container or equivalent, configured with warehouse + DB connection.
+
+:::note
+All services involved in the sync OLake, REST Catalog Service, MinIO, and Postgres must run in the **same Docker network**.
+:::
+
+<br />
+
+### Environment Setup
+
+Save the following `docker-compose.yml` which will start the following services required for an Iceberg REST Catalog.
+
+1. **REST Catalog Service** (Tabular image) – Provides the REST API for managing Iceberg tables.
+2. **PostgreSQL** – Serves as the metadata database to track Iceberg table metadata and schema evolution.
+3. **MinIO + MinIO Client** – An S3-compatible object store used to store table data and snapshots.
+
+```yml title="docker-compose.yml"
+version: "3.9"
+
+services:
+  rest:
+    image: tabulario/iceberg-rest
+    container_name: iceberg-rest
+    ports:
+      - 8181:8181
+    volumes:
+      - catalog-data:/catalog
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: us-east-1
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9090
+      CATALOG_URI: jdbc:postgresql://postgres:5432/iceberg
+      CATALOG_JDBC_USER: iceberg
+      CATALOG_JDBC_PASSWORD: password
+    networks:
+      - iceberg_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mc:
+        condition: service_completed_successfully
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    networks:
+      - iceberg_net
+    environment:
+      POSTGRES_USER: iceberg
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: iceberg
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "iceberg", "-d", "password" ]
+      interval: 2s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    ports:
+      - 5432:5432
+    volumes:
+      - ./data/postgres-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    hostname: minio
+    container_name: minio
+    ports:
+      - 9090:9090
+      - 9091:9091
+    volumes:
+      - minio-data:/data
+    environment:
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password
+      MINIO_DOMAIN: minio
+    command: server --address ":9090" --console-address ":9091" /data
+    networks:
+      iceberg_net:
+        aliases:
+          - warehouse.minio
+
+  mc:
+    image: minio/mc
+    container_name: mc
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: us-east-1
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set minio http://minio:9090 admin password) do echo '...waiting...' && sleep 1; done;
+      echo 'Ensuring warehouse bucket exists and is public...';
+      if /usr/bin/mc stat minio/warehouse > /dev/null 2>&1; then
+        echo 'Warehouse bucket exists, removing for fresh start...';
+        /usr/bin/mc rm -r --force minio/warehouse || echo 'Failed to remove warehouse, proceeding...';
+      fi;
+      /usr/bin/mc mb minio/warehouse;
+      /usr/bin/mc anonymous set public minio/warehouse;
+      echo 'Minio warehouse bucket setup complete.';
+      "
+    networks:
+      - iceberg_net
+    depends_on:
+      - minio
+
+volumes:
+  catalog-data:
+  minio-data:
+
+networks:
+  iceberg_net:
+```
+
+Start the services:
+
+```bash
+docker-compose up -d
+```
+
+<br />
+
+### Configuration
   <Tabs>
+    <TabItem value="rest-ui" label="OLake UI" default>
 
-    <TabItem value="jdbc-ui" label="OLake UI" default>
+    In the OLake UI, go to the **Destinations** page and click **+ Create Destination**. From the list of connectors, choose **Iceberg**. In the configuration form that appears, select **REST** as the catalog type and fill in the required details.
+    
+    ![Create Destination](/img/docs/iceberg/catalog/rest/rest-generic-ui-config.png)
 
-      <RESTIcebergWriterUIConfigDetails />
-      
-      You can query the data via:
-      
-      <CatalogQuery />  
-      
-      For S3 related permissions which is needed to write data to S3, refer to the [AWS S3 Permissions](../../parquet/partitioning) documentation.
+    - <RESTIcebergWriterUIConfigDetails />
+    <br />
 
+    ### Querying Data
+    Once the data is synced successfully, you can query the Iceberg tables from any supported query engine using the following query:
+    <CatalogQuery />  
     </TabItem>
 
-    <TabItem value="jdbc-cli" label="OLake CLI" default>
+    <TabItem value="jdbc-cli" label="OLake CLI">
+    <RESTIcebergWriterConfig />
+    - <RESTIcebergWriterConfigDetails />
 
-      <RESTIcebergWriterConfig />
-
-      ### REST Configuration Parameters
-
-      <RESTIcebergWriterConfigDetails />
-
-      You can query the data via:
-
-      <CatalogQuery />
-
-      For S3 related permissions which is needed to write data to S3, refer to the [AWS S3 Permissions](../../parquet/partitioning) documentation.
+    ### Querying Data
+    Once the data is synced successfully, you can query the Iceberg tables from any supported query engine using the following query:
+    <CatalogQuery />
 
     </TabItem>
 
@@ -45,7 +180,7 @@ sidebar_position: 2
 
 </TabItem>
 
-<TabItem value="lakekeeper" label="Lakekeeper" default>
+<TabItem value="lakekeeper" label="Lakekeeper">
 
   Lakekeeper is a service that provides a unified view of all your data lakes, regardless of their location. It allows you to manage and monitor your data lakes from a single interface, making it easier to keep track of your data and ensure its integrity.
 
@@ -53,7 +188,7 @@ sidebar_position: 2
 
   After you have set up Lakekeeper using the docker compose provided, you can access the Lakekeeper UI at `http://localhost:8181/ui`.
 
-  #### Steps to create a Warehouse in Lakekeeper
+  <h4 id="steps-to-create-a-warehouse-in-lakekeeper">Steps to create a Warehouse in Lakekeeper</h4>
 
   1. **Access the Warehouse Section:**
 
@@ -99,16 +234,31 @@ sidebar_position: 2
 
 <TabItem value="nessie" label="Nessie">
 
-This guide helps you set up and use Project Nessie as an Iceberg REST catalog with OLake. It uses Docker Compose to spin up Nessie, MinIO (S3-compatible object store), and Postgres (for Nessie metadata storage).
+The **REST Nessie Catalog** integrates [Project Nessie](https://projectnessie.org/) as the catalog for Apache Iceberg using the REST Catalog API.
 
-#### Assumption: 
-All services involved in the sync process — including the OLake source image, Nessie, MinIO, and any other dependencies — must be part of the same Docker network.
+Unlike the Generic REST Catalog, Nessie adds Git-like version control for data, enabling branching, tagging, and reproducible queries across multiple engines.
 
-####  Setup Steps:
-1. Save the following as `docker-compose.yml`:
+### Prerequisites
+1. Docker is installed and running on your machine.
+2. Required services:
+- **Object store (warehouse)** – e.g., S3, MinIO, or another S3-compatible storage for table data and metadata.
+- **Metadata database** – typically PostgreSQL, with a dedicated database and user for Iceberg + Nessie.
+- **Nessie REST Service** – the `projectnessie/nessie` container, which provides the catalog API and versioning features.
 
-```yaml
+:::note
+All services involved in the sync — OLake, Nessie, MinIO, and Postgres — must run in the **same Docker network**.
+:::
 
+<br/>
+
+
+### Environment Setup
+Save the following as `docker-compose.yml`: which will start the services required for a Nessie REST Catalog:
+1. **Nessie REST Service** – Provides the REST API for managing Iceberg tables with version control.
+2. **PostgreSQL** – Stores Nessie’s metadata and catalog state.
+3. **MinIO + MinIO Client** – An S3-compatible object store used to store table data and snapshots.
+
+```yml title="docker-compose.yml"
 services:
   nessie:
     image: ghcr.io/projectnessie/nessie:latest
@@ -126,7 +276,7 @@ services:
       - nessie.catalog.service.s3.default-options.region=us-east-1
       - nessie.catalog.service.s3.default-options.path-style-access=true
       - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
-      - nessie.catalog.service.s3.default-options.external-endpoint=http://host.docker.internal:9000/
+      - nessie.catalog.service.s3.default-options.external-endpoint=http://localhost:9000/
       - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
       - nessie.catalog.secrets.access-key.name=minio
       - nessie.catalog.secrets.access-key.secret=minio123
@@ -202,31 +352,52 @@ networks:
     driver: bridge
 ```
 
-2. Start the services:
+Start the services:
 
 ```bash
 docker-compose up -d
 ```
 
-#### Nessie Catalog Configuration in OLake
+<br />
+
+### Configuration
 
 <Tabs>
 
 <TabItem value="nessie-ui" label="OLake UI" default>
 
-To configure Nessie catalog in OLake UI, use the following parameters:
+In the OLake UI, go to the **Destinations** page and click **+ Create Destination**. From the list of connectors, choose **Iceberg**. In the configuration form that appears, select **REST** as the catalog type and fill in the required details.
 
-| Parameter         | Sample Value                          | Description                                                                                                                     |
-|-------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| REST Catalog URL  | http://host.docker.internal:19120/iceberg/ | Specifies the endpoint URL for the Nessie REST catalog service that the writer will connect to.                                       |
-| Iceberg S3 Path   | s3://warehouse/                             | Determines the S3 path or storage location for Iceberg data in the warehouse bucket.           |
-| Iceberg Database        | iceberg_db                         | Specifies the name of the Iceberg database that will be used by the destination configuration.                                      |
-| S3 Endpoint     | http://host.docker.internal:9000                        | Endpoint for the MinIO S3-compatible service.                                                       |
-| AWS Region        | us-east-1                        | Specifies the AWS region associated with the S3 bucket where the data is stored.                                                                     |
-| AWS Access Key  | minio                                        | MinIO access key for authentication.                                                       |
-| AWS Secret Key  | minio123                                     | MinIO secret key for authentication.                                                    |
+![Nessie UI Configuration](/img/docs/iceberg/catalog/rest/rest-generic-ui-config.png)
 
-You can query the data via:
+- **Nessie Configuration Parameters:**
+  | Parameter        | Sample Value                               | Description                                                                                     |
+  |------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------|
+  | REST Catalog URI | http://host.docker.internal:19120/iceberg/ | Specifies the endpoint URL for the Nessie REST catalog service that the writer will connect to. |
+  | Iceberg S3 Path  | s3://warehouse/                            | Determines the S3 path or storage location for Iceberg data in the warehouse bucket.            |
+  | Iceberg Database | iceberg_db                                 | Specifies the name of the Iceberg database that will be used by the destination configuration.  |
+  | S3 Endpoint      | http://host.docker.internal:9000           | Endpoint for the MinIO S3-compatible service.                                                   |
+  | AWS Region       | us-east-1                                  | Specifies the AWS region associated with the S3 bucket where the data is stored.                |
+  | AWS Access Key   | minio                                      | MinIO access key for authentication.                                                            |
+  | AWS Secret Key   | minio123                                   | MinIO secret key for authentication.                                                            |
+
+- **Authentication Fields (optional):**
+  | Parameter                | Sample Value                        | Description                                                                                                   |
+  |--------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------|
+  | Token                    | abc...xyz                           | Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service. |
+  | OAuth2 Auth URI          | https://auth.server.com/oauth/token | OAuth2 server URI for OAuth2 authentication.                                                                  |
+  | REST Auth Type           | oauth2                              | Authentication type (e.g., "oauth2").                                                                         |
+  | Credential (OAuth2)      | your_id:your_secret                 | Specifies the client ID and secret for OAuth2, formatted as client_id:client_secret.                          |
+  | Scope (OAuth2)           | api.read api.write                  | OAuth2 scopes (space-separated).                                                                              |
+  | REST Signing Name        | s3tables                            | Service name for AWS Signature V4 (e.g., "s3tables").                                                         |
+  | REST Signing Region      | us-east-1                           | Region for AWS Signature V4 signing.                                                                          |
+  | REST Enable Signature V4 | `true`                              | Enable AWS Signature V4 signing (boolean).                                                                    |
+  | Disable Primary Keys     | `false`                             | Needed to set `true` for Databricks Unity Catalog as it doesn't support identifier fields                     |
+
+
+### Querying Data
+
+Once the data is synced successfully, you can query the Iceberg tables from any supported query engine using the following query:
 
 <CatalogQuery />
 
@@ -234,42 +405,53 @@ You can query the data via:
 
 <TabItem value="nessie-cli" label="OLake CLI">
 
-To make OLake use Nessie as the catalog via CLI, you'll need to point OLake to the REST endpoint provided by Nessie and configure it to write data to MinIO under the warehouse bucket.
-
-**Example: `writer.json`**
-Save the following config as `writer.json` or your equivalent config file:
-
-```json
+To connect to Iceberg using Nessie as the catalog, create `destination.json` with the following configuration:
+```json title="destination.json"
 {
   "type": "ICEBERG",
   "writer": {
     "catalog_type": "rest",
-      "rest_catalog_url": "http://host.docker.internal:19120/iceberg/",
-      "iceberg_s3_path": "s3://warehouse/",
-      "iceberg_db": "iceberg_db",
-      "s3_endpoint": "http://host.docker.internal:9000",
+      "rest_catalog_url": "http://localhost:19120/iceberg/",
+      "iceberg_s3_path": "warehouse",
+      "iceberg_db": "olake_db",
+      "s3_endpoint": "http://localhost:9000/",
       "aws_access_key": "minio",
-      "aws_secret_key": "minio123",
-      "aws_region": "us-east-1",
-      "no_identifier_fields": true
+      "aws_secret_key": "minio123", 
+      "aws_region": "us-east-1"
   }
 }
 ```
 
-### Nessie Configuration Parameters
+- #### Nessie Configuration Parameters
+  | Parameter        | Sample Value                               | Description                                                                                                    |
+  |------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+  | catalog_type     | rest                                       | Defines the catalog type used by the writer. "rest" means the writer interacts with a RESTful catalog service. |
+  | rest_catalog_url | http://localhost:19120/iceberg/            | Specifies the endpoint URL for the Nessie REST catalog service that the writer will connect to.                |
+  | iceberg_s3_path  | warehouse                                  | Determines the S3 path or storage location for Iceberg data in the warehouse bucket.                           |
+  | iceberg_db       | iceberg_db                                 | Specifies the name of the Iceberg database that will be used by the destination configuration.                 |
+  | s3_endpoint      | http://localhost:9000/                     | Endpoint for the MinIO S3-compatible service.                                                                  |
+  | aws_access_key   | minio                                      | MinIO access key for authentication.                                                                           |
+  | aws_secret_key   | minio123                                   | MinIO secret key for authentication.                                                                           |
+  | aws_region       | us-east-1                                  | Specifies the AWS region associated with the S3 bucket where the data is stored.                               |
 
-| Parameter        | Sample Value                  | Description                                                                                                           |
-| :--------------- | :---------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
-| catalog_type     | rest              | Defines the catalog type used by the writer. "rest" means the writer interacts with a RESTful catalog service.        |
-| rest_catalog_url | http://host.docker.internal:19120/iceberg/ | Specifies the endpoint URL for the Nessie REST catalog service that the writer will connect to.                              |
-| iceberg_s3_path  | s3://warehouse/                     | Determines the S3 path or storage location for Iceberg data in the warehouse bucket. |
-| iceberg_db       | iceberg_db                 | Specifies the name of the Iceberg database that will be used by the destination configuration.                        |
-| s3_endpoint      | http://host.docker.internal:9000 | Endpoint for the MinIO S3-compatible service. |
-| aws_access_key   | minio | MinIO access key for authentication. |
-| aws_secret_key   | minio123 | MinIO secret key for authentication. |
-| aws_region       | us-east-1 | Specifies the AWS region associated with the S3 bucket where the data is stored. |
+- #### Authentication Fields (optional):
+  | Parameter                | Sample Value                        | Description                                                                                                   |
+  |--------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------|
+  | token                    | abc...xyz                           | Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service. |
+  | oauth2_uri               | https://auth.server.com/oauth/token | OAuth2 server URI for OAuth2 authentication.                                                                  |
+  | rest_auth_type           | oauth2                              | Authentication type (e.g., "oauth2").                                                                         |
+  | credential               | your_id:your_secret                 | Specifies the client ID and secret for OAuth2, formatted as client_id:client_secret.                          |
+  | scope                    | api.read api.write                  | OAuth2 scopes (space-separated).                                                                              |
+  | rest_signing_name        | s3tables                            | Service name for AWS Signature V4 (e.g., "s3tables").                                                         |
+  | rest_signing_region      | us-east-1                           | Region for AWS Signature V4 signing.                                                                          |
+  | rest_signing_v_4         | `true`                              | Enable AWS Signature V4 signing (boolean).                                                                    |
+  | no_identifier_fields     | `false`                             | Needed to set `true` for Databricks Unity Catalog as it doesn't support identifier fields                     |
 
-You can query the data via: 
+
+
+### Querying Data
+
+Once the data is synced successfully, you can query the Iceberg tables from any supported query engine using the following query:
 
 <CatalogQuery />
 
@@ -281,14 +463,254 @@ You can query the data via:
 
 <TabItem value="s3-tables" label="S3 Tables">
 
-  <S3Tables />
+# S3 Tables 
+OLake supports S3 table (as REST catalog destination) bucket with AWS signing V4.
+
+## Configuration
+Create a json for destination config (`destination.json`)
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "rest_catalog_url": "https://s3tables.us-east-1.amazonaws.com/iceberg",
+    "iceberg_s3_path": "arn:aws:s3tables:<REGION>:<ACCOUNT_ID>:bucket/<BUCKET_NAME>",
+    "iceberg_db": "<NAMESPACE>",
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_region": "<REGION>",
+    "rest_signing_name": "s3tables",
+    "rest_signing_region": "<REGION>",
+    "rest_signing_v_4": true
+  }
+}
+```
+
+## Configuration Key Details
+Change the following placeholders in the above configuration with:
+
+- `REGION` -> Region for AWS bucket and catalog
+- `NAMESPACE` -> This will be your s3 table bucket namespace
+- `ACCOUNT_ID` -> AWS account identifier
+- `BUCKET_NAME` -> Table Bucket Name
+
+### Authentication Fields (optional):
+
+- `token` - Bearer token for token-based authentication
+- `oauth2_uri` - OAuth2 server URI for OAuth2 authentication
+- `rest_auth_type` - Authentication type (e.g., "oauth2")
+- `credential` - Client secret or credential for OAuth2 (Usually id:secret)
+- `scope` - OAuth2 scopes (space-separated)
+- `rest_signing_name` - Service name for AWS Signature V4 (e.g., "s3tables")
+- `rest_signing_region` - Region for AWS Signature V4 signing
+- `rest_signing_v_4` - Enable AWS Signature V4 signing (boolean)
+
+
+More details on how to configure and use the S3 writer will be available soon. In the meantime, you can refer to the [Iceberg writer documentation](../iceberg/overview) for general guidance on Iceberg integration, as the principles are similar across different storage backends.
+
+
 
 </TabItem>
 
 <TabItem value="unity" label="Unity">
+  # Unity Catalog (Databricks)
 
-  <UnityCatalogIcebergWriterConfig />
+OLake supports Databricks Unity Catalog as a REST catalog destination with token-based or OAuth2 authentication.
 
+## Important Limitations
+
+⚠️ **Current Unity Catalog Limitations:**
+- **Append Only**: At the time of creation of this documentation, Unity Catalog only supports **Append operations** (NO updates) for Iceberg writes
+- **Managed Tables**: Unity Catalog supports Iceberg writes only in its own managed Iceberg tables
+- **OAuth2 Status**: Currently, Personal Access Token authentication has been tested and works well. OAuth2 is available as an alternative but is experiencing issues (receiving internal server errors from Databricks during testing)
+
+For more details on Unity Catalog Iceberg support, refer to the [official Databricks documentation](https://docs.databricks.com/aws/en/iceberg/).
+
+This documentation is primarily focused on creating tokens for ingesting data into Unity/Databricks managed Iceberg tables using OLake.
+
+## Prerequisites
+
+- Admin access to Databricks workspace
+- Access to AWS S3 bucket (if using AWS for external storage)
+
+## Setup Instructions
+
+### Step 1: Create a New User & Token
+
+#### Create the User
+
+It is recommended to create a new user instead of using an existing one for security purposes.
+
+1. Go to top right corner user section → **Settings** → **Identity and Access** → **Users (Manage)**
+2. Add a new user with email address
+3. Go to **Settings** → **Advanced** → **Access Control**
+4. Turn on **Personal Access Tokens** if it's not already enabled
+   
+   ![Personal Access Tokens Settings](/img/docs/iceberg/catalog/unity/unity-catalog-personal-access-tokens.png)
+
+5. Go to **Permissions** and add the new user to allow token generation
+
+#### Create the Token
+
+1. Login with the new user credentials
+2. Go to **Settings** → **Developer** → **Access Tokens** → **Manage**
+3. Create a new token and set the appropriate validity period
+4. Copy and save the token immediately (it's only visible once)
+
+### Step 2: Create External Location for Data Storage
+
+1. Create a new external location as Unity Catalog Iceberg requires S3-based external storage (when using AWS).
+   
+   Navigate to the Catalog section and click on "Create an external location":
+   
+   ![Create External Location](/img/docs/iceberg/catalog/unity/unity-catalog-grant-permissions.png)
+
+2. Follow the recommended Databricks guide to add S3 bucket storage quickly and securely.
+
+### Step 3: Create Schema with Proper Permissions
+
+1. Create a new schema using the storage location created in Step 2
+   
+   ![Create New Schema Dialog](/img/docs/iceberg/catalog/unity/unity-catalog-create-external-location.png)
+
+2. Go to **Schema** → **Permissions**
+3. Grant the following permissions to the newly created user:
+   - `ALL PRIVILEGES`
+   - `EXTERNAL USE SCHEMA`
+   - `MANAGE`
+   
+   ![Grant Schema Permissions](/img/docs/iceberg/catalog/unity/unity-catalog-create-schema.png)
+
+## Configuration
+
+<Tabs>
+
+<TabItem value="unity-ui" label="OLake UI" default>
+
+Unity Catalog supports two authentication methods: **Token-based** (recommended) and **OAuth2** (alternative).
+
+### Common Configuration Fields
+
+These fields are required for both authentication methods:
+
+| Parameter | Sample Value | Description |
+|-----------|--------------|-------------|
+| **REST Catalog URL** | `https://adb-123456789.databricks.com/api/2.1/unity-catalog/iceberg-rest` | Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL. |
+| **Iceberg S3 Path (Warehouse)** | `workspace` | Name of the catalog in Unity Catalog (e.g., "workspace", "main"). This appears as `iceberg_s3_path` in JSON config. |
+| **Iceberg Database** | `default` | Namespace name inside the catalog (e.g., "default", "production"). This appears as `iceberg_db` in JSON config. |
+| **Normalization** | `true` | Enable data normalization for proper formatting in Unity Catalog. Recommended to keep enabled. |
+| **No Identifier Fields** | `true` | Required for Unity Catalog managed Iceberg tables that don't support equality delete-based updates. Must be enabled. |
+
+### Token-Based Authentication (Recommended)
+
+**✅ This method has been thoroughly tested and confirmed working**
+
+Additional field required for token-based authentication:
+
+| Parameter | Sample Value | Description |
+|-----------|--------------|-------------|
+| **Token** | `dapi1234567890abcdef...` | Databricks Personal Access Token for authentication. Created in Settings > Developer > Access Tokens. |
+
+### OAuth2 Authentication (Alternative)
+
+⚠️ **Note**: OAuth2 authentication is currently experiencing issues with internal server errors from Databricks during testing.
+
+Additional fields required for OAuth2 authentication:
+
+| Parameter | Sample Value | Description |
+|-----------|--------------|-------------|
+| **REST Auth Type** | `oauth2` | Set authentication type to OAuth2 |
+| **OAuth2 URI** | `https://adb-123456789.databricks.com/oidc/v1/token` | OAuth2 server URI for your Databricks workspace |
+| **Credential** | `client_id:client_secret` | Client ID and secret in format "id:secret" |
+| **Scope** | `sql offline_access` | OAuth2 scopes (space-separated) |
+
+</TabItem>
+
+<TabItem value="unity-cli" label="OLake CLI" default>
+
+### JSON Configuration
+
+Create a json for destination config (`destination.json`)
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "normalization": true,
+    "rest_catalog_url": "https://<DATABRICK_WORKSPACE_URL>/api/2.1/unity-catalog/iceberg-rest",
+    "iceberg_s3_path": "<CATALOG_NAME>",
+    "iceberg_db": "<NAMESPACE>",
+    "token": "<DATABRICK_USER_PERSONAL_ACCESS_TOKEN>",
+    "no_identifier_fields": true
+  }
+}
+```
+
+### Configuration Key Details
+
+Change the following placeholders in the above configuration with:
+
+- `DATABRICK_WORKSPACE_URL` -> Databricks workspace URL (URL that you use to access your Databricks console)
+- `CATALOG_NAME` -> Catalog name (e.g., "workspace")
+- `NAMESPACE` -> Namespace name inside catalog (e.g., "default")
+- `DATABRICK_USER_PERSONAL_ACCESS_TOKEN` -> Go to Settings > Developer > Create Personal Access Token
+- `no_identifier_fields` -> Set to `true` (Required for environments that don't support equality delete-based updates, such as Databricks Unity managed Iceberg tables)
+
+### OAuth2 Authentication (Alternative - Currently Having Issues)
+
+⚠️ **Note**: OAuth2 authentication is currently experiencing issues with internal server errors from Databricks during testing. Personal Access Token authentication is recommended until these issues are resolved.
+
+You can attempt OAuth2 authentication by modifying the configuration:
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "normalization": true,
+    "rest_catalog_url": "https://<DATABRICK_WORKSPACE_URL>/api/2.1/unity-catalog/iceberg-rest",
+    "iceberg_s3_path": "<CATALOG_NAME>",
+    "iceberg_db": "<NAMESPACE>",
+    "rest_auth_type": "oauth2",
+    "oauth2_uri": "<OAUTH2_SERVER_URI>",
+    "credential": "<CLIENT_ID>:<CLIENT_SECRET>",
+    "scope": "<OAUTH2_SCOPES>",
+    "no_identifier_fields": true
+  }
+}
+```
+
+Additional OAuth2 fields:
+- `rest_auth_type` -> Set to "oauth2"
+- `oauth2_uri` -> OAuth2 server URI for your Databricks workspace
+- `credential` -> Client ID and secret in format "id:secret"
+- `scope` -> OAuth2 scopes (space-separated)
+
+</TabItem>
+
+</Tabs>
+
+
+
+## Important Notes
+
+- **Unity Catalog Compatibility**: The `no_identifier_fields: true` setting is crucial for Unity Catalog managed Iceberg tables as they don't support equality delete-based updates
+- **Normalization**: Set `normalization: true` to ensure proper data formatting for Unity Catalog
+- **REST API**: Unity Catalog uses Iceberg's REST catalog API for table operations
+- **Permissions**: Ensure your user or service principal has appropriate permissions on the target catalog and schema
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication Errors**: Verify your Personal Access Token is valid and has the necessary permissions
+2. **Catalog Not Found**: Ensure the catalog name exists in your Unity Catalog
+3. **Schema Permissions**: Check that you have CREATE TABLE permissions on the target schema
+4. **Network Access**: Verify your OLake instance can reach the Databricks workspace URL
+
+For more general guidance on Iceberg integration, refer to the [Iceberg writer documentation](../overview). 
 </TabItem>
 
 <TabItem value="gravitino" label="Gravitino">
@@ -507,9 +929,3 @@ Save the following as `writer.json`, replacing `<olake_user_client_id>` and `<ol
 </TabItem>
 
 </Tabs>
-
-:::info
-If you wish to test out the REST Catalog locally, you can use the [docker-compose](../docker-compose) setup. The local test setup uses Minio as an S3-compatible storage and other all [supported catalog types](../docker-compose#local-catalog--test-setup).
-
-You can then setup local spark to run queries on the iceberg tables created in the local test setup.
-:::

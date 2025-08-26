@@ -77,8 +77,6 @@ import MinioJDBCIcebergWriterUIConfigLocalDetails from '../../../docs/shared/con
 import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWriterConfig.mdx'
 import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
 import RESTIcebergWriterUIConfigDetails from '../../../docs/shared/config/RESTIcebergWriterUIConfigDetails.mdx'
-import S3Tables from '../../../docs/writers/iceberg/s3-tables.mdx'
-import UnityCatalogIcebergWriterConfig from '../../../docs/writers/iceberg/unity-catalog.mdx'
 
 import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWriterConfig.mdx'
 import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
@@ -184,8 +182,6 @@ const MDXComponents = {
   RESTIcebergWriterConfig,
   RESTIcebergWriterConfigDetails,
   RESTIcebergWriterUIConfigDetails,
-  S3Tables,
-  UnityCatalogIcebergWriterConfig,
 
   HiveIcebergWriterConfig,
   HiveIcebergWriterConfigDetails,
