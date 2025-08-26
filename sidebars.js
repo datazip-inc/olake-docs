@@ -202,6 +202,14 @@ const docSidebar = {
             'connectors/oracle/troubleshooting',
           ],
         },
+
+        {
+          type: 'category',
+          label: 'Kafka',
+          items: [
+            'connectors/kafka/overview',
+          ],
+        },
       ],
     },
 
