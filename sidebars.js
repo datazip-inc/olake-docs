@@ -243,6 +243,7 @@ const docSidebar = {
             'writers/parquet/permission',
             'writers/parquet/config',
             'writers/parquet/partitioning',
+            'writers/parquet/troubleshoot',
             'writers/parquet/s3',
             'writers/parquet/gcs',
             'writers/parquet/local',
