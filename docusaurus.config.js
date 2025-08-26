@@ -756,16 +756,6 @@ const config = {
 
           // END
 
-          {
-            to: '/docs/writers/iceberg/catalog/rest?rest-catalog=s3-tables',
-            from: '/docs/writers/iceberg/s3-tables',
-          },
-
-          {
-            to: '/docs/writers/iceberg/catalog/rest?rest-catalog=unity',
-            from: '/docs/writers/iceberg/unity-catalog',
-          },
-
           // START - 404 redirects
 
           {
