@@ -72,6 +72,7 @@ const docSidebar = {
         'connectors/mongodb/index',
         'connectors/mysql/index',
         'connectors/oracle/index',
+        'connectors/kafka/index',
       ],
     },
 
