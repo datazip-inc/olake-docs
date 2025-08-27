@@ -56,10 +56,11 @@ import PostgresSourceConfig from '../../../docs/shared/config/PostgresSourceConf
 import PostgresSourceConfigDetails from '../../../docs/shared/config/PostgresSourceConfigDetails.mdx'
 import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig.mdx'
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
+import PostgresToIcebergDatatypes from '../../../docs/shared/config/PostgresToIcebergDatatypes.mdx'
 
 import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.mdx'
-import OracleSourceConfigDetails from '../../../docs/shared/config/OracleSourceConfigDetails.mdx'
 import OracledbPermissions from '../../../docs/shared/config/OracledbPermissions.mdx'
+import OracleToIcebergDatatypes from '../../../docs/shared/config/OracleToIcebergDatatypes.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
@@ -163,11 +164,12 @@ const MDXComponents = {
   PostgresSourceConfigDetails,
   PostgresStateConfig,
   PostgresStateConfigDetails,
+  PostgresToIcebergDatatypes,
 
   OracleSourceConfig,
-  OracleSourceConfigDetails,
   OracledbPermissions,
-
+  OracleToIcebergDatatypes,
+  
   S3Config,
   S3ConfigGCS,
   S3ConfigDetails,
