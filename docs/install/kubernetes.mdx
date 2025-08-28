@@ -1,11 +1,267 @@
 ---
-title: Kubernetes (UI)
-description: OLake Installation via Kubernetes/Helm
+title: Kubernetes Installation (UI)
+description: OLake UI Installation via Kubernetes using Helm
 sidebar_position: 2
 ---
 
-# Kubernetes/Helm Installation
+# OLake UI Kubernetes Installation with Helm
 
-:::info Coming Soon
-Helm chart support for OLake is currently in development and will be available soon. This will provide a streamlined way to deploy OLake on Kubernetes clusters using Helm package manager.
+This guide details the process for deploying OLake UI on Kubernetes using the official Helm chart.
+
+## Components
+
+- **OLake UI**: Main web interface for job management and configuration
+- **OLake Worker**: Background worker for processing data replication jobs
+- **PostgreSQL**: Primary database for storing job data, configurations, and sync state
+- **Temporal**: Workflow orchestration engine for managing job execution
+- **Elasticsearch**: Search and indexing backend for Temporal workflow data
+- **Signup Init**: One-time initialization service that creates the default admin user
+
+<div style={{textAlign: 'center'}}>
+
+![Docker Compose Architecture](/img/kubernetes-helm-architecture.png)
+
+</div>
+
+## Prerequisites
+
+Ensure the following requirements are met before proceeding:
+
+- **Kubernetes 1.19+**: Administrative access to a Kubernetes cluster
+- **Helm 3.2.0+**: Helm client installed and configured. [Installation Guide](https://helm.sh/docs/intro/install/)
+- **kubectl**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+
+## Quick Start
+
+### 1. Add OLake Helm Repository
+
+```bash
+helm repo add olake https://datazip-inc.github.io/olake-helm
+helm repo update
+```
+
+### 2. Install the Chart
+
+**Basic Installation:**
+```bash
+helm install olake olake/olake
+```
+
+### 3. Access OLake UI
+
+Forward the UI service port to your local machine:
+
+```bash
+kubectl port-forward svc/olake-ui 8000:8000
+```
+
+Open your browser and navigate to: `http://localhost:8000`
+
+**Default Credentials:**
+- Username: `admin`
+- Password: `password`
+
+:::tip
+If OLake is installed with **Ingress enabled**, port-forwarding is not necessary. Access the application using the configured Ingress hostname.
 :::
+
+## Configuration Options
+
+### Initial User Setup
+
+Create a Kubernetes secret to replace default credentials:
+
+```bash
+kubectl create secret generic olake-admin-credentials \
+  --from-literal=username='superadmin' \
+  --from-literal=password='a-very-secure-password' \
+  --from-literal=email='admin@mycompany.com'
+```
+
+Then configure in `values.yaml`:
+
+```yaml
+olakeUI:
+  initUser:
+    existingSecret: "olake-admin-credentials"
+    secretKeys:
+      username: "username"
+      password: "password"
+      email: "email"
+```
+
+Apply the configuration:
+
+```bash
+helm upgrade olake olake/olake -f values.yaml
+```
+
+### Ingress Configuration
+
+To expose OLake through an ingress controller, create a custom values file:
+
+```yaml
+# values.yaml
+olakeUI:
+  ingress:
+    enabled: true
+    className: "nginx"
+    hosts:
+      - host: olake.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: olake-tls
+        hosts:
+          - olake.example.com
+```
+
+### JobID-Based Node Mapping
+With this powerful feature, specific data jobs can be routed to specific Kubernetes nodes, by which performance and reliability can be optimized.
+
+_**Where is the JobID found?**_ The JobID is an integer that is automatically assigned to each job created in OLake UI. The JobID can be found in the corresponding row for each job on the Jobs page.
+
+```yaml
+global:
+  jobMapping:
+    123:
+      olake.io/workload-type: "heavy"
+    456:
+      node-type: "high-cpu"
+    789:
+      olake.io/workload-type: "small"
+    999: {} # Empty mapping uses default scheduling
+```
+
+:::note
+- A rollout restart of the olake-workers deployment is necessary after updating this map and running helm upgrade.
+- For any JobID that is not specified in the jobMapping configuration, the corresponding job's pod will be scheduled by the standard Kubernetes scheduler, which places it on any available node in the cluster.
+:::
+
+### Cloud IAM Integration
+
+OLake's activity pods (the pods by which the actual data sync is performed) can be allowed to securely access cloud resources(AWS Glue or S3) using IAM roles.
+
+```yaml
+global:
+  jobServiceAccount:
+    create: true
+    name: "olake-job-sa"
+    
+    # Cloud provider IAM role associations
+    annotations:
+      # AWS IRSA
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-job-role"
+      
+      # GCP Workload Identity
+      iam.gke.io/gcp-service-account: "olake-job@project.iam.gserviceaccount.com"
+      
+      # Azure Workload Identity
+      azure.workload.identity/client-id: "12345678-1234-1234-1234-123456789012"
+```
+:::note
+Note: For detailed instructions on the creation of IAM roles and service accounts, the official documentation for AWS IRSA, GCP Workload Identity, or Azure Workload Identity should be referred to. For a minimal Glue and S3 IAM access policy please refer [here](https://olake.io/docs/writers/iceberg/catalog/glue#required-iam-permissions).
+:::
+
+### Encryption Configuration
+
+Configure encryption of job metadata stored in Postgres database by setting the OLAKE_SECRET_KEY environment variable in the OLake Worker:
+
+```yaml
+global:
+  env:
+    # 1. For AWS KMS (starts with 'arn:aws:kms:'):
+    OLAKE_SECRET_KEY: "arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012"
+    
+    # 2. For local AES-256 (any other non-empty string):
+    OLAKE_SECRET_KEY: "your-secret-encryption-key"  # Auto-hashed to 256-bit key
+    
+    # 3. For no encryption (default, not recommended for production):
+    OLAKE_SECRET_KEY: ""  # Empty = no encryption
+```
+
+### Persistent Storage Configuration
+
+The OLake application components (UI, Worker, and Activity Pods) require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata.
+
+For production, a robust, highly-available RWX-capable storage solution such as AWS EFS, GKE Filestore, or Azure Files must be used. This is achieved by disabling the built-in NFS server and providing an existing PersistentVolumeClaim (PVC) that is backed by a managed storage service. An example for using external PVC is given below:
+
+```yaml
+nfsServer:
+  # 1. The development NFS server is disabled
+  enabled: false
+  
+  # 2. An existing ReadWriteMany PersistentVolumeClaim is specified
+  external:
+    name: "my-rwx-pvc"
+```
+:::note
+For development and quick starts, a simple NFS server is included and enabled by default. This provides an out-of-the-box shared storage solution without any external dependencies. However, because this server runs as a single pod, it represents a single point of failure and is not recommended for production use.
+:::
+
+## Upgrading Chart Version
+
+### Upgrade to Latest Version
+
+```bash
+helm repo update
+helm upgrade olake olake/olake
+```
+
+### Upgrade with New Configuration
+
+```bash
+helm upgrade olake olake/olake -f new-values.yaml
+```
+
+## Troubleshooting
+
+### Check Pod Logs
+
+```bash
+# OLake UI logs  
+kubectl logs -l app.kubernetes.io/name=olake-ui -f
+
+# Temporal server logs
+kubectl logs -l app.kubernetes.io/name=temporal-server -f
+```
+
+### Common Issues
+
+**Pods Stuck in Pending State:**
+- Check if your cluster has sufficient resources
+- Verify StorageClass is available and configured correctly
+- Check node selectors or affinity rules
+
+**Database Connection Issues:**
+- Verify PostgreSQL pod is running: `kubectl get pods -l app.kubernetes.io/name=postgresql`
+- Check database connectivity from other pods
+- Review database credentials in secrets
+
+## Uninstallation
+
+### Remove OLake Installation
+
+```bash
+helm uninstall olake
+```
+:::warning
+Some resources are intentionally preserved after helm uninstall to prevent accidental data loss:
+
+- PersistentVolumeClaims (PVCs): olake-shared-storage and database PVCs are retained to preserve job data, configurations, and historical information
+- NFS Server Resources: If installed using the built-in NFS server, the following resources persist:
+    - Service/olake-nfs-server
+    - StatefulSet/olake-nfs-server
+    - ClusterRole/olake-nfs-server
+    - ClusterRoleBinding/olake-nfs-server
+    - StorageClass/nfs-server
+    - ServiceAccount/olake-nfs-server
+:::
+
+## Support
+
+- **Email:** `hello@olake.io`
+- [Join Slack Community](https://olake.io/slack/)
+- [Schedule a Call](https://calendly.com/d/ckr6-g82-p9y/olake_discussion)
+- [GitHub Issues](https://github.com/datazip-inc/olake/issues)
