@@ -78,6 +78,14 @@ import RESTIcebergWriterConfig from '../../../docs/shared/config/RESTIcebergWrit
 import RESTIcebergWriterConfigDetails from '../../../docs/shared/config/RESTIcebergWriterConfigDetails.mdx'
 import RESTIcebergWriterUIConfigDetails from '../../../docs/shared/config/RESTIcebergWriterUIConfigDetails.mdx'
 
+import Generic from '../../../docs/writers/iceberg/catalog/rest/Generic.mdx'
+import Lakekeeper from '../../../docs/writers/iceberg/catalog/rest/Lakekeeper.mdx'
+import Nessie from '../../../docs/writers/iceberg/catalog/rest/Nessie.mdx'
+import Polaris from '../../../docs/writers/iceberg/catalog/rest/Polaris.mdx'
+import S3Tables from '../../../docs/writers/iceberg/catalog/rest/S3Tables.mdx'
+import Unity from '../../../docs/writers/iceberg/catalog/rest/Unity.mdx'
+import Gravitino from '../../../docs/writers/iceberg/catalog/rest/Gravitino.mdx'
+
 import HiveIcebergWriterConfig from '../../../docs/shared/config/HiveIcebergWriterConfig.mdx'
 import HiveIcebergWriterConfigDetails from '../../../docs/shared/config/HiveIcebergWriterConfigDetails.mdx'
 import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIcebergWriterUIConfigDetails.mdx'
@@ -182,6 +190,14 @@ const MDXComponents = {
   RESTIcebergWriterConfig,
   RESTIcebergWriterConfigDetails,
   RESTIcebergWriterUIConfigDetails,
+
+  Generic,
+  Lakekeeper,
+  Nessie,
+  Polaris,
+  S3Tables,
+  Unity,
+  Gravitino,
 
   HiveIcebergWriterConfig,
   HiveIcebergWriterConfigDetails,
