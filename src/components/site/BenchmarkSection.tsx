@@ -404,7 +404,7 @@ const BenchmarkSection: React.FC = () => {
           )}
           <div className="mt-2 flex w-full flex-col space-y-4 2xl:px-40 md:flex-row md:space-x-2 md:space-y-0">
             <Link
-              to="https://olake.io/docs/connectors/postgres/benchmarks"
+              to="/docs/benchmarks"
               className="inline-flex items-center font-medium text-[#203FDD] hover:text-blue-700 ml-auto"
             >
               View all Performance Benchmarks
