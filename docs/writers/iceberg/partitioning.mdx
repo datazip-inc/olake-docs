@@ -1,24 +1,14 @@
 ---
-title: Partitioning 
+title: Partitioning
 description: How to configure and use Apache Iceberg partitioning in OLake’s Iceberg writer, with clear examples and links to upstream docs.
 sidebar_position: 6
 ---
 
 # Iceberg Partitioning Support
 
+OLake allows seamless writing into **Partitioned Iceberg tables** supporting all built-in transformations in **Apache Iceberg™**.
 
-Partitioning groups rows that share common values **at write-time**, so that queries filtering on those values read only the relevant files. The result is **fewer data files scanned, less I/O, and faster queries**. 
-
-
-
-### How Iceberg handles partitions   
-
-Iceberg automatically stores the *derived* partition values for each row in table metadata.  
-Because the physical layout is hidden, your SQL can stay simple (`WHERE date > …`); Iceberg prunes away files that cannot match.  
-
-
-
-###  Partition spec syntax used by the writer   
+### Configuration
 
 In `streams.json` file, add values in the below format to `partition_regex` string that describes one or more partition fields in order:
 
@@ -31,10 +21,10 @@ In `streams.json` file, add values in the below format to `partition_regex` stri
 | `field_name`   | Column in the incoming record (`created_at`, `user_id`, etc.)      |
 | `transform`    | Iceberg transform that converts the value.        |
 
-> **Special case**  
+> **Special case**
 > You may use `now()` as a pseudo-column that evaluates to the writer’s current timestamp (useful when your records lack a suitable time field).
 
-####  Complete examples
+### Complete Examples
 
 ```text
 # Partition rows by calendar year of a timestamp:
@@ -52,32 +42,33 @@ In `streams.json` file, add values in the below format to `partition_regex` stri
 
 
 
-### Supported transforms—what they do and what you’ll see on disk
+### Supported Transforms—what they do and what you’ll see on disk
 
 | Transform & Syntax | Typical use-case | How the transform works | Spec snippet | **Example input → partition value** |
 |--------------------|------------------|-------------------------|--------------|-------------------------------------|
 | **`identity`** | Columns with only a few distinct values – e.g. `country`, `status` | Writes the **raw value** unchanged | `/{status, identity}` | `status = 'active'` → folder `status=active/` |
-| **`year`** | Time-series data where queries slice whole years | Extracts the calendar year as an integer | `/{created_at, year}` | `created_at = 2025-04-24 15:42` → `year=2025/` |
-| **`month`** | Monthly reporting, rollups, retention | Returns the month number (1-12) of the timestamp | `/{created_at, month}` | `created_at = 2025-04-24 15:42` → `month=4/` |
-| **`day`** | Daily dashboards, 30-day TTL jobs | Returns the local calendar day (1-31) | `/{event_date, day}` | `event_date = 2025-04-24` → `day=24/` |
-| **`hour`** | High-volume logs where analysts drill into single hours | Returns hour-of-day (0-23) | `/{event_time, hour}` | `event_time = 2025-04-24 15:42` → `hour=15/` |
+| **`year`** | Time-series data where queries slice whole years | Extracts the calendar year as an integer | `/{created_at, year}` | `created_at = 2025-04-24 15:42` → `created_at_year=2025/` |
+| **`month`** | Monthly reporting, rollups, retention | Extracts year-month as YYYY-MM | `/{created_at, month}` | `created_at = 2025-04-24 15:42` → `created_at_month=2025-04/` |
+| **`day`** | Daily dashboards, 30-day TTL jobs | Extracts the date as days since epoch (1970-01-01) | `/{event_date, day}` | `event_date = 2025-04-24` → `event_date_day=2025-04-24/` |
+| **`hour`** | High-volume logs where analysts drill into single hours | Extracts timestamp truncated to hour | `/{event_time, hour}` | `event_time = 2025-04-24 15:42` → `event_time_hour=2025-04-24-15/` |
 | **`bucket[N]`** | Very high-cardinality keys (email, UUID) to distribute writes | Hashes the value and assigns it to **N** numbered buckets (0…N-1) | `/{user_id, bucket[64]}` | `user_id = 'f47ac10b...'` → `user_id_bucket=17/` *(one of 64)* |
 | **`truncate[N]`** | Long strings where only the prefix matters (domains, URLs) | Keeps the first **N** UTF-8 characters | `/{domain, truncate[4]}` | `domain = 'example.com'` → `domain=exam/` |
 
-> **Quick guide to data types**  
-> * `identity` and `truncate[N]` keep string values as strings.  
-> * `year`, `month`, `day`, `hour` and `bucket[N]` store **integers** under the hood (e.g. `month=4`, `bucket=17`).  
->   That makes partition pruning cheap and predictable.
+> **Quick guide to data types**
+> * `identity` and `truncate[N]` keep original data types
+> * `year` produces integers, while `month`, `day`, and `hour` produce formatted strings for readability
+> * `bucket[N]` produces integers (0 to N-1)
+> * All transforms maintain type consistency for efficient partition pruning
 
 
 
-###  What if a field is missing?   
+## Handling Missing Fields
 
 If the incoming record lacks a declared partition column, the writer sets that partition value to `null`. Iceberg treats `null` like any other value, so the row is written successfully and queries can still skip non-matching files.
 
 
 
-###  Putting it all together   
+## Configuration Example
 
 ```json title="config/snippets/stream.json"
 {
@@ -103,7 +94,7 @@ my_stream/
          └─ data-file.parquet
 ```
 
-####  Querying partitioned tables
+### Querying Partitioned Tables
 
 ```sql
 -- Only partitions for 1 May 2023 and region 'us-east' are read
@@ -113,20 +104,20 @@ WHERE timestamp_col = DATE '2023-05-01'
   AND region = 'us-east';
 ```
 
-Because Iceberg pushes the predicates (`timestamp_col`, `region`) down to the metadata layer, files outside those partitions are skipped entirely. 
+Because Iceberg pushes the predicates (`timestamp_col`, `region`) down to the metadata layer, files outside those partitions are skipped entirely.
 
 
-## Partition-spec “cheat-sheet”  
+## Common Partitioning Patterns
 
 All the examples below follow the **same four-block layout** so you can scan, copy, and adapt them quickly:
 
-* **Partition Spec** – the exact string to paste into `partition_regex`  
-* **Good For** – what kind of workload/problem it solves  
-* **Why It Works** – the principle behind the layout  
-* **Sample Folders & Query** – one real path and a SQL snippet to show pruning in action  
+* **Partition Spec** – the exact string to paste into `partition_regex`
+* **Good For** – what kind of workload/problem it solves
+* **Why It Works** – the principle behind the layout
+* **Sample Folders & Query** – one real path and a SQL snippet to show pruning in action
 
 
-### 1  Streaming click-stream logs
+### 1. Streaming Click-Stream Logs
 **Partition Spec**
 
 ```text
@@ -142,10 +133,10 @@ All the examples below follow the **same four-block layout** so you can scan, co
 }
 ```
 
-**Folder created**
+**Folder Structure**
 
 ```
-event_time_hour=2025-04-24-15/user_id_bucket=344/part-00001.parquet
+event_time_hour=2025-04-24-15/user_id_bucket=344/data-00001.parquet
 ```
 
 **Query that prunes**
@@ -158,7 +149,7 @@ WHERE  event_time BETWEEN TIMESTAMP '2025-04-24 15:00'
 ```
 
 
-### 2  Global e-commerce orders
+### 2. Global E-Commerce Orders
 **Partition Spec**
 
 ```text
@@ -174,10 +165,10 @@ WHERE  event_time BETWEEN TIMESTAMP '2025-04-24 15:00'
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-order_date_month=2025-04/ship_country=IN/part-00037.parquet
+order_date_month=2025-04/ship_country=IN/data-00037.parquet
 ```
 
 **Query**
@@ -190,7 +181,7 @@ WHERE  order_date BETWEEN DATE '2025-04-01' AND DATE '2025-04-30'
 ```
 
 
-### 3  IoT device telemetry
+### 3. IoT Device Telemetry
 **Partition Spec**
 
 ```text
@@ -206,10 +197,10 @@ WHERE  order_date BETWEEN DATE '2025-04-01' AND DATE '2025-04-30'
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-event_date_month=2025-04/device_id_bucket=22/part-00003.parquet
+event_date_month=2025-04/device_id_bucket=22/data-00003.parquet
 ```
 
 **Query**
@@ -222,7 +213,7 @@ WHERE  device_id = 'sensor-9f2c'
 ```
 
 
-### 4  Modernising a Hive `yyyy/mm/dd` layout
+### 4. Modernizing a Hive `yyyy/mm/dd` Layout
 **Partition Spec**
 
 ```text
@@ -238,10 +229,10 @@ WHERE  device_id = 'sensor-9f2c'
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-order_ts_year=2025/order_ts_month=04/order_ts_day=24/part-99983.parquet
+order_ts_year=2025/order_ts_month=2025-04/order_ts_day=2025-04-24/data-99983.parquet
 ```
 
 **Query**
@@ -253,7 +244,7 @@ WHERE  order_ts = DATE '2025-04-24';
 ```
 
 
-### 5  GDPR / CCPA expiry window (day-level)
+### 5. GDPR / CCPA Expiry Window (Day-Level)
 **Partition Spec**
 
 ```text
@@ -269,15 +260,15 @@ WHERE  order_ts = DATE '2025-04-24';
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-delete_after_day=2025-05-24/part-00017.parquet
+delete_after_day=2025-05-24/data-00017.parquet
 ```
 
 
 
-### 6  Pure identity on low-cardinality code
+### 6. Pure Identity on Low-Cardinality Code
 **Partition Spec**
 
 ```text
@@ -293,10 +284,10 @@ delete_after_day=2025-05-24/part-00017.parquet
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-status=active/part-00009.parquet
+status=active/data-00009.parquet
 ```
 
 **Query**
@@ -308,7 +299,7 @@ WHERE  status = 'active';
 ```
 
 
-### 7  Hierarchical calendar (year → month → day)
+### 7. Hierarchical Calendar (Year → Month → Day)
 **Partition Spec**
 
 ```text
@@ -324,10 +315,10 @@ WHERE  status = 'active';
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-event_ts_year=2025/event_ts_month=04/event_ts_day=24/part-00571.parquet
+event_ts_year=2025/event_ts_month=2025-04/event_ts_day=2025-04-24/data-00571.parquet
 ```
 
 **Query**
@@ -341,7 +332,7 @@ WHERE  event_ts BETWEEN DATE '2025-04-24' AND DATE '2025-04-24';
 
 
 
-### 8  Prefix truncate on long strings
+### 8. Prefix Truncate on Long Strings
 **Partition Spec**
 
 ```text
@@ -357,10 +348,10 @@ WHERE  event_ts BETWEEN DATE '2025-04-24' AND DATE '2025-04-24';
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-domain=exam/part-00001.parquet          # holds rows like 'example.com'
+domain=exam/data-00001.parquet          # holds rows like 'example.com'
 ```
 
 **Query**
@@ -372,7 +363,7 @@ WHERE  domain LIKE 'exam%';
 ```
 
 
-### 9  Boolean flag shield
+### 9. Boolean Flag Shield
 **Partition Spec**
 
 ```text
@@ -388,10 +379,10 @@ WHERE  domain LIKE 'exam%';
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-is_test=true/part-00005.parquet
+is_test=true/data-00005.parquet
 ```
 
 **Query**
@@ -403,7 +394,7 @@ WHERE  is_test = false;   -- skips the whole test partition
 ```
 
 
-### 10  Schema-versioned blobs
+### 10. Schema-Versioned Blobs
 **Partition Spec**
 
 ```text
@@ -419,10 +410,10 @@ WHERE  is_test = false;   -- skips the whole test partition
 }
 ```
 
-**Folder**
+**Folder Structure**
 
 ```
-schema_version=v3/update_ts_month=2025-04/part-00077.parquet
+schema_version=v3/update_ts_month=2025-04/data-00077.parquet
 ```
 
 **Query**
@@ -433,7 +424,7 @@ FROM   repo.blobs
 WHERE  schema_version >= 'v3';
 ```
 
-### Quick-select flowchart  
+## Choosing the Right Partitioning Strategy
 
 ```mermaid
 flowchart TD
@@ -445,7 +436,7 @@ flowchart TD
     E -- No --> G["Use truncate[N] or keep unpartitioned"]
 ```
 
-> **Rule of thumb** – Aim for **100 - 10 000 small files** inside each partition folder.  
+> **Rule of thumb** – Aim for **100 - 10 000 small files** inside each partition folder.
 > Adjust bucket counts or combine fields until you hit that sweet spot.
 
 
@@ -453,7 +444,7 @@ flowchart TD
 Use these patterns as a baseline, evolve when your query patterns or data volume change, and you’ll keep scans fast without over-engineering your layout.
 
 
-### Checklist before you decide
+## Decision Checklist
 
 | Question | If **yes**, consider … |
 |----------|-----------------------|
@@ -462,20 +453,20 @@ Use these patterns as a baseline, evolve when your query patterns or data volume
 | Do you need easy bulk-deletes? | Partition on expiry or ingest date. |
 | Do analysts group by a specific code (country, status)? | Use `identity` on that column. |
 
-Stick to one or two partition fields at first; you can *evolve* later if query patterns change.  
+Stick to one or two partition fields at first; you can *evolve* later if query patterns change.
 
 ### Quick checklist before you pick a spec
 
-1. **Cardinality** — Aim for 100 – 10 000 files per partition folder.  
-2. **Skew** — Use `bucket[N]` when one value dominates (e.g., a single large tenant).  
-3. **Time range queries** — Put the *time transform first* if nearly every query filters on a date.  
-4. **Evolution** — Start simple (e.g., `{event_date, day}`) and add more fields later; Iceberg keeps old snapshots readable.
+1. **Cardinality** — Aim for 100 – 10,000 files per partition folder
+2. **Skew** — Use `bucket[N]` when one value dominates (e.g., a single large tenant)
+3. **Time range queries** — Put the time transform first if nearly every query filters on a date
+4. **Evolution** — Start simple (e.g., `{event_date, day}`) and add more fields later; Iceberg keeps old snapshots readable
 
-These patterns should cover 90 % of use-cases we’ve seen in the field.  
+These patterns should cover 90% of use-cases we've seen in the field.
 If your workload looks different, open an issue or drop us a message—we love weird corner-cases!
 
 
-###  Further reading
+## Further Reading
 
 - [What is Iceberg Partitioning? (official docs)](https://iceberg.apache.org/docs/latest/partitioning/#what-is-partitioning)
 - [What is transform (official docs)](https://iceberg.apache.org/spec/#partitioning)
@@ -483,6 +474,6 @@ If your workload looks different, open an issue or drop us a message—we love w
 
 
 
-### Need more help?   
+## Need More Help?
 
 If any part of this guide feels unclear, open an issue in the docs repo or ping us on Slack—feedback helps us improve!
