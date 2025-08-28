@@ -1,44 +1,282 @@
 ---
-title: 3. JDBC
-description: OLake Apache Iceberg writer description
+title: 3. JDBC/SQL
+description: JDBC/SQL Catalog configuration for OLake Apache Iceberg
 sidebar_position: 3
 ---
 
-## JDBC Catalog
+<style>
+{`
+/* Consistent styling for docs */
+.full-width-container {
+  width: 100% !important;
+  max-width: 100% !important;
+}
 
+.full-width-container img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto;
+}
+
+.full-width-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto;
+}
+
+.full-width-table table {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: auto;
+  margin: 0 !important;
+}
+
+.full-width-table th,
+.full-width-table td {
+  padding: 8px 12px;
+  word-wrap: break-word;
+}
+
+.markdown table {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: table !important;
+}
+
+.table-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.full-width-table * {
+  max-width: 100% !important;
+}
+
+div[class*="table"] table,
+.markdown > table,
+table {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.tabs-container {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+.tabs {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  justify-content: flex-start !important;
+}
+
+.tabs__item {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  margin-left: 0 !important;
+  padding: 10px 18px !important;
+  border-radius: 6px 6px 0 0 !important;
+}
+
+.tabs__item--active {
+  background-color: var(--ifm-hover-overlay) !important;
+  color: var(--ifm-color-primary) !important;
+  border-bottom: 2px solid var(--ifm-color-primary) !important;
+}
+
+.tabs__item:hover {
+  background-color: var(--ifm-hover-overlay) !important;
+}
+`}
+</style>
+
+# JDBC/SQL Catalog Write Guide
+
+OLake integrates with **JDBC/SQL catalogs** (PostgreSQL, MySQL, etc.) to provide full support for **Apache Iceberg tables**.
+
+With this setup:
+- **Data** is stored in object storage (S3, MinIO, or any S3-compatible system).
+- **Metadata** is managed in a relational database (via JDBC).
+- **OLake** seamlessly writes into Iceberg tables using JDBC + object storage.
+
+---
+
+## Prerequisites
+
+Before configuring OLake with JDBC Catalog, ensure the following:
+
+### 1. Relational Database (PostgreSQL/MySQL)
+
+- A JDBC-supported database (such as PostgreSQL or MySQL) will serve as the Iceberg metadata catalog.
+
+### 2. Object Storage (S3/MinIO)
+
+- A bucket for storing **Iceberg data files (Parquet + metadata)**.
+
+---
+
+Here’s an example `docker-compose.yml` for OLake with **PostgreSQL JDBC Catalog + MinIO**:
+
+```yml
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: iceberg-postgres
+    environment:
+      POSTGRES_USER: iceberg
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: iceberg
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "iceberg", "-d", "iceberg"]
+      interval: 2s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ./data/postgres-data:/var/lib/postgresql/data
+    networks:
+      - iceberg_net
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-03T14-56-28Z
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_DOMAIN=minio
+    networks:
+      iceberg_net:
+        aliases:
+          - warehouse.minio
+    ports:
+      - 9001:9001
+      - 9000:9000
+    volumes:
+      - ./data/minio-data:/data
+    command: [ "server", "/data", "--console-address", ":9001" ]
+
+  mc:
+    depends_on:
+      - minio
+    image: minio/mc:RELEASE.2025-04-03T17-07-56Z
+    container_name: mc
+    networks:
+      iceberg_net:
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    entrypoint: |
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+      if ! /usr/bin/mc ls minio/warehouse > /dev/null 2>&1; then
+        /usr/bin/mc mb minio/warehouse;
+        /usr/bin/mc policy set public minio/warehouse;
+      fi;
+      tail -f /dev/null
+      "
+
+networks:
+  iceberg_net:
+    name: iceberg_net
+
+volumes:
+  postgres-data:
+  minio-data:
+````
+
+---
+
+## Configuration
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 <Tabs>
-
 <TabItem value="jdbc-ui" label="OLake UI" default>
+
+After setting up the source, configure your **destination with JDBC Catalog**.
+
+![JDBC Catalog OLake UI Configuration](/img/docs/iceberg/jdbc/jdbc-catalog-olake-ui-setup-destination.png)
 
 <MinioJDBCIcebergWriterUIConfigLocalDetails/>
 
-</TabItem>
-
-<TabItem value="jdbc-cli" label="OLake CLI" default>
-
-<MinioJDBCIcebergWriterConfigLocal/>
-
-### JDBC Configuration Parameters
-
-<MinioJDBCIcebergWriterConfigLocalDetails/>
+**Click `Next →`** to test the connection. OLake will verify JDBC + object storage connectivity.
 
 </TabItem>
 
+<TabItem value="jdbc-cli" label="OLake CLI">
+
+Create a `destination.json` with the following configuration:
+
+```json title="destination.json"
+{
+     "type": "ICEBERG",
+     "writer": {
+          "catalog_type": "jdbc",
+          "jdbc_url": "jdbc:postgresql://host.docker.internal:5432/iceberg",
+          "jdbc_username": "iceberg",
+          "jdbc_password": "password",
+          "iceberg_s3_path": "s3a://warehouse",
+          "s3_endpoint": "http://host.docker.internal:9000",
+          "s3_use_ssl": false,
+          "s3_path_style": true,
+          "aws_access_key": "admin",
+          "aws_region": "us-east-1",
+          "aws_secret_key": "password",
+          "iceberg_db": "iceberg_db"
+     }
+}
+```
+
+<MinioJDBCIcebergWriterUIConfigLocalDetails/>
+
+Run the sync command using this `destination.json`.
+
+</TabItem>
 </Tabs>
 
-You can query the data via:
+:::tip Connection Testing
+OLake automatically validates:
 
-<CatalogQuery/>
-
-If you are build olake locally (using `./build.sh` command), change the config to:
-1. `jdbc_url": "jdbc:postgresql://localhost:5432/iceberg"`
-2. `s3_endpoint": "http://localhost:9000"`
-
-For S3 related permissions which is needed to write data to S3, refer to the [AWS S3 Permissions](../../parquet/partitioning) documentation.
-
-:::info
-If you wish to test out the REST Catalog locally, you can use the [docker-compose](../docker-compose) setup. The local test setup uses Minio as an S3-compatible storage and other all [supported catalog types](../docker-compose#local-catalog--test-setup). 
-
-You can then setup local spark to run queries on the iceberg tables created in the local test setup.
+* JDBC connectivity & authentication
+* Object storage access (S3/MinIO)
+* Database creation & access permissions
 :::
+
+---
+
+## Troubleshooting
+
+### Common Errors & Solutions
+
+<div className="full-width-table">
+
+| Error                 | Cause                   | Resolution                                                                             |
+| --------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
+| `Connection refused`  | Database not reachable        | Check `jdbc_url`, port, and Docker network. Avoid using `localhost` inside containers. |
+| `SSL Handshake Error` | Wrong SSL configuration | Ensure `s3_use_ssl` matches your storage endpoint settings.                            |
+
+</div>
+
+---
+
+### Debugging Checklist
+
+1. **Check DB connectivity**
+
+   ```bash
+   psql -h localhost -p 5432 -U iceberg -d iceberg
+   ```
+
+2. **Verify Object Storage access**
+
+   ```bash
+   docker exec -it mc /bin/sh
+   mc alias set local http://minio:9000 admin password
+   mc ls local
+   ```
