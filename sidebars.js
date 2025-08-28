@@ -107,9 +107,12 @@ const docSidebar = {
           type: 'category',
           label: 'Parquet Writer',
           items: [
+            'writers/parquet/permission',
             'writers/parquet/config',
             'writers/parquet/partitioning',
-            'writers/parquet/permission',
+            'writers/parquet/troubleshoot',
+            'writers/parquet/s3',
+            'writers/parquet/gcs',
             'writers/parquet/local',
             
           ],
