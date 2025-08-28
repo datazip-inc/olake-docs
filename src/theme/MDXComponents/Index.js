@@ -64,6 +64,7 @@ import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.m
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
 import S3ConfigGCS from '../../../docs/shared/config/S3ConfigGCS.mdx'
+import S3ConfigMinIO from '../../../docs/shared/config/S3ConfigMinIO.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 import S3ConfigUIDetails from '../../../docs/shared/config/S3ConfigUIDetails.mdx'
 
@@ -168,6 +169,7 @@ const MDXComponents = {
 
   S3Config,
   S3ConfigGCS,
+  S3ConfigMinIO,
   S3ConfigDetails,
   S3ConfigUIDetails,
   LocalParquetConfig,
