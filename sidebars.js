@@ -91,9 +91,10 @@ const docSidebar = {
               label: 'Catalogs',
               items: [
                 'writers/iceberg/catalog/glue',
+                'writers/iceberg/catalog/rest',
                 'writers/iceberg/catalog/jdbc',
                 'writers/iceberg/catalog/hive',
-                'writers/iceberg/catalog/rest',
+                'writers/iceberg/catalog/unity',
               ],
             },
             'writers/iceberg/partitioning',
