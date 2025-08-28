@@ -2,127 +2,249 @@
 title: MySQL
 description: OLake MySQL Connector
 ---
+# Overview
 
-## Overview {#overview}
+The OLake MySQL Source connector supports multiple synchronization modes: **Full Load**, **Incremental**, and **Change Data Capture (CDC)** using MySQL binlogs. It offers features like parallel chunking, checkpointing, and automatic resume for failed full loads. This connector can be used within the OLake UI or run locally via Docker for open-source workflows.
 
-MySQL Source enables data synchronization from MySQL to your [desired destination](../../writers/iceberg/overview).
+## Prerequisites
 
-::::info
-OLake UI is live (beta)! You can now use the UI to configure your MySQL source, discover streams, and sync data. Check it out at [OLake UI](../../getting-started/olake-ui) regarding how to setup using Docker Compose and running it locally.
-::::
+To use this connector, you'll need a MySQL database setup with the following.
 
-<Tabs>
+- **MySQL Version**
+  - MySQL 5.5+ (5.7+ recommended) for stable CDC and full binary logging support.
+- **Binary Logging Setup**
+  - Enable binary logging: `log-bin=mysql-bin`
+  - Set row-based format: `binlog-format=ROW` 
+  - Capture full row data: `binlog-row-image=FULL` 
+  - Ensure enough disk space for binary logs.
+- **Access & Permissions**
+  - Superuser/root privileges to modify `my.cnf`.
+  - Set a unique `server-id` for replication.
+  - Create a CDC user with `REPLICATION SLAVE`, `REPLICATION CLIENT`, and `SELECT` privileges.
 
-<TabItem value="mysql-ui" label="Use OLake UI for MySQL" default>
+For detailed setup for different MySQL environments, see the guides in the section below.
 
-### Create a MySQL Source in OLake UI
-1. Navigate to Sources Tab.
-2. Click on `+ Create Source`.
-3. Select `MySQL` as the source type from Connector type.
-4. Fill in the required connection details in the form. For details regarding the connection details, refer to the MySQL Source Configuration section on the right side of UI.
-5. Click on `Create ->`
-6. OLake will test the source connection and display the results.
+- [Aurora MySQL – CDC Setup Guide](/docs/connectors/mysql/setup/aurora)
+- [Amazon RDS MySQL – CDC Setup Guide](/docs/connectors/mysql/setup/rds)
+- [MySQL via Docker Compose – Local Setup](/docs/connectors/mysql/setup/local)
+- [Azure Database for MySQL – CDC Setup Guide](/docs/connectors/mysql/setup/azure)
+- [Google Cloud SQL for MySQL – CDC Setup Guide](/docs/connectors/mysql/setup/gcp)
+- [Generic MySQL – CDC Setup Guide](/docs/connectors/mysql/setup/generic)
 
-### Edit/Delete MySQL Source in OLake UI
-Use the edit and delete actions in the Sources list to manage existing sources.
-
-</TabItem>
-
-<TabItem value="mysql-cli" label="Use OLake CLI for MySQL">
-
-### To sync data TLDR:
-1. Create a [`source.json`](#configurations) with your MySQL connection details.
-2. Create a `destination.json` with your Writer ([Apache Iceberg](../../writers/iceberg/catalog/overview) / [AWS S3](../../writers/parquet/s3) / [Azure ADLS](../../writers/iceberg/azure) / [Google Cloud Storage](../../writers/iceberg/gcs)) connection details.
-3. Run `discover` to generate a `streams.json` of available streams.
-4. Run `sync` to replicate data to your specified destination.
-
-### Supported Modes
-| Mode | Description |
-|---|---|
-| Full Refresh | Fetches the complete dataset from MySQL. |
-| CDC (Change Data Capture) | Tracks and syncs incremental changes from MySQL in real time. |
-| Strict CDC | Tracks only new changes from current binlog position (no initial backfill). |
-
-### Supported Destinations
-<SupportedDestinations/>
-
-### Commands
-
-#### Discover
+## Configurations
 
 <Tabs>
+  <TabItem value="ui" label="Olake UI">
 
-<TabItem value="docker-mysql" label="OLake Docker" default>
-<DockerDiscoverMySQL/>
-</TabItem>
+    To create a MySQL source in OLake UI, first set up the OLake UI (see [OLake UI setup](/docs/install/olake-ui)), then go to `Sources` → `+ Create Source` → select `MySQL`, enter your connection details, and click `Create`.
 
-<TabItem value="docker-local" label="Locally run OLake" default>
-<LocalDiscoverMySQL/>
-</TabItem>
+    :::info
+    You can use it to configure your MySQL source, discover streams, and sync data. See [OLake UI setup](/docs/install/olake-ui) for running via Docker Compose or locally.
 
+    ![olake-source-mysql](/img/docs/sources/olake-source-mysql.png)
+    :::
+
+    #### Create a MySQL Source in OLake UI
+    Follow these steps (assuming OLake UI is running locally on [localhost:8000](localhost:8000)):
+    1. Navigate to the Sources tab.
+    2. Click `+ Create Source`.
+    3. Select `MySQL` as the source type (Connector type).
+    4. Fill in the required connection details. Refer to the field reference below.
+    5. Click `Create ->`.
+    6. OLake tests the connection and shows success or actionable error messages.
+
+    - How to create a destination in OLake: see [OLake Destinations](/docs/getting-started/creating-first-pipeline#3-configure-destination)
+    - How to create a job in OLake UI: see [OLake UI guide](/docs/getting-started/creating-first-pipeline)
+
+
+    Configure the following properties in the UI:
+
+    | Field                | Description                                                                 | Data Type | Required/Default |
+    |----------------------|-----------------------------------------------------------------------------|-----------|------------------|
+    | **Mysql Host**            | List of database host addresses to connect to.                              | string    | Required         |
+    | **Username**         | Username for authenticating with the database.                              | string    | Required         |
+    | **Password**         | Password for the database user.                                             | string    | Required         |
+    | **Database**         | Name of the target database to use.                                        | string    | mysql            |
+    | **Port**             | Port number on which the database server is listening.                      | integer   | Required         |
+    | **Initial Wait Time** | Maximum duration in seconds to wait before considering the bin syncer idle. | integer   | 0                |
+    | **TLS Skip Verify**  | Indicates whether to skip TLS certificate verification.                     | bool      | false            |
+    | **Max Threads**      | Maximum number of parallel threads for processing or syncing data.          | integer   | 3                |
+    | **Backoff Retry Count** | Number of retry attempts for establishing sync with exponential backoff. | integer   | 3                |
+
+  :::info MySQL to Iceberg Data Type Mapping
+  When syncing data from MySQL to Iceberg, OLake converts source types to compatible Iceberg types. The table below summarizes the mapping used during writes:
+
+  | MySQL Data Types | Iceberg Data Type |
+  |---|---|
+  | int, int unsigned, mediumint, mediumint unsigned, smallint, smallint unsigned, tinyint, tinyint unsigned | int |
+  | bigint, bigint unsigned | bigint |
+  | float, decimal(10,2) | float |
+  | double, double precision, real | double |
+  | datetime, timestamp | timestamp |
+  | char, varchar, text, tinytext, mediumtext, longtext, enum, json, bit(1), time | string |
+  :::
+  </TabItem>
+
+  <TabItem value="cli" label="CLI">
+
+    ### Configuring via CLI
+
+    To configure the MySQL source locally, edit the `source.json` file. Below is an example configuration for connecting to a MySQL replica set:
+
+    ```json
+    {
+        "hosts": "localhost",
+        "username": "root",
+        "password": "password",
+        "database": "main",
+        "port": 3306,
+        "tls_skip_verify": true,
+        "update_method": {
+          "initial_wait_time": 10
+        },
+        "max_threads": 5,
+        "backoff_retry_count": 4
+    }
+    ```
+
+    ### Configuration Properties
+
+    | Field                | Description                                                                 | Data Type | Required/Default |
+    |----------------------|-----------------------------------------------------------------------------|-----------|------------------|
+    | **hosts**            | List of database host addresses to connect to.                              | string    | Required         |
+    | **username**         | Username for authenticating with the database.                              | string    | Required         |
+    | **password**         | Password for the database user.                                             | string    | Required         |
+    | **database**         | Name of the target database to use.                                        | string    | mysql            |
+    | **port**             | Port number on which the database server is listening.                      | integer   | Required         |
+    | **initial_wait_time** | Maximum duration in seconds to wait before considering the bin syncer idle. | integer   | 0                |
+    | **tls_skip_verify**  | Indicates whether to skip TLS certificate verification.                     | bool      | false            |
+    | **max_threads**      | Maximum number of parallel threads for processing or syncing data.          | integer   | 3                |
+    | **backoff_retry_count** | Number of retry attempts for establishing sync with exponential backoff. | integer   | 3                |
+
+      :::info MySQL to Iceberg Data Type Mapping
+  When syncing data from MySQL to Iceberg, OLake converts source types to compatible Iceberg types. The table below summarizes the mapping used during writes:
+
+  | MySQL Data Types | Iceberg Data Type |
+  |---|---|
+  | int, int unsigned, mediumint, mediumint unsigned, smallint, smallint unsigned, tinyint, tinyint unsigned | int |
+  | bigint, bigint unsigned | bigint |
+  | float, decimal(10,2) | float |
+  | double, double precision, real | double |
+  | datetime, timestamp | timestamp |
+  | char, varchar, text, tinytext, mediumtext, longtext, enum, json, bit(1), time | string |
+  :::
+
+### Run the OLake discover command
+
+:::tip Discover streams and create streams.json
+Use this to scan your MySQL source and generate a <code>streams.json</code> catalog next to your <code>source.json</code>. You can then review and modify <code>streams.json</code> to select streams and set sync options before running a sync.
+
+```bash
+docker run --pull=always \
+  -v /Users/{PATH_TO_OLAKE_DIRECTORY}/OLAKE_DIRECTORY:/mnt/config \
+  source-mysql:latest \
+  discover \
+  --config /mnt/config/source.json
+```
+
+:::
+
+
+## Streams Configuration
+
+<StreamsConfiguration/>
+
+### Run OLake sync command
+
+:::tip Run OLake sync
+After configuring your `source.json` and selecting streams in `streams.json`, configure a destination writer (`writer.json`). See <a href="docs/writers" style={{ color: '#1a73e8' }}>OLake Destinations</a> for supported destinations and examples.
+
+By default, this command will perform a full load for streams set to `full_refresh`. If a stream is configured for `incremental` or `cdc`, it will use that mode from the next sync. This command will also create a `state.json` file in the same directory as your provided config (e.g., alongside `source.json`).
+
+```bash
+docker run --pull=always \
+  -v /Users/{PATH_TO_OLAKE_DIRECTORY}/OLAKE_DIRECTORY:/mnt/config \
+  source-mysql:latest \
+  sync \
+  --config /mnt/config/source.json \
+  --streams /mnt/config/streams.json \
+  --destination /mnt/config/writer.json \
+```
+
+:::
+
+
+## State Configuration
+The state.json file is essential for Olake's sync process, tracking the last processed point to ensure seamless resume without duplicates. It supports resumable full loads, allowing sync to restart from any failure point.
+
+### Run Olake Sync with State command
+
+:::tip Run OLake sync with state
+When a <code>state.json</code> is provided, OLake resumes from the stored cursor for each stream and continues according to the selected sync mode: <code>cdc</code> (binlog position) or <code>incremental</code> (cursor field). This ensures seamless, duplicate-free continuation from the last successful point.
+
+```bash
+docker run --pull=always \
+  -v /Users/{PATH_TO_OLAKE_DIRECTORY}/OLAKE_DIRECTORY:/mnt/config \
+  source-mysql:latest \
+  sync \
+  --config /mnt/config/source.json \
+  --streams /mnt/config/streams.json \
+  --destination /mnt/config/writer.json \
+  --state /mnt/config/state.json
+```
+
+:::
+
+:::info Logs
+OLake generates log files for each command that is run. For more details, read the [Logs Documentation](/docs/features/logs).
+:::
+
+  </TabItem>
 </Tabs>
 
-#### Sync
+## Troubleshooting
 
-<Tabs>
+The OLake MySQL Source connector stops immediately upon encountering errors to ensure data accuracy. Below are common issues and their fixes:
+ 
+- <span style={{ color: '#1a73e8' }}>Failed to Get Current Binlog Position</span>
+  - Cause: Binary logging not enabled, wrong format, or insufficient privileges.
+  - Fix:
+    - Ensure binary logging is enabled:
+      ```sql
+      SHOW VARIABLES LIKE 'log_bin';
+      ```
+      Should return `ON`.
+    - Ensure row-based logging:
+      ```sql
+      SHOW VARIABLES LIKE 'binlog_format';
+      ```
+      Should return `ROW`.
+    - Grant required privileges:
+      ```sql
+      GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'your_user'@'%';
+      ```
 
-<TabItem value="docker-mysql-2" label="OLake Docker" default>
-<DockerSyncMySQL/>
-</TabItem>
+- <span style={{ color: '#1a73e8' }}>Idle Timeout Reached, Exiting Bin Syncer</span>
+  - Cause: No new changes within the configured `initial_wait_time`.
+  - Fix: Increase `initial_wait_time` in the connector configuration or verify data changes in the source database.
 
-<TabItem value="docker-local-2" label="Locally run OLake" default>
-<LocalSyncMySQL/>
-</TabItem>
+- <span style={{ color: '#1a73e8' }}>Column Count Mismatch: Expected X, Got Y</span>
+  - Cause: Table schema changed after CDC started or incomplete binlog metadata.
+  - Fix:
+    - Ensure full binlog metadata:
+      ```sql
+      SHOW VARIABLES LIKE 'binlog_metadata';
+      ```
+      Should return `FULL`. To set it:
+      ```sql
+      SET GLOBAL binlog_metadata = 'FULL';
+      ```
+      Update `my.cnf` or `my.ini` for persistence.
+    - Restart the connector after schema changes.
 
-</Tabs>
-
-#### Sync with State
-
-<Tabs>
-
-<TabItem value="docker-mysql-3" label="OLake Docker" default>
-<DockerSyncWithStateMySQL/>
-</TabItem>
-
-<TabItem value="docker-local-3" label="Locally run OLake" default>
-<LocalSyncWithStateMySQL/>
-</TabItem>
-
-</Tabs>
-
-</TabItem>
-
-</Tabs>
-
-## Configurations {#configurations}
-
-### `source.json` Configuration
-<MySQLSourceConfig/>
-
-#### Description of above parameters
-<MySQLSourceConfigDetails/>
-
-### `streams.json` Configuration
-<StreamsOnly/>
-<StreamsOnlyDetails/>
-
-### `state.json` Configuration
-<MySQLStateConfig/>
-<MySQLStateConfigDetails/>
-
-## Setup {#setup}
-
-Setup guides open in a new tab:
-
-- <a href="/docs/connectors/mysql/setup/aurora" target="_blank" rel="noopener noreferrer">Aurora</a>
-- <a href="/docs/connectors/mysql/setup/rds" target="_blank" rel="noopener noreferrer">RDS</a>
-- <a href="/docs/connectors/mysql/setup/local" target="_blank" rel="noopener noreferrer">Local</a>
-- <a href="/docs/connectors/mysql/setup/azure" target="_blank" rel="noopener noreferrer">Azure</a>
-- <a href="/docs/connectors/mysql/setup/gcp" target="_blank" rel="noopener noreferrer">GCP</a>
-- <a href="/docs/connectors/mysql/setup/generic" target="_blank" rel="noopener noreferrer">Generic</a>
-
-## Troubleshooting {#troubleshooting}
-
-See common issues and solutions in MySQL troubleshooting.
-
-
+- <span style={{ color: '#1a73e8' }}>Failed to Get or Split Chunks</span>
+  - Cause: Table stats not populated or table contains 0 records.
+  - Fix: Run the following query to populate table statistics:
+    ```sql
+    ANALYZE TABLE <namespace>.<table_name>;
+    ```
