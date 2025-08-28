@@ -121,7 +121,14 @@ const docSidebar = {
     sectionHeader("UNDERSTANDING OLAKE"),
     'features/index',
     'core/architecture',
-    'understanding/terminologies',
+    {
+      type: 'category',
+      label: 'Terminologies',
+      items: [
+        'understanding/terminologies/general',
+        'understanding/terminologies/olake',
+      ],
+    },
     'understanding/compatibility-catalogs',
     'understanding/compatibility-engines',
     'core/use-cases',
@@ -136,7 +143,11 @@ const docSidebar = {
 
     // Resources category removed as requested
 
-    'roadmap',
+    {
+      type: 'link',
+      label: 'Roadmap',
+      href: 'https://github.com/datazip-inc/olake/?tab=readme-ov-file#-roadmap-highlights',
+    },
     // FAQs section removed
     {
       type: 'category',
