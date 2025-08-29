@@ -134,33 +134,98 @@ SELECT * FROM "ICEBERG_DATABASE_NAME"."TABLE_NAME" LIMIT 10;
 
 ## Troubleshooting
 
-### Common Errors & Solutions
+The OLake Iceberg Writer with AWS Glue Catalog stops immediately upon encountering errors to ensure data integrity. Below are common issues and their fixes:
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `AccessDeniedException` | IAM role lacks permissions | Ensure Glue + S3 permissions in IAM policy |
-| `NoSuchBucket` | S3 bucket doesn't exist or wrong region | Verify bucket exists and region matches config |
-| `Database does not exist` | Glue database not found | OLake will create it automatically with proper permissions |
-| `InvalidInputException` | Invalid S3 path format | Ensure S3 path follows format: `s3://bucket-name/prefix/` |
+- <span style={{ color: '#1a73e8' }}>AccessDeniedException: User is not authorized to perform action</span>
+  - Cause: IAM role or user lacks required permissions for AWS Glue or S3 operations.
+  - Fix:
+    - Ensure your IAM policy includes necessary Glue permissions:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "glue:CreateDatabase",
+              "glue:GetDatabase",
+              "glue:CreateTable",
+              "glue:GetTable",
+              "glue:UpdateTable",
+              "glue:GetPartitions"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+      ```
+    - Add S3 permissions for the warehouse path:
+      ```json
+      {
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ],
+        "Resource": [
+          "arn:aws:s3:::your-bucket-name/*",
+          "arn:aws:s3:::your-bucket-name"
+        ]
+      }
+      ```
 
-### Debugging Checklist
+- <span style={{ color: '#1a73e8' }}>NoSuchBucket: The specified bucket does not exist</span>
+  - Cause: S3 bucket doesn't exist, wrong region, or incorrect bucket name in configuration.
+  - Fix:
+    - Verify bucket exists in the correct region:
+      ```bash
+      aws s3 ls s3://your-bucket-name/ --region us-east-1
+      ```
+    - Create bucket if it doesn't exist:
+      ```bash
+      aws s3 mb s3://your-bucket-name --region us-east-1
+      ```
+    - Ensure the `aws_region` in your configuration matches the bucket's region.
 
-1. **Verify AWS Identity**:
-   ```bash
-   aws sts get-caller-identity
-   ```
+- <span style={{ color: '#1a73e8' }}>Database does not exist in Glue Catalog</span>
+  - Cause: Specified database name doesn't exist in AWS Glue Data Catalog.
+  - Fix: OLake will automatically create the database if you have `glue:CreateDatabase` permissions. Verify permissions or create manually:
+    ```bash
+    aws glue create-database --database-input Name=iceberg_db --region us-east-1
+    ```
 
-2. **List Glue Databases**:
-   ```bash
-   aws glue get-databases --region <your-region>
-   ```
+- <span style={{ color: '#1a73e8' }}>InvalidInputException: Invalid S3 location</span>
+  - Cause: Malformed S3 path or unsupported S3 URI format.
+  - Fix:
+    - Ensure S3 path follows the correct format: `s3://bucket-name/path/`
+    - Path must end with a trailing slash for warehouse locations
+    - Avoid special characters except hyphens and underscores
+    - Example valid paths:
+      ```
+      s3://my-iceberg-warehouse/
+      s3://data-lake-bucket/iceberg/warehouse/
+      ```
 
-3. **Check S3 Bucket Access**:
-   ```bash
-   aws s3 ls s3://your-bucket-name/
-   ```
+- <span style={{ color: '#1a73e8' }}>Connection timeout or network errors</span>
+  - Cause: Network connectivity issues, VPC configuration, or security group restrictions.
+  - Fix:
+    - Verify internet connectivity to AWS services
+    - Check VPC endpoints for Glue and S3 if running in private subnets
+    - Ensure security groups allow outbound HTTPS (port 443) traffic
+    - Test connectivity:
+      ```bash
+      aws sts get-caller-identity --region us-east-1
+      aws glue get-databases --region us-east-1
+      ```
 
-4. **Test Glue Catalog Permissions**:
-   ```bash
-   aws glue get-database --name your-database-name --region <your-region>
-   ```
+- <span style={{ color: '#1a73e8' }}>Table already exists with different schema</span>
+  - Cause: Attempting to create an Iceberg table that conflicts with existing table schema.
+  - Fix:
+    - Check existing table schema in Glue Console
+    - Drop and recreate table if schema change is intended:
+      ```bash
+      aws glue delete-table --database-name iceberg_db --name table_name --region us-east-1
+      ```
+    - Or use OLake's schema evolution capabilities for compatible changes
