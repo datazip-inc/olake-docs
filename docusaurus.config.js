@@ -78,12 +78,27 @@ const config = {
           lastmod: 'date',
           changefreq: 'weekly',
           priority: 0.5,
-          ignorePatterns: ['/tags/**'],
+          // Exclude tag pages and author listing/pagination from sitemap
+          ignorePatterns: [
+            '/tags/**',
+            '/blog/tags/**',
+            '/iceberg/tags/**',
+            '/blog/authors/**',
+            '/iceberg/authors/**'
+          ],
           filename: 'sitemap.xml',
           createSitemapItems: async (params) => {
             const { defaultCreateSitemapItems, ...rest } = params;
             const items = await defaultCreateSitemapItems(rest);
-            return items.filter((item) => !item.url.includes('/page/'));
+            return items.filter((item) => {
+              const url = item.url || '';
+              // Drop generic pagination
+              if (url.includes('/page/')) return false;
+              // Drop author pagination like /blog/authors/:slug/authors/2 or /iceberg/authors/:slug/authors/2
+              if (url.includes('/blog/authors/') && /\/authors\/\d+\/?$/.test(url)) return false;
+              if (url.includes('/iceberg/authors/') && /\/authors\/\d+\/?$/.test(url)) return false;
+              return true;
+            });
           },
         },
       })
@@ -273,18 +288,9 @@ const config = {
         // { name: 'robots', content: 'noindex, nofollow' },
         { name: 'OLake', content: 'ETL tool, ELT tool, open source' },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:site", content: "@olake.io" },
+        { name: "twitter:site", content: "@_olake" },
       ],
       headTags: [
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preconnect',
-            sizes: "any",
-            href: 'https://olake.io',
-            href: "/img/logo/olake-blue.svg",
-          },
-        },
         // Declare some json-ld structured data
         {
           tagName: 'script',
