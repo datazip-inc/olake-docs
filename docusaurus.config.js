@@ -742,14 +742,6 @@ const config = {
             to: '/docs/install/docker-cli',
             from: '/docs/install/docker.mdx',
           },
-          {
-            to: '/docs/install/cli-binary',
-            from: '/docs/install/setup',
-          },
-          {
-            to: '/docs/install/cli-binary',
-            from: '/docs/install/setup.mdx',
-          },
 
 
 
@@ -876,10 +868,6 @@ const config = {
           {
             to: '/docs/writers/overview',
             from: '/docs/category/destinations-writers',
-          },
-          {
-            to: '/docs/install/cli-binary',
-            from: '/docs/category/install',
           },
           {
             to: '/docs/resources/olake-terminologies',
