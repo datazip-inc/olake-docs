@@ -34,6 +34,17 @@ function imageFetchPriorityRehypePluginFactory() {
           files.set(key, node['properties']['src']);
         }
 
+        // Ensure alt attribute exists (improves accessibility/SEO)
+        if (!node['properties'].alt || node['properties'].alt === null || node['properties'].alt === undefined) {
+          try {
+            const src = String(node['properties'].src || '')
+            const fileName = src.split('?')[0].split('#')[0].split('/').pop() || 'image'
+            const base = fileName.replace(/\.[^.]+$/, '')
+            const altText = base.replace(/[-_]+/g, ' ').trim() || 'image'
+            node['properties'].alt = altText
+          } catch {}
+        }
+
         if (fetchpriorityThisImage) {
           node['properties'].fetchpriority = 'high';
           node['properties'].loading = 'eager';
@@ -59,13 +70,16 @@ function imageFetchPriorityRehypePluginFactory() {
           files.set(key, node['value']);
         }
 
+        // Add loading/fetchpriority and ensure alt attribute exists for JSX <img> occurrences
+        const addAltIfMissing = (html) => html.replace(/<img(?![^>]*\balt=)/g, '<img alt="image"');
+
         if (fetchpriorityThisImage) {
-          node['value'] = node['value'].replace(
+          node['value'] = addAltIfMissing(node['value']).replace(
             /<img /g,
             '<img loading="eager" fetchpriority="high" ',
           );
         } else {
-          node['value'] = node['value'].replace(
+          node['value'] = addAltIfMissing(node['value']).replace(
             /<img /g,
             '<img loading="lazy" ',
           );
