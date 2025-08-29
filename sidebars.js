@@ -122,6 +122,7 @@ const docSidebar = {
     },
 
     sectionHeader("UNDERSTANDING OLAKE"),
+    'understanding/terminologies',
     'features/index',
     'core/architecture',
     {
