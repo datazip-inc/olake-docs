@@ -6,47 +6,245 @@ sidebar_position: 3
 
 # Docker (CLI)
 
-OLake CLI can be installed and executed using the official Docker images. Each supported source driver has a dedicated image available on the [OLake DockerHub page](https://hub.docker.com/u/olakego).
+Docker CLI can be installed and executed using the official Docker images. Each supported source driver has a dedicated image available on the [OLake DockerHub page](https://hub.docker.com/u/olakego).
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) installed and running on the host system
-- Access to the internet to pull Docker images
+- Internet access to pull Docker images  
 
-## Configuration and Setup
+In the subsequent commands, replace `[SOURCE-NAME]` with the value corresponding to the required driver.
 
-
-### 1. Navigate to the OLake DockerHub Repository
-Go to [OLake DockerHub repository](https://hub.docker.com/u/olakego) to browse the available source driver images.
-    <div style={{textAlign: 'center'}}>
-    ![Docker source images](/img/docs/install/olake-cli-docker/docker-source-images.png)
-    </div>
-
-### 2. Select the Source Driver
-Choose the correct source driver from the table below. Use the corresponding value in place of `[SOURCE-NAME]` in the Docker command.
 <div style={{ display: "flex", justifyContent: "center", textAlign: "center"}}>
 
 | Driver Name | [SOURCE-NAME] |
-|-------------|---------------|
+| ----------- | ------------- |
 | Postgres    | `postgres`    |
 | MySQL       | `mysql`       |
 | Oracle      | `oracle`      |
 | MongoDB     | `mongodb`     |
+
 </div>
-### 3. Pull the Docker Image
-Pull the Docker image for your chosen source driver. Ensure that the Docker daemon is running on your machine.
+
+
+With the driver identified, the next step is configuring the source system.
+
+## Sources
+
+Each source driver requires specific configuration. Detailed setup instructions can be found in the following guides:
+
+- [Working with MongoDB](/docs/connectors/mongodb)  
+- [Working with MySQL](/docs/connectors/mysql)  
+- [Working with Oracle](/docs/connectors/oracle)  
+- [Working with Postgres](/docs/connectors/postgres)  
+
+***What's Next*** : Once the source has been configured, the next step is to define the destination where the ingested data will be written.
+
+
+## Destination
+
+Destinations specify where ingested data will be written. OLake supports multiple destinations. The following guides provide setup of:
+
+- [Working with AWS S3](/docs/writers/parquet/config)  
+- [Working with Iceberg Glue Catalog](/docs/writers/iceberg/catalog/glue)  
+- [Working with Iceberg Hive Catalog](/docs/writers/iceberg/catalog/hive)  
+- [Working with Iceberg JDBC Catalog](/docs/writers/iceberg/catalog/jdbc)  
+- [Working with Iceberg REST Catalog](/docs/writers/iceberg/catalog/rest)  
+
+***What's Next*** : Once both source and destination are configured, the next step is to discover available streams.
+
+## Discover Command
+To discover the available streams from the source, run the following command:
+
+```bash title="discover command"
+docker run --pull=always \
+-v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+olakego/source-[SOURCE-NAME]:latest \
+discover \
+--config /mnt/config/source.json
+```
+
+Running this command generates a streams.json file, which contains the list of available streams along with their metadata.
+
+***What's Next*** : Understanding the streams.json file to modify the required fields.
+
+## Streams Config
+
+    The `streams.json` file is organized into two main sections:
+
+    - **`selected_streams`:** Lists the streams that have been chosen for processing. These are grouped by namespace.
+    - **`streams`:** Contains an array of stream definitions. Each stream holds details about its schema, supported synchronization modes, primary keys, and other metadata.
+
+    ### 1. Selected Streams
+
+    The **`selected_streams`** section groups streams by their namespace. For example, the configuration might look like this:
+
+```json title="streams.json"
+"selected_streams": {
+  "my_db": [
+    {
+      "partition_regex": "/{dropoff_datetime, year}",
+      "stream_name": "table1",
+      "normalization": true,
+      "append_mode": false,
+      "filter": "UPDATED_AT >= \"08-JUN-25 07.19.23.690870000 AM\""
+    },
+    {
+      "partition_regex": "",
+      "stream_name": "table2",
+      "normalization": false,
+      "append_mode": false,
+      "filter": "city = \"London\""
+    }
+  ]
+}
+```
+
+    #### Details about all the fields mentioned in selected streams
+
+| **Component**         | **Data Type** | **Example Value**                                                            | **Description**                                                                                                                                                                                                                     |
+|-----------------------|---------------|------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`namespace`**       | string        | `my_db`                                                                   | Groups streams that belong to a specific database or logical category                                                                                                                                                               |
+| **`stream_name`**     | string        | `"table1"`, `"table2"`                                                   | Identifier for the stream. Must match the stream name defined in the `Streams` configurations.                                                                                                                                   |
+| **`partition_regex`** | string        | `"/{dropoff_datetime, year}"` | A pattern defining how to partition the data. To read more, refer the [Partition Regex for S3](/docs/writers/parquet/partitioning#partition-regex-attributes) or [Partition Regex for iceberg](/docs/writers/iceberg/partitioning#partition-spec-syntax-used-by-the-writer)                                             |
+| **`normalization`**   | boolean       | `true`                                                                       | Determines whether OLake applies level-1 JSON flattening to Level 0 nested objects. Set to `true` if you require normalized output; otherwise, use `false`.                                                                                 |
+| **`append_mode`**     | boolean       | `false`                                                                      | Disables upserts in Iceberg when set to `true` .                                                                                             |
+| **`filter`**          | string        | `"UPDATED_AT >= \"08-JUN-25 07.19.23.690870000 AM\""`                                                                 | Ensures that only data matching the specified condition is synced.                                                                                                                                                              |
+
+
+    ### 2. Streams
+
+    The **streams** section is an array where each element is an object that defines a specific data stream. For example, one stream definition looks like this:
+
+```json title="streams.json"
+{
+  "stream": {
+    "name": "table1",
+    "namespace": "my_db",
+    "type_schema": {
+      "properties": {
+        "_id": {
+          "type": ["string"]
+        },
+        "name": {
+          "type": ["string"]
+        },
+        "marks": {
+          "type": ["integer"]
+        },
+        "updated_at": {
+          "type": ["timestamp"]
+        },
+        ...
+      }
+    },
+    "supported_sync_modes": ["full_refresh", "cdc", "incremental", "strict_cdc"],
+    "source_defined_primary_key": ["_id"],
+    "available_cursor_fields": ["_id", "name", "marks", "updated_at"],
+    "sync_mode": "incremental",
+    "cursor_field": "updated_at",
+  }
+}
+```
+
+
+    #### 2.1 Stream Configuration Elements
+
+ | **Component**                    | **Example Value**                                | **Description & Possible Values**                                                                                                                                               |
+|----------------------------------|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`name`**                       |  `"stream_8"`                                     | Unique identifier for the stream. Each stream must have a unique name.                                                                                                          |
+| **`namespace`**                  | `"olake_db"`                                     | The grouping or database name that the stream belongs to.                                                          |
+| **`type_schema`**                | *(JSON object with properties)*                  | Defines the structure of the records in the stream. |
+| **`supported_sync_modes`**       | `["full_refresh", "cdc", "incremental","strict_cdc"]`         | Lists the sync modes the stream supports. Includes `"full_refresh"`, `"cdc"`, `"strict_cdc"` and `"incremental"`. To read more about sync modes read ‼️                                                       |
+| **`source_defined_primary_key`** | `["_id"]`                                        | Specifies the field(s) that is set as a primary key in the source.                                                                |
+| **`available_cursor_fields`**    | `["_id", "name", "marks", "updated_at"]`         | Lists fields that can be used to track synchronization progress in `incremental` sync mode.                                                                                     |
+| **`sync_mode`**                  | `"incremental"`                                  | Indicates the active sync mode. Possible values are defined in `supported_sync_modes`.                                                                  |
+| **`cursor_field`**               | `"updated_at"`                                   | Defines the cursor field used to track incremental sync.  To read more about incremental sync read this ‼️                                             |
+
+
+***Whats's Next***: Once the streams.json file is configured as required, sync can be initiated.
+
+## Sync
+
+The Sync section describes how to start the sync process using the configuration files.It also explains how to run sync with a state file when operating in Incremental (Bookmark/cursor) or CDC mode.
+    
+    
+    ### Sync command
+This command is executed when a sync needs to be run in Full Refresh mode or when running a sync for the first time (i.e., before a state file has been created).
+    ```bash title="sync command"
+    docker run --pull=always \
+    -v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+    olakego/source-[SOURCE-NAME]:latest \
+    sync \
+    --config /mnt/config/source.json \
+    --catalog /mnt/config/streams.json \
+    --destination /mnt/config/destination.json
     ```
-    docker pull olakego/source-[SOURCE-NAME]:dev-latest
+
+    :::warning Use version specific command
+    Using a version specific image is recommended instead of using latest in the commands for production use case.
+    :::
+
+    ### Sync with state command
+    When using Incremental (Bookmark/cursor) or CDC mode, the state gets saved, and this file is used to start the sync from last saved point.
+    ```bash title="sync with state command"
+    docker run --pull=always \
+    -v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+    olakego/source-[SOURCE-NAME]:latest \
+    sync \
+    --config /mnt/config/source.json \
+    --catalog /mnt/config/streams.json \
+    --destination /mnt/config/destination.json \
+    --state /mnt/config/state.json
     ```
-    <div style={{textAlign: 'center'}}>
-    ![Docker image pull command](/img/docs/install/olake-cli-docker/docker-source-pull.png)
-    </div>
+
+***Whats's Next***:  Monitor sync progress and performance using the `stats.json` file.
+
+## Stats
+
+The `stats.json` file is created as soon as the sync starts. The file looks like this:
+
+```json title="stats.json"
+{"Estimated Remaining Time": "1642.00","Memory": "2228 mb","Running Threads": 21,"Seconds Elapsed": "186.00","Speed": "76542.20 rps","Synced Records": 14236868}
+```
+
+| Componenet                   | Example Value  | Description                                                                     |
+|------------------------------|----------------|---------------------------------------------------------------------------------|
+| **Estimated Remaining Time** | `1642.00`      | A rough estimation in seconds, indicating when the sync is expected to complete |
+| **Memory**                   | `2228 mb`      | Memory which is currently getting utilizied                                     |
+| **Running Threads**          | `21`           | Number of parallel threads actively syncing data                                |
+| **Seconds Elapsed**          | `186.00`       | Time in seconds elapsed since the sync started                                  |
+| **Speed**                    | `76542.20 rps` | How many rows per second are being synced in this sync.                         |
+| **Synced Records**           | `14236868`     | Total number of records which have been synced since the sync started.          |
 
 
+The `stats.json` file remains available after sync completion. 
 
-## Next Steps
-After the initial configuration is completed:
+***What's Next***: Similarly logs get saved for every command that is executed. And those can be reviewed for additional information.
 
-1. Create a local folder to store configuration files such as `source.json` and `destination.json`.  
-2. Refer to the driver-specific documentation for detailed configuration options and commands.  
+## Logs
 
+An `olake.log` file is automatically created inside `<TYPE_OF_COMMAND>_<TIMESTAMP_IN_UTC>` (for example, sync_2025-2-17_11-41-40) within the same folder where the configuration files are located.
+
+This file contains the complete snapshot of all logs generated while the command was running.
+
+![logs](/img/docs/features/olake-logs.png)
+
+The console logs appear in the following format:
+
+![logs console](/img/docs/features/logs-console.png)
+
+
+and has the color specs for easy identification:
+
+```go
+"debug": "\033[36m", // Cyan
+"info":  "\033[32m", // Green
+"warn":  "\033[33m", // Yellow
+"error": "\033[31m", // Red
+"fatal": "\033[31m", // Red
+```
+
+**With this, the sync setup using the OLake CLI is complete, from configuring source and destination to reviewing key outputs such as stats and logs.**
+
+---
