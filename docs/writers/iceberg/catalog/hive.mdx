@@ -149,7 +149,7 @@ OLake supports using Google Cloud Dataproc Metastore (Hive) as the Iceberg catal
 
 <TabItem value="local-docker" label="Local Docker Compose Setup">
 
-For local development and testing, you can set up a complete Hive Metastore environment using Docker Compose. This setup includes Hive Metastore, PostgreSQL, MinIO (S3-compatible storage), and Spark with Iceberg support.
+For local development and testing, you can set up a complete Hive Metastore environment using Docker Compose. This setup includes Hive Metastore, PostgreSQL, and MinIO (S3-compatible storage).
 
 ### Docker Compose Setup
 
@@ -162,36 +162,6 @@ Create the following files in your project directory:
 
 ```yaml title="docker-compose.yml"
 services:
-  spark-iceberg:
-    image: olakego/spark-connect:v0.0.1
-    container_name: spark-iceberg-hive
-    networks:
-      iceberg_net:
-    depends_on:
-      - minio
-      - postgres
-    environment:
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=password
-      - AWS_REGION=us-east-1
-    ports:
-      - 8888:8888
-      - 8088:8080
-      - 10000:10000
-      - 10001:10001
-      - 15002:15002
-    entrypoint: |
-          /bin/sh -c "
-          ./entrypoint.sh &&
-          echo 'Starting Spark Connect server...' &&
-          /opt/spark/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.12:3.5.2,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem &
-          echo 'Starting Jupyter Notebook server...' &&
-          export PYSPARK_DRIVER_PYTHON=jupyter-notebook &&
-          export PYSPARK_DRIVER_PYTHON_OPTS=\"--notebook-dir=/home/iceberg/notebooks --ip='*' --NotebookApp.token='' --NotebookApp.password='' --port=8888 --no-browser --allow-root\" &&
-          pyspark &
-          while true; do sleep 30; done
-          "
-
   minio:
     image: minio/minio:RELEASE.2025-04-03T14-56-28Z
     container_name: minio-hive
@@ -262,7 +232,6 @@ services:
         - SERVICE_NAME=metastore
     depends_on:
       - postgres
-      - spark-iceberg
     user: root
     volumes:
         - ./data/ivy-cache:/root/.ivy2
@@ -422,71 +391,9 @@ volumes:
 
 </details>
 
-#### spark-defaults.conf
-
-<details>
-<summary>spark-defaults.conf</summary>
-
-```conf title="spark-defaults.conf"
-spark.jars.packages                                  org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1,org.postgresql:postgresql:42.5.4,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262,org.apache.spark:spark-connect_2.12:3.5.2
-spark.sql.extensions                                 org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
-spark.sql.catalog.spark_catalog                      org.apache.iceberg.spark.SparkSessionCatalog
-spark.sql.catalog.spark_catalog.type                 hive
-
-spark.hadoop.hive.metastore.uris                     thrift://hive-metastore:9083
-
-spark.driver.extraClassPath                          /root/.ivy2/jars/org.postgresql_postgresql-42.5.4.jar
-spark.executor.extraClassPath                        /root/.ivy2/jars/org.postgresql_postgresql-42.5.4.jar
-
-spark.hadoop.fs.s3a.endpoint                           http://minio:9000
-spark.hadoop.fs.s3a.access.key                         admin
-spark.hadoop.fs.s3a.secret.key                         password
-spark.hadoop.fs.s3a.path.style.access                  true
-spark.hadoop.fs.s3a.impl                               org.apache.hadoop.fs.s3a.S3AFileSystem
-spark.hadoop.fs.s3a.connection.ssl.enabled             false
-
-spark.sql.catalog.olake_iceberg                      org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.olake_iceberg.catalog-impl         org.apache.iceberg.jdbc.JdbcCatalog
-spark.sql.catalog.olake_iceberg.uri                  jdbc:postgresql://postgres:5432/iceberg?ssl=false
-spark.sql.catalog.olake_iceberg.jdbc.user            iceberg
-spark.sql.catalog.olake_iceberg.jdbc.password        password
-spark.sql.catalog.olake_iceberg.warehouse            s3a://warehouse/olake_iceberg/
-spark.sql.catalog.olake_iceberg.jdbc.driver          org.postgresql.Driver
-spark.sql.catalog.olake_iceberg.jdbc.schema-version  V1
-
-spark.sql.catalog.hive_catalog                       org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.hive_catalog.type                  hive
-spark.sql.catalog.hive_catalog.uri                   thrift://hive-metastore:9083
-spark.sql.catalog.hive_catalog.warehouse             s3a://warehouse/
-
-spark.sql.catalog.rest                      org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.rest.catalog-impl         org.apache.iceberg.rest.RESTCatalog
-spark.sql.catalog.rest.uri                  http://lakekeeper:8181/catalog
-spark.sql.catalog.rest.warehouse            warehouse
-
-spark.sql.defaultCatalog                             olake_iceberg
-```
-
-</details>
-
 #### Dockerfile
 
-<details>
-<summary>Dockerfile</summary>
-
-```dockerfile title="Dockerfile"
-FROM tabulario/spark-iceberg
-
-ENV IVY2_CACHE_DIR=/root/.ivy2
-
-RUN mkdir -p ${IVY2_CACHE_DIR}
-
-COPY ./data/ivy-cache ${IVY2_CACHE_DIR}
-
-COPY spark-defaults.conf /opt/spark/conf/spark-defaults.conf
-```
-
-</details>
+No Spark image is required for this setup.
 
 ### Starting the Environment
 
@@ -495,12 +402,70 @@ COPY spark-defaults.conf /opt/spark/conf/spark-defaults.conf
    docker-compose up -d
    ```
 
+2. **Wait for Hive to initialize (first run downloads dependencies):**
+   - Tail the Hive Metastore logs and wait until these messages appear:
+     ```bash
+     docker logs -f hive-metastore-only
+     ```
+     ```text
+     Starting metastore schema initialization to 4.0.0
+     Initialization script hive-schema-4.0.0.derby.sql
+     ```
+
 3. **Verify services are running:**
    ```bash
    docker-compose ps
    ```
 
-And then, we are good to go for creating a job
+### Destination Configuration (Local Hive + MinIO)
+
+Assuming OLake is running locally in another Docker Compose stack, configure the destination as follows.
+
+<Tabs>
+
+<TabItem value="local-ui" label="OLake UI" default>
+
+| Parameter | Sample Value | Description |
+|---|---|---|
+| **Iceberg S3 Path (Warehouse)** | `s3a://warehouse/` | MinIO bucket/path for Iceberg data. |
+| **AWS Region** | `us-east-1` | Any region string (required by SDK). |
+| **AWS Access Key** | `admin` | MinIO access key. |
+| **AWS Secret Key** | `password` | MinIO secret key. |
+| **S3 Endpoint** | `http://host.docker.internal:9000` | MinIO endpoint exposed on host. |
+| **Use SSL for S3** | `false` | Disable SSL for HTTP endpoint. |
+| **Use Path Style for S3** | `true` | Required for MinIO. |
+| **Hive URI** | `thrift://host.docker.internal:9083` | Hive Metastore exposed on host. |
+| **Hive Clients** | `5` | Number of concurrent Hive clients. |
+| **Enable SASL for Hive** | `false` | Keep disabled unless required. |
+| **Iceberg Database** | `iceberg_db` | Target Iceberg database name. |
+
+</TabItem>
+
+<TabItem value="local-cli" label="OLake CLI">
+
+```json title="destination.json (Local Hive + MinIO)"
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "hive",
+    "iceberg_s3_path": "s3a://warehouse/",
+    "aws_region": "us-east-1",
+    "aws_access_key": "admin",
+    "aws_secret_key": "password",
+    "s3_endpoint": "http://host.docker.internal:9000",
+    "hive_uri": "thrift://host.docker.internal:9083",
+    "s3_use_ssl": false,
+    "s3_path_style": true,
+    "hive_clients": 5,
+    "hive_sasl_enabled": false,
+    "iceberg_db": "iceberg_db"
+  }
+}
+```
+
+</TabItem>
+
+</Tabs>
 
 </TabItem>
 
