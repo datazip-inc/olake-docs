@@ -305,6 +305,14 @@ const config = {
             logo: 'https://olake.io/img/logo/olake-blue.svg',
           }),
         },
+        // Add robots noindex for listing pages (tags/authors/archive)
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'index,follow',
+          },
+        },
       ],
 
       colorMode: {
