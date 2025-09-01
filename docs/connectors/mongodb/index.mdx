@@ -11,9 +11,10 @@ The MongoDB Source connector enables you to extract data from MongoDB databases 
 
 ## Sync Mode Supported
 
-- **Full Sync**: Complete data extraction from MongoDB collections
-- **Incremental Sync**: Captures only new or modified records since the last sync
-- **CDC (Change Data Capture)**: Real-time capture of database changes using MongoDB's oplog
+- **Full Refresh**: Loads the entire collection from MongoDB on each run, replacing prior data.
+- **Full Refresh + Incremental**: Performs an initial full reload and thereafter loads only newly inserted or updated documents.
+- **Full Refresh + CDC**: Executes a one-time full reload, then captures live oplog changes via Change Data Capture.
+- **CDC Only**: Skips the initial snapshot and streams only real-time changes from MongoDB’s oplog.
 
 ## Prerequisites
 
@@ -21,9 +22,15 @@ The MongoDB Source connector enables you to extract data from MongoDB databases 
 
 - **Docker**: Latest stable version
 - **Docker Compose**: Latest stable version (required only for local MongoDB containers)
-   > Required only if you are running MongoDB locally using containers.  
-   > If you are using **MongoDB Atlas**, Docker/Docker Compose are **not required**.
+    :::note
+
+    Required only if you are running MongoDB locally using containers.  
+    If you are using **MongoDB Atlas**, Docker/Docker Compose are **not required**.
+
+    :::
+   
 - **OLake Docker Image**: `olakego/source-mongodb:latest`
+- **MongoDB Version**: 4.0 or higher
 
 ### CDC Prerequisites
 
@@ -34,7 +41,11 @@ For CDC mode, MongoDB must meet the following requirements:
   - `readWrite` role on your target database
   - `read` role on the local database (to access oplog)
 
-⚠️ **Important**: CDC in OLake is not a continuous always-on process. It requires execution through the **Orchestrator**.
+:::info
+
+**Important**: CDC in OLake is not a continuous always-on process. It requires execution through the **Orchestrator**.
+
+:::
 
 **To set up MongoDB for CDC, please refer to the [MongoDB and Atlas CDC Setup](/docs/connectors/mongodb/cdc_setup) guide.**
 
@@ -44,9 +55,11 @@ For CDC mode, MongoDB must meet the following requirements:
   - Self-hosted MongoDB (local or remote instance)
   - MongoDB Atlas (managed MongoDB cluster)
 
-💡 **Note:** If you don’t have access to enable CDC (replica sets + oplog), OLake also supports **Incremental sync**.
-- Use Incremental mode if CDC is not available in your MongoDB environment.  
-- This allows you to still capture data changes, but without relying on oplog.
+:::info
+
+**Note:** If you don’t have access to enable CDC (replica sets + oplog), OLake also supports **Incremental sync**.
+
+:::
 
 **After initial Prerequisites are fullfilled, the configurations for MongoDB can be configured.**
 
@@ -58,47 +71,59 @@ For CDC mode, MongoDB must meet the following requirements:
 
 <TabItem value="ui" label="Configure MongoDB on OLake UI" default>
 
-#### Step 1: Navigate To Source Configuration Page
+### Step 1: Navigate To Source Configuration Page
 
 1. Complete the [OLake UI Setup Guide](/docs/getting-started/olake-ui)
 2. Login to the OLake UI
-3. Navigate to **Sources → + Create Source**
+3. Navigate to **Sources → Create Source**
 4. Select **MongoDB** from the connector list
 5. Fill in the connection details
 6. Save changes
+
+### Step 2: Provide Configuration Details
+
+1. Fill in the connection details
+2. Save changes
 
 The following image shows the Olake UI configuration screen. Use it as a reference to provide MongoDB connection details when creating the source:
 
 ![Olake UI MongoDB Source Setup](/img/connectors/mongodb/mongodb-ui-setup.png)
 
-#### Step 2: Configure Configuration
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| Hosts<br/> `required` | List of MongoDB hosts. Use DNS SRV format if `srv = true` | `x.xxx.xxx.120:27017`, `x.xxx.xxx.133:27017` (multiple hosts supported) | 
+| Username<br/> `required` | MongoDB authentication username | `test` | 
+| Password<br/> `required` | MongoDB authentication password | `test` | 
+| Auth DB<br/> `required` | Authentication database name | `admin` | 
+| Replica Set | Name of the replica set (if applicable) | `rs0` | 
+| Read Preference | MongoDB read preference setting | `secondaryPreferred` |
+| Use SRV | Enable DNS SRV connection strings. When `true`, only one host allowed in `hosts` field | `true` or `false` |
+| Database Name<br/> `required` | Target MongoDB database name to replicate | `database_name` |
+| Max Threads | Maximum parallel threads for chunk-based snapshotting | `5` |
+| Retry Count | Number of retry attempts with exponential backoff. Defaults to 3 | `4` | 
+| Chunking Strategy | Data chunking strategy for backfill: `timestamp` (time-based), `bucket_auto` (MongoDB's $bucketAuto), `splitVector` (built-in command). Defaults to `splitVector` if empty | `splitVector` |
 
-| Field | Description | Example Value | Data Type |
-|-------|-------------|---------------|-----------|
-| `hosts` | List of MongoDB hosts. Use DNS SRV format if `srv = true` | `x.xxx.xxx.120:27017`, `x.xxx.xxx.133:27017` (multiple hosts supported) | STRING[] |
-| `username` | MongoDB authentication username | `"test"` | STRING |
-| `password` | MongoDB authentication password | `"test"` | STRING |
-| `authdb` | Authentication database name | `"admin"` | STRING |
-| `replica_set` | Name of the replica set (if applicable) | `"rs0"` | STRING |
-| `read_preference` | MongoDB read preference setting | `"secondaryPreferred"` | STRING |
-| `srv` | Enable DNS SRV connection strings. When `true`, only one host allowed in `hosts` field | `true` or `false` | BOOLEAN |
-| `database` | Target MongoDB database name to replicate | `"database_name"` | STRING |
-| `max_threads` | Maximum parallel threads for chunk-based snapshotting | `5` | INTEGER |
-| `backoff_retry_count` | Number of retry attempts with exponential backoff (1, 2, 4, 8, 16 minutes). Defaults to 3 if set to -1 | `4` | INTEGER |
-| `chunking_strategy` | Data chunking strategy for backfill: `timestamp` (time-based), `bucket_auto` (MongoDB's $bucketAuto), `splitVector` (built-in command). Defaults to `splitVector` if empty | `"timestamp"` | STRING |
+:::tip
 
-#### Step 3: Test Connection & Save
+OLake employs a parallel chunking strategy, where large datasets are first split into smaller chunks. For a deeper explanation, go and check out [What makes OLake Fast](https://olake.io/blog/olake-ingestion-filters-explained)
 
-1. Click **Test Connection** to verify your configuration
-2. If the test succeeds, click **Save** to create the source
+:::
 
-⚠️ **Important**: If errors occur during testing, refer to the **Troubleshooting** section below
+### Step 3: Test Connection & Save
+
+1.  Once the connection is validated, the MongoDB source is created. Jobs can then be configured using this source.
+
+:::warning
+
+**Important**: If errors occur during testing, refer to the **Troubleshooting** section below
+
+:::
 
 </TabItem>
 
 <TabItem value="cli" label="Configure MongoDB on OLake CLI">
 
-#### Step 1: Create Configuration File
+### Step 1: Create Configuration File
 
 Create a directory for your MongoDB configuration:
 
@@ -107,7 +132,7 @@ mkdir olake-mongodb
 cd olake-mongodb
 ```
 
-#### Step 2: Configure Configuration
+### Step 2: Provide Configuration Details
 
 Create a file named `source.json` with your MongoDB connection details.
 
@@ -140,10 +165,10 @@ Sample `source.json` file is mentioned below for reference about the structure:
 | `srv` | Enable DNS SRV connection strings. When `true`, only one host allowed | `false` | BOOLEAN |
 | `database` | Target MongoDB database name to replicate | `"database_name"` | STRING |
 | `max_threads` | Maximum parallel threads for chunk-based snapshotting | `5` | INTEGER |
-| `backoff_retry_count` | Number of retry attempts with exponential backoff (defaults to 3 if set to -1) | `4` | INTEGER |
-| `chunking_strategy` | Data chunking strategy: `timestamp`, `bucket_auto`, `splitVector`. Defaults to `splitVector` | `"timestamp"` | STRING |
+| `backoff_retry_count` | Number of retry attempts with exponential backoff. Defaults to 3 | `4` | INTEGER |
+| `chunking_strategy` | Data chunking strategy: `timestamp`, `bucket_auto`, `splitVector`. Defaults to `splitVector` | `"splitVector"` | STRING |
 
-#### Step 3: Run Command of Check
+### Step 3: Run Command of Check
 
 Run the discover command to validate your configuration and generate the streams schema:
 
@@ -156,7 +181,11 @@ docker run --pull=always \
   --config /mnt/config/source.json
 ```
 
-⚠️ **Important**: If errors occur during the check command, refer to the **Troubleshooting** section below.
+:::warning
+
+If errors occur during the check command, refer to the **Troubleshooting** section below.
+
+:::
 
 </TabItem>
 
@@ -170,13 +199,17 @@ The following table shows how MongoDB data types are mapped to Iceberg data type
 
 | MongoDB Data Types | Iceberg Data Type |
 |--------------------|-------------------|
-| int<br/>timestamp | int |
+| int, timestamp | int |
 | long | bigint |
 | None Observed | float |
 | double | double |
 | boolean | boolean |
-| date | timestamp |
-| string<br/>object<br/>objectId<br/>binData (binary)<br/>code<br/>regex (BSONRegExp)<br/>decimal128<br/>maxKey<br/>minKey<br/>array<br/>undefined | string |
+| date | timestamptz |
+| string, object, objectId, binData (binary), code, regex (BSONRegExp), decimal128, maxKey, minKey, array, undefined | string |
+
+:::info timestamptz timezone
+The timestamp is stored in the UTC timezone.
+:::
 
 ---
 
