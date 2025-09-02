@@ -6,6 +6,18 @@ import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower 
 const WebinarsPage = () => {
   const communityMeets = [
     {
+      title: 'OLake 8th Community Meetup',
+      subtitle: 'Join us for an end-to-end demo of OLake\'s latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.',
+      route: '/community/8th-community-meetup',
+      img: `/img/community/8th-olake-community-call.png`,
+      alt: 'OLake 8th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '29 August 2025',
+      icon: FaVideo
+    },
+    {
       title: 'OLake 6th Community Meetup',
       subtitle: 'Join us ',
       route: '/community/6th-community-meetup',
@@ -56,6 +68,18 @@ const WebinarsPage = () => {
   ]
   // Define webinars data directly
   const webinars = [
+    {
+      title: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
+      subtitle: 'Join us for a comprehensive technical workshop exploring ClickHouse\'s experimental Iceberg support and how open table formats are revolutionizing data engineering workflows.',
+      route: '/webinar/w-9-clickhouse-iceberg-workshop',
+      img: `/img/webinars/w-9-clickhouse-iceberg-write.avif`,
+      alt: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 August 2025',
+      icon: FaVideo
+    },
     {
       title: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
       subtitle: 'Introducing OLake v0.',
