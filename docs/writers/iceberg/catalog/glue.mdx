@@ -1,37 +1,44 @@
 ---
 title: 1. AWS Glue
-description: OLake Apache Iceberg writer description
-sidebar_position: 2
+description: AWS Glue Catalog configuration for OLake Apache Iceberg
+sidebar_position: 1
 ---
 
-## AWS S3 + Glue Configuration
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import GlueIcebergWriterConfig from '@site/docs/shared/config/GlueIcebergWriterConfig.mdx';
+import GlueIcebergWriterUIConfigDetails from '@site/docs/shared/config/GlueIcebergWriterUIConfigDetails.mdx';
+import GlueIcebergWriterCLIConfigDetails from '@site/docs/shared/config/GlueIcebergWriterCLIConfigDetails.mdx';
 
+# AWS Glue Catalog Write Guide
 
-<Tabs>
+OLake integrates with AWS Glue Catalog to provide full support for **Apache Iceberg tables**.
+This setup ensures that:
+- **Data** is stored in Amazon S3 (Parquet + metadata files)
+- **Metadata** is managed in AWS Glue Catalog (schemas, partitions, table properties)
+- **OLake** seamlessly writes into Iceberg tables through Glue APIs
 
-<TabItem value="glue-ui" label="OLake UI" default>
+---
 
-<GlueIcebergWriterUIConfigDetails/>
+## Prerequisites
 
-</TabItem>
+Before configuring OLake with AWS Glue Catalog, ensure the following are set up:
 
-<TabItem value="glue-cli" label="OLake CLI" default>
+#### 1. Amazon S3 Bucket
 
+- Create an S3 bucket in the same **AWS region** as your Glue Catalog.
+- Example: `s3://olake-iceberg/`
 
-<GlueIcebergWriterConfig/>
+#### 2. AWS IAM Permissions
 
-### AWS S3 + Glue Configuration Parameters
+- Create an IAM role or user with **Glue + S3 access**.
 
-<GlueIcebergWriterConfigDetails/>
+Here is a sample IAM policy example:
 
-</TabItem>
+<details>
+<summary>**IAM Policy JSON**</summary>
 
-</Tabs>
-
-
-### Required IAM Permissions
-
-```json
+```json title="IAM Policy"
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -75,18 +82,166 @@ sidebar_position: 2
         }
     ]
 }
-
 ```
 
-:::info
-The above IAM policy is a sample policy that allows the OLake Glue Catalog to create and update tables in the Glue Catalog. You can modify the `Resource` section to match your specific Glue Catalog ARN. If you already have a database and table created in the Glue Catalog, you can use the `GetTable` and `GetDatabase` permissions to read the existing metadata and remove the `CreateDatabase` and `CreateTable` permissions. The `SearchTables` permission is optional and is used to search for tables in the Glue Catalog.
+</details>
+
+:::info **IAM Policy Notes**
+- Replace `<REGION>`, `<ACCOUNT_ID>`, `{AWS_GLUE_DATABASE_NAME}`, and `{S3_BUCKET_NAME}` with your actual values
+- If you already have databases and tables in Glue Catalog, you can remove `CreateDatabase` and `CreateTable` permissions
+- The `SearchTables` permission is optional and used for table discovery operations
+- **Note**: Drop table or delete table permissions are not included. Add `glue:DeleteTable` if you need table deletion capabilities
 :::
 
-For S3 related permissions which is needed to write data to S3, refer to the [AWS S3 Permissions](../../parquet/partitioning) documentation.
+---
+## Configuration
 
+<Tabs>
 
-:::info
-If you wish to test out the REST Catalog locally, you can use the [docker-compose](../docker-compose) setup. The local test setup uses Minio as an S3-compatible storage and other all [supported catalog types](../docker-compose#local-catalog--test-setup). 
+<TabItem value="glue-ui" label="OLake UI" default>
 
-You can then setup local spark to run queries on the iceberg tables created in the local test setup.
+- Before setting up the destination, make sure you have successfully set up the [source](/docs/getting-started/creating-first-pipeline#2-configure-source).
+
+![AWS Glue UI Configuration](/img/docs/iceberg/catalog/glue/glue-catalog-olake-ui-setup-destination.png)
+
+<GlueIcebergWriterUIConfigDetails/>
+
+**Click `Next ->`** to test the connection and verify that OLake can validate both Glue Catalog and S3 access.
+
+</TabItem>
+
+<TabItem value="glue-cli" label="OLake CLI">
+
+Create a `destination.json` file with the following configuration:
+
+<GlueIcebergWriterConfig/>
+
+<GlueIcebergWriterCLIConfigDetails/>
+
+Using this `destination.json`, you can run the sync command.
+
+</TabItem>
+
+</Tabs>
+
+:::tip **Connection Testing**
+OLake will automatically test:
+- AWS credentials validity
+- S3 bucket access permissions
+- Glue Catalog connectivity
+- Database creation/access permissions
 :::
+
+<br></br>
+
+- After you have successfully set up the destination: [Configure your streams](/docs/getting-started/creating-first-pipeline#4-configure-streams)
+
+---
+
+## Querying Data
+
+:::info **Query Your Data with AWS Athena**
+Once OLake has written data to Iceberg tables in AWS Glue Catalog, you can query the data using AWS Athena:
+
+```sql
+SELECT * FROM "ICEBERG_DATABASE_NAME"."TABLE_NAME" LIMIT 10;
+```
+:::
+
+## Troubleshooting
+
+The OLake Iceberg Writer with AWS Glue Catalog stops immediately upon encountering errors to ensure data integrity. Below are common issues and their fixes:
+
+- <span >AccessDeniedException: User is not authorized to perform action</span>
+  - Cause: IAM role or user lacks required permissions for AWS Glue or S3 operations.
+  - Fix:
+    - Ensure your IAM policy includes necessary Glue permissions:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "glue:CreateDatabase",
+              "glue:GetDatabase",
+              "glue:CreateTable",
+              "glue:GetTable",
+              "glue:UpdateTable",
+              "glue:GetPartitions"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+      ```
+    - Add S3 permissions for the warehouse path:
+      ```json
+      {
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ],
+        "Resource": [
+          "arn:aws:s3:::your-bucket-name/*",
+          "arn:aws:s3:::your-bucket-name"
+        ]
+      }
+      ```
+
+- <span >NoSuchBucket: The specified bucket does not exist</span>
+  - Cause: S3 bucket doesn't exist, wrong region, or incorrect bucket name in configuration.
+  - Fix:
+    - Verify bucket exists in the correct region:
+      ```bash
+      aws s3 ls s3://your-bucket-name/ --region us-east-1
+      ```
+    - Create bucket if it doesn't exist:
+      ```bash
+      aws s3 mb s3://your-bucket-name --region us-east-1
+      ```
+    - Ensure the `aws_region` in your configuration matches the bucket's region.
+
+- <span >Database does not exist in Glue Catalog</span>
+  - Cause: Specified database name doesn't exist in AWS Glue Data Catalog.
+  - Fix: OLake will automatically create the database if you have `glue:CreateDatabase` permissions. Verify permissions or create manually:
+    ```bash
+    aws glue create-database --database-input Name=iceberg_db --region us-east-1
+    ```
+
+- <span >InvalidInputException: Invalid S3 location</span>
+  - Cause: Malformed S3 path or unsupported S3 URI format.
+  - Fix:
+    - Ensure S3 path follows the correct format: `s3://bucket-name/path/`
+    - Path must end with a trailing slash for warehouse locations
+    - Avoid special characters except hyphens and underscores
+    - Example valid paths:
+      ```
+      s3://my-iceberg-warehouse/
+      s3://data-lake-bucket/iceberg/warehouse/
+      ```
+
+- <span >Connection timeout or network errors</span>
+  - Cause: Network connectivity issues, VPC configuration, or security group restrictions.
+  - Fix:
+    - Verify internet connectivity to AWS services
+    - Check VPC endpoints for Glue and S3 if running in private subnets
+    - Ensure security groups allow outbound HTTPS (port 443) traffic
+    - Test connectivity:
+      ```bash
+      aws sts get-caller-identity --region us-east-1
+      aws glue get-databases --region us-east-1
+      ```
+
+- <span >Table already exists with different schema</span>
+  - Cause: Attempting to create an Iceberg table that conflicts with existing table schema.
+  - Fix:
+    - Check existing table schema in Glue Console
+    - Drop and recreate table if schema change is intended:
+      ```bash
+      aws glue delete-table --database-name iceberg_db --name table_name --region us-east-1
+      ```
+    - Or use OLake's schema evolution capabilities for compatible changes
