@@ -51,6 +51,7 @@ import MySQLSourceConfig from '../../../docs/shared/config/MySQLSourceConfig.mdx
 import MySQLSourceConfigDetails from '../../../docs/shared/config/MySQLSourceConfigDetails.mdx'
 import MySQLStateConfig from '../../../docs/shared/config/MySQLStateConfig.mdx'
 import MySQLStateConfigDetails from '../../../docs/shared/config/MySQLStateConfigDetails.mdx'
+import MySQLToIcebergDatatypes from '../../../docs/shared/config/MySQLToIcebergDatatypes.mdx'
 
 import PostgresSourceConfig from '../../../docs/shared/config/PostgresSourceConfig.mdx'
 import PostgresSourceConfigDetails from '../../../docs/shared/config/PostgresSourceConfigDetails.mdx'
@@ -157,7 +158,8 @@ const MDXComponents = {
   MySQLSourceConfigDetails,
   MySQLStateConfig,
   MySQLStateConfigDetails,
-
+  MySQLToIcebergDatatypes,
+  
   PostgresSourceConfig,
   PostgresSourceConfigDetails,
   PostgresStateConfig,
