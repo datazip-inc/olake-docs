@@ -10,9 +10,7 @@ Ensure the following requirements are met before proceeding:
 2.  **`kubectl`**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 3.  **Pre-generated OLake Streams (`streams.json`)**: This setup requires a `streams.json` generated beforehand using the OLake `discover` command against your source database.
     *   Streams Generation Guides:
-        *   [MongoDB](https://olake.io/docs/getting-started/mongodb#step-2-generate-a-streams-file)
-        *   [MySQL](https://olake.io/docs/getting-started/mysql#step-2-generate-a-streams-file)
-        *   [Postgres](https://olake.io/docs/getting-started/postgres#step-2-generate-a-streams-file)
+        *   [Streams config](https://olake.io/docs/install/docker-cli#streams-config)
     *   The content of this file will be placed within the `cm_olake-streams-config.yaml` ConfigMap.
 4.  **Kubernetes Namespace**: The manifests default to the `olake` namespace. Create it (`kubectl create namespace olake`) or update the `namespace` fields in all YAML files if using a different target.
 5.  **Node Labels (Optional)**: If using `nodeAffinity` in `cronjob_olake.yaml`, ensure target nodes possess the specified labels.

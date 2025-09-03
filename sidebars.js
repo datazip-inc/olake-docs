@@ -121,9 +121,6 @@ const docSidebar = {
     },
 
     sectionHeader("UNDERSTANDING OLAKE"),
-    'understanding/terminologies',
-    'features/index',
-    'core/architecture',
     {
       type: 'category',
       label: 'Terminologies',
@@ -132,6 +129,8 @@ const docSidebar = {
         'understanding/terminologies/olake',
       ],
     },
+    'features/index',
+    'core/architecture',
     'understanding/compatibility-catalogs',
     'understanding/compatibility-engines',
     'core/use-cases',
