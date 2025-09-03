@@ -55,7 +55,6 @@ const docSidebar = {
         'install/olake-ui/index',
         'install/kubernetes',
         'install/docker-cli',
-        'install/cli-binary',
       ],
     },
 
