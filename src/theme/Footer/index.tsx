@@ -22,8 +22,7 @@ const Footer: React.FC = () => {
         { label: 'Contact us', href: '/contact' },
         { label: 'Branding', href: '/branding' },
         { label: 'Terms of Use', href: 'https://datazip.io/terms-of-use' },
-        { label: 'Privacy (Users)', href: 'https://datazip.io/privacy-policy' },
-        { label: 'Privacy (Customers)', href: 'https://datazip.io/privacy-policy-customer' },
+        { label: 'Privacy Policy', href: 'https://datazip.io/privacy-policy' },
     ];
 
     const resourceLinks: LinkItem[] = [
