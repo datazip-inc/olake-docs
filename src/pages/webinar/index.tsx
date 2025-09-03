@@ -72,7 +72,7 @@ const WebinarsPage = () => {
       title: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
       subtitle: 'Join us for a comprehensive technical workshop exploring ClickHouse\'s experimental Iceberg support and how open table formats are revolutionizing data engineering workflows.',
       route: '/webinar/w-9-clickhouse-iceberg-workshop',
-      img: `/img/webinars/w-9-clickhouse-iceberg-write.avif`,
+      img: `/img/webinars/w-9-clickhouse-iceberg-write.png`,
       alt: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
       status: 'archived',
       button: 'secondary',
