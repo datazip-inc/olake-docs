@@ -98,7 +98,6 @@ import SelectedStreamsOnlyDetails from '../../../docs/shared/streams/SelectedStr
 import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
 import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
 import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
-import StreamsConfiguration from '../../../docs/shared/streams/StreamsConfiguration.mdx'
 
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
 import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
@@ -205,7 +204,6 @@ const MDXComponents = {
   StreamsFull,
   StreamsOnly,
   StreamsOnlyDetails,
-  StreamsConfiguration,
 
   OLakePathInfo,
   StreamSelectionExample
