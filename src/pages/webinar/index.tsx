@@ -19,7 +19,7 @@ const WebinarsPage = () => {
     },
     {
       title: 'OLake 6th Community Meetup',
-      subtitle: 'Join us ',
+      subtitle: 'Join us for a real-world production story from PhysicsWallah showcasing their migration from Redshift to Iceberg-based lakehouse, and explore OLake\'s roadmap including Golang architecture, upcoming UI, and SMT transformations.',
       route: '/community/6th-community-meetup',
       img: `/img/community/6th-community-meetup-cover.png`,
       alt: 'OLake 6th Community Meetup',
@@ -31,7 +31,7 @@ const WebinarsPage = () => {
     },
     {
       title: 'OLake 5th Community Meetup',
-      subtitle: 'Join us ',
+      subtitle: 'Join us for a showcase of new features including Apache Iceberg as a destination for AWS S3 and local setups, MongoDB to Iceberg sync capabilities, upcoming MySQL and Postgres sync features, and performance improvements with 2-3x faster syncs.',
       route: '/community/5th-community-meetup',
       img: `/img/community/5th-community-meetup-cover.png`,
       alt: 'OLake 5th Community Meetup',
@@ -43,7 +43,7 @@ const WebinarsPage = () => {
     },
     {
       title: 'OLake 4th Community Meetup',
-      subtitle: 'Join us ',
+      subtitle: 'Join us for updates on recent developments including faster target writer for normalization, new stats file for performance metrics, Docker Compose for MongoDB replica sets, Split Vector Strategy, and Iceberg Writer development with schema evolution.',
       route: '/community/4th-community-meetup',
       img: `/img/community/4th-community-meetup-cover.png`,
       alt: 'OLake 4th Community Meetup',
@@ -55,7 +55,7 @@ const WebinarsPage = () => {
     },
     {
       title: 'OLake 3rd Community Meetup',
-      subtitle: 'Join us ',
+      subtitle: 'Join us for updates on new features including parquet writer, MongoDB 2.0 connector, Apache Iceberg Writer integration, Postgres Writer development, and a comprehensive demo of OLake\'s CLI functionality with MongoDB to S3 syncing.',
       route: '/community/3rd-community-meetup',
       img: `/img/community/3rd-community-meetup-cover.png`,
       alt: 'OLake 3rd Community Meetup',
