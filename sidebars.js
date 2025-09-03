@@ -91,9 +91,9 @@ const docSidebar = {
               label: 'Catalogs',
               items: [
                 'writers/iceberg/catalog/glue',
+                'writers/iceberg/catalog/rest',
                 'writers/iceberg/catalog/jdbc',
                 'writers/iceberg/catalog/hive',
-                'writers/iceberg/catalog/rest',
               ],
             },
             'writers/iceberg/partitioning',
@@ -108,9 +108,12 @@ const docSidebar = {
           label: 'Parquet Writer',
           items: [
             'writers/parquet/config',
-            'writers/parquet/partitioning',
             'writers/parquet/permission',
-            'writers/parquet/local',
+            'writers/parquet/partitioning',
+            'writers/parquet/troubleshoot',
+            // 'writers/parquet/s3',
+            // 'writers/parquet/gcs',
+            // 'writers/parquet/local',
             
           ],
         },
@@ -121,7 +124,14 @@ const docSidebar = {
     sectionHeader("UNDERSTANDING OLAKE"),
     'features/index',
     'core/architecture',
-    'understanding/terminologies',
+    {
+      type: 'category',
+      label: 'Terminologies',
+      items: [
+        'understanding/terminologies/general',
+        'understanding/terminologies/olake',
+      ],
+    },
     'understanding/compatibility-catalogs',
     'understanding/compatibility-engines',
     'core/use-cases',
@@ -136,7 +146,11 @@ const docSidebar = {
 
     // Resources category removed as requested
 
-    'roadmap',
+    {
+      type: 'link',
+      label: 'Roadmap',
+      href: 'https://github.com/datazip-inc/olake/?tab=readme-ov-file#-roadmap-highlights',
+    },
     // FAQs section removed
     {
       type: 'category',
