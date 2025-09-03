@@ -8,7 +8,7 @@ import React from "react";
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
-import meetupData from '../../data/meetup/6th-meetup.json'
+import meetupData from '../../data/meetup/6th-meetup.json';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';

@@ -34,6 +34,7 @@ const deriveThumbnail = (url: string): string | null => {
   if (!match) return null;
   const fileId = match[1];
   // Google Drive thumbnail endpoint. Size w320‑h240 keeps 4:3 ratio
+  // Note: This may not work due to CORS restrictions
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w640`;
 };
 
@@ -78,6 +79,8 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
       >
         {slides.map((slide) => {
           const thumb = slide.thumbnail ?? deriveThumbnail(slide.url);
+          const [imageError, setImageError] = React.useState(false);
+          
           return (
             <a
               key={slide.url}
@@ -86,8 +89,13 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
               rel="noopener noreferrer"
               className="group w-64 shrink-0 snap-start rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow bg-white dark:bg-gray-900"
             >
-              {thumb ? (
-                <img src={thumb} alt={slide.title} className="h-40 w-full object-cover rounded-t-xl" />
+              {thumb && !imageError ? (
+                <img 
+                  src={thumb} 
+                  alt={slide.title} 
+                  className="h-40 w-full object-cover rounded-t-xl" 
+                  onError={() => setImageError(true)}
+                />
               ) : (
                 <div className="h-40 w-full flex items-center justify-center rounded-t-xl bg-gray-100 dark:bg-gray-800">
                   <FileVideo className="h-10 w-10 text-gray-400 group-hover:text-blue-600 transition-colors" />

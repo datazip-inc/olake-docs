@@ -162,8 +162,8 @@ const EnhancedWebinarCard: React.FC<EnhancedWebinarCardProps> = ({
         <h3 className={clsx(
           'font-bold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#193ae6] dark:group-hover:text-blue-400 transition-colors line-clamp-2',
           {
-            'text-xl': !isCompact,
-            'text-lg': isCompact,
+            'text-lg': !isCompact,
+            'text-base': isCompact,
           }
         )}>
           {title}
