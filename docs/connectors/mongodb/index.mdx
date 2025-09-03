@@ -3,144 +3,214 @@ title: MongoDB
 description: OLake MongoDB Connector
 ---
 
-## Overview {#overview}
+# MongoDB Source Documentation
 
-MongoDB Source enables data synchronization from MongoDB to your [desired destination](../../writers/iceberg/overview).
+## Overview
 
-::::info
-OLake UI is live (beta)! You can now use the UI to configure your MongoDB source, discover streams, and sync data. Check it out at [OLake UI](../../getting-started/olake-ui) regarding how to setup using Docker Compose and running it locally.
-::::
+The OLake MongoDB Source connector supports multiple synchronization modes. It offers features like parallel chunking, checkpointing, and automatic resume for failed full loads. This connector can be used within the OLake UI or run locally via Docker for open-source workflows.
 
-<Tabs>
+## Sync Modes Supported
 
-<TabItem value="mongodb-ui" label="Use OLake UI for MongoDB" default>
+- **Full Refresh**
+- **Full Refresh + Incremental**
+- **Full Refresh + CDC**
+- **CDC Only**
 
-### Create a MongoDB Source in OLake UI
+## Prerequisites
 
-1. Navigate to Sources Tab.
-2. Click on `+ Create Source`.
-3. Select `MongoDB` as the source type from Connector type.
-4. Fill in the required connection details in the form. For details regarding the connection details, refer to the MongoDB Source Configuration section on the right side of UI.
-5. Click on `Create ->`
-6. OLake will test the source connection and display the results. If the connection is successful, you will see a success message. If there are any issues, OLake will provide error messages to help you troubleshoot.
+### Version Prerequisites
 
-This will create a MongoDB source in OLake, now you can use this source in your [Jobs Pipeline](../../jobs/overview) to sync data from MongoDB to [Apache Iceberg](../../writers/iceberg/overview) or [AWS S3](../../writers/parquet/s3).
+MongoDB Version 4.0 or higher
 
-### Edit/Delete MongoDB Source in OLake UI
-Use the edit and delete actions in the Sources list to manage existing sources.
+### CDC Prerequisites
 
-</TabItem>
+For CDC mode, MongoDB must meet the following requirements:
+- MongoDB must be running in **replica set mode** (`--replSet rs0`)
+- **Oplog must be enabled** (automatic in replica sets)
 
-<TabItem value="mongodb-cli" label="Use OLake CLI for MongoDB">
+:::info
 
-### To sync data TLDR:
-1. Create a [`source.json`](#configurations) with your MongoDB connection details.
-2. Create a `destination.json` with your Writer ([Apache Iceberg](../../writers/iceberg/catalog/overview) / [AWS S3](../../writers/parquet/s3) / [Azure ADLS](../../writers/iceberg/azure) / [Google Cloud Storage](../../writers/iceberg/gcs)) connection details.
-3. Run `discover` to generate a `streams.json` of available streams.
-4. Run `sync` to replicate data to your specified destination.
+1. CDC in OLake is not a continuous always-on process. It requires execution through the **Orchestrator**.
 
-### Supported Modes
+2. If you don’t have access to enable CDC (replica sets + oplog), OLake also supports **Incremental sync**.
 
-| Mode | Description |
-|---|---|
-| Full Refresh | Fetches the complete dataset from MongoDB. |
-| CDC (Change Data Capture) | Tracks and syncs incremental changes from MongoDB in real time. |
-| Strict CDC | Tracks only new changes from the current position in the change stream. |
+:::
 
-### Supported Destinations
+**To set up MongoDB for CDC, please refer to the [MongoDB and Atlas CDC Setup](/docs/connectors/mongodb/cdc_setup) guide.**
 
-<SupportedDestinations/>
+### Connection Prerequisites
 
-### Commands
+- Read access to the tables for the MongoDB user.
 
-#### Discover
+**After initial Prerequisites are fulfilled, the configurations for MongoDB can be configured.**
+
+---
+
+## Configuration
 
 <Tabs>
 
-<TabItem value="docker-mongo" label="OLake Docker" default>
-<DockerDiscoverMongoDB/>
+<TabItem value="ui" label="Use Olake UI for MongoDB" default>
+
+### 1. Navigate to the Source Configuration Page 
+
+1. Complete the [OLake UI Setup Guide](/docs/getting-started/olake-ui)
+2. After logging in to the OlakeUI, select the `Sources` tab from the left sidebar.
+3. Click **`Create Source`** on the top right corner. 
+4. Select **MongoDB** from the connector dropdown
+5. Provide a name for this source. 
+
+### 2. Provide Configuration Details
+- Enter MongoDB credentials.
+
+![Olake UI MongoDB Source Setup](/img/connectors/mongodb/mongodb-ui-setup.png)
+
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| Hosts<br/> `required` | List of MongoDB hosts. Use DNS SRV format if `srv = true` | `x.xxx.xxx.120:27017`, `x.xxx.xxx.133:27017` (multiple hosts supported) | 
+| Username<br/> `required` | MongoDB authentication username | `test` | 
+| Password<br/> `required` | MongoDB authentication password | `test` | 
+| Auth DB<br/> `required` | Authentication database name | `admin` | 
+| Replica Set | Name of the replica set (if applicable) | `rs0` | 
+| Read Preference | MongoDB read preference setting | `secondaryPreferred` |
+| Use SRV | Enable DNS SRV connection strings. When `true`, only one host allowed in `hosts` field | `true` or `false` |
+| Database Name<br/> `required` | Target MongoDB database name to replicate | `database_name` |
+| Max Threads | Maximum parallel threads for chunk-based snapshotting | `3` |
+| Retry Count | Number of retry attempts with exponential backoff. Defaults to 3 | `3` | 
+| Chunking Strategy | Data chunking strategy for backfill: `timestamp` (time-based), `bucket_auto` (MongoDB's $bucketAuto), `splitVector` (built-in command). Defaults to `splitVector` if empty | `splitVector` |
+
+### 3. Test Connection
+
+-  Once the connection is validated, the MongoDB source is created. Jobs can then be configured using this source.
+
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting).
+
 </TabItem>
 
-<TabItem value="docker-local" label="Locally run OLake" default>
-<LocalDiscoverMongoDB/>
+<TabItem value="cli" label="Use Olake CLI for MongoDB">
+
+### 1. Create Configuration File
+
+    - Once the Olake CLI is setup, create a folder to store configuration files such as `source.json` and `destination.json`.
+
+### 2. Provide Configuration Details
+
+An example `source.json` file will look like this:
+
+```bash title="source.json"
+{
+  "hosts": ["host1:27017", "host2:27017", "host3:27017"],
+  "username": "your_username",
+  "password": "your_password",
+  "authdb": "admin",
+  "replica_set": "rs0",
+  "read_preference": "secondaryPreferred",
+  "srv": false,
+  "database": "your_db",
+  "max_threads": 5,
+  "backoff_retry_count": 4,
+  "chunking_strategy": ""
+}
+```
+
+| Field | Description | Example Value | Type |
+|-------|-------------|---------------|-----------|
+| `hosts` | List of MongoDB hosts. Use DNS SRV format if `srv = true` | `["x.xxx.xxx.120:27017", "x.xxx.xxx.133:27017"]` | STRING[] |
+| `username` | MongoDB authentication username | `"test"` | STRING |
+| `password` | MongoDB authentication password | `"test"` | STRING |
+| `authdb` | Authentication database name | `"admin"` | STRING |
+| `replica_set` | Name of the replica set (if applicable) | `"rs0"` | STRING |
+| `read_preference` | MongoDB read preference setting | `"secondaryPreferred"` | STRING |
+| `srv` | Enable DNS SRV connection strings. When `true`, only one host allowed | `false` | BOOLEAN |
+| `database` | Target MongoDB database name to replicate | `"database_name"` | STRING |
+| `max_threads` | Maximum parallel threads for chunk-based snapshotting | `3` | INTEGER |
+| `backoff_retry_count` | Number of retry attempts with exponential backoff. | `3` | INTEGER |
+| `chunking_strategy` | Data chunking strategy: `timestamp`, `bucket_auto`, `splitVector`. Defaults to `splitVector` | `"splitVector"` | STRING |
+
+Similarly, `destination.json` file can be created inside this folder. For more information, see destination documentation.
+
+### 3. Check Source Connection
+
+To verify the database connection following command needs to be run:
+```bash title="check command"
+docker run --pull=always \
+-v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+olakego/source-mongodb:latest \
+check \
+--config /mnt/config/source.json
+```
+
+- If OLake is able to connect with MongoDB `{"connectionStatus":{"status":"SUCCEEDED"},"type":"CONNECTION_STATUS"}` response is returned.
+
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting-1).
+
 </TabItem>
 
 </Tabs>
 
-#### Sync
+---
 
-<Tabs>
+## Data Type Mapping
 
-<TabItem value="docker-mongo-2" label="OLake Docker" default>
-<DockerSyncMongoDB/>
-</TabItem>
+| MongoDB Data Types | Destination Data Type |
+|--------------------|-------------------|
+| int, timestamp | int |
+| long | bigint |
+| double | double |
+| boolean | boolean |
+| date | timestamptz |
+| string, object, objectId, binData (binary), code, regex (BSONRegExp), decimal128, maxKey, minKey, array, undefined | string |
 
-<TabItem value="docker-local-2" label="Locally run OLake" default>
-<LocalSyncMongoDB/>
-</TabItem>
+:::info timestamptz timezone
+OLake always ingests timestamp data in UTC format, independent of the source timezone.
+:::
 
-</Tabs>
+---
 
-#### Sync with State
+## Troubleshooting
 
-<Tabs>
+### 1. Connection Failed (UI/CLI):
 
-<TabItem value="docker-mongo-3" label="OLake Docker" default>
-<DockerSyncWithStateMongoDB/>
-</TabItem>
+**Cause**: Wrong host/port, MongoDB not running.
 
-<TabItem value="docker-local-3" label="Locally run OLake" default>
-<LocalSyncWithStateMongoDB/>
-</TabItem>
+**Solution**: Check the port number entered is correct and MongoDB is up and accessible.
 
-</Tabs>
+### 2. CDC Not Working:
 
-</TabItem>
+**Cause**: MongoDB not in replica set / oplog not accessible
 
-</Tabs>
+**Solution**: Verify replica set is active by running `rs.status()`
 
-## Configurations {#configurations}
+### 3. File not found (CLI):
 
-### `source.json` Configuration
+**Cause**: Not in correct directory while running commands
 
-<Tabs>
+**Solution**: Make sure both source.json is present in correct directory and the commands are executed while inside the directory
 
-<TabItem value="mongo-config" label="Config" default>
-<MongoDBSourceConfig/>
-</TabItem>
+### 4. file name too long & FATAL error occurred while reading records: failed to finish backfill chunk 381: main writer closed:
 
-<TabItem value="mongo-config-wth-srv" label="Config with SRV" default>
-<MongoDBSourceConfigWithSRV/>
-</TabItem>
+**Cause**: The generated file or directory name exceeded the Linux limit of 255 bytes (often happens when partitioning on very long string values).
+```bash
+2025-02-17T07:03:00Z ERROR main writer closed, with error: failed to create parititon file: failed to create directories[output/otter_db/stream_8/H.
+```
 
-</Tabs>
+**Solution**: The max filename length is 255 bytes and this error shows that you have excceded that limit for file creation (might happen if you partion based on STRING field that contain values that are too large). Usually in a linux system, these limits are defined at:
 
-#### Description of above parameters
-<MongoDBSourceConfigDetails/>
+```bash
+cat /usr/include/linux/limits.h
 
-### `streams.json` Configuration
-
-<SelectedStreamsOnly/>
-<SelectedStreamsOnlyDetails/>
-<StreamsOnly/>
-<StreamsOnlyDetails/>
-
-### `state.json` Configuration
-
-<MongoDBStateConfig/>
-<MongoDBStateConfigDetails/>
-
-## Setup {#setup}
-
-- <a href="/docs/connectors/mongodb/setup/local" target="_blank" rel="noopener noreferrer">Local</a>
-
-## Troubleshooting {#troubleshooting}
-
-::::info
-Read debug docs [here](../../community/contributing#debugging-olake)
-::::
-
-#### File name too long & FATAL error during backfill
-The max filename length is 255 bytes; overly long partition values can exceed this. See Linux NAME_MAX and PATH_MAX.
+...
+#define NAME_MAX         255    /* # chars in a file name */
+#define PATH_MAX        4096    /* # chars in a path name including nul */
+...
+```
 
 
+---
+
+## ChangeLogs
+
+| Date of Release | Version | Description |
+|-------|----------------|----------|
+| Aug 27, 2025 | [v0.1.11](https://github.com/datazip-inc/olake/releases/tag/v0.1.11) | override default timeout in Discover |
+---
