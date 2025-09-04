@@ -144,12 +144,9 @@ const docSidebar = {
 
 
     // Resources category removed as requested
+    // Roadmap removed as requested
 
-    {
-      type: 'link',
-      label: 'Roadmap',
-      href: 'https://github.com/datazip-inc/olake/?tab=readme-ov-file#-roadmap-highlights',
-    },
+    
     // FAQs section removed
     {
       type: 'category',
