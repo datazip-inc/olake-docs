@@ -20,7 +20,6 @@ const sectionHeader = (title) => ({
   className: "navbar__category",
 });
 
-
 const docSidebar = {
   // module.exports = {
   docSidebar: [
@@ -44,22 +43,24 @@ const docSidebar = {
       ],
     },
 
-    
-
     // INSTALL 
 
     {
       type: 'category',
       label: 'Install',
       items: [
-        'install/olake-ui/index',
+        {
+          type: 'category',
+          label: 'Docker Compose (UI)',
+          link: { type: 'doc', id: 'install/olake-ui/index' },
+          items: [
+            'install/olake-ui/offline-environments',
+          ],
+        },
         'install/kubernetes',
         'install/docker-cli',
       ],
     },
-
-    
-
 
     // CONNECTORS
     sectionHeader("CONNECTORS"),
@@ -141,7 +142,6 @@ const docSidebar = {
     'community/issues-and-prs',
     'community/code-of-conduct',
     'community/channels',
-
 
     // Resources category removed as requested
     // Roadmap removed as requested

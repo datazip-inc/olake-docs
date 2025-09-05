@@ -86,8 +86,8 @@ export const paginationConfig = {
       permalink: '/docs'
     },
     next: {
-      title: 'Create first job pipeline',
-      permalink: '/docs/getting-started/creating-first-pipeline'
+      title: 'Create first job pipeline in OLake CLI',
+      permalink: '/blog/creating-job-olake-docker-cli#option-b--olake-cli-docker'
     }
   },
 
