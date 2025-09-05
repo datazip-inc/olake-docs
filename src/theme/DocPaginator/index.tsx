@@ -6,7 +6,7 @@ import ArrowLeft from "@site/static/img/logo/arrowleft.svg";
 import ArrowRight from "@site/static/img/logo/arrowright.svg";
 import clsx from "clsx";
 import { useLocation } from "@docusaurus/router";
-import { paginationConfig} from "@site/src/theme/DocPaginator/redirections";
+import { paginationConfig} from "@site/src/theme/DocPaginator/footerNavigations";
 
 const customPagination = paginationConfig;
 
