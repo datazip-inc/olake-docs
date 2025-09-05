@@ -296,26 +296,26 @@ export const paginationConfig = {
   },
 
   // Parquet Partitioning
-  '/docs/writers/parquet/permission': {
-    previous: {
-      title: 'Setup & Config',
-      permalink: '/docs/writers/parquet/config'
-    },
-    next: {
-      title: 'Configure Streams',
-      permalink: '/docs/getting-started/creating-first-pipeline#4-configure-streams'
-    }
-  },
-
-  // Parquet Partitioning
   '/docs/writers/parquet/partitioning': {
     previous: {
       title: 'Configure Streams',
       permalink: '/docs/getting-started/creating-first-pipeline#4-configure-streams'
     },
     next: {
-      title: 'Configure Streams',
-      permalink: '/docs/getting-started/creating-first-pipeline#4-configure-streams'
+      title: 'Schedule Job',
+      permalink: '/docs/getting-started/creating-first-pipeline#5-schedule-job'
+    }
+  },
+
+  // Parquet Troubleshooting
+  '/docs/writers/parquet/troubleshoot': {
+    previous: {
+      title: 'Configure Destination',
+      permalink: '/docs/getting-started/creating-first-pipeline#3-configure-destination'
+    },
+    next: {
+      title: 'Schedule Job',
+      permalink: '/docs/getting-started/creating-first-pipeline#5-schedule-job'
     }
   },
 
@@ -356,7 +356,7 @@ export const paginationConfig = {
   },
 
   // Architechture
-  '/docs/architecture': {
+  '/docs/core/architecture': {
     previous: {
       title: 'Introduction',
       permalink: '/docs'
