@@ -4,465 +4,1334 @@ description: OLake Apache Iceberg writer description
 sidebar_position: 2
 ---
 
-## REST Catalog
-
-<Tabs>
-
-<TabItem value="jdbc-ui" label="OLake UI" default>
-
-<RESTIcebergWriterUIConfigDetails />
-
-You can query the data via:
-
-<CatalogQuery />
-
-For S3 related permissions which is needed to write data to S3, refer to the [AWS S3 Permissions](../../parquet/partitioning) documentation.
-
-</TabItem>
-
-<TabItem value="jdbc-cli" label="OLake CLI" default>
-
-<RESTIcebergWriterConfig />
-
-### REST Configuration Parameters
-
-<RESTIcebergWriterConfigDetails />
-
-You can query the data via:
-
-<CatalogQuery />
-
-For S3 related permissions which is needed to write data to S3, refer to the [AWS S3 Permissions](../../parquet/partitioning) documentation.
-
-</TabItem>
-
-<TabItem value="catalog-types" label="REST Supported catalog types">
-
-<Tabs>
-
-<TabItem value="lakekeeper" label="Lakekeeper" default>
-
-Lakekeeper is a service that provides a unified view of all your data lakes, regardless of their location. It allows you to manage and monitor your data lakes from a single interface, making it easier to keep track of your data and ensure its integrity.
-
-We have provided a sample configuration for Lakekeeper, which can be used to set up the service in your environment. This configuration includes all the necessary parameters and settings to get started with Lakekeeper. Reder [here](https://docs.lakekeeper.io/getting-started/) for more
-
-After you have set up Lakekeeper using the docker compose provided, you can access the Lakekeeper UI at `http://localhost:8181/ui`.
-
-#### Steps to create a Warehouse in Lakekeeper
-
-1. **Access the Warehouse Section:**
-
-   - Navigate to the `Warehouse` section within Lakekeeper.
-
-2. **Initiate Warehouse Creation:**
-
-   - Click on the `Add Warehouse` button.
-
-3. **Select the Storage Type:**
-
-   - Choose `S3` as the storage option.
-
-4. **Enter AWS Credentials:**
-
-   - Provide the AWS Access Key ID as `admin`.
-   - Provide the AWS Secret Access Key as `password`.
-
-5. **Configure S3 Settings:**
-
-   - Set the S3 Flavor to `S3 Compatible Storage`.
-   - Enable the toggle for `Enable path style access`.
-   - Enable the toggle for `Enable alternative s3 protocols`.
-
-6. **Specify the Bucket Details:**
-
-   - Enter the bucket name as `warehouse` (or the name of the bucket you created using MinIO).
-
-7. **Configure the Endpoint:**
-
-   - Provide the endpoint as `http:{IP of your machine}:9000`.
-   - To retrieve your machine's IP address, execute the command:
-     ```
-     ipconfig getifaddr en0
-     ```
-
-8. **Select the Bucket Region:**
-   - Choose the appropriate region for your bucket.
-
-Following these steps will successfully create a warehouse in Lakekeeper.
-
-</TabItem>
-
-<TabItem value="nessie" label="Nessie">
-
-This guide helps you set up and use Project Nessie as an Iceberg REST catalog with OLake. It uses Docker Compose to spin up Nessie, MinIO (S3-compatible object store), and Postgres (for Nessie metadata storage).
-
-#### Assumption: 
-All services involved in the sync process — including the OLake source image, Nessie, MinIO, and any other dependencies — must be part of the same Docker network.
-
-####  Setup Steps:
-1. Save the following as `docker-compose.yml`:
-
-```yaml
-
-services:
-  nessie:
-    image: ghcr.io/projectnessie/nessie:latest
-    container_name: nessie
-    ports:
-      - "19120:19120"
-    environment:
-      - nessie.version.store.type=JDBC
-      - quarkus.datasource.db-kind=postgresql
-      - quarkus.datasource.jdbc.url=jdbc:postgresql://postgres:5432/nessie_db
-      - quarkus.datasource.username=nessie
-      - quarkus.datasource.password=nessie
-      - nessie.catalog.default-warehouse=warehouse
-      - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
-      - nessie.catalog.service.s3.default-options.region=us-east-1
-      - nessie.catalog.service.s3.default-options.path-style-access=true
-      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
-      - nessie.catalog.service.s3.default-options.external-endpoint=http://host.docker.internal:9000/
-      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
-      - nessie.catalog.secrets.access-key.name=minio
-      - nessie.catalog.secrets.access-key.secret=minio123
-    depends_on:
-      postgres:
-        condition: service_healthy
-      mc:
-        condition: service_completed_successfully
-    networks:
-      - nessie-network
-
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
-    container_name: minio
-    ports:
-      - "9000:9000"
-      - "9090:9090"
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
-      MINIO_ADDRESS: ":9000"
-      MINIO_CONSOLE_ADDRESS: ":9090"
-    volumes:
-      - minio-data:/data
-    command: server /data
-    networks:
-      - nessie-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
-      interval: 5s
-      timeout: 2s
-      retries: 15
-
-  mc:
-    image: quay.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
-    container_name: mc
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: /bin/bash
-    restart: "no"
-    command: >
-      -c "mc alias set myminio http://minio:9000/ minio minio123 && 
-           mc mb myminio/warehouse --ignore-existing"
-    networks:
-      - nessie-network
-
-  postgres:
-    image: postgres:15
-    container_name: postgres
-    environment:
-      POSTGRES_USER: nessie
-      POSTGRES_PASSWORD: nessie
-      POSTGRES_DB: nessie_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/data
-    networks:
-      - nessie-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nessie"]
-      interval: 5s
-      timeout: 2s
-      retries: 10
-
-volumes:
-  minio-data:
-  postgres-data:
-
-networks:
-  nessie-network:
-    driver: bridge
-```
-
-2. Start the services:
-
-```bash
-docker-compose up -d
-```
-
-#### Nessie Catalog Configuration in OLake
-To make OLake use Nessie as the catalog, you'll need to point OLake to the REST endpoint provided by Nessie (`http://host.docker.internal:19120/iceberg/`), and configure it to write data to MinIO under the warehouse bucket.
-
-**Example: `writer.json`**
-Save the following config as `writer.json` or your equivalent config file:
-
-```json
-{
-  "type": "ICEBERG",
-  "writer": {
-    "catalog_type": "rest",
-      "rest_catalog_url": "http://host.docker.internal:19120/iceberg/",
-      "iceberg_s3_path": "s3://warehouse/",
-      "iceberg_db": "iceberg_db",
-      "s3_endpoint": "http://host.docker.internal:9000",
-      "aws_access_key": "minio",
-      "aws_secret_key": "minio123",
-      "aws_region": "us-east-1",
-      "no_identifier_fields": true
-  }
-}
-```
-
-</TabItem>
-
-<TabItem value="s3-tables" label="S3 Tables">
-
-Click [here](../s3-tables)
-
-</TabItem>
-
-<TabItem value="unity" label="Unity">
-
-Click [here](../unity-catalog)
-
-</TabItem>
-
-<TabItem value="gravitino" label="Gravitino">
-
-Coming soon!
-
-</TabItem>
-
-<TabItem value="polaris" label="Apache Polaris">
-
-This guide helps you set up and use Apache Polaris as an Iceberg REST catalog with OLake. It uses Docker to run Polaris with AWS S3 integration for metadata and data storage.
-
-#### Assumption: 
-All services involved in the sync process — including the OLake source image, Polaris, and any other dependencies — must be part of the same Docker network or accessible via network configuration.
-
-#### Setup Steps:
-
-1. Save the following as `docker-compose.yml`:
-
-```yaml
-services:
-  polaris:
-    image: apache/polaris:latest # version on date: 22 Aug 2025
-    container_name: polaris
-    ports:
-      - "8080:8080"    # Application port
-      - "8181:8181"    # API port 
-      - "8182:8182"    # Management port
-      - "8443:8443"    # HTTPS port
-    
-    # Environment variables to fix the AWS region configuration issue
-    environment:
-      - AWS_REGION=ap-south-1
+# REST Catalog
+
+The REST catalog is a standardized API designed to simplify the management of Apache Iceberg tables across diverse engines and programming languages. By providing a unified client interface, it eliminates the need for separate catalog integrations for engines like Spark, Flink, Trino, or languages like Java.
+
+Built on an OpenAPI specification, the REST catalog offers a modern, flexible alternative to the Hive Metastore's Thrift interface, tailored specifically for Iceberg's architecture.
+
+<Tabs queryString="rest-catalog" groupId="rest-catalog">
+
+  {/* REST - Generic */}
+  <TabItem value="generic" label="Generic" default>
+  The Generic **REST Catalog** is the default implementation of the Apache Iceberg REST Catalog API.
+  It provides a standard, engine-agnostic way to manage Iceberg tables without depending on a specific catalog service like Nessie, Polaris, or Unity.
+
+  ## Prerequisites
+  **Required services**:
+    - **Object store** – e.g., S3, MinIO, or another S3-compatible storage for table data and metadata.
+    - **Metadata database** – typically PostgreSQL, with a dedicated database and user for Iceberg.
+    - **REST service** – the Iceberg REST Catalog service.
+  
+  **Permissions**: 
+  - The REST Catalog service user needs read and write permissions on the object store buckets used by Iceberg tables.
+  - The catalog user should have full DDL and DML privileges on the Iceberg metadata database and tables.
+
+  ---
+
+  ## Configuration
+  <Tabs queryString="tab">
+    <TabItem value="rest-ui" label="OLake UI" default>
+      Before setting up the destination, make sure you have successfully set up the [source](/docs/getting-started/creating-first-pipeline#2-configure-source).   
       
-      # Optional: AWS credentials (if not using IAM roles)
-      # Uncomment and set these if you're not using IAM roles for authentication
-      # - AWS_ACCESS_KEY_ID=your_access_key_here
-      # - AWS_SECRET_ACCESS_KEY=your_secret_key_here
+      After setting up the source, configure your destination with **REST Catalog**. 
+
+      <div className='flex justify-center w-2/3 mx-auto'>
+        ![Create Destination](/img/docs/iceberg/catalog/rest/rest-generic-config.png)
+      </div>
+      <RESTIcebergWriterUIConfigDetails />
+      <br/>
+      After you have successfully set up the destination: [Configure your streams](/docs/getting-started/creating-first-pipeline#4-configure-streams )
+    </TabItem>
+
+    <TabItem value="jdbc-cli" label="OLake CLI">
+      Create a `destination.json` with the following configuration:
+      <RESTIcebergWriterConfig />
+      <RESTIcebergWriterConfigDetails />
+      <br/>
+      After you have successfully set up the destination: [Run the Discover command](/docs/install/docker-cli#discover-command )
+    </TabItem>
+  </Tabs>
+  
+  ---
+
+  ## Setup For Local Testing
+
+  Save the following `docker-compose.yml` which will start the following services required for an Iceberg REST Catalog.
+
+  1. **REST Catalog Service** (Tabular image) – Provides the REST API for managing Iceberg tables.
+  2. **PostgreSQL** – Serves as the metadata database to track Iceberg table metadata and schema evolution.
+  3. **MinIO + MinIO Client** – An S3-compatible object store used to store table data and snapshots.
+
+  ```yml title="docker-compose.yml"
+  version: "3.9"
+
+  services:
+    rest:
+      image: tabulario/iceberg-rest
+      container_name: iceberg-rest
+      ports:
+        - 8181:8181
+      volumes:
+        - catalog-data:/catalog
+      environment:
+        AWS_ACCESS_KEY_ID: admin
+        AWS_SECRET_ACCESS_KEY: password
+        AWS_REGION: us-east-1
+        CATALOG_WAREHOUSE: s3://warehouse/
+        CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+        CATALOG_S3_ENDPOINT: http://minio:9090
+        CATALOG_URI: jdbc:postgresql://postgres:5432/iceberg
+        CATALOG_JDBC_USER: iceberg
+        CATALOG_JDBC_PASSWORD: password
+      networks:
+        - iceberg_net
+      depends_on:
+        postgres:
+          condition: service_healthy
+        mc:
+          condition: service_completed_successfully
+
+    postgres:
+      image: postgres:15
+      container_name: postgres
+      networks:
+        - iceberg_net
+      environment:
+        POSTGRES_USER: iceberg
+        POSTGRES_PASSWORD: password
+        POSTGRES_DB: iceberg
+      healthcheck:
+        test: [ "CMD", "pg_isready", "-U", "iceberg", "-d", "password" ]
+        interval: 2s
+        timeout: 10s
+        retries: 3
+        start_period: 10s
+      ports:
+        - 5432:5432
+      volumes:
+        - ./data/postgres-data:/var/lib/postgresql/data
+
+    minio:
+      image: minio/minio
+      hostname: minio
+      container_name: minio
+      ports:
+        - 9090:9090
+        - 9091:9091
+      volumes:
+        - minio-data:/data
+      environment:
+        MINIO_ACCESS_KEY: admin
+        MINIO_SECRET_KEY: password
+        MINIO_DOMAIN: minio
+      command: server --address ":9090" --console-address ":9091" /data
+      networks:
+        iceberg_net:
+          aliases:
+            - warehouse.minio
+
+    mc:
+      image: minio/mc
+      container_name: mc
+      environment:
+        AWS_ACCESS_KEY_ID: admin
+        AWS_SECRET_ACCESS_KEY: password
+        AWS_REGION: us-east-1
+      entrypoint: >
+        /bin/sh -c "
+        until (/usr/bin/mc alias set minio http://minio:9090 admin password) do echo '...waiting...' && sleep 1; done;
+        echo 'Ensuring warehouse bucket exists and is public...';
+        if /usr/bin/mc stat minio/warehouse > /dev/null 2>&1; then
+          echo 'Warehouse bucket exists, removing for fresh start...';
+          /usr/bin/mc rm -r --force minio/warehouse || echo 'Failed to remove warehouse, proceeding...';
+        fi;
+        /usr/bin/mc mb minio/warehouse;
+        /usr/bin/mc anonymous set public minio/warehouse;
+        echo 'Minio warehouse bucket setup complete.';
+        "
+      networks:
+        - iceberg_net
+      depends_on:
+        - minio
+
+  volumes:
+    catalog-data:
+    minio-data:
+
+  networks:
+    iceberg_net:
+  ```
+
+  Start the services:
+
+  ```bash
+  docker-compose up -d
+  ```
+  :::note
+  All services involved in the sync OLake, REST Catalog Service, MinIO, and Postgres must run in the **same Docker network**.
+  ::: 
+
+  ---
+
+  ## Troubleshooting
+
+  - <span> Your authentication credentials are invalid ... unauthorized_client</span>
+    - Fix:
+      - Ensure the correct OAuth/token or DB username/password is provided.
+      - Re-issue new tokens or refresh secrets if expired.
+    - Check using this command:
+      ```bash
+      curl -H "Authorization: Bearer <token>" https://<catalog-endpoint>/v1/config
+      ```
+
+  - <span> User: `<ARN>` is not authorized to perform: sts:AssumeRole </span>
+    - Fix:
+      - Make sure the correct IAM role is assigned.
+      - Validate role trust relationships and necessary permissions to S3 and Catalog.
+    - Check using this command:
+      ```bash
+      aws sts assume-role --role-arn <S3_role_arn> --role-session-name test-session
+      ```
+  </TabItem>  
+
+      {/* REST - Lakekeeper */}
+      <TabItem value="lakekeeper" label="Lakekeeper">
+
+      The **Lakekeeper REST Catalog** is a catalog service that provides a unified view of all your Iceberg tables and data lakes.  
+      It implements the Apache Iceberg REST Catalog API, with extensions for governance and monitoring.  
+      Using Lakekeeper, you can manage tables across different storage systems while exposing them to engines in a consistent way.  
+
+      ## Prerequisites
+
+      **Required services**:
+      - **Lakekeeper Server** – The REST catalog service for Iceberg tables.  
+      - **Object Store** – e.g., AWS S3, MinIO, or any S3-compatible storage for table data and snapshots.  
+      - **Metadata Database** – PostgreSQL, used internally by Lakekeeper to store catalog state and metadata.  
+
+      **Permissions**:
+      - Lakekeeper must have read/write access to the object store bucket(s).  
+      - The PostgreSQL user must have DDL/DML rights to manage catalog metadata tables.  
+
+      ---
+
+      ## Configuration
+      <Tabs queryString="tab">
+        <TabItem value="rest-ui" label="OLake UI" default>
+          Before setting up the destination, make sure you have successfully set up the [source](/docs/getting-started/creating-first-pipeline#2-configure-source).   
+
+          After setting up the source, configure your destination with **Lakekeeper** as the REST Catalog.  
+
+          <div className='flex justify-center w-2/3 mx-auto'>
+          ![Nessie UI Configuration](/img/docs/iceberg/catalog/rest/rest-nessie-config.png)
+        </div>
+          **Lakekeeper Configuration Parameters:**
+
+          | Parameter            | Sample Value            | Description                                                                 |
+          |----------------------|-------------------------|-----------------------------------------------------------------------------|
+          | **REST Catalog URI** | `http://<LAKEKEEPER_ENDPOINT>:8181/catalog` | Endpoint for the Lakekeeper REST catalog service.                           |
+          | **Iceberg S3 Path**  | `s3://warehouse/`       | Root S3 path (or bucket) where Iceberg data will be stored.                 |
+          | **Iceberg Database** | `<ICEBERG_DATABASE>`               | Logical database/namespace name used for the Iceberg tables.                |
+          | **S3 Endpoint**      | `http://<S3_ENDPOINT>:9000` | Endpoint for the S3-compatible service (e.g., MinIO, AWS S3).               |
+          | **AWS Region**       | `<AWS_REGION>`             | Region of the S3 bucket.                                                    |
+          | **AWS Access Key**   | `<AWS_ACCESS_KEY>`                 | Access key for S3 authentication.                                           |
+          | **AWS Secret Key**   | `<AWS_SECRET_KEY>`              | Secret key for S3 authentication.                                           |
+
+          <br/>
+          After you have successfully set up the destination: [Configure your streams](/docs/getting-started/creating-first-pipeline#4-configure-streams )
+        </TabItem>
+
+        <TabItem value="jdbc-cli" label="OLake CLI">
+          Create a `destination.json` with the following configuration:
+
+          ```json title="destination.json"
+          {
+            "type": "ICEBERG",
+            "writer": {
+              "catalog_type": "rest",
+              "rest_catalog_url": "http://<LAKEKEEPER_ENDPOINT>:8181/catalog",
+              "iceberg_s3_path": "s3://<ICEBERG_S3_PATH>",
+              "iceberg_db": "<ICEBERG_DATABASE>",
+              "s3_endpoint": "http://<S3_ENDPOINT>:9000",
+              "aws_access_key": "<AWS_ACCESS_KEY>",
+              "aws_secret_key": "<AWS_SECRET_KEY>",
+              "aws_region": "<AWS_REGION>"
+            }
+          }
+          ```
+
+          **Lakekeeper Configuration Parameters:**
+        
+          | Parameter            | Sample Value            | Description                                                                 |
+          |----------------------|-------------------------|-----------------------------------------------------------------------------|
+          | **catalog_type**     | `rest`                  | Defines the catalog type used by the writer. "rest" means the writer interacts with a RESTful catalog service. |
+          | **rest_catalog_url** | `http://<LAKEKEEPER_ENDPOINT>:8181/catalog` | Endpoint for the Lakekeeper REST catalog service.                           |
+          | **iceberg_s3_path**  | `s3://<ICEBERG_S3_PATH>`       | Determines the S3 path or storage location for Iceberg data in the warehouse bucket. |
+          | **iceberg_db**       | `<ICEBERG_DATABASE>`               | Specifies the name of the Iceberg database that will be used by the destination configuration. |
+          | **s3_endpoint**      | `http://<S3_ENDPOINT>:9000` | Endpoint for the MinIO S3-compatible service.                               |
+          | **aws_access_key**   | `<AWS_ACCESS_KEY>`                 | MinIO access key for authentication (Optional).                             |
+          | **aws_secret_key**   | `<AWS_SECRET_KEY>`              | MinIO secret key for authentication (Optional).                             |
+          | **aws_region**       | `<AWS_REGION>`             | Specifies the AWS region associated with the S3 bucket.                     |
+
+          <br/>
+          After you have successfully set up the destination: [`Run the Discover command`](/docs/install/docker-cli#discover-command )
+        </TabItem>
+      </Tabs>
+
+      ---
+
+    ## Setup For Local Testing
+
+    Save the following `docker-compose.yml` which will start all required services for a Lakekeeper REST Catalog:
+
+    1. **Lakekeeper Server** – Provides the REST API for Iceberg table operations.  
+    2. **PostgreSQL** – Metadata database.  
+    3. **MinIO + MinIO Client** – S3-compatible object store.  
+
+    ```yml title="docker-compose.yml"
+    version: "3"
+
+    services:
+      lakekeeper:
+        image: &lakekeeper-image ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
+        pull_policy: &lakekeeper-pull-policy always
+        environment: &lakekeeper-environment
+          - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+          - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://iceberg:password@postgres:5432/iceberg
+          - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://iceberg:password@postgres:5432/iceberg
+          - LAKEKEEPER__AUTHZ_BACKEND=allowall
+        command: [ "serve" ]
+        healthcheck:
+          test: [ "CMD", "/home/nonroot/iceberg-catalog", "healthcheck" ]
+          interval: 1s
+          timeout: 10s
+          retries: 3
+          start_period: 3s
+        depends_on:
+          migrate:
+            condition: service_completed_successfully
+        ports:
+          - "8181:8181"
+        networks:
+          iceberg_net:
+
+      migrate:
+        image: *lakekeeper-image
+        pull_policy: *lakekeeper-pull-policy
+        environment: *lakekeeper-environment
+        restart: "no"
+        command: [ "migrate" ]
+        depends_on:
+          postgres:
+            condition: service_healthy
+        networks:
+          iceberg_net:
+
+      minio:
+        image: minio/minio:RELEASE.2025-04-03T14-56-28Z
+        container_name: minio
+        environment:
+          - MINIO_ROOT_USER=admin
+          - MINIO_ROOT_PASSWORD=password
+          - MINIO_DOMAIN=minio
+        networks:
+          iceberg_net:
+            aliases:
+              - warehouse.minio
+        ports:
+          - 9001:9001
+          - 9000:9000
+        volumes:
+          - ./data/minio-data:/data
+        command: [ "server", "/data", "--console-address", ":9001" ]
+
+      mc:
+        depends_on:
+          - minio
+        image: minio/mc:RELEASE.2025-04-03T17-07-56Z
+        container_name: mc
+        networks:
+          iceberg_net:
+        environment:
+          - AWS_ACCESS_KEY_ID=admin
+          - AWS_SECRET_ACCESS_KEY=password
+          - AWS_REGION=us-east-1
+        entrypoint: |
+          /bin/sh -c "
+          until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+          if ! /usr/bin/mc ls minio/warehouse > /dev/null 2>&1; then
+            /usr/bin/mc mb minio/warehouse;
+            /usr/bin/mc policy set public minio/warehouse;
+          fi;
+          tail -f /dev/null
+          "
+
+      postgres:
+        image: postgres:15
+        container_name: iceberg-postgres
+        networks:
+          iceberg_net:
+        environment:
+          - POSTGRES_USER=iceberg
+          - POSTGRES_PASSWORD=password
+          - POSTGRES_DB=iceberg
+        healthcheck:
+          test: [ "CMD", "pg_isready", "-U", "iceberg", "-d", "iceberg" ]
+          interval: 2s
+          timeout: 10s
+          retries: 3
+          start_period: 10s
+        ports:
+          - 5432:5432
+        volumes:
+          - ./data/postgres-data:/var/lib/postgresql/data
+
     networks:
-      - polaris-network
+      iceberg_net:
 
-networks:
-  polaris-network:
-    driver: bridge
-```
+    volumes:
+      postgres-data:
+      minio-data:
+    ```
 
-2. Start the services:
-```bash
-docker-compose up -d
-```
+    Start the services:
+    ```bash
+    docker-compose up -d
+    ```
 
-3. Get Polaris root credentials from logs:
+    Once you have started the services you can access the Lakekeeper UI at: [http://localhost:8181/ui](http://localhost:8181/ui)
 
-```bash
-docker logs polaris | grep "root principal credentials"
-```
+    ### Steps to Create a Warehouse
 
-Look for a line similar to:
-```
-realm: default-realm root principal credentials: bd0b5cde9ffb3966:9c377f72a27ba22c47e26cd53423fa96
-```
+    1. In the Lakekeeper UI, navigate to the Warehouse section.
+    2. Click on the **Add Warehouse** button.
+    3. Choose S3 as the storage option.
+    4. Enter AWS Credentials
+        - Credential Type → `Access Key`
+        - Access Key ID → `admin`
+        - Secret Access Key → `password`
+    5. Configure S3 Settings
+        - Set S3 Flavor → `S3 Compatible Storage`
+        - Bucket Region → `us-east-1`
+        - Enable toggle → `Enable alternative S3 protocols`
+        - Enable toggle → `Enable path style access`
+    6. Specify Bucket Details
+        - Bucket Name → `warehouse`
+    7. Configure the Endpoint
+        - Endpoint → `http:<YOUR_MACHINE_IP>:9000`
+        - To retrieve your machine’s IP address, run:
+        ```bash
+        ipconfig getifaddr en0 
+        ```
 
-Extract the credentials:
-- **Client ID**: `bd0b5cde9ffb3966`
-- **Client Secret**: `9c377f72a27ba22c47e26cd53423fa96`
+    After completing these steps, your Warehouse will be registered and ready for use with Iceberg tables via Lakekeeper.
 
-4. Get bearer token for API requests (replace `<client_id>` and `<client_secret>` with the root credential):
 
-```bash
-curl -i -X POST \
-  http://localhost:8181/api/catalog/v1/oauth/tokens \
-  -d 'grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>&scope=PRINCIPAL_ROLE:ALL'
-```
+    :::note
+    All services involved in the sync — OLake, Lakekeeper, MinIO, and Postgres — must run in the **same Docker network**.
+    ::: 
 
-5. Create S3 bucket with the following policy:
+    ---
 
-```json
-{
-    "Version": "2012-10-17",
-    "Statement": [
+    ## Troubleshooting
+
+    - <span>Invalid Database Connection</span>
+      - Fix:
+        - Verify `LAKEKEEPER__PG_DATABASE_URL_*`, username, and password.
+        - Check PostgreSQL is running and healthy.
+
+    - <span>Permission Denied on S3 Bucket</span>
+      - Fix:
+        - Ensure the access key and secret key are correct.
+        - Verify the bucket (warehouse) exists and is accessible.
+        - Test with:
+          ```bash
+          mc ls minio/warehouse
+          ```
+
+    - <span> Access Denied / S3 or Object Store Permission Errors </span>
+      - Fix:
+        - Make sure Lakekeeper’s runtime account/service role has the required access: `s3:GetObject`, `s3:PutObject,` `s3:DeleteObject`, `s3:ListBucket`.
+        - Check using this command:
+          ```bash
+          aws s3 ls s3://<your-bucket>/<your-prefix>
+          ```
+
+  </TabItem>
+
+      {/* REST - Nessie */}
+      <TabItem value="nessie" label="Nessie">
+        The **REST Nessie Catalog** integrates [Project Nessie](https://projectnessie.org/) as the catalog for Apache Iceberg using the REST Catalog API.
+
+    Unlike the Generic REST Catalog, Nessie adds Git-like version control for data, enabling branching, tagging, and reproducible queries across multiple engines.
+
+    ## Prerequisites
+    **Required services**:
+      - **Object store** – e.g., S3, MinIO, or another S3-compatible storage for table data and metadata.
+      - **Metadata database** – typically PostgreSQL, with a dedicated database and user for Iceberg + Nessie.
+      - **Nessie REST Service** – a Nessie deployment that provides the REST catalog API along with versioning features
+
+    **Permissions**:
+      - The Nessie service requires **read/write access** permissions to the configured object store (e.g., S3, MinIO) buckets or directories used for table data and metadata storage. 
+      - Ensure the IAM role or user permissions allow **listing, reading, writing, and deleting objects**.
+      - The database user for Nessie metadata storage (PostgreSQL or alternative) should have **full create**, **read**, **update**, and **delete** (CRUD) privileges on the dedicated Nessie schema or database.
+
+    ---
+
+    ## Configuration
+
+    <Tabs queryString="tab">
+
+      <TabItem value="nessie-ui" label="OLake UI" default>
+
+        Before setting up the destination, make sure you have successfully set up the [source](/docs/getting-started/creating-first-pipeline#2-configure-source).   
+      
+        After setting up the source, configure your destination with **REST Catalog**. 
+
+        <div className='flex justify-center w-2/3 mx-auto'>
+          ![Nessie UI Configuration](/img/docs/iceberg/catalog/rest/rest-nessie-config.png)
+        </div>
+
+
+        **Nessie Configuration Parameters:**
+
+        | Parameter        | Sample Value                            | Description                                                                                     |
+        |------------------|-----------------------------------------|-------------------------------------------------------------------------------------------------|
+        | **REST Catalog URI** | `http://<REST_ENDPOINT>:19120/iceberg/` | Specifies the endpoint URL for the Nessie REST catalog service that the writer will connect to. |
+        | **Iceberg S3 Path**  | `s3://<BUCKET_NAME>`                    | Determines the S3 path or storage location for Iceberg data in the warehouse bucket.            |
+        | **Iceberg Database** | `iceberg_db`                            | Specifies the name of the Iceberg database that will be used by the destination configuration.  |
+        | **S3 Endpoint**      | `http://<S3_ENDPOINT>:9000`             | Endpoint for the  S3-compatible service.                                                        |
+        | **AWS Region**       | `<S3_REGION>`                             | Specifies the AWS region associated with the S3 bucket where the data is stored.                |
+        | **AWS Access Key**   | `<S3_ACCESS_KEY>`                       | S3 access key for authentication (Optional).                                                               |
+        | **AWS Secret Key**   | `<S3_SECRET_KEY>`                       | S3 secret key for authentication (Optional).                                                               |
+
+        <br/>
+
+        **Authentication Fields (optional):**
+        
+        | Parameter                | Sample Value                        | Description                                                                                                   |
+        |--------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------|
+          | **Token**                    | `abc...xyz`                          | Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service. |
+        | **OAuth2 Auth URI**          | `https://auth.server.com/oauth/token` | OAuth2 server URI for OAuth2 authentication.                                                                  |
+        | **REST Auth Type**           | `oauth2`                              | Authentication type (e.g., "oauth2").                                                                         |
+        | **Credential (OAuth2)**      | `your_id:your_secret`                 | Specifies the client ID and secret for OAuth2, formatted as client_id:client_secret.                          |
+        | **Scope (OAuth2)**           | `api.read api.write`                  | OAuth2 scopes (space-separated).                                                                              |
+        | **REST Signing Name**        | `s3tables`                            | Service name for AWS Signature V4 (e.g., "s3tables").                                                         |
+        | **REST Signing Region**      | `us-east-1`                           | Region for AWS Signature V4 signing.                                                                          |
+        | **REST Enable Signature V4** | `true`                              | Enable AWS Signature V4 signing (boolean).                                                                    |
+        | **Disable Identifier Tables**    | `false`                             | Needed to set `true` for Databricks Unity Catalog as it doesn't support identifier fields                     |
+
+        <br/>
+
+        After you have successfully set up the destination: [Configure your streams](/docs/getting-started/creating-first-pipeline#4-configure-streams )
+
+      </TabItem>
+
+      <TabItem value="nessie-cli" label="OLake CLI">
+
+        To connect to Iceberg using Nessie as the catalog, create `destination.json` with the following configuration:
+        ```json title="destination.json"
         {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject",
-                "s3:PutObject",
-                "s3:DeleteObject",
-                "s3:ListBucket"
-            ],
-            "Resource": [
-                "arn:aws:s3:::your-bucket-name",
-                "arn:aws:s3:::your-bucket-name/*"
-            ]
+          "type": "ICEBERG",
+          "writer": {
+            "catalog_type": "rest",
+              "rest_catalog_url": "http://<REST_ENDPOINT>:19120/iceberg/",
+              "iceberg_s3_path": "s3://<BUCKET_NAME>",
+              "iceberg_db": "<DATABASE_NAME>",
+              "s3_endpoint": "http://<S3_ENDPOINT>:9000/",
+              "aws_access_key": "<S3_ACCESS_KEY>",
+              "aws_secret_key": "<S3_SECRET_KEY>", 
+              "aws_region": "<AWS_REGION>"
+          }
         }
-    ]
-}
-```
+        ```
 
-6. Create IAM role for S3 access. After creating the IAM role, you'll get an ARN that looks like:
-```
-arn:aws:iam::############:role/olake-role
-```
-Copy this ARN as you'll need it in the next step.
+        **Nessie Configuration Parameters**
+        | Parameter        | Sample Value                            | Description                                                                                                    |
+        |------------------|-----------------------------------------|----------------------------------------------------------------------------------------------------------------|
+        | **catalog_type**     | `rest`                                  | Defines the catalog type used by the writer. "rest" means the writer interacts with a RESTful catalog service. |
+        | **rest_catalog_url** | `http://<REST_ENDPOINT>:19120/iceberg/` | Specifies the endpoint URL for the Nessie REST catalog service that the writer will connect to.                |
+        | **iceberg_s3_path**  | `s3://<BUCKET_NAME>`                    | Determines the S3 path or storage location for Iceberg data in the warehouse bucket.                           |
+        | **iceberg_db**       | `<DATABASE_NAME>`                            | Specifies the name of the Iceberg database that will be used by the destination configuration.                 |
+        | **s3_endpoint**      | `http://<S3_ENDPOINT>:9000/`            | Endpoint for the MinIO S3-compatible service.                                                                  |
+        | **aws_access_key**   | `<S3_ACCESS_KEY>`                       | MinIO access key for authentication (Optional).                                                                           |
+        | **aws_secret_key**   | `<S3_SECRET_KEY>`                       | MinIO secret key for authentication (Optional).                                                                           |
+        | **aws_region**       | `<S3_REGION>`                             | Specifies the AWS region associated with the S3 bucket where the data is stored.                               |
 
-7. Create catalog (replace `<bearer_token>` with token received in prev steps, `your-bucket-name` with your S3 bucket, and `<your-iam-role-arn>` with the ARN from step 6):
+        <br />
 
-```bash
-curl -i -X POST http://localhost:8181/api/management/v1/catalogs \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "olake_catalog",
-    "type": "INTERNAL",
-    "properties": {
-      "default-base-location": "s3://your-bucket-name"
-    },
-    "storageConfigInfo": {
-      "storageType": "S3",
-      "roleArn": "<your-iam-role-arn>",
-      "allowedLocations": ["s3://your-bucket-name"]
-    }
-  }'
-```
+        **Authentication Fields (optional):**
+        | Parameter                | Sample Value                        | Description                                                                                                   |
+        |--------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------|
+          | **token**                    | `abc...xyz`                           | Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service. |
+          | **oauth2_uri**               | `https://auth.server.com/oauth/token` | OAuth2 server URI for OAuth2 authentication.                                                                  |
+          | **rest_auth_type**           | `oauth2`                              | Authentication type (e.g., "oauth2").                                                                         |
+          | **credential**               | `your_id:your_secret`                 | Specifies the client ID and secret for OAuth2, formatted as client_id:client_secret.                          |
+          | **scope**                    | `api.read api.write`                  | OAuth2 scopes (space-separated).                                                                              |
+          | **rest_signing_name**        | `s3tables`                            | Service name for AWS Signature V4 (e.g., "s3tables").                                                         |
+          | **rest_signing_region**      | `us-east-1`                           | Region for AWS Signature V4 signing.                                                                          |
+        | **rest_signing_v_4**         | `true`                              | Enable AWS Signature V4 signing (boolean).                                                                    |
+        | **no_identifier_fields**     | `false`                             | Needed to set `true` for Databricks Unity Catalog as it doesn't support identifier fields                     |
 
-8. Create user and assign roles (replace `<bearer_token>` with your bearer token). The create user command’s response includes the new user’s client credentials.
+        <br/>
 
-```bash
-# Create user (output includes client_id and client_secret, note them required in olake configuration)
-curl -i -X POST "http://localhost:8181/api/management/v1/principals" \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "olake_user", "type": "user"}'
+        After you have successfully set up the destination: [Run the Discover command](/docs/install/docker-cli#discover-command)
 
-# Create principal role
-curl -i -X POST "http://localhost:8181/api/management/v1/principal-roles" \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"principalRole": {"name": "olake_user_role"}}'
+      </TabItem>
 
-# Assign role to user
-curl -i -X PUT "http://localhost:8181/api/management/v1/principals/olake_user/principal-roles" \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"principalRole": {"name": "olake_user_role"}}'
+    </Tabs>
 
-# Create catalog role
-curl -i -X POST "http://localhost:8181/api/management/v1/catalogs/olake_catalog/catalog-roles" \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"catalogRole": {"name": "olake_catalog_role"}}'
+    --- 
+    ## Setup For Local Testing
 
-# Assign catalog role to principal role
-curl -i -X PUT "http://localhost:8181/api/management/v1/principal-roles/olake_user_role/catalog-roles/olake_catalog" \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"catalogRole": {"name": "olake_catalog_role"}}'
+    Save the following as `docker-compose.yml`: which will start the services required for a Nessie REST Catalog:
+    1. **Nessie REST Service** – Provides the REST API for managing Iceberg tables with version control.
+    2. **PostgreSQL** – Stores Nessie's metadata and catalog state.
+    3. **MinIO + MinIO Client** – An S3-compatible object store used to store table data and snapshots.
 
-# Grant privileges
-curl -i -X PUT "http://localhost:8181/api/management/v1/catalogs/olake_catalog/catalog-roles/olake_catalog_role/grants" \
-  -H "Authorization: Bearer <bearer_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"grant": {"type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT"}}'
-```
+    ```yml title="docker-compose.yml"
+    services:
+      nessie:
+        image: ghcr.io/projectnessie/nessie:latest
+        container_name: nessie
+        ports:
+          - "19120:19120"
+        environment:
+          - nessie.version.store.type=JDBC
+          - quarkus.datasource.db-kind=postgresql
+          - quarkus.datasource.jdbc.url=jdbc:postgresql://postgres:5432/nessie_db
+          - quarkus.datasource.username=nessie
+          - quarkus.datasource.password=nessie
+          - nessie.catalog.default-warehouse=warehouse
+          - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
+          - nessie.catalog.service.s3.default-options.region=us-east-1
+          - nessie.catalog.service.s3.default-options.path-style-access=true
+          - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
+          - nessie.catalog.service.s3.default-options.external-endpoint=http://localhost:9000/
+          - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+          - nessie.catalog.secrets.access-key.name=minio
+          - nessie.catalog.secrets.access-key.secret=minio123
+        depends_on:
+          postgres:
+            condition: service_healthy
+          mc:
+            condition: service_completed_successfully
+        networks:
+          - nessie-network
 
-#### Polaris Catalog Configuration in OLake
+      minio:
+        image: quay.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
+        container_name: minio
+        ports:
+          - "9000:9000"
+          - "9090:9090"
+        environment:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio123
+          MINIO_ADDRESS: ":9000"
+          MINIO_CONSOLE_ADDRESS: ":9090"
+        volumes:
+          - minio-data:/data
+        command: server /data
+        networks:
+          - nessie-network
+        healthcheck:
+          test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+          interval: 5s
+          timeout: 2s
+          retries: 15
 
-To make OLake use Polaris as the catalog, point OLake to the REST endpoint provided by Polaris (`http://host.docker.internal:8181/api/catalog`) and configure OAuth2 authentication.
-<Tabs>
+      mc:
+        image: quay.io/minio/minio:RELEASE.2025-07-18T21-56-31Z
+        container_name: mc
+        depends_on:
+          minio:
+            condition: service_healthy
+        entrypoint: /bin/bash
+        restart: "no"
+        command: >
+          -c "mc alias set myminio http://minio:9000/ minio minio123 && 
+              mc mb myminio/warehouse --ignore-existing"
+        networks:
+          - nessie-network
 
-<TabItem value="olake-ui" label="OLake UI" default>
+      postgres:
+        image: postgres:15
+        container_name: postgres
+        environment:
+          POSTGRES_USER: nessie
+          POSTGRES_PASSWORD: nessie
+          POSTGRES_DB: nessie_db
+        ports:
+          - "5432:5432"
+        volumes:
+          - postgres-data:/data
+        networks:
+          - nessie-network
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U nessie"]
+          interval: 5s
+          timeout: 2s
+          retries: 10
 
-| Parameter            | Sample Value                                              | Description                                                                                   |
-|----------------------|----------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| Catalog Type         | rest                                                     | Defines the catalog type used by the writer.                                                  |
-| REST Catalog URL     | http://host.docker.internal:8181/api/catalog             | Endpoint URL for the Polaris REST catalog service.                                            |
-| Iceberg S3 Path      | olake_catalog                                            | S3 path or storage location for Iceberg data.                                                 |
-| Iceberg Database     | olake_db                                                 | Name of the Iceberg database used by the destination configuration.                           |
-| Authentication Type  | oauth2                                                   | Type of authentication (e.g., "oauth2").                                                      |
-| OAuth2 URI           | http://host.docker.internal:8181/api/catalog/v1/oauth/tokens | OAuth2 server URI for authentication.                                             |
-| Credential           | `<olake_user_client_id>:<olake_user_client_secret>`        | OAuth2 client ID and secret, formatted as client_id:client_secret.                            |
-| Scope                | PRINCIPAL_ROLE:ALL                                       | OAuth2 scopes (space-separated).                                                              |
-| AWS Region           | ap-south-1                                               | AWS region associated with the S3 bucket.                                                     |
+    volumes:
+      minio-data:
+      postgres-data:
 
-</TabItem>
+    networks:
+      nessie-network:
+        driver: bridge
+    ```
 
-<TabItem value="olake-cli" label="OLake CLI">
-**Example: `writer.json`**
-Save the following as `writer.json`, replacing `<olake_user_client_id>` and `<olake_user_client_secret>` with the credentials from the create user response:
+    Start the services:
 
-```json
-{
+    ```bash
+    docker-compose up -d
+    ```
+
+    :::note
+    All services involved in the sync — OLake, Nessie, MinIO, and Postgres — must run in the **same Docker network**.
+    ::: 
+
+    ---
+
+    ## Troubleshooting
+
+    - <span>Invalid Reference (Branch/Tag Not Found)</span>
+      - Fix: Verify that the branch/tag exists before running operations like sync or queries.
+      - Use the REST API or CLI to list branches/tags:
+        ```bash
+        curl https://<nessie-endpoint>/api/v2/trees/branch
+        ```
+
+    - <span> Commit Conflicts </span>
+      - Cause: Nessie uses optimistic concurrency control. If multiple writers update the same branch, a commit may be rejected because the branch has advanced since your last fetch
+      - Fix: If multiple writers update the same table, Nessie may reject the commit. Retry after pulling the latest state.
+
+
+  </TabItem>
+
+
+  {/* REST - S3 Tables */}
+  <TabItem value="s3-tables" label="S3 Tables">
+    **S3 Tables** is an AWS service that provides a REST catalog implementation for Apache Iceberg tables. It allows you to manage Iceberg tables directly through AWS S3 with AWS Signature V4 authentication.
+
+  ## Prerequisites
+
+  Required services:
+  - **AWS S3 Bucket** – for storing Iceberg table data and metadata.
+  - **AWS Account** – with permissions to create and manage S3 Tables and access related AWS analytics services.
+  - **AWS Credentials** – access key ID and secret key for authentication, with permissions to read/write to the S3 bucket.
+  - **Compatible Query Engine** – such as Amazon Athena, EMR (Spark), Glue, or other Iceberg-aware engines configured to use S3 Tables.
+
+  ---
+
+## Configuration
+
+<Tabs queryString="tab">
+
+  <TabItem value="s3tables-ui" label="OLake UI" default>
+
+      Before setting up the destination, make sure you have successfully set up the [source](/docs/getting-started/creating-first-pipeline#2-configure-source).   
+
+      <div className='flex justify-center w-2/3 mx-auto'>
+        ![S3 Tables UI Configuration](/img/docs/iceberg/catalog/rest/rest-s3tables-config.png)
+      </div>
+
+      **S3 Tables Configuration Parameters:**
+      | Parameter        | Sample Value                               | Description                                                                                     |
+      |------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------|
+      | **REST Catalog URI** | `https://s3tables.<REGION>.amazonaws.com/iceberg` | Specifies the endpoint URL for the S3 Tables REST catalog service. |
+      | **Iceberg S3 Path**  | `arn:aws:s3tables:<REGION>:<ACCOUNT_ID>:bucket/<BUCKET_NAME>` | Determines the S3 Tables ARN for the bucket and namespace. |
+      | **Iceberg Database** | `<NAMESPACE>`                              | Specifies the namespace within the S3 Tables bucket. |
+      | **AWS Region**       | `<REGION>`                                 | Specifies the AWS region for the S3 Tables service. |
+      | **AWS Access Key**   | `<AWS_ACCESS_KEY>`                         | AWS access key for authentication. |
+      | **AWS Secret Key**   | `<AWS_SECRET_KEY>`                         | AWS secret key for authentication. |
+      | **REST Signing Name** | `s3tables`                                 | Service name for AWS Signature V4. |
+      | **REST Signing Region** | `<REGION>`                              | Region for AWS Signature V4 signing. |
+      | **REST Enable Signature V4** | `true`                                | Enable AWS Signature V4 signing. |
+
+      **Authentication Fields (optional):**
+      | Parameter                | Sample Value                        | Description                                                                                                   |
+      |--------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------|
+      | **Token**                    | `abc...xyz`                         | Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service. |
+      | **OAuth2 Auth URI**          | `https://auth.server.com/oauth/token` | OAuth2 server URI for OAuth2 authentication.                                                                  |
+      | **REST Auth Type**           | `oauth2`                            | Authentication type (e.g., "oauth2").                                                                         |
+      | **Credential (OAuth2)**      | `your_id:your_secret`               | Specifies the client ID and secret for OAuth2, formatted as client_id:client_secret.                          |
+      | **Scope (OAuth2)**           | `api.read api.write`                | OAuth2 scopes (space-separated).                                                                              |
+
+      <br/>
+
+      After you have successfully set up the destination: [Configure your streams](/docs/getting-started/creating-first-pipeline#4-configure-streams )
+
+    </TabItem>
+
+    <TabItem value="s3tables-cli" label="OLake CLI">
+
+      To connect to Iceberg using S3 Tables as the catalog, create `destination.json` with the following configuration:
+
+      ```json title="destination.json"
+  {
     "type": "ICEBERG",
     "writer": {
-      "catalog_type": "rest",
-      "rest_catalog_url": "http://host.docker.internal:8181/api/catalog", 
-      "iceberg_s3_path": "olake_catalog",
-      "iceberg_db": "olake_db",
-      "rest_auth_type": "oauth2",
-      "oauth2_uri": "http://host.docker.internal:8181/api/catalog/v1/oauth/tokens",
-      "credential": "<olake_user_client_id>:<olake_user_client_secret>",
-      "scope": "PRINCIPAL_ROLE:ALL",
-      "aws_region": "ap-south-1"
+          "catalog_type": "rest",
+          "rest_catalog_url": "https://s3tables.<REGION>.amazonaws.com/iceberg",
+          "iceberg_s3_path": "arn:aws:s3tables:<REGION>:<ACCOUNT_ID>:bucket/<BUCKET_NAME>",
+          "iceberg_db": "<NAMESPACE>",
+          "aws_access_key": "<AWS_ACCESS_KEY>",
+          "aws_secret_key": "<AWS_SECRET_KEY>",
+          "aws_region": "<REGION>",
+          "rest_signing_name": "s3tables",
+          "rest_signing_region": "<REGION>",
+          "rest_signing_v_4": true
+        }
     }
-}
-```
+  ```
 
-</TabItem>
+      **S3 Tables Configuration Parameters**
+      | Parameter        | Sample Value                               | Description                                                                                                    |
+      |------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+      | **catalog_type**     | `rest`                                       | Defines the catalog type used by the writer. "rest" means the writer interacts with a RESTful catalog service. |
+      | **rest_catalog_url** | `https://s3tables.<REGION>.amazonaws.com/iceberg` | Specifies the endpoint URL for the S3 Tables REST catalog service.                                           |
+      | **iceberg_s3_path**  | `arn:aws:s3tables:<REGION>:<ACCOUNT_ID>:bucket/<BUCKET_NAME>` | Determines the S3 Tables ARN for the bucket and namespace.                                                |
+      | **iceberg_db**       | `<NAMESPACE>`                                | Specifies the namespace within the S3 Tables bucket.                                                          |
+      | **aws_access_key**   | `<AWS_ACCESS_KEY>`                           | AWS access key for authentication.                                                                             |
+      | **aws_secret_key**   | `<AWS_SECRET_KEY>`                           | AWS secret key for authentication.                                                                             |
+      | **aws_region**       | `<REGION>`                                   | Specifies the AWS region for the S3 Tables service.                                                           |
+      | **rest_signing_name** | `s3tables`                                   | Service name for AWS Signature V4.                                                                             |
+      | **rest_signing_region** | `<REGION>`                                | Region for AWS Signature V4 signing.                                                                          |
+      | **rest_signing_v_4** | `true`                                       | Enable AWS Signature V4 signing (boolean).                                                                    |
+
+      <br />
+
+      **Authentication Fields (optional):**
+      | Parameter                | Sample Value                        | Description                                                                                                   |
+      |--------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------|
+      | **token**                    | `abc...xyz`                         | Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service. |
+      | **oauth2_uri**               | `https://auth.server.com/oauth/token` | OAuth2 server URI for OAuth2 authentication.                                                                  |
+      | **rest_auth_type**           | `oauth2`                            | Authentication type (e.g., "oauth2").                                                                         |
+      | **credential**               | `your_id:your_secret`               | Specifies the client ID and secret for OAuth2, formatted as client_id:client_secret.                          |
+      | **scope**                    | `api.read api.write`                | OAuth2 scopes (space-separated).                                                                              |
+
+      <br/>
+
+      After you have successfully set up the destination: [Run the Discover command](/docs/install/docker-cli#discover-command )
+
+    </TabItem>
+
+  </Tabs>
+
+  ---
+
+  ## Troubleshooting
+
+  - <span>Permission denied (AccessDenied)</span>
+    - Cause: Missing or insufficient IAM permissions
+    - Fix:
+      - Ensure your IAM role or user has these permissions::
+        - `s3tables:*`
+        - `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket`
+      - Verify bucket policies or resource-based policies do not block access.
+
+  - <span>Invalid or expired credentials</span>
+    - Cause: Incorrect keys or expired session tokens
+    - Fix:
+      - Double-check your `AWS Access Key` and `AWS Secret Key`.
+      - For temporary credentials (assumed roles, sessions), refresh them before they expire.
+      - Verify that the IAM role is correctly attached and trusted.
+
+  - <span>Incorrect REST Catalog URI</span>
+    - Cause: Wrong endpoint or region.
+    - Fix:
+      - The REST catalog endpoint must follow the pattern:  
+        ```
+        https://s3tables.<REGION>.amazonaws.com/iceberg
+        ```
+      - Confirm the region is correct and the URI is reachable.
+
+  </TabItem>
+  
+  {/* REST - Unity */}
+  <TabItem value="unity" label="Unity">
+      OLake supports Databricks Unity Catalog as a REST catalog destination with token-based or OAuth2 authentication.
+
+      ## Important Limitations
+
+      ⚠️ **Current Unity Catalog Limitations:**
+      - **Append Only**: At the time of creation of this documentation, Unity Catalog only supports **Append operations** (NO updates) for Iceberg writes
+      - **Managed Tables**: Unity Catalog supports Iceberg writes only in its own managed Iceberg tables
+      - **OAuth2 Status**: Currently, Personal Access Token authentication has been tested and works well. OAuth2 is available as an alternative but is experiencing issues (receiving internal server errors from Databricks during testing)
+
+      For more details on Unity Catalog Iceberg support, refer to the [official Databricks documentation](https://docs.databricks.com/aws/en/iceberg/).
+
+      This documentation is primarily focused on creating tokens for ingesting data into Unity/Databricks managed Iceberg tables using OLake.
+
+      ## Prerequisites
+
+      - Admin access to Databricks workspace
+      - Access to AWS S3 bucket (if using AWS for external storage)
+
+      ## Setup Instructions
+
+      ### Step 1: Create a New User & Token
+
+      #### Create the User
+
+      It is recommended to create a new user instead of using an existing one for security purposes.
+
+      1. Go to top right corner user section → **Settings** → **Identity and Access** → **Users (Manage)**
+      2. Add a new user with email address
+      3. Go to **Settings** → **Advanced** → **Access Control**
+      4. Turn on **Personal Access Tokens** if it's not already enabled
+        
+        ![Personal Access Tokens Settings](/img/docs/iceberg/catalog/unity/unity-catalog-personal-access-tokens.png)
+
+      5. Go to **Permissions** and add the new user to allow token generation
+
+      #### Create the Token
+
+      1. Login with the new user credentials
+      2. Go to **Settings** → **Developer** → **Access Tokens** → **Manage**
+      3. Create a new token and set the appropriate validity period
+      4. Copy and save the token immediately (it's only visible once)
+
+      ### Step 2: Create External Location for Data Storage
+
+      1. Create a new external location as Unity Catalog Iceberg requires S3-based external storage (when using AWS).
+        
+        Navigate to the Catalog section and click on "Create an external location":
+        
+        ![Create External Location](/img/docs/iceberg/catalog/unity/unity-catalog-grant-permissions.png)
+
+      2. Follow the recommended Databricks guide to add S3 bucket storage quickly and securely.
+
+      ### Step 3: Create Schema with Proper Permissions
+
+      1. Create a new schema using the storage location created in Step 2
+        
+        ![Create New Schema Dialog](/img/docs/iceberg/catalog/unity/unity-catalog-create-external-location.png)
+
+      2. Go to **Schema** → **Permissions**
+      3. Grant the following permissions to the newly created user:
+        - `ALL PRIVILEGES`
+        - `EXTERNAL USE SCHEMA`
+        - `MANAGE`
+        
+        ![Grant Schema Permissions](/img/docs/iceberg/catalog/unity/unity-catalog-create-schema.png)
+
+      ## Configuration
+
+      <Tabs queryString="tab">
+
+        <TabItem value="unity-ui" label="OLake UI" default>
+
+          Unity Catalog supports two authentication methods: **Token-based** (recommended) and **OAuth2** (alternative).
+
+          ### Common Configuration Fields
+
+          These fields are required for both authentication methods:
+
+          | Parameter | Sample Value | Description |
+          |-----------|--------------|-------------|
+          | **REST Catalog URL** | `https://adb-123456789.databricks.com/api/2.1/unity-catalog/iceberg-rest` | Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL. |
+          | **Iceberg S3 Path (Warehouse)** | `workspace` | Name of the catalog in Unity Catalog (e.g., "workspace", "main"). This appears as `iceberg_s3_path` in JSON config. |
+          | **Iceberg Database** | `default` | Namespace name inside the catalog (e.g., "default", "production"). This appears as `iceberg_db` in JSON config. |
+          | **Normalization** | `true` | Enable data normalization for proper formatting in Unity Catalog. Recommended to keep enabled. |
+          | **No Identifier Fields** | `true` | Required for Unity Catalog managed Iceberg tables that don't support equality delete-based updates. Must be enabled. |
+
+          ### Token-Based Authentication (Recommended)
+
+          **✅ This method has been thoroughly tested and confirmed working**
+
+          Additional field required for token-based authentication:
+
+          | Parameter | Sample Value | Description |
+          |-----------|--------------|-------------|
+          | **Token** | `dapi1234567890abcdef...` | Databricks Personal Access Token for authentication. Created in Settings > Developer > Access Tokens. |
+
+          ### OAuth2 Authentication (Alternative)
+
+          ⚠️ **Note**: OAuth2 authentication is currently experiencing issues with internal server errors from Databricks during testing.
+
+          Additional fields required for OAuth2 authentication:
+
+          | Parameter | Sample Value | Description |
+          |-----------|--------------|-------------|
+          | **REST Auth Type** | `oauth2` | Set authentication type to OAuth2 |
+          | **OAuth2 URI** | `https://adb-123456789.databricks.com/oidc/v1/token` | OAuth2 server URI for your Databricks workspace |
+          | **Credential** | `client_id:client_secret` | Client ID and secret in format "id:secret" |
+          | **Scope** | `sql offline_access` | OAuth2 scopes (space-separated) |
+
+        </TabItem>
+
+        <TabItem value="unity-cli" label="OLake CLI" default>
+
+          ### JSON Configuration
+
+          Create a json for destination config (`destination.json`)
+
+          ```json
+          {
+            "type": "ICEBERG",
+            "writer": {
+              "catalog_type": "rest",
+              "normalization": true,
+              "rest_catalog_url": "https://<DATABRICK_WORKSPACE_URL>/api/2.1/unity-catalog/iceberg-rest",
+              "iceberg_s3_path": "<CATALOG_NAME>",
+              "iceberg_db": "<NAMESPACE>",
+              "token": "<DATABRICK_USER_PERSONAL_ACCESS_TOKEN>",
+              "no_identifier_fields": true
+            }
+          }
+          ```
+
+          ### Configuration Key Details
+
+          Change the following placeholders in the above configuration with:
+
+          - `DATABRICK_WORKSPACE_URL` -> Databricks workspace URL (URL that you use to access your Databricks console)
+          - `CATALOG_NAME` -> Catalog name (e.g., "workspace")
+          - `NAMESPACE` -> Namespace name inside catalog (e.g., "default")
+          - `DATABRICK_USER_PERSONAL_ACCESS_TOKEN` -> Go to Settings > Developer > Create Personal Access Token
+          - `no_identifier_fields` -> Set to `true` (Required for environments that don't support equality delete-based updates, such as Databricks Unity managed Iceberg tables)
+
+          ### OAuth2 Authentication (Alternative - Currently Having Issues)
+
+          ⚠️ **Note**: OAuth2 authentication is currently experiencing issues with internal server errors from Databricks during testing. Personal Access Token authentication is recommended until these issues are resolved.
+
+          You can attempt OAuth2 authentication by modifying the configuration:
+
+          ```json
+          {
+            "type": "ICEBERG",
+            "writer": {
+              "catalog_type": "rest",
+              "normalization": true,
+              "rest_catalog_url": "https://<DATABRICK_WORKSPACE_URL>/api/2.1/unity-catalog/iceberg-rest",
+              "iceberg_s3_path": "<CATALOG_NAME>",
+              "iceberg_db": "<NAMESPACE>",
+              "rest_auth_type": "oauth2",
+              "oauth2_uri": "<OAUTH2_SERVER_URI>",
+              "credential": "<CLIENT_ID>:<CLIENT_SECRET>",
+              "scope": "<OAUTH2_SCOPES>",
+              "no_identifier_fields": true
+            }
+          }
+          ```
+
+          Additional OAuth2 fields:
+          - `rest_auth_type` -> Set to "oauth2"
+          - `oauth2_uri` -> OAuth2 server URI for your Databricks workspace
+          - `credential` -> Client ID and secret in format "id:secret"
+          - `scope` -> OAuth2 scopes (space-separated)
+
+        </TabItem>
+
+      </Tabs>
+
+      ## Important Notes
+
+      - **Unity Catalog Compatibility**: The `no_identifier_fields: true` setting is crucial for Unity Catalog managed Iceberg tables as they don't support equality delete-based updates
+      - **Normalization**: Set `normalization: true` to ensure proper data formatting for Unity Catalog
+      - **REST API**: Unity Catalog uses Iceberg's REST catalog API for table operations
+      - **Permissions**: Ensure your user or service principal has appropriate permissions on the target catalog and schema
+
+      ## Troubleshooting
+
+      ### Common Issues
+
+      1. **Authentication Errors**: Verify your Personal Access Token is valid and has the necessary permissions
+      2. **Catalog Not Found**: Ensure the catalog name exists in your Unity Catalog
+      3. **Schema Permissions**: Check that you have CREATE TABLE permissions on the target schema
+      4. **Network Access**: Verify your OLake instance can reach the Databricks workspace URL
+
+      For more general guidance on Iceberg integration, refer to the [Iceberg writer documentation](../overview). 
+  </TabItem>
+
+  {/* REST - Apache Polaris */}
+  <TabItem value="polaris" label="Apache Polaris">
+    **Apache Polaris** is an Iceberg REST catalog implementation that provides table management through a REST API. It supports OAuth2 authentication, fine-grained access control, and integrates with cloud object stores like AWS S3 for metadata and data storage
+
+    ## Prerequisites
+
+    **Required services**:
+    - **Object store** – e.g., AWS S3, MinIO, GCS, or any cloud-compatible storage for Iceberg table data and metadata.
+    - **Polaris REST Service** – Provides the Iceberg REST Catalog API with built-in OAuth2 authentication, authorization, and management features.
+    - **Identity and access management (OAuth2)** – Polaris uses OAuth2 to issue and validate tokens, supporting fine-grained role-based access control (RBAC).
+    - **Metadata database (optional)** – Polaris can use an internal backing database (e.g., PostgreSQL) for managing tokens and system metadata, handled internally.
+
+    **Required permissions**:
+
+    - **Object Store Permissions**  
+      Polaris requires read/write privileges on the target object storage buckets or prefixes where Iceberg data and metadata reside.
+
+    - **IAM Role and Trust Policy**  
+      - For AWS S3, create an IAM role with permissions scoped to the Polaris bucket and assign a trust policy allowing Polaris service principals to assume the role.  
+      - Include permissions like `s3:ListBucket`, `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject`. Check [Setup Guide](/docs/writers/iceberg/catalog/rest?rest-catalog=polaris#setup-steps) for detailed instructions on IAM configuration.
+
+    - **OAuth2 Client and Service Principals**  
+      - Define Polaris service principals and OAuth2 clients with credentials (client ID and secret) that query engines and clients use to authenticate.  
+      - Assign RBAC permissions to control access at the catalog, namespace, table, and column level.
+
+    ---
+
+    ## Configuration
+    <Tabs queryString="tab">
+
+      <TabItem value="olake-ui" label="OLake UI" default>
+
+      Before setting up the destination, make sure you have successfully set up the [source](/docs/getting-started/creating-first-pipeline#2-configure-source).   
+
+        <div className='flex justify-center w-2/3 mx-auto'>
+          ![Create Destination](/img/docs/iceberg/catalog/rest/rest-polaris-config.png)
+        </div>
+
+        | Parameter            | Sample Value                                              | Description                                                                                   |
+        |----------------------|----------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+        | **Catalog Type**         | `rest`                                                     | Defines the catalog type used by the writer.                                                  |
+        | **REST Catalog URL**     | `http://<REST_ENDPOINT>:8181/api/catalog `            | Endpoint URL for the Polaris REST catalog service.                                            |
+        | **Iceberg S3 Path**      | `s3://<BUCKET_NAME>`                                            | S3 path or storage location for Iceberg data.                                                 |
+        | **Iceberg Database**     | `<DATABASE_NAME>`                                              | Name of the Iceberg database used by the destination configuration.                           |
+        | **Authentication Type**  | `oauth2`                                                   | Type of authentication (e.g., "oauth2").                                                      |
+        | **OAuth2 URI**           | `http://<REST_ENDPOINT>:8181/api/catalog/v1/oauth/tokens` | OAuth2 server URI for authentication.                                             |
+        | **Credential**           | `<olake_user_client_id>:<olake_user_client_secret>`        | OAuth2 client ID and secret, formatted as client_id:client_secret.                            |
+        | **Scope**                | `PRINCIPAL_ROLE:ALL`                                       | OAuth2 scopes (space-separated).                                                              |
+        | **AWS Region**           | `<S3_REGION>`                                               | AWS region associated with the S3 bucket.                                                     |
+
+        <br/>
+
+        After you have successfully set up the destination: [Configure your streams](/docs/getting-started/creating-first-pipeline#4-configure-streams )
+
+      </TabItem>
+
+      <TabItem value="olake-cli" label="OLake CLI">
+      To connect to Iceberg using S3 Tables as the catalog, create `destination.json` with the following configuration
+
+        ```json title="destination.json"
+        {
+            "type": "ICEBERG",
+            "writer": {
+              "catalog_type": "rest",
+              "rest_catalog_url": "http://<REST_ENDPOINT>:8181/api/catalog", 
+              "iceberg_s3_path": "s3://<BUCKET_NAME>",
+              "iceberg_db": "<DATABASE_NAME>",
+              "rest_auth_type": "oauth2",
+              "oauth2_uri": "http://<REST_ENDPOINT>:8181/api/catalog/v1/oauth/tokens",
+              "credential": "<olake_user_client_id>:<olake_user_client_secret>",
+              "scope": "PRINCIPAL_ROLE:ALL",
+              "aws_region": "<S3_REGION>"
+            }
+        }
+        ```
+
+        #### Configuration Parameters
+        | Parameter        | Sample Value                               | Description                                                                                                    |
+        |------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+        | **catalog_type**     | `rest`                                       | Defines the catalog type used by the writer. "rest" means the writer interacts with a RESTful catalog service. |
+        | **rest_catalog_url** | `http://<REST_ENDPOINT>:8181/api/catalog`   | Specifies the endpoint URL for the Polaris REST catalog service that the writer will connect to.                |
+        | **iceberg_s3_path**  | `s3://<BUCKET_NAME>`                        | Determines the S3 path or storage location for Iceberg data in the warehouse bucket.                           |
+        | **iceberg_db**       | `<DATABASE_NAME>`                                   | Specifies the name of the Iceberg database that will be used by the destination configuration.                 |
+        | **rest_auth_type**   | `oauth2`                                     | Authentication type for Polaris REST catalog service.                                                          |
+        | **oauth2_uri**       | `http://<REST_ENDPOINT>:8181/api/catalog/v1/oauth/tokens` | OAuth2 server URI for Polaris authentication.                                                          |
+        | **credential**       | `<olake_user_client_id>:<olake_user_client_secret>` | OAuth2 client ID and secret, formatted as client_id:client_secret.                                    |
+        | **scope**            | `PRINCIPAL_ROLE:ALL`                        | OAuth2 scopes for Polaris authentication.                                                                      |
+        | **aws_region**       | `<AWS_REGION>`                              | Specifies the AWS region associated with the S3 bucket where the data is stored.                               |
+
+        <br/>
+
+        After you successfully set up the destination: [Run the Discover command](/docs/install/docker-cli#discover-command )
+
+      </TabItem>
+
+    </Tabs>
+
+    ---
+
+    ## Setup Steps:
+
+    1. Save the following as `docker-compose.yml`:
+
+    ```yaml
+    services:
+      polaris:
+        image: apache/polaris:latest # version on date: 22 Aug 2025
+        container_name: polaris
+        ports:
+          - "8080:8080"    # Application port
+          - "8181:8181"    # API port 
+          - "8182:8182"    # Management port
+          - "8443:8443"    # HTTPS port
+        
+        # Environment variables to fix the AWS region configuration issue
+        environment:
+          - AWS_REGION=ap-south-1
+          
+          # Optional: AWS credentials (if not using IAM roles)
+          # Uncomment and set these if you're not using IAM roles for authentication
+          # - AWS_ACCESS_KEY_ID=your_access_key_here
+          # - AWS_SECRET_ACCESS_KEY=your_secret_key_here
+        networks:
+          - polaris-network
+
+    networks:
+      polaris-network:
+        driver: bridge
+    ```
+
+    2. Start the services:
+    ```bash
+    docker-compose up -d
+    ```
+
+    3. Get Polaris root credentials from logs:
+
+    ```bash
+    docker logs polaris | grep "root principal credentials"
+    ```
+
+    Look for a line similar to:
+    ```
+    realm: default-realm root principal credentials: bd0b5cde9ffb3966:9c377f72a27ba22c47e26cd53423fa96
+    ```
+
+    Extract the credentials:
+    - **Client ID**: `bd0b5cde9ffb3966`
+    - **Client Secret**: `9c377f72a27ba22c47e26cd53423fa96`
+
+    4. Get bearer token for API requests (replace `<client_id>` and `<client_secret>` with the root credential):
+
+    ```bash
+    curl -i -X POST \
+      http://localhost:8181/api/catalog/v1/oauth/tokens \
+      -d 'grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>&scope=PRINCIPAL_ROLE:ALL'
+    ```
+
+    5. Create S3 bucket with the following policy:
+
+    ```json
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::your-bucket-name",
+                    "arn:aws:s3:::your-bucket-name/*"
+                ]
+            }
+        ]
+    }
+    ```
+
+    6. Create IAM role for S3 access. After creating the IAM role, you'll get an ARN that looks like:
+    ```
+    arn:aws:iam::############:role/olake-role
+    ```
+    Copy this ARN as you'll need it in the next step.
+
+    7. Create catalog (replace `<bearer_token>` with token received in prev steps, `your-bucket-name` with your S3 bucket, and `<your-iam-role-arn>` with the ARN from step 6):
+
+    ```bash
+    curl -i -X POST http://localhost:8181/api/management/v1/catalogs \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H 'Accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "name": "olake_catalog",
+        "type": "INTERNAL",
+        "properties": {
+          "default-base-location": "s3://your-bucket-name"
+        },
+        "storageConfigInfo": {
+          "storageType": "S3",
+          "roleArn": "<your-iam-role-arn>",
+          "allowedLocations": ["s3://your-bucket-name"]
+        }
+      }'
+    ```
+
+    8. Create user and assign roles (replace `<bearer_token>` with your bearer token). The create user command's response includes the new user's client credentials.
+
+    ```bash
+    # Create user (output includes client_id and client_secret, note them required in olake configuration)
+    curl -i -X POST "http://localhost:8181/api/management/v1/principals" \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "olake_user", "type": "user"}'
+
+    # Create principal role
+    curl -i -X POST "http://localhost:8181/api/management/v1/principal-roles" \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H "Content-Type: application/json" \
+      -d '{"principalRole": {"name": "olake_user_role"}}'
+
+    # Assign role to user
+    curl -i -X PUT "http://localhost:8181/api/management/v1/principals/olake_user/principal-roles" \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H "Content-Type: application/json" \
+      -d '{"principalRole": {"name": "olake_user_role"}}'
+
+    # Create catalog role
+    curl -i -X POST "http://localhost:8181/api/management/v1/catalogs/olake_catalog/catalog-roles" \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H "Content-Type: application/json" \
+      -d '{"catalogRole": {"name": "olake_catalog_role"}}'
+
+    # Assign catalog role to principal role
+    curl -i -X PUT "http://localhost:8181/api/management/v1/principal-roles/olake_user_role/catalog-roles/olake_catalog" \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H "Content-Type: application/json" \
+      -d '{"catalogRole": {"name": "olake_catalog_role"}}'
+
+    # Grant privileges
+    curl -i -X PUT "http://localhost:8181/api/management/v1/catalogs/olake_catalog/catalog-roles/olake_catalog_role/grants" \
+      -H "Authorization: Bearer <bearer_token>" \
+      -H "Content-Type: application/json" \
+      -d '{"grant": {"type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT"}}'
+    ```
+
+    :::note
+    All services involved in the sync process — including the OLake source image, Polaris, and any other dependencies — must be part of the same Docker network or accessible via network configuration.
+    :::
+
+    **Important Notes:**
+    - Use the `olake_user` credentials (not root credentials) for the final OLake configuration.
+    - The IAM role ARN is required for S3 access permissions.
+    - Ensure your AWS region matches across all configurations. 
+
+    ---
+
+    ## Troubleshooting
+
+    - <span>Invalid OAuth2 credentials (401 Unauthorized)</span>
+      - Cause: Incorrect or expired OAuth2 client credentials
+      - Fix:
+        - Verify that **client_id**, **client_secret**, **scope**, and token endpoint match your Polaris configuration.
+        - Refresh tokens if expired
+      
+    - <span>Permission Denied on S3 Bucket</span>
+      - Cause: Missing or incorrect IAM permissions.
+      - Fix:
+        - Ensure the IAM Role ARN configured for Polaris has the following permissions on your bucket:
+          - `s3:GetObject`
+          - `s3:PutObject`
+          - `s3:DeleteObject`
+          - `s3:ListBucket`
+        - Confirm the bucket name matches exactly, including letter case.
+        - If using prefixes, check that your role has access to the correct path (e.g., mybucket/tenant-prefix/*)
+
+    - <span>Connection Errors to Polaris REST API</span>
+      - Cause: The REST service is not reachable
+      - Fix:
+        - Confirm that the Polaris REST service is running and accessible on the correct port (default is `8181`).
+        - Ensure the service is reachable from your OLake environment; verify Docker network connectivity or firewall rules if self-hosted.
+        - If TLS is enabled, check that certificates are trusted and correctly configured
+  </TabItem>
 
 </Tabs>
-
-**Important Notes:**
-- Use the `olake_user` credentials (not root credentials) for the final OLake configuration.
-- The IAM role ARN is required for S3 access permissions.
-- Ensure your AWS region matches across all configurations.
-
-</TabItem>
-
-</Tabs>
-
-</TabItem>
-
-</Tabs>
-
-:::info
-If you wish to test out the REST Catalog locally, you can use the [docker-compose](../docker-compose) setup. The local test setup uses Minio as an S3-compatible storage and other all [supported catalog types](../docker-compose#local-catalog--test-setup).
-
-You can then setup local spark to run queries on the iceberg tables created in the local test setup.
-:::

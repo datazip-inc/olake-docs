@@ -1,0 +1,244 @@
+---
+title: Features
+description: OLake features overview
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs groupId="features" queryString="tab">
+
+<TabItem value="overview" label="Overview" default>
+
+# OLake Features
+
+## Source Level Features
+
+### 1. Parallelised Chunking
+
+Parallel chunking is a technique that splits large datasets or collections into smaller virtual chunks, allowing them to be read and processed simultaneously. It is used in sync modes such as Full Refresh, Full Refresh + CDC, and Full Refresh + Incremental.
+
+**What it does**:
+- Splits big collections into manageable pieces without altering the underlying data.
+- Each chunk can be processed parallely & independently.
+
+**Benefit**:
+- Enables **parallel reads**, dramatically reducing the time needed to perform full snapshots or scans of large datasets.
+- Improves ingestion speed, scalability, and overall system performance. 
+
+### 2. Sync Modes Supported
+
+OLake supports following sync modes to provide flexibility across use cases:
+
+- **Full Refresh** → Loads the complete table from the source.
+- **Full Refresh + Incremental** → Performs an initial full load, then captures subsequent changes using incremental logic (Primary or Fallback Cursor).
+- **Full Refresh + CDC** → Performs an initial full load, then continuously captures inserts, updates, and deletes in near real-time via Change Data Capture (CDC).
+- **Strict CDC** → Only captures changes from the source database logs (inserts, updates, deletes), without performing an initial full load.
+
+### 3. Stateful, Resumable Syncs
+
+OLake ensures that data syncs resume automatically from the last checkpoint after interruptions. Applicable for Full Refresh + CDC and Full Refresh + Incremental & Strict CDC sync modes.
+
+**What it does**:
+- Maintains **state** of in-progress syncs.
+- Automatically **resumes** after crashes, network failures, or manual pauses.
+- Eliminates the need for restarting jobs from scratch.
+
+**Benefit**:
+- Reduces data duplication and processing time.
+- Ensures **reliable**, **fault-tolerant** pipelines.
+- Minimizes manual intervention for operational teams 
+
+### 4. Configurable Max Connections
+
+OLake allows configuring the maximum number of database connections per source, helping prevent overload and ensuring stable performance on the source system.
+
+### 5. Exact Source Data Type Mapping
+
+OLake guarantees accurate mapping of source database types to Iceberg, maintaining schema integrity and ensuring reliable data replication.
+
+### 6. Data Filter
+
+Data Filters let you replicate only the rows you need, based on specified column values, during Full Refreshes syncs (Full Refresh, Full Refresh + Incremental and Full Refresh + CDC). By filtering at the source, they reduce database load, save storage and processing resources, and make downstream queries faster and more efficient.
+
+<br/>
+
+## Destination Level Features
+
+### 1. Data Deduplication
+
+Data Deduplication ensures that only unique records are stored and processed : saving space, reducing costs, and improving data quality. OLake automatically deduplicates data using the primary key from the source tables, guaranteeing that each primary key maps to a single row in the destination along with its corresponding olake_id.
+
+### 2. Hive Style Partitioning
+
+Partitioning is the process of dividing large datasets into smaller, more manageable segments based on specific column values (e.g., date, region, or category), improving query performance, scalability, and data organization
+
+- **Iceberg partitioning** → Metadata-driven, no need for directory-based partitioning; enables efficient pruning and schema evolution.
+- **S3-style partitioning** → Traditional folder-based layout (e.g., `year=2025/month=08/day=22/`) for compatibility with external tools.
+- **Normalization** → Automatically expands **level-1 nested JSON fields** into top-level columns.
+
+**What it does**:
+
+- Converts nested JSON objects into **flat columns** for easier querying.
+- Preserves all data while simplifying structure.
+
+**Benefit**:
+
+- Makes **SQL queries simpler and faster**.
+- Reduces the need for complex JSON parsing in queries.
+- Improves readability and downstream analytics efficiency.
+
+### 3. Schema Evolution & Data Types Changes
+
+OLake automatically handles changes in your table's schema without breaking downstream jobs. Read More [Schema Evolution in OLake](/docs/features?tab=schema-evolution)
+
+**What it does**:
+- Detects **column additions**, **deletions**, or **renames**.
+- Supports **data type promotions as of Iceberg v2** (e.g., `int → long`, `float → double`).
+- Updates table metadata seamlessly.
+
+**Benefit**:
+
+- Ensures pipeline stability even as source schemas evolve.
+- Eliminates costly manual migrations or pipeline rewrites.
+- Keeps data consistent and queries reliable at scale.
+
+### 4. Append Mode
+
+Adds all incoming data from the source to the destination table without performing deduplication. Full load always runs in append mode, and for CDC or incremental syncs, it can be used to disable upsert behavior. Upsert mode ensures no duplicate records by writing delete entries for existing rows before inserting new ones.
+
+### 5. Dead Letter Queue Columns (WIP)
+
+The DLQ column handles values with data type changes not supported by Iceberg / Parquet destinations type promotions, safely storing them without loss. This prevents sync failures and ensures downstream models remain stable. By isolating incompatible values, it allows users to continue syncing data seamlessly while addressing type mismatches at their convenience, improving reliability and reducing manual intervention.
+
+</TabItem>
+
+<TabItem value="schema-evolution" label="Schema Evolution">
+
+# Schema Evolution and Data Type Changes
+
+This document explains how OLake handles schema changes and data type changes in your data pipelines. It covers two distinct features that help maintain pipeline resilience when your source data structures evolve.
+
+## Schema Evolution
+
+Schema evolution refers to changes in your database structure like adding, removing, or renaming columns and tables. OLake handles these changes to prevent pipeline failures and data loss.
+
+### Schema Evolution — Column-Level Changes
+
+| Change Type                                          | How OLake Detects & Handles It                                                                                                                                                                                                                                                                                                        | Typical Pipeline Impact                                               | Extra Details & Tips                                                                                                                                                                                                              |
+|------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Adding a column**                                  | OLake runs a *schema discovery* at the start of every sync. When a new source column appears, it is **automatically** added to the Iceberg schema (new field-ID) and starts receiving values immediately. If the source back-fills historical rows, CDC registers them as updates. **No user action is required.**                    | **No breakage.** Historical rows show `NULL` until back-filled.       | • Monitor write throughput if a back-fill is large.                                                                                                                                                                               |
+| **Deleting (dropping) a column**                     | OLake notices the column is removed in the source streams.<br/>• The deleted column still exists in the destination (so old snapshots stay queryable).<br/>                                                                                                                                                                           | **No breakage**. ETL continues with a “virtual” column (null-filled). | • Down-stream BI tools won’t break, but they might show the column full of nulls—communicate schema changes to analysts.<br/>• You can later run a “rewrite manifests” job to strip the dead column if storage footprint matters. |
+| **Renaming a column**                                | Source column renamed → old column stays in destination (no new values) → new column with updated name is created and receives all incoming data.    <br/> <br/> WIP: Iceberg keeps immutable field IDs, so on rename (customer_id → client_id) OLake just updates the column’s name on the same field ID—no data migration required. | **No breakage**.                                                      | • Renames are instant—no file rewrites.<br/>• If you have SQL downstream, update column names in your SQL queries to use the new column name.                                                                                     |
+| **JSON / Semi-structured key add / remove / rename** | OLake flattens keys to a canonical path inside a single JSON column (or keeps raw JSON).<br/>• Added keys appear automatically.<br/>• Removed keys simply vanish from new rows.<br/>• Renamed keys are treated as “remove + add” because JSON has no intrinsic field ID.                                                              | **No breakage**.                                                      |                                                                                                                                                                                                                                   |
+
+
+:::info
+-  A sparse new column (will not be synced to destination unless there is atleast 1 non `NULL` value). Because Iceberg stores data column-wise (Parquet).
+:::
+
+
+### Schema Evolution — Table-Level Changes
+
+| Change Type                              | How OLake Detects & Handles It                                                                                                                                                                                                 | Typical Pipeline Impact                                                                          | Extra Details & Tips                                                                                                                       |
+|------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| **Adding a table / stream**              | Newly detected source tables appear in the OLake UI list. **You choose which ones to sync.** Once added, OLake performs an initial full load and then switches to CDC. Tables not selected to sync are ignored.                | **No breakage.** Pipelines for existing tables run as usual; disabled tables simply do not sync. | • Initial full loads run in parallel.<br/>• Default naming is `source_db.table_name`.                                                      |
+| **Removing (dropping) a table / stream** | No new data will get added to the deleted table. Existing table data and metadata remain queryable.                                                                                                                            | **No breakage.** Downstream queries on historic data still work; new inserts stop.               | • If the table is recreated later with the same name but different structure, treat it as a brand-new stream to avoid field-ID collisions. |
+| **Renaming a table**                     | Renaming of a table is treated as a new table itself and will be discovered as a new stream and on enbaling sync for this table it will be synced as full load + CDC.<br/> <br/>• The old Iceberg table keeps historical data. | **No breakage**, but post-rename data lands in a separate table unless you merge histories.      | For continuous history, enable the new table quickly and (optionally) set an alias so both names map to the same Iceberg table.            |
+
+
+
+## Schema Data Type Changes
+
+Schema data type changes refer to modifications to the data type of existing columns (e.g., changing `INT` to `BIGINT`). OLake leverages `Apache Iceberg v2` tables' type promotion capabilities to handle compatible changes automatically.
+
+### Supported Data Type Promotions
+
+OLake fully supports all Iceberg v2 data type promotions:
+
+| From          | To                          | Notes                                                 |
+| ------------- | --------------------------- | ----------------------------------------------------- |
+| INT           | LONG (BIGINT)               | Widening integers is safe                             |
+| FLOAT         | DOUBLE                      | Promoting to higher precision works without data loss |
+| DATE          | TIMESTAMP, TIMESTAMP_NS     | Dates can be safely converted to timestamps           |
+| DECIMAL(P, S) | DECIMAL(P', S) where P' > P | Only widening precision is supported                  |
+
+:::caution
+- Iceberg v2 supports widening type changes only. Narrowing changes (e.g., `BIGINT` to `INT`) along with any other data type changes will result in an errror as are not supported.
+- All the incompatible type changes will be handled by OLake with DLQ (Dead Letter Queue) tables (coming soon)
+:::
+
+### Handling Incompatible Type Changes
+
+For type changes not supported by Iceberg v2 (like STRING to INT), OLake offers two options:
+
+1. **Schema Data Type Changes Enabled with DLQ** ([coming soon](https://github.com/datazip-inc/olake/issues/265)):
+
+   - Records with incompatible types will be routed to a Dead Letter Queue Column (DLQ)
+   - Main pipeline continues processing compatible records
+   - Full record information preserved for troubleshooting
+
+2. **Schema Data Type Changes Enabled without DLQ**:
+
+   - Sync fails with clear error message about incompatible type change
+   - Message identifies the specific column and type conversion that failed
+
+3. **Schema Data Type Changes Disabled**:
+
+   - Any data type change results in sync failure
+   - Provides explicit error about the type change detected
+
+### Production Best Practices
+
+- Enable Schema Data Type Changes for production environments
+- Implement robust monitoring for type change errors
+- Test schema changes in non-production environments first
+- Document your schema and track changes over time
+
+## Example Scenarios
+
+### Scenario 1: Adding a Column in Source
+
+When a new column appears in your source data:
+
+- OLake automatically detects the new column
+- The column is added to your destination schema
+- New data includes values for this column
+- Historical data has null values for this column
+
+### Scenario 2: Adding a Table / Collection in Source
+
+When a new table appears in your source database:
+
+- OLake automatically detects the new table in the next scheduled run
+- The table is added to your destination schema
+- A New table gets created.
+
+### Scenario 3: Table Name Change
+
+When a table name changes in your source database:
+- OLake automatically detects the new table name
+- The table is added to your destination schema
+- A New table gets created.
+- The old table name is retained in the destination schema but will not be populated with new data.
+
+### Scenario 4: INT to BIGINT Conversion
+
+When a column changes from INT to BIGINT type:
+
+- OLake detects the widening type change
+- Column type is updated in the destination
+- All values are properly converted
+- Pipeline continues without interruption
+
+### Scenario 5: Incompatible Type Change
+
+When a column changes from STRING to INT type, incompatible with Iceberg v2, sync fails.
+
+For more detailed information on Iceberg's schema evolution capabilities, refer to the [Apache Iceberg documentation](https://iceberg.apache.org/spec/#schema-evolution).
+
+</TabItem>
+
+</Tabs>
+
+
