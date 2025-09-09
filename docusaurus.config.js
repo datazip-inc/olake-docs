@@ -278,6 +278,125 @@ const config = {
             href: "/img/logo/olake-blue.svg",
           },
         },
+        // OpenSearch meta tags
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'search',
+            type: 'application/opensearchdescription+xml',
+            title: 'OLake Documentation',
+            href: '/opensearch.xml',
+          },
+        },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:site_name',
+            content: 'OLake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:locale',
+            content: 'en_US',
+          },
+        },
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:creator',
+            content: '@olake',
+          },
+        },
+        // Bot Directives
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'googlebot',
+            content: 'index, follow',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'bingbot',
+            content: 'index, follow',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'index, follow',
+          },
+        },
+        // PWA Support Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'theme-color',
+            content: '#203FDD',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msapplication-TileColor',
+            content: '#203FDD',
+          },
+        },
+        // Enhanced Favicon Support
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'apple-touch-icon',
+            sizes: '180x180',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: '32x32',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: '16x16',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        // Web App Manifest
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'manifest',
+            href: '/site.webmanifest',
+          },
+        },
         // Declare some json-ld structured data
         {
           tagName: 'script',
@@ -290,6 +409,17 @@ const config = {
             name: 'OLake',
             url: 'https://olake.io/',
             logo: 'https://olake.io/img/logo/olake-blue.svg',
+            description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
+            foundingDate: '2023',
+            contactPoint: {
+              '@type': 'ContactPoint',
+              contactType: 'customer service',
+              email: 'hello@olake.io'
+            },
+            sameAs: [
+              'https://github.com/datazip-inc/olake',
+              'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
+            ]
           }),
         },
       ],
@@ -485,6 +615,14 @@ const config = {
 
     [
       './src/plugins/tailwind-config.js', {}
+    ],
+
+    [
+      './src/plugins/blog-structured-data/index.js', {}
+    ],
+
+    [
+      './src/plugins/indexnow/index.js', {}
     ],
 
     [
