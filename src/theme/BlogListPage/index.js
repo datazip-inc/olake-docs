@@ -11,6 +11,7 @@ import { useLocation } from '@docusaurus/router'
 
 import { BlogPagination } from '../BlogPagination'
 import QueryEngineAdvertisement from '../../components/Iceberg/QueryEngineAdvertisement'
+import BlogBreadcrumbs from '../BlogBreadcrumbs'
 
 function BlogListPageMetadata(props) {
   const { metadata } = props
@@ -54,6 +55,9 @@ function BlogListPageContent(props) {
 
   return (
     <BlogLayout sidebar={sidebar}>
+      <div className="container mx-auto px-4 py-6">
+        <BlogBreadcrumbs />
+      </div>
       <BlogHomepageBanner {...props} />
       {/* Conditionally render Query Engine Advertisement */}
       {isIcebergRoute && <QueryEngineAdvertisement />}
