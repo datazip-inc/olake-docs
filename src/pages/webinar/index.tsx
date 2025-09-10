@@ -77,7 +77,7 @@ const WebinarsPage = () => {
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
-      date: '15 January 2025',
+      date: '4 September 2025',
       icon: FaVideo
     },
     {
