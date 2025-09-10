@@ -110,30 +110,6 @@ export default function BlogLayout(props) {
   const hasSidebar = sidebar && sidebar.items.length > 0
   const progress = useReadingProgress()
   
-  // Get article title from document title or props
-  const [articleTitle, setArticleTitle] = React.useState('')
-  
-  React.useEffect(() => {
-    // Try to get title from document with a delay to ensure it's loaded
-    const getTitle = () => {
-      const title = document.title
-      if (title && title !== 'OLake' && !title.includes('Blogs on OLake') && !title.includes('Blog')) {
-        // Remove site name from title if present
-        const cleanTitle = title.replace(' | OLake', '').replace(' - OLake', '').replace('OLake - ', '')
-        if (cleanTitle && cleanTitle !== 'OLake' && cleanTitle.length > 3) {
-          setArticleTitle(cleanTitle)
-        }
-      }
-    }
-    
-    // Try immediately
-    getTitle()
-    
-    // Also try after a short delay to catch titles that load later
-    const timeout = setTimeout(getTitle, 200)
-    
-    return () => clearTimeout(timeout)
-  }, [])
 
   return (
     <Layout {...layoutProps}>
@@ -188,10 +164,7 @@ export default function BlogLayout(props) {
 
               <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
-                  <BlogBreadcrumbs 
-                    articleTitle={articleTitle}
-                    articleUrl={typeof window !== 'undefined' ? window.location.pathname : ''}
-                  />
+                  <BlogBreadcrumbs />
                   {children}
                 </div>
               </article>
