@@ -114,13 +114,25 @@ export default function BlogLayout(props) {
   const [articleTitle, setArticleTitle] = React.useState('')
   
   React.useEffect(() => {
-    // Try to get title from document
-    const title = document.title
-    if (title && title !== 'OLake') {
-      // Remove site name from title if present
-      const cleanTitle = title.replace(' | OLake', '').replace(' - OLake', '')
-      setArticleTitle(cleanTitle)
+    // Try to get title from document with a delay to ensure it's loaded
+    const getTitle = () => {
+      const title = document.title
+      if (title && title !== 'OLake' && !title.includes('Blogs on OLake') && !title.includes('Blog')) {
+        // Remove site name from title if present
+        const cleanTitle = title.replace(' | OLake', '').replace(' - OLake', '').replace('OLake - ', '')
+        if (cleanTitle && cleanTitle !== 'OLake' && cleanTitle.length > 3) {
+          setArticleTitle(cleanTitle)
+        }
+      }
     }
+    
+    // Try immediately
+    getTitle()
+    
+    // Also try after a short delay to catch titles that load later
+    const timeout = setTimeout(getTitle, 200)
+    
+    return () => clearTimeout(timeout)
   }, [])
 
   return (
