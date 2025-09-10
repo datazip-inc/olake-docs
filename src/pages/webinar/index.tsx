@@ -69,6 +69,18 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
+      subtitle: 'As Apache Iceberg continues its rapid evolution and the catalog ecosystem expands, data engineers must make pivotal decisions about metadata management that directly influence query performance, costs, and operational complexity.',
+      route: '/webinar/w-10-deep-dive-on-catalogs',
+      img: `/img/webinars/w-10-catalogs-deep-dive.png`,
+      alt: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '4 September 2025',
+      icon: FaVideo
+    },
+    {
       title: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
       subtitle: 'Join us for a comprehensive technical workshop exploring ClickHouse\'s experimental Iceberg support and how open table formats are revolutionizing data engineering workflows.',
       route: '/webinar/w-9-clickhouse-iceberg-workshop',
