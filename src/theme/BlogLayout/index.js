@@ -109,6 +109,19 @@ export default function BlogLayout(props) {
   const { sidebar, toc, children, ...layoutProps } = props
   const hasSidebar = sidebar && sidebar.items.length > 0
   const progress = useReadingProgress()
+  
+  // Get article title from document title or props
+  const [articleTitle, setArticleTitle] = React.useState('')
+  
+  React.useEffect(() => {
+    // Try to get title from document
+    const title = document.title
+    if (title && title !== 'OLake') {
+      // Remove site name from title if present
+      const cleanTitle = title.replace(' | OLake', '').replace(' - OLake', '')
+      setArticleTitle(cleanTitle)
+    }
+  }, [])
 
   return (
     <Layout {...layoutProps}>
@@ -163,7 +176,10 @@ export default function BlogLayout(props) {
 
               <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
-                  <BlogBreadcrumbs />
+                  <BlogBreadcrumbs 
+                    articleTitle={articleTitle}
+                    articleUrl={typeof window !== 'undefined' ? window.location.pathname : ''}
+                  />
                   {children}
                 </div>
               </article>

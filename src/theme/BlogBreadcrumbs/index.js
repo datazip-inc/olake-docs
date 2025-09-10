@@ -5,10 +5,17 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import { useLocation } from '@docusaurus/router';
 import clsx from 'clsx';
 
-export default function BlogBreadcrumbs() {
+export default function BlogBreadcrumbs({ articleTitle, articleUrl }) {
   const { siteConfig } = useDocusaurusContext();
   const location = useLocation();
   const baseUrl = useBaseUrl('/');
+
+  // Function to truncate long titles
+  const truncateTitle = (title, maxLength = 50) => {
+    if (!title) return '';
+    if (title.length <= maxLength) return title;
+    return title.substring(0, maxLength).trim() + '...';
+  };
 
   // Don't show breadcrumbs on the main blog listing page
   if (location.pathname === '/blog' || location.pathname === '/') {
@@ -40,6 +47,15 @@ export default function BlogBreadcrumbs() {
     },
   ];
 
+  // Add article title if available and we're on a blog post page
+  if (articleTitle && (isBlogPost || isIcebergPost)) {
+    breadcrumbItems.push({
+      label: truncateTitle(articleTitle),
+      href: articleUrl || location.pathname,
+      isCurrentPage: true
+    });
+  }
+
   return (
     <nav 
       className="mb-4" 
@@ -70,18 +86,22 @@ export default function BlogBreadcrumbs() {
                 />
               </svg>
             )}
-            <Link
-              to={item.href}
-              className={clsx(
-                "hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
-                index === breadcrumbItems.length - 1 
-                  ? "text-gray-900 dark:text-gray-100 font-medium" 
-                  : "text-gray-600 dark:text-gray-400"
-              )}
-              itemProp="item"
-            >
-              <span itemProp="name">{item.label}</span>
-            </Link>
+            {item.isCurrentPage ? (
+              <span
+                className="text-gray-900 dark:text-gray-100 font-medium"
+                itemProp="name"
+              >
+                {item.label}
+              </span>
+            ) : (
+              <Link
+                to={item.href}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-gray-600 dark:text-gray-400"
+                itemProp="item"
+              >
+                <span itemProp="name">{item.label}</span>
+              </Link>
+            )}
             <meta itemProp="position" content={String(index + 1)} />
           </li>
         ))}
