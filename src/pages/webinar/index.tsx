@@ -72,7 +72,7 @@ const WebinarsPage = () => {
       title: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
       subtitle: 'As Apache Iceberg continues its rapid evolution and the catalog ecosystem expands, data engineers must make pivotal decisions about metadata management that directly influence query performance, costs, and operational complexity.',
       route: '/webinar/w-10-deep-dive-on-catalogs',
-      img: `/img/webinars/w-10-deepdive-on-catalogs.png`,
+      img: `/img/webinars/w-10-catalogs-deep-dive.png`,
       alt: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
       status: 'archived',
       button: 'secondary',
