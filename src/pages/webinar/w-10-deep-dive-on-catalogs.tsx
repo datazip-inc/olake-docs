@@ -53,7 +53,7 @@ const WebinarPage = () => {
         </div>
 
         <WebinarOverview
-          date="January 15, 2025"
+          date="September 4, 2025"
           time="11:00 AM EST, 08:30 PM IST"
           duration="60 mins"
           summary={webinarData.summary}
