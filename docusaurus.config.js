@@ -397,31 +397,6 @@ const config = {
             href: '/site.webmanifest',
           },
         },
-        // Declare some json-ld structured data
-        {
-          tagName: 'script',
-          attributes: {
-            type: 'application/ld+json',
-          },
-          innerHTML: JSON.stringify({
-            '@context': 'https://schema.org/',
-            '@type': 'Organization',
-            name: 'OLake',
-            url: 'https://olake.io/',
-            logo: 'https://olake.io/img/logo/olake-blue.svg',
-            description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
-            foundingDate: '2023',
-            contactPoint: {
-              '@type': 'ContactPoint',
-              contactType: 'customer service',
-              email: 'hello@olake.io'
-            },
-            sameAs: [
-              'https://github.com/datazip-inc/olake',
-              'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
-            ]
-          }),
-        },
       ],
 
       colorMode: {
