@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import Layout from '@theme/Layout'
 import BlogSidebar from '@theme/BlogSidebar'
+import BlogBreadcrumbs from '@theme/BlogBreadcrumbs'
+import Head from '@docusaurus/Head'
 
 // Reading Progress Hook
 function useReadingProgress() {
@@ -107,9 +109,35 @@ export default function BlogLayout(props) {
   const { sidebar, toc, children, ...layoutProps } = props
   const hasSidebar = sidebar && sidebar.items.length > 0
   const progress = useReadingProgress()
+  
 
   return (
     <Layout {...layoutProps}>
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org/',
+              '@type': 'Organization',
+              name: 'OLake',
+              url: 'https://olake.io/',
+              logo: 'https://olake.io/img/logo/olake-blue.svg',
+              description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
+              foundingDate: '2023',
+              contactPoint: {
+                '@type': 'ContactPoint',
+                contactType: 'customer service',
+                email: 'hello@olake.io'
+              },
+              sameAs: [
+                'https://github.com/datazip-inc/olake',
+                'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
+              ]
+            })
+          }}
+        />
+      </Head>
       {/* Fixed Reading Progress Bar at Top */}
       <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-gray-200 dark:bg-gray-800">
         <div
@@ -136,6 +164,7 @@ export default function BlogLayout(props) {
 
               <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
+                  <BlogBreadcrumbs />
                   {children}
                 </div>
               </article>
