@@ -273,7 +273,7 @@ function generateFAQSchema(content, baseUrl, slug) {
   if (!contentString) return null;
   
   // Look for FAQ patterns in content
-  const faqPattern = /##\s*FAQ|###\s*FAQ|##\s*Frequently Asked Questions|###\s*Frequently Asked Questions/i;
+  const faqPattern = /##\s*FAQ|###\s*FAQ|##\s*FAQs|###\s*FAQs|##\s*Frequently Asked Questions|###\s*Frequently Asked Questions/i;
   if (!faqPattern.test(contentString)) return null;
   
   // Extract FAQ questions and answers
@@ -616,7 +616,7 @@ function extractTutorialSteps(content) {
 }
 
 function detectFAQContent(content) {
-  const faqPattern = /##\s*FAQ|###\s*FAQ|##\s*Frequently Asked Questions|###\s*Frequently Asked Questions/i;
+  const faqPattern = /##\s*FAQ|###\s*FAQ|##\s*FAQs|###\s*FAQs|##\s*Frequently Asked Questions|###\s*Frequently Asked Questions/i;
   const hasFAQ = faqPattern.test(content);
   
   if (!hasFAQ) {
