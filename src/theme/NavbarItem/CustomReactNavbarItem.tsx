@@ -1,11 +1,10 @@
 import React, { type ReactNode } from 'react';
-import CustomSolutionsNavbarItem from '../../components/CustomSolutionsNavbarItem';
 
 type CustomReactNavbarItemProps = {
-    component: ReactNode;
+    component: React.ComponentType;
 };
 
-
-export default function CustomReactNavbarItem(_props: CustomReactNavbarItemProps) {
-    return <CustomSolutionsNavbarItem />;
+export default function CustomReactNavbarItem(props: CustomReactNavbarItemProps): ReactNode {
+    const Component = props.component;
+    return <Component />;
 }

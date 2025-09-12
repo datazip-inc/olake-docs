@@ -123,12 +123,12 @@ const config = {
       // async: false,
       defer: true, // if the script must be executed in order, set async to false
     },
+
     {
       // Suppress noisy ResizeObserver loop errors that Chrome prints
       src: '/ignore-resize-observer-error.js',
       defer: true
     }
-
   ],
 
   themeConfig:
@@ -241,12 +241,9 @@ const config = {
           //   position: 'left',
           // },
           {
-            href: 'https://github.com/datazip-inc/olake',
-            // label: 'GitHub',
+            type: 'html',
             position: 'right',
-            // position: 'right',
-            className: 'header-github-link',
-
+            value: '<div id="github-stars-react-container"></div>',
           },
           {
             label: 'Talk to us',
