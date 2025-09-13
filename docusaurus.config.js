@@ -269,13 +269,139 @@ const config = {
         { name: "twitter:site", content: "@olake.io" },
       ],
       headTags: [
+        // Canonical URL
         {
           tagName: 'link',
           attributes: {
-            rel: 'preconnect',
-            sizes: "any",
-            href: 'https://olake.io',
-            href: "/img/logo/olake-blue.svg",
+            rel: 'canonical',
+            href: 'https://olake.io/',
+          },
+        },
+        // OpenSearch
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'search',
+            type: 'application/opensearchdescription+xml',
+            title: 'OLake Search',
+            href: '/opensearch.xml',
+          },
+        },
+        // Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:type',
+            content: 'website',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:url',
+            content: 'https://olake.io/',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:description',
+            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:site_name',
+            content: 'OLake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:locale',
+            content: 'en_US',
+          },
+        },
+        // Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:creator',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:description',
+            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        // Bing Webmaster Verification
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msvalidate.01',
+            content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
+          },
+        },
+        // Bot Directives
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'googlebot',
+            content: 'index, follow',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'bingbot',
+            content: 'index, follow',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'index, follow',
+          },
+        },
+        // Web App Manifest
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'manifest',
+            href: '/site.webmanifest',
           },
         },
         // Declare some json-ld structured data
@@ -290,6 +416,17 @@ const config = {
             name: 'OLake',
             url: 'https://olake.io/',
             logo: 'https://olake.io/img/logo/olake-blue.svg',
+            description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
+            foundingDate: '2023',
+            contactPoint: {
+              '@type': 'ContactPoint',
+              contactType: 'customer service',
+              email: 'hello@olake.io'
+            },
+            sameAs: [
+              'https://github.com/datazip-inc/olake',
+              'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
+            ]
           }),
         },
       ],
