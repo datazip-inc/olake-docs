@@ -69,10 +69,6 @@ const config = {
         googleTagManager: {
           containerId: 'GTM-TFZ2GXJP',
         },
-        gtag: {
-          trackingID: 'G-GTNTGHDNZW',
-          anonymizeIP: true,
-        },
 
         sitemap: {
           lastmod: 'date',
@@ -163,25 +159,24 @@ const config = {
 
 
           { to: '/docs', label: 'Docs', position: 'right' },
-          { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/ai-lake', label: 'AILake', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
           // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
 
           {
-            // Dropdown menu in the navbar for "Learn" section
+            // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
             position: "right",
-            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
-            label: "Resources",
+            label: "Iceberg",
             items: [
               {
-                label: "Query Engine",
-                // type: 'link',
-                href: `/iceberg/query-engine`,
-                // activeBaseRegex: 'docs/zenith',
+                label: "Blog",
+                href: `/iceberg`,
               },
-
+              {
+                label: "Query Engine",
+                href: `/iceberg/query-engine`,
+              },
             ],
           },
 
@@ -347,6 +342,14 @@ const config = {
             content: 'index, follow',
           },
         },
+        // Bing Webmaster Verification
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msvalidate.01',
+            content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
+          },
+        },
         // PWA Support Meta Tags
         {
           tagName: 'meta',
@@ -395,6 +398,68 @@ const config = {
           attributes: {
             rel: 'manifest',
             href: '/site.webmanifest',
+          },
+        },
+        // RSS Feed Links
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            type: 'application/rss+xml',
+            title: 'OLake Blog Feed',
+            href: '/blog/rss.xml',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            type: 'application/rss+xml',
+            title: 'OLake Iceberg Blog Feed',
+            href: '/iceberg/rss.xml',
+          },
+        },
+        // oEmbed Support
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            title: 'JSON',
+            type: 'application/json',
+            href: '/api/pages.json',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            title: 'oEmbed (JSON)',
+            type: 'application/json+oembed',
+            href: '/api/oembed.json',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            title: 'oEmbed (XML)',
+            type: 'text/xml+oembed',
+            href: '/api/oembed.xml',
+          },
+        },
+        // Additional Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'format-detection',
+            content: 'telephone=no',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'generator',
+            content: 'Docusaurus 3.0; features: search, i18n, theme',
           },
         },
       ],
@@ -590,10 +655,6 @@ const config = {
 
     [
       './src/plugins/tailwind-config.js', {}
-    ],
-
-    [
-      './src/plugins/blog-structured-data/index.js', {}
     ],
 
     [
