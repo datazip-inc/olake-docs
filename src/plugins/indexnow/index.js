@@ -104,7 +104,6 @@ module.exports = function indexNowPlugin(context, options) {
     
     async postBuild({ siteDir, routesPaths, outDir }) {
       console.log('🔍 IndexNow: Collecting URLs for submission...');
-      console.log('📁 Build directory:', outDir);
       
       // Generate URLs from sitemap
       const urls = generateUrlsFromSitemap(outDir);

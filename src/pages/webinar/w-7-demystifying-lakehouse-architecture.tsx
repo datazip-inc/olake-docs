@@ -3,6 +3,7 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 // import WebinarForm from '../../components/forms/WebinarForm';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/webinar/6th.json'
@@ -47,6 +48,11 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
+
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"

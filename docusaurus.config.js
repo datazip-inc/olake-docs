@@ -273,6 +273,14 @@ const config = {
             href: "/img/logo/olake-blue.svg",
           },
         },
+        // Canonical URL
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'canonical',
+            href: 'https://olake.io/',
+          },
+        },
         // OpenSearch meta tags
         {
           tagName: 'link',
@@ -284,6 +292,41 @@ const config = {
           },
         },
         // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:type',
+            content: 'website',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:url',
+            content: 'https://olake.io/',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:description',
+            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
         {
           tagName: 'meta',
           attributes: {
@@ -317,7 +360,42 @@ const config = {
           tagName: 'meta',
           attributes: {
             name: 'twitter:creator',
-            content: '@olake',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:site',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:description',
+            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image:alt',
+            content: 'OLake - The Open Lakehouse Platform',
           },
         },
         // Bot Directives
@@ -413,6 +491,34 @@ const config = {
           attributes: {
             name: 'generator',
             content: 'Docusaurus 3.0; features: search, i18n, theme',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'author',
+            content: 'OLake Team',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'keywords',
+            content: 'data lakehouse, apache iceberg, mongodb, etl, elt, cdc, data engineering, open source, data replication, data warehouse',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'viewport',
+            content: 'width=device-width, initial-scale=1.0',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'language',
+            content: 'en-US',
           },
         },
       ],
@@ -1110,3 +1216,4 @@ const config = {
 };
 
 export default config;
+

@@ -5,6 +5,7 @@ import WebinarOverview from '../../components/webinars/WebinarOverview';
 import Image from '@theme/IdealImage'
 import LeadershipForumEventDetails from '../../components/events/LeadershipForumEventDetails';
 import CTAButton from '../../components/webinars/CTAButton';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import { FaRegCalendarAlt } from 'react-icons/fa';
 
 import Layout from '@theme/Layout';
@@ -39,6 +40,11 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto px-16 md:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title="A Leadership Forum for Data Engineers and MLOps"
+        />
+        
         <WebinarTitle
           title="A Leadership Forum for Data Engineers and MLOps"
           tag="Event"

@@ -9,6 +9,7 @@ import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/8th-meetup.json';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 
 const hosts = [
   {
@@ -43,6 +44,11 @@ const CommunityPage = () => {
       description={communityData.summary}
     >
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="community"
+          title={communityData.title}
+        />
+
         <WebinarTitle
           title={`${communityData.title}`}
           tag="Community Meetup"

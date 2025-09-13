@@ -8,6 +8,7 @@ import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 
 const hosts = [
   {
@@ -54,6 +55,11 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
+
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"

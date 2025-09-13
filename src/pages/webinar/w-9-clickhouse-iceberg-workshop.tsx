@@ -3,6 +3,7 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 
 import CTAButton from '../../components/webinars/CTAButton';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
@@ -47,6 +48,11 @@ const WebinarPage = () => {
       description={webinarData.summary}
     >
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
+
         <WebinarTitle
           title={`${webinarData.title} `}
           tag="Webinar"
