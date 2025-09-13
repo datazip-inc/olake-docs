@@ -400,53 +400,6 @@ const config = {
             href: '/site.webmanifest',
           },
         },
-        // RSS Feed Links
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            type: 'application/rss+xml',
-            title: 'OLake Blog Feed',
-            href: '/blog/rss.xml',
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            type: 'application/rss+xml',
-            title: 'OLake Iceberg Blog Feed',
-            href: '/iceberg/rss.xml',
-          },
-        },
-        // oEmbed Support
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            title: 'JSON',
-            type: 'application/json',
-            href: '/api/pages.json',
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            title: 'oEmbed (JSON)',
-            type: 'application/json+oembed',
-            href: '/api/oembed.json',
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            title: 'oEmbed (XML)',
-            type: 'text/xml+oembed',
-            href: '/api/oembed.xml',
-          },
-        },
         // Additional Meta Tags
         {
           tagName: 'meta',
