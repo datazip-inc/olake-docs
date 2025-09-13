@@ -69,10 +69,6 @@ const config = {
         googleTagManager: {
           containerId: 'GTM-TFZ2GXJP',
         },
-        gtag: {
-          trackingID: 'G-GTNTGHDNZW',
-          anonymizeIP: true,
-        },
 
         sitemap: {
           lastmod: 'date',
@@ -163,25 +159,24 @@ const config = {
 
 
           { to: '/docs', label: 'Docs', position: 'right' },
-          { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/ai-lake', label: 'AILake', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
           // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
 
           {
-            // Dropdown menu in the navbar for "Learn" section
+            // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
             position: "right",
-            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
-            label: "Resources",
+            label: "Iceberg",
             items: [
               {
-                label: "Query Engine",
-                // type: 'link',
-                href: `/iceberg/query-engine`,
-                // activeBaseRegex: 'docs/zenith',
+                label: "Blog",
+                href: `/iceberg`,
               },
-
+              {
+                label: "Query Engine",
+                href: `/iceberg/query-engine`,
+              },
             ],
           },
 
@@ -269,6 +264,15 @@ const config = {
         { name: "twitter:site", content: "@olake.io" },
       ],
       headTags: [
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'preconnect',
+            sizes: "any",
+            href: 'https://olake.io',
+            href: "/img/logo/olake-blue.svg",
+          },
+        },
         // Canonical URL
         {
           tagName: 'link',
@@ -277,17 +281,17 @@ const config = {
             href: 'https://olake.io/',
           },
         },
-        // OpenSearch
+        // OpenSearch meta tags
         {
           tagName: 'link',
           attributes: {
             rel: 'search',
             type: 'application/opensearchdescription+xml',
-            title: 'OLake Search',
+            title: 'OLake Documentation',
             href: '/opensearch.xml',
           },
         },
-        // Open Graph Meta Tags
+        // Enhanced Open Graph Meta Tags
         {
           tagName: 'meta',
           attributes: {
@@ -326,6 +330,20 @@ const config = {
         {
           tagName: 'meta',
           attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
             property: 'og:site_name',
             content: 'OLake',
           },
@@ -337,11 +355,18 @@ const config = {
             content: 'en_US',
           },
         },
-        // Twitter Meta Tags
+        // Enhanced Twitter Meta Tags
         {
           tagName: 'meta',
           attributes: {
             name: 'twitter:creator',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:site',
             content: '@_olake',
           },
         },
@@ -366,12 +391,11 @@ const config = {
             content: 'https://olake.io/img/logo/olake-blue.svg',
           },
         },
-        // Bing Webmaster Verification
         {
           tagName: 'meta',
           attributes: {
-            name: 'msvalidate.01',
-            content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
+            name: 'twitter:image:alt',
+            content: 'OLake - The Open Lakehouse Platform',
           },
         },
         // Bot Directives
@@ -396,6 +420,56 @@ const config = {
             content: 'index, follow',
           },
         },
+        // Bing Webmaster Verification
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msvalidate.01',
+            content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
+          },
+        },
+        // PWA Support Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'theme-color',
+            content: '#203FDD',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msapplication-TileColor',
+            content: '#203FDD',
+          },
+        },
+        // Enhanced Favicon Support
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'apple-touch-icon',
+            sizes: '180x180',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: '32x32',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: '16x16',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
         // Web App Manifest
         {
           tagName: 'link',
@@ -404,30 +478,48 @@ const config = {
             href: '/site.webmanifest',
           },
         },
-        // Declare some json-ld structured data
+        // Additional Meta Tags
         {
-          tagName: 'script',
+          tagName: 'meta',
           attributes: {
-            type: 'application/ld+json',
+            name: 'format-detection',
+            content: 'telephone=no',
           },
-          innerHTML: JSON.stringify({
-            '@context': 'https://schema.org/',
-            '@type': 'Organization',
-            name: 'OLake',
-            url: 'https://olake.io/',
-            logo: 'https://olake.io/img/logo/olake-blue.svg',
-            description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
-            foundingDate: '2023',
-            contactPoint: {
-              '@type': 'ContactPoint',
-              contactType: 'customer service',
-              email: 'hello@olake.io'
-            },
-            sameAs: [
-              'https://github.com/datazip-inc/olake',
-              'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
-            ]
-          }),
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'generator',
+            content: 'Docusaurus 3.0; features: search, i18n, theme',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'author',
+            content: 'OLake Team',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'keywords',
+            content: 'data lakehouse, apache iceberg, mongodb, etl, elt, cdc, data engineering, open source, data replication, data warehouse',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'viewport',
+            content: 'width=device-width, initial-scale=1.0',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'language',
+            content: 'en-US',
+          },
         },
       ],
 
@@ -622,6 +714,10 @@ const config = {
 
     [
       './src/plugins/tailwind-config.js', {}
+    ],
+
+    [
+      './src/plugins/indexnow/index.js', {}
     ],
 
     [
@@ -1120,3 +1216,4 @@ const config = {
 };
 
 export default config;
+
