@@ -262,6 +262,7 @@ const config = {
         { name: 'OLake', content: 'ETL tool, ELT tool, open source' },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:site", content: "@olake.io" },
+        { name: "msvalidate.01", content: "C36AD97FE1CEDCD4041338A807D6BC4C" },
       ],
       headTags: [
         {

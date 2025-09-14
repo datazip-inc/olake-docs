@@ -1,11 +1,19 @@
 import React from 'react';
-import { useLocation } from '@docusaurus/router';
+import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import { useLocation } from '@docusaurus/router';
+import clsx from 'clsx';
 
 export default function BlogBreadcrumbs() {
-  const location = useLocation();
   const { siteConfig } = useDocusaurusContext();
-  const baseUrl = siteConfig.url;
+  const location = useLocation();
+  const baseUrl = useBaseUrl('/');
+
+  // Don't show breadcrumbs on the main blog listing page
+  if (location.pathname === '/blog' || location.pathname === '/') {
+    return null;
+  }
 
   // Check if we're on a blog post page
   const isBlogPost = location.pathname.startsWith('/blog/') && 
@@ -17,24 +25,25 @@ export default function BlogBreadcrumbs() {
                         location.pathname !== '/iceberg' &&
                         !location.pathname.includes('/page/');
 
-  if (!isBlogPost && !isIcebergPost) {
-    return null;
-  }
-
   // Show custom breadcrumbs for iceberg posts
   if (isIcebergPost) {
     // Try to get the actual post title from document title or use URL fallback
     const getPostTitle = () => {
-      // First try to get from document title
+      // First try to get from document title (more accurate)
       if (typeof document !== 'undefined') {
         const docTitle = document.title;
-        if (docTitle && docTitle !== 'OLake') {
-          // Remove site name and clean up
-          return docTitle.replace(' | OLake', '').replace(' - OLake', '').trim();
+        // Remove site name and common suffixes to get just the post title
+        const cleanTitle = docTitle
+          .replace(/ - .*$/, '') // Remove everything after " - "
+          .replace(/ \| .*$/, '') // Remove everything after " | "
+          .trim();
+        
+        if (cleanTitle && cleanTitle !== 'OLake') {
+          return cleanTitle;
         }
       }
       
-      // Fallback: convert URL slug to readable title
+      // Fallback: Extract from URL and convert to title case
       const postSlug = location.pathname.replace('/iceberg/', '').replace(/\/$/, '');
       return postSlug
         .split('-')
@@ -69,26 +78,40 @@ export default function BlogBreadcrumbs() {
       >
         <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
           {icebergBreadcrumbItems.map((item, index) => (
-            <li key={index} className="flex items-center" itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+            <li 
+              key={item.href}
+              className="flex items-center"
+              itemProp="itemListElement"
+              itemScope
+              itemType="https://schema.org/ListItem"
+            >
               {index > 0 && (
-                <svg className="w-4 h-4 mx-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                <svg 
+                  className="w-4 h-4 mx-2 text-gray-400" 
+                  fill="currentColor" 
+                  viewBox="0 0 20 20"
+                  aria-hidden="true"
+                >
+                  <path 
+                    fillRule="evenodd" 
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" 
+                    clipRule="evenodd" 
+                  />
                 </svg>
               )}
-              {item.current ? (
-                <span className="font-medium text-gray-900 dark:text-gray-100" itemProp="name">
-                  {item.label}
-                </span>
-              ) : (
-                <a 
-                  href={item.href} 
-                  className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                  itemProp="item"
-                >
-                  <span itemProp="name">{item.label}</span>
-                </a>
-              )}
-              <meta itemProp="position" content={index + 1} />
+              <Link
+                to={item.href}
+                className={clsx(
+                  "hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+                  item.current 
+                    ? "text-gray-900 dark:text-gray-100 font-medium" 
+                    : "text-gray-600 dark:text-gray-400"
+                )}
+                itemProp="item"
+              >
+                <span itemProp="name">{item.label}</span>
+              </Link>
+              <meta itemProp="position" content={String(index + 1)} />
             </li>
           ))}
         </ol>
@@ -96,7 +119,10 @@ export default function BlogBreadcrumbs() {
     );
   }
 
-  // Regular blog post breadcrumbs
+  if (!isBlogPost) {
+    return null;
+  }
+
   const breadcrumbItems = [
     {
       label: 'Home',
@@ -117,20 +143,40 @@ export default function BlogBreadcrumbs() {
     >
       <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
         {breadcrumbItems.map((item, index) => (
-          <li key={index} className="flex items-center" itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+          <li 
+            key={item.href}
+            className="flex items-center"
+            itemProp="itemListElement"
+            itemScope
+            itemType="https://schema.org/ListItem"
+          >
             {index > 0 && (
-              <svg className="w-4 h-4 mx-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              <svg 
+                className="w-4 h-4 mx-2 text-gray-400" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+              >
+                <path 
+                  fillRule="evenodd" 
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" 
+                  clipRule="evenodd" 
+                />
               </svg>
             )}
-            <a 
-              href={item.href} 
-              className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            <Link
+              to={item.href}
+              className={clsx(
+                "hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+                index === breadcrumbItems.length - 1 
+                  ? "text-gray-900 dark:text-gray-100 font-medium" 
+                  : "text-gray-600 dark:text-gray-400"
+              )}
               itemProp="item"
             >
               <span itemProp="name">{item.label}</span>
-            </a>
-            <meta itemProp="position" content={index + 1} />
+            </Link>
+            <meta itemProp="position" content={String(index + 1)} />
           </li>
         ))}
       </ol>
