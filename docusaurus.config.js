@@ -87,6 +87,7 @@ const config = {
     ],
   ],
 
+
   scripts: [
     {
       src: '/suppress-resize-observer.js', // Suppress ResizeObserver warnings
