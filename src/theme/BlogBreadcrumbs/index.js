@@ -27,32 +27,6 @@ export default function BlogBreadcrumbs() {
 
   // Show custom breadcrumbs for iceberg posts
   if (isIcebergPost) {
-    // Try to get the actual post title from document title or use URL fallback
-    const getPostTitle = () => {
-      // First try to get from document title (more accurate)
-      if (typeof document !== 'undefined') {
-        const docTitle = document.title;
-        // Remove site name and common suffixes to get just the post title
-        const cleanTitle = docTitle
-          .replace(/ - .*$/, '') // Remove everything after " - "
-          .replace(/ \| .*$/, '') // Remove everything after " | "
-          .trim();
-        
-        if (cleanTitle && cleanTitle !== 'OLake') {
-          return cleanTitle;
-        }
-      }
-      
-      // Fallback: Extract from URL and convert to title case
-      const postSlug = location.pathname.replace('/iceberg/', '').replace(/\/$/, '');
-      return postSlug
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-    };
-
-    const postTitle = getPostTitle();
-
     const icebergBreadcrumbItems = [
       {
         label: 'Home',
@@ -63,7 +37,7 @@ export default function BlogBreadcrumbs() {
         href: '/iceberg',
       },
       {
-        label: postTitle,
+        label: 'Blog',
         href: location.pathname,
         current: true
       },
