@@ -356,6 +356,35 @@ const config = {
             content: 'en_US',
           },
         },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:secure_url',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:type',
+            content: 'image/svg+xml',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:alt',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:updated_time',
+            content: '2025-01-15T12:00:00-05:00',
+          },
+        },
         // Enhanced Twitter Meta Tags
         {
           tagName: 'meta',
@@ -399,7 +428,43 @@ const config = {
             content: 'OLake - The Open Lakehouse Platform',
           },
         },
-        // Bot Directives
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:label1',
+            content: 'Written by',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:data1',
+            content: 'OLake Team',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:label2',
+            content: 'Time to read',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:data2',
+            content: '5 minutes',
+          },
+        },
+        // Enhanced Bot Directives
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large',
+          },
+        },
         {
           tagName: 'meta',
           attributes: {
@@ -411,13 +476,6 @@ const config = {
           tagName: 'meta',
           attributes: {
             name: 'bingbot',
-            content: 'index, follow',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'robots',
             content: 'index, follow',
           },
         },
@@ -477,6 +535,25 @@ const config = {
           attributes: {
             rel: 'manifest',
             href: '/site.webmanifest',
+          },
+        },
+        // RSS Feed Links
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            type: 'application/rss+xml',
+            title: 'OLake >> Feed',
+            href: 'https://olake.io/feed/',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            type: 'application/rss+xml',
+            title: 'OLake >> Comments Feed',
+            href: 'https://olake.io/comments/feed/',
           },
         },
         // Additional Meta Tags
