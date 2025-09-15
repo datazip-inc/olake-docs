@@ -140,6 +140,7 @@ const docSidebar = {
     sectionHeader("COMMUNITY"),
     'community/contributing',
     'community/issues-and-prs',
+    'community/setting-up-a-dev-env',
     'community/code-of-conduct',
     'community/channels',
 

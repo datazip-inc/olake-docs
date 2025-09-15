@@ -1,0 +1,274 @@
+---
+title: Setting up a Development Environment
+description: Setting up a Development Environment in OLake guide
+sidebar_position: 3
+---
+
+# Setting up a Development Environment
+
+The documentation in this section is a bit of knowlegde required to run OLake for developement purposes.
+:::note
+Now we have evolved to recommend and support docker compose more actively as the main way to run OLake for development and preserve your sanity. Most people should stick to the first few sections - ("Fork & Clone", "docker compose" and "Installing Dev Tools")
+:::
+
+## Fork and Clone
+First, [fork the repository on GitHub](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks), then clone it. 
+
+Second, you can clone the main repository directly, and raise pull required accordingly.
+
+There are basically 3 repositories in which you can contribute to.
+
+- ### OLake CLI
+```bash
+git clone git@github.com:datazip-inc/olake.git
+```
+
+- ### OLake UI
+```bash
+git clone git@github.com:datazip-inc/olake-ui.git
+```
+
+- ### OLake Helm
+```bash
+git clone git@github.com:datazip-inc/olake-helm.git
+```
+
+## docker compose
+
+In order to test you code, you must have your source and destination configured.
+
+As of now, OLake offers 5 sources whose local setup via docker compose is provided below:
+- #### Postgres - **[docker compose](/docs/connectors/postgres/setup/local)**
+- #### MongoDB - **[docker compose](/docs/connectors/mongodb/setup/local)**
+- #### MySQL - **[docker compose](/docs/connectors/mysql/setup/local)**
+- #### Oracle (docker compose WIP)
+- #### Kafka (docker compose WIP)
+
+OLake destination docker compose:
+- #### Iceberg (using JDBC catalog) - [docker compose](https://github.com/datazip-inc/olake/blob/master/destination/iceberg/local-test/docker-compose.yml)
+- #### Parquet docker compose
+
+```yml title="docker-compose.yml"
+version: '3.1'
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-04-03T14-56-28Z
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_DOMAIN=minio
+    networks:
+      default:
+        aliases:
+          - warehouse.minio
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ./data/minio-data:/data
+    command: [ "server", "/data", "--console-address", ":9001" ]
+
+  mc:
+    depends_on:
+      - minio
+    image: minio/mc:RELEASE.2025-04-03T17-07-56Z
+    container_name: minio-mc
+    networks:
+      - default
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    entrypoint: |
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+      if ! /usr/bin/mc ls minio/warehouse > /dev/null 2>&1; then
+        /usr/bin/mc mb minio/warehouse;
+        /usr/bin/mc policy set public minio/warehouse;
+      fi;
+      tail -f /dev/null
+      "
+```
+
+Paste this above docker compose in a file and run: 
+```bash
+docker compose -f {file-location} up -d
+```
+
+## Setup up Source
+
+<Tabs>
+<TabItem value="postgres cli" label="Postgres" default>
+**This setup is using the above provided docker compose for Postgres.**
+```json title="source.json"
+{
+  "host": "primary_postgres",
+  "port": 5432,
+  "database": "main",
+  "username": "main",
+  "password": "password",
+  "jdbc_url_params": {},
+  "ssl": {
+    "mode": "disable"
+  },
+  "update_method": {
+    "replication_slot": "postgres_slot",
+    "intial_wait_time": 120
+  },
+  "reader_batch_size": 1000,
+  "default_mode": "cdc",
+  "max_threads": 10
+}
+```
+</TabItem>
+
+<TabItem value="mongodb cli" label="Mongodb" default>
+
+</TabItem>
+<TabItem value="mysql cli" label="MySQL" default>
+</TabItem>
+<TabItem value="oracle cli" label="Oracle" default>
+You can use your own Oracle configuration. The docker compose is **WIP**.
+</TabItem>
+<TabItem value="cli" label="Kafka" default>
+You can use your own Kafka configuration. The docker compose is **WIP**.
+</TabItem>
+</Tabs>
+
+## Setup up Destination
+<Tabs>
+<TabItem value="iceberg cli" label="Iceberg" default>
+**This setup is using the above provided docker compose for Iceberg.**
+```json title="destination.json"
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "jdbc",
+    "jdbc_url": "jdbc:postgresql://localhost:5432/iceberg",
+    "jdbc_username": "iceberg",
+    "jdbc_password": "password",
+    "iceberg_s3_path": "s3a://warehouse",
+    "s3_endpoint": "http://localhost:9000",
+    "s3_use_ssl": false,
+    "s3_path_style": true,
+    "aws_access_key": "admin",
+    "aws_secret_key": "password",
+    "iceberg_db": "olake_iceberg",
+    "aws_region": "us-east-1"
+  }
+}
+```
+</TabItem>
+<TabItem value="parquet cli" label="S3 Parquet" default>
+**This setup is using the above provided docker compose for S3 Parquet.**
+```json title="destination.json"
+{
+  "type": "PARQUET",
+  "writer": {
+    "s3_bucket": "warehouse",
+    "s3_region": "us-east-1",
+    "s3_access_key": "admin",
+    "s3_secret_key": "password",
+    "s3_endpoint": "http://localhost:9000",
+    "s3_path": ""
+  }
+}
+```
+</TabItem>
+</Tabs>
+To access S3-compatible MinIO, click on [`http://localhost:9001/login`](http://localhost:9001/login), with username = `admin` and password = `password`.
+
+## Commands
+:::info
+Below given commands are the mandatory commands required to run OLake. For more information, refer to this: [`OLake commands`](/docs/community/commands-and-flags)
+:::
+
+- ### Discover
+    Initially you have to run the discover command to get the possible streams of the source. It requires source name and source config path, with command type `discover`.
+    ```bash
+    ./build.sh driver-{source-name} discover --config {source.json path}
+    ```
+    This will generate streams.json, which will have all the streams of the source.
+
+- ### Sync
+    After doing required changes in the streams, sync command has to be run.
+    ```bash
+    ./build.sh driver-{source-name} sync --config {source.json path} --catalog {stream.json path} --destination {destination.json path}
+    ```
+    :::note
+    This above command will generate state.json, having the persisted state of the source and stats.json, having the statistics of the sync.
+    :::
+    If want to run sync with state, run:
+    ```bash
+    ./build.sh driver-{source-name} sync --config {source.json path} --catalog {stream.json path} --destination {destination.json path} --state {state.json path}
+    ```
+
+## Debug Mode
+If you don't want to run the sync commands after every change, we have this debugger mode for Go side of code.
+:::caution
+If using the Iceberg as destination, you have to generate the jar file for Java side of code. To generate the jar file either run the sync command once or run `mvn clean package -DskipTests`.
+:::
+
+**Assumptions: You are using [VSCode](https://code.visualstudio.com/download) to run OLake locally.**
+
+### Steps to Debug
+- Make a directory `.vscode` (inside OLake project, at root location) if not already created.
+- Create a file named `launch.json` inside the `.vscode` directory and paste the beflow config.
+
+```json title=".vscode/launch.json"
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Go Code",
+            "type": "go",
+            "request": "launch",
+            "program": "{PATH_TO_UPDATE}/drivers/{source-name}/main.go",
+            "mode": "auto",
+            "args": [
+                "sync",
+                "--config",
+                "{PATH_TO_UPDATE}/drivers/{source-name}/examples/source.json",
+                "--catalog",
+                "{PATH_TO_UPDATE}/drivers/{source-name}/examples/streams.json",
+                "--destination",
+                "{PATH_TO_UPDATE}/drivers/{source-name}/examples/destination.json",
+                // "--state",
+                // "{PATH_TO_UPDATE}/drivers/{source-name}/examples/state.json",
+            ]
+        }
+    ]
+}
+```
+
+### Params:
+| key | value(s) |
+| --- | --- |
+|`mode` | `auto`, `debug` |
+| `args` | `sync` , `discover`, `check` |
+
+Update `PATH_TO_UPDATE` with the location where OLake project lives inside your system. For example:
+
+```json
+"program": "/Users/john/Desktop/projects/olake/drivers/mongodb/main.go",
+...
+    "--config",
+    "/Users/john/Desktop/projects/olake/drivers/mongodb/examples/source.json",
+...          
+```
+Now, setup debug points in the codebase and click "Launch Go Code".
+
+![Debug](/img/docs/getting-started/debug.webp)
+
+
+<YouTubeEmbed videoId="b7tQmWe3wmw" className="max-w-6xl" />
+
+
+
+
+
+
+
+
