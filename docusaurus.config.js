@@ -382,6 +382,20 @@ const config = {
         {
           tagName: 'meta',
           attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
             property: 'og:updated_time',
             content: '2025-01-15T12:00:00-05:00',
           },
@@ -412,7 +426,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             name: 'twitter:description',
-            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+            content: 'OLake is the fastest data replication platform, built to stream operational databases into Apache Iceberg in real time with full CDC, incremental sync, and zero-lag reliability.',
           },
         },
         {
