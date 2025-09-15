@@ -908,7 +908,7 @@ const config = {
           },
           {
             to: '/docs/release/overview',
-            from: '/docs/release-notes',
+            from: '/docs/release-notes'
           },
           {
             to: '/docs',

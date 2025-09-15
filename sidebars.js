@@ -143,11 +143,26 @@ const docSidebar = {
     'community/code-of-conduct',
     'community/channels',
 
+    
+    sectionHeader("RELEASE NOTES"),
+    {
+      type: 'category',
+      label: 'Versions',
+      items: [
+        'release/v0.2.0-v0.2.1',
+        'release/v0.1.9-v0.1.11',
+        'release/v0.1.6-v0.1.8',
+        'release/v0.1.2-v0.1.5',
+        'release/v0.1.0-v0.1.1',
+      ],
+    },
+    
     // Resources category removed as requested
     // Roadmap removed as requested
 
     
     // FAQs section removed
+    /*
     {
       type: 'category',
       label: 'Release Notes',
@@ -158,6 +173,7 @@ const docSidebar = {
         },
       ],
     },
+    */
   ],
 };
 
