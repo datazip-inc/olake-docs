@@ -8,6 +8,7 @@ import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 // import CTAButton from '../../components/webinars/CTAButton';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 import { FaRegCalendarAlt } from 'react-icons/fa';
@@ -43,6 +44,10 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"
