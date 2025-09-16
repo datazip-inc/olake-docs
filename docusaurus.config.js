@@ -278,19 +278,124 @@ const config = {
             href: "/img/logo/olake-blue.svg",
           },
         },
-        // Declare some json-ld structured data
+        // OpenSearch meta tags
         {
-          tagName: 'script',
+          tagName: 'link',
           attributes: {
-            type: 'application/ld+json',
+            rel: 'search',
+            type: 'application/opensearchdescription+xml',
+            title: 'OLake Documentation',
+            href: '/opensearch.xml',
           },
-          innerHTML: JSON.stringify({
-            '@context': 'https://schema.org/',
-            '@type': 'Organization',
-            name: 'OLake',
-            url: 'https://olake.io/',
-            logo: 'https://olake.io/img/logo/olake-blue.svg',
-          }),
+        },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:site_name',
+            content: 'OLake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:locale',
+            content: 'en_US',
+          },
+        },
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:creator',
+            content: '@olake',
+          },
+        },
+        // Bot Directives
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'googlebot',
+            content: 'index, follow',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'bingbot',
+            content: 'index, follow',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'index, follow',
+          },
+        },
+        // PWA Support Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'theme-color',
+            content: '#203FDD',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msapplication-TileColor',
+            content: '#203FDD',
+          },
+        },
+        // Enhanced Favicon Support
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'apple-touch-icon',
+            sizes: '180x180',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: '32x32',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: '16x16',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        // Web App Manifest
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'manifest',
+            href: '/site.webmanifest',
+          },
         },
       ],
 
@@ -485,6 +590,14 @@ const config = {
 
     [
       './src/plugins/tailwind-config.js', {}
+    ],
+
+    [
+      './src/plugins/blog-structured-data/index.js', {}
+    ],
+
+    [
+      './src/plugins/indexnow/index.js', {}
     ],
 
     [
