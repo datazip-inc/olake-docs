@@ -78,42 +78,46 @@ export default function New3Page() {
   }, [history, history.location.hash])
 
   return (
-    <Layout
-      title='OLake'
-      description='Fastest Database to Data Lakehouse data replication tool, open sourced'
-    >
-      <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
-        <DataWarehouseToLakes />
-        
-        {/* Announcement Banner */}
-        <div className='bg-[#193ae6] text-white py-4 px-4'>
-          <div className='max-w-7xl mx-auto text-center'>
-            <p className='text-lg font-medium'>
-              Monthly events are here. Check out{' '}
-              <a 
-                href="https://app.livestorm.co/#/events" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className='underline hover:text-blue-200 transition-colors'
-              >
-                here
-              </a>
-              🎉
-            </p>
-          </div>
+    <>
+      {/* Announcement Banner - Above Layout */}
+      <div className='bg-[#193ae6] text-white py-3 px-4 fixed top-0 left-0 right-0 z-50'>
+        <div className='max-w-7xl mx-auto text-center'>
+          <p className='text-sm font-medium'>
+            Monthly events are here. Check out{' '}
+            <a 
+              href="https://app.livestorm.co/#/events" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className='underline hover:text-blue-200 transition-colors'
+            >
+              here
+            </a>
+            🎉
+          </p>
         </div>
-        
-        <WorkflowSection />
+      </div>
+      
+      {/* Add top padding to account for fixed banner */}
+      <div className='pt-12'>
+        <Layout
+          title='OLake'
+          description='Fastest Database to Data Lakehouse data replication tool, open sourced'
+        >
+          <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
+            <DataWarehouseToLakes />
+            <WorkflowSection />
         <IcebergHero />
         <BenchmarkSection />
         <FeatureShowcase />
         <SetupStepsSection />
         <RegistrationSection />
         <BlogShowcase />
-        <div className='container mx-auto my-8 w-full max-w-[90%]'>
-          <Faq data={OLakeFaqs} showHeading={true} />
-        </div>
+            <div className='container mx-auto my-8 w-full max-w-[90%]'>
+              <Faq data={OLakeFaqs} showHeading={true} />
+            </div>
+          </div>
+        </Layout>
       </div>
-    </Layout>
+    </>
   )
 }

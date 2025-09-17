@@ -316,14 +316,21 @@ const WebinarsPage = () => {
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 text-center">
                   Upcoming Events
                 </h3>
-                <iframe 
-                  width="100%" 
-                  height="400" 
-                  frameBorder="0" 
-                  src="https://app.livestorm.co/datazip-inc/upcoming?limit=3" 
-                  title="OLake by Datazip events | Livestorm"
-                  className="rounded-lg"
-                />
+                <div className="relative w-full overflow-hidden">
+                  <iframe 
+                    width="100%" 
+                    height="400" 
+                    frameBorder="0" 
+                    src="https://app.livestorm.co/datazip-inc/upcoming?limit=3" 
+                    title="OLake by Datazip events | Livestorm"
+                    className="rounded-lg w-full h-auto min-h-[300px] max-h-[600px]"
+                    style={{
+                      height: 'clamp(300px, 50vw, 500px)',
+                      minHeight: '300px',
+                      maxHeight: '600px'
+                    }}
+                  />
+                </div>
               </div>
             </div>
             
