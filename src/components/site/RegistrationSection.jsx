@@ -85,22 +85,7 @@ const RegistrationSection = () => {
                 streams for real-time sync, and pulling data in a lake house
               </div>
 
-              {/* Livestorm Embed */}
-              <div className='mt-6'>
-                <h3 className='mb-4 text-lg font-semibold text-gray-900 dark:text-white'>
-                  Schedule a Demo
-                </h3>
-                <div className='rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden'>
-                  <iframe 
-                    width="100%" 
-                    height="480" 
-                    frameBorder="0" 
-                    src="https://app.livestorm.co/p/f0521533-dc15-423c-9f5f-662d119f2373/form"
-                    className="w-full"
-                    title="Schedule a Demo"
-                  />
-                </div>
-              </div>
+
             </div>
 
             {/* Right side - Feature Text */}
