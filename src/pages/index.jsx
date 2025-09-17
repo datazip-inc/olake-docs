@@ -88,7 +88,7 @@ export default function New3Page() {
               href="https://app.livestorm.co/#/events" 
               target="_blank" 
               rel="noopener noreferrer"
-              className='text-white underline'
+              className='text-white underline hover:text-black transition-colors duration-200'
             >
               here
             </a>
