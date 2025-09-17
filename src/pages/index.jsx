@@ -83,7 +83,7 @@ export default function New3Page() {
       <div className='bg-[#193ae6] text-white py-3 px-4 fixed top-0 left-0 right-0 z-50'>
         <div className='max-w-7xl mx-auto text-center'>
           <p className='text-sm font-medium'>
-            Monthly events are here. Check out{' '}
+            Monthly events are{' '}
             <a 
               href="https://app.livestorm.co/#/events" 
               target="_blank" 
@@ -92,7 +92,7 @@ export default function New3Page() {
             >
               here
             </a>
-            🎉
+            . Check out! 🎉
           </p>
         </div>
       </div>
