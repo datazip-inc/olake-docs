@@ -4,7 +4,6 @@ import { useHistory } from 'react-router-dom'
 
 import Faq from '@site/src/components/site/Faq'
 import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
-import EventsSection from '../components/site/EventsSection'
 import WorkflowSection from '../components/site/WorkflowSection'
 import IcebergHero from '../components/site/IcebergHero'
 import BenchmarkSection from '../components/site/BenchmarkSection'
@@ -85,7 +84,25 @@ export default function New3Page() {
     >
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
         <DataWarehouseToLakes />
-        <EventsSection />
+        
+        {/* Announcement Banner */}
+        <div className='bg-[#193ae6] text-white py-4 px-4'>
+          <div className='max-w-7xl mx-auto text-center'>
+            <p className='text-lg font-medium'>
+              Monthly events are here. Check out{' '}
+              <a 
+                href="https://app.livestorm.co/#/events" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className='underline hover:text-blue-200 transition-colors'
+              >
+                here
+              </a>
+              🎉
+            </p>
+          </div>
+        </div>
+        
         <WorkflowSection />
         <IcebergHero />
         <BenchmarkSection />

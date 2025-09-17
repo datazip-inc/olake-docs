@@ -310,6 +310,23 @@ const WebinarsPage = () => {
               </p>
             </div>
             
+            {/* Upcoming Events Embed */}
+            <div className="mb-8">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 text-center">
+                  Upcoming Events
+                </h3>
+                <iframe 
+                  width="100%" 
+                  height="400" 
+                  frameBorder="0" 
+                  src="https://app.livestorm.co/datazip-inc/upcoming?limit=3" 
+                  title="OLake by Datazip events | Livestorm"
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            
             <div className="relative">
               {/* Background decoration */}
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-3xl -m-4"></div>
