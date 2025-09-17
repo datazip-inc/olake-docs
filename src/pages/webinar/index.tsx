@@ -1,9 +1,88 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Layout from '@theme/Layout';
 import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
 
+// Custom hook for dynamic iframe height
+const useDynamicIframeHeight = (src) => {
+  const [height, setHeight] = useState(200);
+  const iframeRef = useRef(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const updateHeight = () => {
+      // Try multiple approaches to get the right height
+      try {
+        // Method 1: Try to access iframe content (may fail due to CORS)
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc) {
+          const bodyHeight = iframeDoc.body?.scrollHeight || iframeDoc.documentElement?.scrollHeight;
+          if (bodyHeight && bodyHeight > 0) {
+            setHeight(Math.max(200, bodyHeight + 20));
+            return;
+          }
+        }
+      } catch (e) {
+        // CORS restrictions - use fallback methods
+      }
+
+      // Method 2: Listen for postMessage from iframe
+      const handleMessage = (event) => {
+        if (event.origin === 'https://app.livestorm.co' && event.data?.type === 'resize') {
+          setHeight(Math.max(200, event.data.height));
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Method 3: Set a reasonable default based on content type
+      // For Livestorm embeds, we'll use a responsive height
+      const updateResponsiveHeight = () => {
+        const viewportWidth = window.innerWidth;
+        let responsiveHeight = 200;
+        
+        if (viewportWidth < 640) {
+          responsiveHeight = 250; // Mobile: more space for single event
+        } else if (viewportWidth < 1024) {
+          responsiveHeight = 300; // Tablet: medium height
+        } else {
+          responsiveHeight = 350; // Desktop: larger height
+        }
+        
+        setHeight(responsiveHeight);
+      };
+
+      updateResponsiveHeight();
+
+      // Cleanup
+      return () => {
+        window.removeEventListener('message', handleMessage);
+      };
+    };
+
+    // Update height on load and periodically
+    const timeout1 = setTimeout(updateHeight, 1000);
+    const timeout2 = setTimeout(updateHeight, 3000);
+    
+    // Update on window resize
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, [src]);
+
+  return { height, iframeRef };
+};
+
 const WebinarsPage = () => {
+  // Use the dynamic iframe height hook
+  const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=1');
+  
   const communityMeets = [
     {
       title: 'OLake 8th Community Meetup',
@@ -308,6 +387,32 @@ const WebinarsPage = () => {
                 Deep dive into Apache Iceberg, CDC strategies, and modern data engineering practices 
                 with industry experts and practitioners
               </p>
+            </div>
+            
+            {/* Upcoming Events Embed with Dynamic Sizing */}
+            <div className="mb-4">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 text-center">
+                  Upcoming Events
+                </h3>
+                <div className="relative w-full">
+                  <iframe 
+                    ref={iframeRef}
+                    width="100%" 
+                    height={iframeHeight}
+                    frameBorder="0" 
+                    src="https://app.livestorm.co/datazip-inc/upcoming?limit=3" 
+                    title="OLake by Datazip events | Livestorm"
+                    className="rounded-lg w-full"
+                    style={{
+                      minHeight: '150px',
+                      height: `${iframeHeight}px`,
+                      transition: 'height 0.3s ease-in-out',
+                      border: 'none'
+                    }}
+                  />
+                </div>
+              </div>
             </div>
             
             <div className="relative">
