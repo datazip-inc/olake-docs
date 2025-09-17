@@ -4,6 +4,7 @@ import { useHistory } from 'react-router-dom'
 
 import Faq from '@site/src/components/site/Faq'
 import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
+import EventsSection from '../components/site/EventsSection'
 import WorkflowSection from '../components/site/WorkflowSection'
 import IcebergHero from '../components/site/IcebergHero'
 import BenchmarkSection from '../components/site/BenchmarkSection'
@@ -84,6 +85,7 @@ export default function New3Page() {
     >
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
         <DataWarehouseToLakes />
+        <EventsSection />
         <WorkflowSection />
         <IcebergHero />
         <BenchmarkSection />
