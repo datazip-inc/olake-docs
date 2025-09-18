@@ -1,7 +1,6 @@
 import React from 'react'
 
 import Link from '@docusaurus/Link'
-// import OLakeDashboard from './OLakeDashboard';
 import StatsSection from './StatsSection'
 
 interface HeroSectionProps {

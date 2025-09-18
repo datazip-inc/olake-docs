@@ -3,11 +3,9 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-// import WebinarForm from '../../components/forms/WebinarForm';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/webinar/5th.json'
 
-import CTAButton from '../../components/webinars/CTAButton';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 import Layout from '@theme/Layout';
@@ -87,24 +85,6 @@ const WebinarPage = () => {
 
 
           <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
-
-            {/* <WebinarForm
-              source="w-4-pratical-session-on-apache-iceberg"
-              nexturl="w-3-cdc-unplugged-confirmation"
-            /> */}
-
-
-            {/* remove this button with email collection form that leads to confirmation page of this webinar */}
-
-            {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
-              <CTAButton
-                title="Join Our Upcoming Event"
-                buttonText="Register Now!"
-                icon={FaRegCalendarAlt}
-                href="https://app.livestorm.co/datazip-inc/women-in-data"
-                variant="secondary"
-              />
-            </div> */}
 
           </div>
         </div>

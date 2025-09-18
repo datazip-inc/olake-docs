@@ -102,7 +102,6 @@ const WebinarsPage = () => {
       button: 'secondary',
       CTA: 'Watch Now',
       date: '26 June 2025',
-      // icon: FaVideo
     },
     {
       title: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines]',
@@ -114,7 +113,6 @@ const WebinarsPage = () => {
       button: 'secondary',
       CTA: 'Watch Now',
       date: '19 June 2025',
-      // icon: FaVideo
     },
      {
       title: 'From Source to Presto: Developer Playground for Fast Analytics',

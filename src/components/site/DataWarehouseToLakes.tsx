@@ -7,7 +7,6 @@ const DataWarehouseToLakes: React.FC = () => {
     <section className='bg-white dark:bg-gray-900'>
       <div className='mx-auto'>
         <HeroSection />
-        {/* <StatsSection /> */}
       </div>
     </section>
   )

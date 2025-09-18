@@ -3,9 +3,7 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-// import WebinarForm from '../../components/forms/WebinarForm';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
-// import CTAButton from '../../components/webinars/CTAButton';
 
 import Layout from '@theme/Layout';
 import React from "react";
@@ -52,31 +50,6 @@ const WebinarPage = () => {
           <div className="w-full md:w-2/3 flex justify-center">
             <WebinarCoverImage src="/img/webinars/w-4-pratical-session-on-apache-iceberg-cover.webp" alt="Webinar Cover Image" />
           </div>
-
-
-          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20"> */}
-
-          {/* <WebinarForm
-              source="w-4-pratical-session-on-apache-iceberg"
-              nexturl="w-3-cdc-unplugged-confirmation"
-            /> */}
-
-
-          {/* remove this button with email collection form that leads to confirmation page of this webinar */}
-
-          {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
-              <CTAButton
-                title="Join Our Upcoming Event"
-                buttonText="Register Now!"
-                icon={FaRegCalendarAlt}
-                href="https://app.livestorm.co/datazip-inc/apache-iceberg-webinar4"
-                variant="secondary"
-              />
-            </div> */}
-
-
-
-
         </div>
         {/* </div> */}
 
