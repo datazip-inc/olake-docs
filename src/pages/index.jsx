@@ -26,6 +26,11 @@ export default function New3Page() {
         'Yes. OLake is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1K+ developers) and use it freely without hidden costs.'
     },
     {
+      question: 'How Can I Contribute?',
+      answer:
+        'Join our slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
+    },
+    {
       question: 'What data platforms and tools does OLake integrate with?',
       answer:
         'As of now, we are integrating with Apache Iceberg as a destination. You can query this from most of the big data platform like Snowflake, Databricks, Redshift and BigQuery'
@@ -39,11 +44,6 @@ export default function New3Page() {
       question: 'Is There Any Enterprise Plan?',
       answer:
         'We\'re actively building on that to help teams scale OLake in production. You can reach out at hello@olake.io to learn more.'
-    },
-    {
-      question: 'How Can I Contribute?',
-      answer:
-        'Join our slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
     }
   ]
 
