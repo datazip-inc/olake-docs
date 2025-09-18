@@ -70,6 +70,11 @@ const config = {
           containerId: 'GTM-TFZ2GXJP',
         },
 
+        gtag: {
+          trackingID: 'G-GTNTGHDNZW',
+          anonymizeIP: true,
+        },
+
         sitemap: {
           lastmod: 'date',
           changefreq: 'weekly',
