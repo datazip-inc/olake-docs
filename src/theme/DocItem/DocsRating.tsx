@@ -29,13 +29,12 @@ const DocsRating: React.FC<DocsRatingProps> = ({ label }) => {
 
   // Google Analytics event
   const giveFeedback = (value: number) => {
-    if (window.ga) {
-      window.ga("send", {
-        hitType: "event",
-        eventCategory: "button",
-        eventAction: "feedback",
-        eventLabel: label,
-        eventValue: value,
+    // Check if gtag is available (only in production)
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag("event", "feedback", {
+        event_category: "button",
+        event_label: label,
+        value: value,
       });
     }
     setLiked(value === 1);

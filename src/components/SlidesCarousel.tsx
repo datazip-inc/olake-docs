@@ -53,7 +53,9 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
 
   return (
     <div className="relative w-full" aria-label={label}>
-      <h2 className="flex items-center justify-center" >Slides</h2>
+      <h2 className="flex items-center justify-center" id="slides-heading">
+        Slides
+      </h2>
       {/* Navigation Arrows */}
       <button
         type="button"
@@ -75,7 +77,10 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
       {/* Slide cards container */}
       <div
         ref={containerRef}
-        className="flex overflow-x-auto space-x-4 px-1 md:px-10 py-4 scroll-smooth snap-x snap-mandatory scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600"
+        className="scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 flex snap-x snap-mandatory space-x-4 overflow-x-auto scroll-smooth px-1 py-4 md:px-10"
+        role="region"
+        aria-label="Slide carousel"
+        aria-labelledby="slides-heading"
       >
         {slides.map((slide) => {
           const thumb = slide.thumbnail ?? deriveThumbnail(slide.url);
@@ -97,8 +102,11 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
                   onError={() => setImageError(true)}
                 />
               ) : (
-                <div className="h-40 w-full flex items-center justify-center rounded-t-xl bg-gray-100 dark:bg-gray-800">
-                  <FileVideo className="h-10 w-10 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                <div className="flex h-40 w-full items-center justify-center rounded-t-xl bg-gray-100 dark:bg-gray-800">
+                  <FileVideo
+                    className="h-10 w-10 text-gray-400 transition-colors group-hover:text-blue-600"
+                    aria-hidden="true"
+                  />
                 </div>
               )}
               <div className="p-3 text-center">
