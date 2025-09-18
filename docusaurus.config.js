@@ -69,10 +69,13 @@ const config = {
         googleTagManager: {
           containerId: 'GTM-TFZ2GXJP',
         },
-        gtag: {
-          trackingID: 'G-GTNTGHDNZW',
-          anonymizeIP: true,
-        },
+        // Only enable gtag in production to avoid development errors
+        ...(process.env.NODE_ENV === 'production' && {
+          gtag: {
+            trackingID: 'G-GTNTGHDNZW',
+            anonymizeIP: true,
+          },
+        }),
 
         sitemap: {
           lastmod: 'date',

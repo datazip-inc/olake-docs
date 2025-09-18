@@ -48,6 +48,7 @@ const RegistrationSection = () => {
           src='/img/site/registration-bg.webp'
           alt='Lake background'
           className='h-full w-full object-cover'
+          role='presentation'
         />
         {/* <div className='absolute inset-0 bg-blue-900/70'></div> */}
       </div>
@@ -84,6 +85,8 @@ const RegistrationSection = () => {
                 OLake makes data replication faster by parallelising full loads, leveraging change
                 streams for real-time sync, and pulling data in a lake house
               </div>
+
+
             </div>
 
             {/* Right side - Feature Text */}
@@ -101,7 +104,11 @@ const RegistrationSection = () => {
                 {/* Feature 1 */}
                 <div>
                   <div className='mb-3 flex items-start gap-4'>
-                    <img src='/img/site/iceberg-logo.svg' className='mt-1' />
+                    <img
+                      src='/img/site/iceberg-logo.svg'
+                      className='mt-1'
+                      alt='Apache Iceberg logo'
+                    />
                     <div className='flex max-w-[90%] flex-col gap-2'>
                       <div className='text-lg font-semibold md:text-xl lg:text-xl'>
                         Iceberg Native
@@ -122,6 +129,7 @@ const RegistrationSection = () => {
                       viewBox='0 0 24 24'
                       fill='none'
                       xmlns='http://www.w3.org/2000/svg'
+                      aria-label='Lightning bolt icon representing speed'
                     >
                       <path
                         d='M13 10V3L4 14H11V21L20 10H13Z'
