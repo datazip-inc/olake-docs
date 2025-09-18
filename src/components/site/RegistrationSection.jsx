@@ -46,7 +46,7 @@ const RegistrationSection = () => {
       <div className='absolute inset-0 z-0'>
         <img
           src='/img/site/registration-bg.jpg'
-          alt=''
+          alt='Lake background'
           className='h-full w-full object-cover'
           role='presentation'
         />
