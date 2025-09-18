@@ -45,7 +45,7 @@ const RegistrationSection = () => {
       {/* Background lake image */}
       <div className='absolute inset-0 z-0'>
         <img
-          src='/img/site/registration-bg.jpg'
+          src='/img/site/registration-bg.webp'
           alt='Lake background'
           className='h-full w-full object-cover'
         />
