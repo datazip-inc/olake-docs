@@ -141,7 +141,7 @@ const config = {
             // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
             position: "right",
-            label: "Iceberg",
+            label: "Resources",
             items: [
               {
                 label: "Blog",
