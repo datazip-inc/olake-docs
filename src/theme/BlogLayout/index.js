@@ -164,7 +164,7 @@ export default function BlogLayout(props) {
 
               <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
-                  <CentralizedBreadcrumbs type="blog" title="Blog" />
+                  <BlogBreadcrumbs />
                   {children}
                 </div>
               </article>

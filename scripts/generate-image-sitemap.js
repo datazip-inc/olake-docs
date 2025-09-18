@@ -57,39 +57,74 @@ async function generateImageSitemap() {
     // Sort images by path for consistent output
     const sortedImages = imageFiles.sort((a, b) => a.path.localeCompare(b.path));
     
+    // Group images by their page context
+    const imagesByPage = {};
+    
     for (const image of sortedImages) {
       const imageUrl = `${siteUrl}${image.path}`;
-      const lastMod = image.lastModified.toISOString().split('T')[0];
       
-      xml += '  <url>\n';
-      xml += `    <loc>${siteUrl}/</loc>\n`;
-      xml += '    <image:image>\n';
-      xml += `      <image:loc>${imageUrl}</image:loc>\n`;
-      
-      // Generate title from filename
-      const title = image.name
-        .replace(/\.[^/.]+$/, '') // Remove extension
-        .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
-        .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize words
-      
-      xml += `      <image:title>${title}</image:title>\n`;
-      
-      // Generate caption based on path context
-      let caption = title;
+      // Determine the page URL based on image path
+      let pageUrl = siteUrl + '/';
       if (image.path.includes('/blog/')) {
-        caption = `Blog image: ${title}`;
+        pageUrl = siteUrl + '/blog';
       } else if (image.path.includes('/docs/')) {
-        caption = `Documentation image: ${title}`;
-      } else if (image.path.includes('/webinar/')) {
-        caption = `Webinar image: ${title}`;
-      } else if (image.path.includes('/connectors/')) {
-        caption = `Connector image: ${title}`;
+        pageUrl = siteUrl + '/docs';
       } else if (image.path.includes('/iceberg/')) {
-        caption = `Iceberg image: ${title}`;
+        pageUrl = siteUrl + '/iceberg';
+      } else if (image.path.includes('/webinar/')) {
+        pageUrl = siteUrl + '/webinar';
+      } else if (image.path.includes('/connectors/')) {
+        pageUrl = siteUrl + '/connectors';
       }
       
-      xml += `      <image:caption>${caption}</image:caption>\n`;
-      xml += '    </image:image>\n';
+      // Group images by page URL
+      if (!imagesByPage[pageUrl]) {
+        imagesByPage[pageUrl] = [];
+      }
+      imagesByPage[pageUrl].push(image);
+    }
+    
+    // Generate XML for each page with its images
+    for (const [pageUrl, pageImages] of Object.entries(imagesByPage)) {
+      const lastMod = pageImages[0].lastModified.toISOString().split('T')[0];
+      
+      xml += '  <url>\n';
+      xml += `    <loc>${pageUrl}</loc>\n`;
+      xml += `    <lastmod>${lastMod}</lastmod>\n`;
+      
+      // Add all images for this page
+      for (const image of pageImages) {
+        const imageUrl = `${siteUrl}${image.path}`;
+        
+        xml += '    <image:image>\n';
+        xml += `      <image:loc>${imageUrl}</image:loc>\n`;
+        
+        // Generate title from filename
+        const title = image.name
+          .replace(/\.[^/.]+$/, '') // Remove extension
+          .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
+          .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize words
+        
+        xml += `      <image:title>${title}</image:title>\n`;
+        
+        // Generate caption based on path context
+        let caption = title;
+        if (image.path.includes('/blog/')) {
+          caption = `Blog image: ${title}`;
+        } else if (image.path.includes('/docs/')) {
+          caption = `Documentation image: ${title}`;
+        } else if (image.path.includes('/webinar/')) {
+          caption = `Webinar image: ${title}`;
+        } else if (image.path.includes('/connectors/')) {
+          caption = `Connector image: ${title}`;
+        } else if (image.path.includes('/iceberg/')) {
+          caption = `Iceberg image: ${title}`;
+        }
+        
+        xml += `      <image:caption>${caption}</image:caption>\n`;
+        xml += '    </image:image>\n';
+      }
+      
       xml += '  </url>\n';
     }
     

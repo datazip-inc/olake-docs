@@ -14,19 +14,84 @@ import {
   FaTrophy,
   FaComments,
   FaLightbulb,
-  FaGraduationCap
+  FaGraduationCap,
+  FaVideo
 } from 'react-icons/fa'
 
 import Button from '../../components/community/improved/Button'
 import FeatureCard from '../../components/community/improved/FeatureCard'
 import PageHeader from '../../components/community/improved/PageHeader'
 import SectionHeader from '../../components/community/improved/SectionHeader'
+import WebinarGrid from '../../components/webinars/WebinarGrid'
 
 import ActiveContributors from '../../components/community/improved/ActiveContributors'
 import SectionLayout from '../../components/community/SectionLayout'
 import StatCard from '@site/src/components/community/improved/StatCard'
 
 const CommunityPage = () => {
+  const communityMeets = [
+    {
+      title: 'OLake 8th Community Meetup',
+      subtitle: 'Join us for an end-to-end demo of OLake\'s latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.',
+      route: '/community/8th-community-meetup',
+      img: `/img/community/8th-olake-community-call.png`,
+      alt: 'OLake 8th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '29 August 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 6th Community Meetup',
+      subtitle: 'Join us for a real-world production story from PhysicsWallah showcasing their migration from Redshift to Iceberg-based lakehouse, and explore OLake\'s roadmap including Golang architecture, upcoming UI, and SMT transformations.',
+      route: '/community/6th-community-meetup',
+      img: `/img/community/6th-community-meetup-cover.png`,
+      alt: 'OLake 6th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 April 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 5th Community Meetup',
+      subtitle: 'Join us for a showcase of new features including Apache Iceberg as a destination for AWS S3 and local setups, MongoDB to Iceberg sync capabilities, upcoming MySQL and Postgres sync features, and performance improvements with 2-3x faster syncs.',
+      route: '/community/5th-community-meetup',
+      img: `/img/community/5th-community-meetup-cover.png`,
+      alt: 'OLake 5th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '27 March 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 4th Community Meetup',
+      subtitle: 'Join us for updates on recent developments including faster target writer for normalization, new stats file for performance metrics, Docker Compose for MongoDB replica sets, Split Vector Strategy, and Iceberg Writer development with schema evolution.',
+      route: '/community/4th-community-meetup',
+      img: `/img/community/4th-community-meetup-cover.png`,
+      alt: 'OLake 4th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 February 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 3rd Community Meetup',
+      subtitle: 'Join us for updates on new features including parquet writer, MongoDB 2.0 connector, Apache Iceberg Writer integration, Postgres Writer development, and a comprehensive demo of OLake\'s CLI functionality with MongoDB to S3 syncing.',
+      route: '/community/3rd-community-meetup',
+      img: `/img/community/3rd-community-meetup-cover.png`,
+      alt: 'OLake 3rd Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '13 February 2025',
+      icon: FaVideo
+    },
+  ]
+
   const channels = [
     {
       name: 'contributing-to-olake',
@@ -285,12 +350,20 @@ const CommunityPage = () => {
       <SectionLayout className="py-20 bg-gray-50 dark:bg-gray-900/50">
         <SectionHeader
           title="Community Events & Meetups"
-          subtitle="Join our webinars, meetups, and workshops to learn from experts and connect with peers"
+          subtitle="Join our regular community meetups where we discuss real-world challenges, share experiences, and learn from each other"
         />
 
-        <div className="flex justify-center">
-          <Button href="/webinar" size="lg">
-            <FaCalendarAlt className="mr-2" /> View All Events
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-3xl -m-4"></div>
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
+            <WebinarGrid webinars={communityMeets} />
+          </div>
+        </div>
+
+        <div className="flex justify-center mt-8">
+          <Button href="/webinar" size="lg" variant="outline">
+            <FaCalendarAlt className="mr-2" /> View All Webinars
           </Button>
         </div>
       </SectionLayout>

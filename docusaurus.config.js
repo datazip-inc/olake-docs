@@ -70,11 +70,6 @@ const config = {
           containerId: 'GTM-TFZ2GXJP',
         },
 
-        gtag: {
-          trackingID: 'G-GTNTGHDNZW',
-          anonymizeIP: true,
-        },
-
         sitemap: {
           lastmod: 'date',
           changefreq: 'weekly',
@@ -280,14 +275,8 @@ const config = {
             href: "/img/logo/olake-blue.svg",
           },
         },
-        // Canonical URL
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'canonical',
-            href: 'https://olake.io/',
-          },
-        },
+        // Canonical URL - Removed hardcoded canonical tag
+        // Docusaurus automatically generates proper canonical URLs for each page
         // OpenSearch meta tags
         {
           tagName: 'link',
@@ -310,7 +299,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:url',
-            content: 'https://olake.io/',
+            content: 'https://olake.io',
           },
         },
         {
@@ -485,20 +474,6 @@ const config = {
             content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large',
           },
         },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'googlebot',
-            content: 'index, follow',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'bingbot',
-            content: 'index, follow',
-          },
-        },
         // Bing Webmaster Verification
         {
           tagName: 'meta',
@@ -526,26 +501,8 @@ const config = {
         {
           tagName: 'link',
           attributes: {
-            rel: 'apple-touch-icon',
-            sizes: '180x180',
-            href: '/img/logo/olake-blue.svg',
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
             rel: 'icon',
-            type: 'image/png',
-            sizes: '32x32',
-            href: '/img/logo/olake-blue.svg',
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'icon',
-            type: 'image/png',
-            sizes: '16x16',
+            type: 'image/svg+xml',
             href: '/img/logo/olake-blue.svg',
           },
         },
@@ -563,8 +520,8 @@ const config = {
           attributes: {
             rel: 'alternate',
             type: 'application/rss+xml',
-            title: 'OLake >> Feed',
-            href: 'https://olake.io/feed/',
+            title: 'OLake Blog RSS Feed',
+            href: 'https://olake.io/blog/rss.xml',
           },
         },
         {
@@ -572,8 +529,8 @@ const config = {
           attributes: {
             rel: 'alternate',
             type: 'application/rss+xml',
-            title: 'OLake >> Comments Feed',
-            href: 'https://olake.io/comments/feed/',
+            title: 'OLake Iceberg Blog RSS Feed',
+            href: 'https://olake.io/iceberg/rss.xml',
           },
         },
         // Additional Meta Tags
@@ -582,13 +539,6 @@ const config = {
           attributes: {
             name: 'format-detection',
             content: 'telephone=no',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'generator',
-            content: 'Docusaurus 3.0; features: search, i18n, theme',
           },
         },
         {

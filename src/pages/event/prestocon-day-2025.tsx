@@ -10,7 +10,6 @@ import CTAButton from '../../components/webinars/CTAButton';
 import { FaRegCalendarAlt } from 'react-icons/fa';
 
 import Layout from '@theme/Layout';
-import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';

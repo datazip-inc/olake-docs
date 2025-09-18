@@ -54,7 +54,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
       case 'community':
         return [
           ...baseItems,
-          { label: 'Webinars & Events', href: '/webinar' },
+          { label: 'Community', href: '/community' },
           { label: title, current: true }
         ];
 
