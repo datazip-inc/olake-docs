@@ -83,7 +83,7 @@ export default function BlogBreadcrumbs() {
                 )}
                 itemProp="item"
               >
-                <span itemProp="name">{item.label}</span>
+                <span itemProp="name">{index === 0 ? "" : item.label}</span>
               </Link>
               <meta itemProp="position" content={String(index + 1)} />
             </li>
@@ -148,7 +148,7 @@ export default function BlogBreadcrumbs() {
               )}
               itemProp="item"
             >
-              <span itemProp="name">{item.label}</span>
+              <span itemProp="name">{index === 0 ? "" : item.label}</span>
             </Link>
             <meta itemProp="position" content={String(index + 1)} />
           </li>

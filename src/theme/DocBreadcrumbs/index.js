@@ -44,12 +44,12 @@ export default function DocBreadcrumbsWrapper(props) {
                   className="flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                 >
                   {item.icon && <span className="mr-1">{item.icon}</span>}
-                  {item.label}
+                  {index === 0 ? "" : item.label}
                 </Link>
               ) : (
                 <span className="flex items-center text-gray-900 dark:text-gray-100 font-medium">
                   {item.icon && <span className="mr-1">{item.icon}</span>}
-                  {item.label}
+                  {index === 0 ? "" : item.label}
                 </span>
               )}
             </li>

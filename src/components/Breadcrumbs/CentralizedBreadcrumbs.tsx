@@ -88,8 +88,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
               >
                 {index === 0 ? (
                   <span className="flex items-center">
-                    <HomeIcon className="w-4 h-4 mr-1" />
-                    {item.label}
+                    <HomeIcon className="w-4 h-4" />
                   </span>
                 ) : (
                   item.label
@@ -103,8 +102,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
               }`}>
                 {index === 0 ? (
                   <span className="flex items-center">
-                    <HomeIcon className="w-4 h-4 mr-1" />
-                    {item.label}
+                    <HomeIcon className="w-4 h-4" />
                   </span>
                 ) : (
                   item.label
