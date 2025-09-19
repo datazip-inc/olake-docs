@@ -70,7 +70,7 @@ const CommunityPage = () => {
       title: 'OLake 4th Community Meetup',
       subtitle: 'Join us for updates on recent developments including faster target writer for normalization, new stats file for performance metrics, Docker Compose for MongoDB replica sets, Split Vector Strategy, and Iceberg Writer development with schema evolution.',
       route: '/community/4th-community-meetup',
-      img: `/img/community/4th-community-meetup-cover.png`,
+      img: `/img/community/4th-community-meetup-cover.webp`,
       alt: 'OLake 4th Community Meetup',
       status: 'archived',
       button: 'secondary',
