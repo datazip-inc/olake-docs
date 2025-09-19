@@ -34,7 +34,7 @@ const CommunityPage = () => {
       title: 'OLake 8th Community Meetup',
       subtitle: 'Join us for an end-to-end demo of OLake\'s latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.',
       route: '/community/8th-community-meetup',
-      img: `/img/community/8th-olake-community-call.png`,
+      img: `/img/community/8th-olake-community-call.webp`,
       alt: 'OLake 8th Community Meetup',
       status: 'archived',
       button: 'secondary',
