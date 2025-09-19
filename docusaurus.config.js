@@ -51,6 +51,13 @@ const config = {
         googleTagManager: {
           containerId: 'GTM-TFZ2GXJP',
         },
+        // Only enable gtag in production to avoid development errors
+        ...(process.env.NODE_ENV === 'production' && {
+          gtag: {
+            trackingID: 'G-GTNTGHDNZW',
+            anonymizeIP: true,
+          },
+        }),
 
         sitemap: {
           lastmod: 'date',
@@ -141,8 +148,12 @@ const config = {
             // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
             position: "right",
-            label: "Resources",
+            label: "Iceberg",
             items: [
+              {
+                label: "Blog",
+                href: `/iceberg`,
+              },
               {
                 label: "Blog",
                 href: `/iceberg`,
