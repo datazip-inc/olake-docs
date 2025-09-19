@@ -138,8 +138,8 @@ const config = {
       image: 'img/logo/olake-blue.svg',
 
       announcementBar: {
-        id: 'monthly-events',
-        content: 'Monthly events are <a target="_blank" rel="noopener noreferrer" href="https://olake.io/webinar" class="text-white underline hover:text-black transition-colors duration-200">here</a>. Check out! 🎉',
+        id: 'monthly-events-2025',
+        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200">here</a>. Check out! 🎉',
         backgroundColor: '#193ae6',
         textColor: 'white',
         isCloseable: true,

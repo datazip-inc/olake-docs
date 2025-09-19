@@ -12,6 +12,13 @@ const useDynamicIframeHeight = (src) => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
+    // Method 2: Listen for postMessage from iframe
+    const handleMessage = (event) => {
+      if (event.origin === 'https://app.livestorm.co' && event.data?.type === 'resize') {
+        setHeight(Math.max(200, event.data.height));
+      }
+    };
+
     const updateHeight = () => {
       // Try multiple approaches to get the right height
       try {
@@ -27,15 +34,6 @@ const useDynamicIframeHeight = (src) => {
       } catch (e) {
         // CORS restrictions - use fallback methods
       }
-
-      // Method 2: Listen for postMessage from iframe
-      const handleMessage = (event) => {
-        if (event.origin === 'https://app.livestorm.co' && event.data?.type === 'resize') {
-          setHeight(Math.max(200, event.data.height));
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
 
       // Method 3: Set a reasonable default based on content type
       // For Livestorm embeds, we'll use a responsive height
@@ -55,23 +53,19 @@ const useDynamicIframeHeight = (src) => {
       };
 
       updateResponsiveHeight();
-
-      // Cleanup
-      return () => {
-        window.removeEventListener('message', handleMessage);
-      };
     };
 
-    // Update height on load and periodically
-    const timeout1 = setTimeout(updateHeight, 1000);
-    const timeout2 = setTimeout(updateHeight, 3000);
-    
-    // Update on window resize
+    // Add event listeners
+    window.addEventListener('message', handleMessage);
     window.addEventListener('resize', updateHeight);
 
+    // Update height on load with a single timeout
+    const timeout = setTimeout(updateHeight, 1000);
+
+    // Cleanup function
     return () => {
-      clearTimeout(timeout1);
-      clearTimeout(timeout2);
+      clearTimeout(timeout);
+      window.removeEventListener('message', handleMessage);
       window.removeEventListener('resize', updateHeight);
     };
   }, [src]);
@@ -372,29 +366,15 @@ const WebinarsPage = () => {
       {/* Main Content */}
       <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
-          
-          {/* Featured Events & Webinars Section */}
-          <section className="mb-20">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center px-4 py-2 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium mb-4">
-                <FaVideo className="w-4 h-4 mr-2" />
-                Technical Sessions
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-                Featured Events & Webinars
-              </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                Deep dive into Apache Iceberg, CDC strategies, and modern data engineering practices 
-                with industry experts and practitioners
-              </p>
-            </div>
-            
-            {/* Upcoming Events Embed with Dynamic Sizing */}
-            <div className="mb-4">
-              <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-4">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 text-center">
-                  Upcoming Events
-                </h3>
+                      {/* Upcoming Events Embed with Dynamic Sizing */}
+                      <div className="text-center mb-4">
+                        <div className="inline-flex items-center px-4 py-2 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
+                          <FaVideo className="w-4 h-4 mr-2" />
+                          Active Events
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
                 <div className="relative w-full">
                   <iframe 
                     ref={iframeRef}
@@ -412,7 +392,24 @@ const WebinarsPage = () => {
                     }}
                   />
                 </div>
+              
+            </div>
+            
+
+          {/* Featured Events & Webinars Section */}
+          <section className="mb-20">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center px-4 py-2 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium mb-4">
+                <FaVideo className="w-4 h-4 mr-2" />
+                Technical Sessions
               </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Featured Events & Webinars
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                Deep dive into Apache Iceberg, CDC strategies, and modern data engineering practices 
+                with industry experts and practitioners
+              </p>
             </div>
             
             <div className="relative">
