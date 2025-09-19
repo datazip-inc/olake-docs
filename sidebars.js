@@ -132,6 +132,7 @@ const docSidebar = {
     // Community
     sectionHeader("COMMUNITY"),
     'community/contributing',
+    'community/commands-and-flags',
     'community/issues-and-prs',
     'community/code-of-conduct',
     'community/channels',
