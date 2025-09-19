@@ -23,21 +23,21 @@ const hosts = [
     name: "Priyansh Khodiyar",
     role: "Ex DevRel",
     bio: "",
-    image: "/img/authors/priyansh.jpg",
+    image: "/img/authors/priyansh.webp",
     linkedin: "https://www.linkedin.com/in/zriyansh/",
   },
   {
     name: "Shubham Satish Baldava",
     role: "Co-founder @ Datazip and OLake Maintainer",
     bio: "",
-    image: "/img/authors/shubham.jpg",
+    image: "/img/authors/shubham.webp",
     linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
   },
   {
     name: "Ankit Kumar",
     role: "Senior backend dev and OLake Maintainer",
     bio: "",
-    image: "/img/authors/ankit.jpg",
+    image: "/img/authors/ankit.webp",
     linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
   },
 ];
@@ -62,7 +62,7 @@ const CommunityPage = () => {
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
 
           {/* <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/community/3rd-community-meetup-cover.png" alt="Meetup Cover Image" />
+            <WebinarCoverImage src="/img/community/3rd-community-meetup-cover.webp" alt="Meetup Cover Image" />
           </div> */}
 
 

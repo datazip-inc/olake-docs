@@ -19,7 +19,7 @@ const hosts = [
     name: "Presto Foundation",
     role: "",
     bio: " Presto",
-    image: "/img/authors/presto.jpg",
+    image: "/img/authors/presto.webp",
     linkedin: "https://www.linkedin.com/company/presto-foundation/",
   },
   {
@@ -35,7 +35,7 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'From Source to Presto: Developer Playground for Fast Analytics',
     summary: 'This talk introduces a lightweight developer playground that demonstrates how to ingest change data from a transactional database (like Postgres or MySQL), register it via an open-source REST catalog (e.g., Polaris or LakeKeeper), and instantly make it queryable in Presto. The demo will walk through the setup, tools, and real-time experience of how quickly one can go from source data to interactive Presto queries using open standards and pluggable components. Ideal for developers and data engineers exploring modern lakehouse and federated query patterns',
-    image_url: '/img/events/prestocon-day-2025-cover.jpg',
+    image_url: '/img/events/prestocon-day-2025-cover.webp',
     event_url: 'https://olake.io/event/prestocon-day-2025',
     register_link: 'https://linuxfoundation.regfox.com/prestocon-day-2025',
   };

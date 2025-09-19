@@ -15,14 +15,14 @@ const hosts = [
     name: "Akshay Kumar Sharma",
     role: "DevRel @ OLake",
     bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.jpg",
+    image: "/img/authors/akshay.webp",
     linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
   },
   {
     name: "Schitiz Sharma",
     role: "DevOps Engineer @ OLake",
     bio: "OLake Maintainer and DevOps engineer with expertise in Kubernetes deployments, Helm charts, and infrastructure automation for data engineering platforms.",
-    image: "/img/authors/schitiz.jpg",
+    image: "/img/authors/schitiz.webp",
     linkedin: "https://www.linkedin.com/in/schitizsharma",
   },
 ];

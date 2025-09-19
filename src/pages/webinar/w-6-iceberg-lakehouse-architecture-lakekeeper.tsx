@@ -28,7 +28,7 @@ const hosts = [
     name: "Viktor Kessler",
     role: "Co-founder @ Vakamo",
     bio: "Viktor Kessler is the Co-Founder of Vakamo (founded December 2024), where he focuses on Apache Iceberg and Lakekeeper Catalog technologies. His technical expertise spans modern data infrastructure with a particular emphasis on open-source technologies and lakehouse architectures. Prior to founding Vakamo, Viktor built his technical expertise through roles at Dremio, MongoDB, ERGO Group. Viktor is actively involved in the data infrastructure community, particularly around Apache Iceberg implementations. His current focus appears to be on transforming data analytics from cost centers to profit centers through innovative data products and open technologies like Apache Iceberg and Lakekeeper Catalog.",
-    image: "/img/authors/viktor.png",
+    image: "/img/authors/viktor.webp",
     linkedin: "https://www.linkedin.com/in/viktor-kessler/",
   },
   
@@ -55,7 +55,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.png" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.webp" alt="Webinar Cover Image" />
           </div>
 
 

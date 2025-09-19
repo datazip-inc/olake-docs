@@ -16,14 +16,14 @@ const hosts = [
     name: "Arsham Eslami",
     role: "Co-Founder @ Greybeam",
     bio: "Arsham Eslami is Co-Founder of Greybeam, where he builds automated workload routing systems to optimize Snowflake costs and performance. With extensive experience in data infrastructure automation, Arsham has architected scalable data platforms across multiple startups. His technical expertise spans distributed systems, real-time analytics, and cost optimization for cloud-native data architectures.",
-    image: "/img/authors/arsham.jpeg",
+    image: "/img/authors/arsham.webp",
     linkedin: "https://www.linkedin.com/in/arsham-eslami/",
   },
   {
     name: "Akshay Kumar Sharma",
     role: "DevRel @ OLake",
     bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.jpg",
+    image: "/img/authors/akshay.webp",
     linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
   },
 ];

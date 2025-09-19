@@ -64,9 +64,9 @@
 *Example – slug `flatten-array`, published May 2025:*
 
 ```
-static/img/blog/cover/flatten-array-cover.png
-static/img/blog/2025/05/flatten-array-1.png
-static/img/blog/2025/05/flatten-array-2.png
+static/img/blog/cover/flatten-array-cover.webp
+static/img/blog/2025/05/flatten-array-1.webp
+static/img/blog/2025/05/flatten-array-2.webp
 ```
 
 ---

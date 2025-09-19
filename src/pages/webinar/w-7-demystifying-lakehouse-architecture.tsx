@@ -28,7 +28,7 @@ const hosts = [
     name: "Akshat Mathur",
     role: "Senior Software Engineer @ Cloudera",
     bio: "As a senior software engineer at Cloudera, Akshat Mathur works on developing and maintaining scalable, reliable, and secure data solutions using Apache Iceberg, Hive, Tez, Trino, and other big data technologies. He collaborates with cross-functional teams to deliver high-quality products and services that meet the needs and expectations of clients and users. He also contributes to the open source community actively as an Apache contributor, where he helps to improve the performance, functionality, and usability of the projects.",
-    image: "/img/authors/akshat.jpg",
+    image: "/img/authors/akshat.webp",
     linkedin: "https://www.linkedin.com/in/devakshatmathur/",
   },
 ];
@@ -54,7 +54,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-7-demystifying-lakehouse-architecture-cover.png" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-7-demystifying-lakehouse-architecture-cover.webp" alt="Webinar Cover Image" />
           </div>
 
 
