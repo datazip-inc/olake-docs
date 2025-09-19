@@ -154,7 +154,7 @@ Schema data type changes refer to modifications to the data type of existing col
 
 ### Supported Data Type Promotions
 
-OLake fully supports all Iceberg v2 data type promotions:
+OLake supports Iceberg v2’s widening promotions, where the destination column type expands to accommodate a larger range or higher precision without data loss. These include:
 
 | From          | To                          | Notes                                                 |
 | ------------- | --------------------------- | ----------------------------------------------------- |
@@ -165,35 +165,23 @@ OLake fully supports all Iceberg v2 data type promotions:
 
 :::caution
 - Iceberg v2 supports widening type changes only. Narrowing changes (e.g., `BIGINT` to `INT`) along with any other data type changes will result in an errror as are not supported.
-- All the incompatible type changes will be handled by OLake with DLQ (Dead Letter Queue) tables (coming soon)
 :::
 
-### Handling Incompatible Type Changes
+### Handling Incompatible Data Type Changes
 
-For type changes not supported by Iceberg v2 (like STRING to INT), OLake offers two options:
+For data type changes not supported by Iceberg v2: 
+1. STRING ➡ (INT, LONG, FLOAT, DOUBLE) - OLake provides enhanced handling which includes string-to-numeric conversions with automatic parsing attempts. If the parsing attempt fails, then only the sync gets failed.
+2. Narrowing Type Conversions like: 
+   - BIGINT to INT 
+   - DOUBLE to FLOAT
+   - TIMESTAMP to DATE
+   - DECIMAL(P, S) to DECIMAL(P', S) where P' < P
 
-1. **Schema Data Type Changes Enabled with DLQ** ([coming soon](https://github.com/datazip-inc/olake/issues/265)):
+   When a source value’s data type has a smaller range or precision than the destination column’s type, OLake treats this as a narrowing conversion and handles it seamlessly. For example, if the destination column is defined as BIGINT but the incoming values are INT, OLake recognizes that every INT value falls within BIGINT’s range and simply stores the values without error. This validation step ensures that compatible, smaller-range types are accepted even when Iceberg v2 would flag a mismatch.
 
-   - Records with incompatible types will be routed to a Dead Letter Queue Column (DLQ)
-   - Main pipeline continues processing compatible records
-   - Full record information preserved for troubleshooting
-
-2. **Schema Data Type Changes Enabled without DLQ**:
-
-   - Sync fails with clear error message about incompatible type change
-   - Message identifies the specific column and type conversion that failed
-
-3. **Schema Data Type Changes Disabled**:
-
-   - Any data type change results in sync failure
-   - Provides explicit error about the type change detected
-
-### Production Best Practices
-
-- Enable Schema Data Type Changes for production environments
-- Implement robust monitoring for type change errors
-- Test schema changes in non-production environments first
-- Document your schema and track changes over time
+:::tip
+All other incompatible type changes will be captured by OLake using a Dead Letter Queue column (DLQ)  (feature coming soon).
+:::
 
 ## Example Scenarios
 
@@ -219,21 +207,35 @@ When a new table appears in your source database:
 When a table name changes in your source database:
 - OLake automatically detects the new table name
 - The table is added to your destination schema
-- A New table gets created.
-- The old table name is retained in the destination schema but will not be populated with new data.
+- A New table gets created
+- The old table name is retained in the destination schema but will not be populated with new data
 
-### Scenario 4: INT to BIGINT Conversion
+### Scenario 4: Widening Type Conversion (INT to BIGINT Conversion)
 
-When a column changes from INT to BIGINT type:
+When a column data type is INT and it encounters BIGINT type:
 
 - OLake detects the widening type change
 - Column type is updated in the destination
 - All values are properly converted
 - Pipeline continues without interruption
 
-### Scenario 5: Incompatible Type Change
+### Scenario 5: Narrowing Type Conversion (BIGINT to INT Conversion)
 
-When a column changes from STRING to INT type, incompatible with Iceberg v2, sync fails.
+When a column data type is BIGINT and it encounters INT type:
+
+- OLake detects the narrowing type change
+- Column type is validated in the destination making sure it fits in the BIGINT range
+- All values are properly approved
+- Pipeline continues without interruption
+
+### Scenario 6: Incompatible Type Change
+
+When a column changes from STRING to INT type:, incompatible with Iceberg v2, sync fails.
+
+- OLake detects the incompatible type change
+- It tries to parse STRING values to INT
+- If parsing is successful, values are stored and pipeline continues
+- If parsing fails, the sync get failed.
 
 For more detailed information on Iceberg's schema evolution capabilities, refer to the [Apache Iceberg documentation](https://iceberg.apache.org/spec/#schema-evolution).
 
