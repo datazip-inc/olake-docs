@@ -16,12 +16,6 @@ export type { InteractiveTableProps, TableColumn, TableRow } from './Interactive
 export { StatusIndicator } from './StatusIndicator';
 export type { StatusLevel } from './StatusIndicator';
 
-// Progress visualization
-export { ProgressRing } from './ProgressRing';
-
-// Comparison components
-export { ComparisonCard } from './ComparisonCard';
-export type { ComparisonCardProps, ComparisonFeature } from './ComparisonCard';
 
 // Existing components (if any)
 export { default as IcebergQueryEngines } from './IcebergQueryEngines';

@@ -1,6 +1,5 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../context/ThemeContext";
 
 interface LogoProps {
   className?: string;
@@ -8,7 +7,6 @@ interface LogoProps {
 }
 
 const Logo: React.FC<LogoProps> = ({ className = "", linkClassName = "" }) => {
-  const { theme } = useTheme();
 
   return (
     <Link to="/" className={`inline-flex items-center ${linkClassName}`}>
