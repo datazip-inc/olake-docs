@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
-import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/solid';
 
 export interface BreadcrumbItem {
   label: string;

@@ -1,7 +1,7 @@
 import React from 'react';
 import DocBreadcrumbs from '@theme-original/DocBreadcrumbs';
 import Link from '@docusaurus/Link';
-import { HomeIcon } from '@heroicons/react/24/outline';
+import { HomeIcon } from '@heroicons/react/24/solid';
 
 export default function DocBreadcrumbsWrapper(props) {
   // Check if this is a query engine page

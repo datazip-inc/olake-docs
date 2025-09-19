@@ -4,6 +4,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import { useLocation } from '@docusaurus/router';
 import clsx from 'clsx';
+import { HomeIcon } from '@heroicons/react/24/solid';
 
 export default function BlogBreadcrumbs() {
   const { siteConfig } = useDocusaurusContext();
@@ -29,7 +30,7 @@ export default function BlogBreadcrumbs() {
   if (isIcebergPost) {
     const icebergBreadcrumbItems = [
       {
-        label: 'Home',
+        label: '',
         href: baseUrl,
       },
       {
@@ -83,7 +84,13 @@ export default function BlogBreadcrumbs() {
                 )}
                 itemProp="item"
               >
-                <span itemProp="name">{index === 0 ? "" : item.label}</span>
+                <span itemProp="name">
+                  {index === 0 ? (
+                    <HomeIcon className="w-4 h-4" />
+                  ) : (
+                    item.label
+                  )}
+                </span>
               </Link>
               <meta itemProp="position" content={String(index + 1)} />
             </li>
@@ -99,7 +106,7 @@ export default function BlogBreadcrumbs() {
 
   const breadcrumbItems = [
     {
-      label: 'Home',
+      label: '',
       href: baseUrl,
     },
     {
@@ -148,7 +155,13 @@ export default function BlogBreadcrumbs() {
               )}
               itemProp="item"
             >
-              <span itemProp="name">{index === 0 ? "" : item.label}</span>
+              <span itemProp="name">
+                {index === 0 ? (
+                  <HomeIcon className="w-4 h-4" />
+                ) : (
+                  item.label
+                )}
+              </span>
             </Link>
             <meta itemProp="position" content={String(index + 1)} />
           </li>
