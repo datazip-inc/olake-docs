@@ -46,7 +46,7 @@ const CommunityPage = () => {
       title: 'OLake 6th Community Meetup',
       subtitle: 'Join us for a real-world production story from PhysicsWallah showcasing their migration from Redshift to Iceberg-based lakehouse, and explore OLake\'s roadmap including Golang architecture, upcoming UI, and SMT transformations.',
       route: '/community/6th-community-meetup',
-      img: `/img/community/6th-community-meetup-cover.png`,
+      img: `/img/community/6th-community-meetup-cover.webp`,
       alt: 'OLake 6th Community Meetup',
       status: 'archived',
       button: 'secondary',
