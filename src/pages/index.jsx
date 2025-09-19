@@ -17,9 +17,9 @@ import Footer from '../components/site/Footer.tsx'
 export default function New3Page() {
   const OLakeFaqs = [
     {
-      question: 'What is OLake, and how does it handle MongoDB data?',
+      question: 'What is OLake, and how does it handle database replication?',
       answer:
-        'OLake is a data engineering tool designed to simplify and automate the real-time ingestion & normalization of complex MongoDB data. It handles the entire process — from parsing and extraction to flattening/extrapolating and transforming raw, semi-structured data into relational streams — without the need for coding.'
+        'OLake is a data engineering tool designed to simplify and automate the real-time ingestion & normalization of complex database data. It handles the entire process — from parsing and extraction to flattening/extrapolating and transforming raw, semi-structured data into relational streams — without the need for coding.'
     },
     {
       question: 'How does OLake ensure data accuracy and prevent data loss during transformation?',
