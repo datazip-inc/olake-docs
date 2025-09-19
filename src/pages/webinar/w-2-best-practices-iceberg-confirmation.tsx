@@ -4,6 +4,7 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 
@@ -51,6 +52,10 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
 
         <WebinarTitle
           title="Best Practices for Migrating to Apache Iceberg"

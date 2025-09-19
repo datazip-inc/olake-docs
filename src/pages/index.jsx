@@ -1,4 +1,5 @@
 import Layout from '@theme/Layout'
+import Head from '@docusaurus/Head'
 import React, { useEffect, useRef } from 'react'
 import { useHistory } from 'react-router-dom'
 
@@ -69,7 +70,6 @@ export default function New3Page() {
       setTimeout(() => {
         window.scrollTo(0, formRef.current.offsetTop)
       }, 0)
-      console.log('hereee', window.location.pathname, window.location.search)
       history.replace({
         pathname: window.location.pathname,
         search: window.location.search
@@ -82,6 +82,31 @@ export default function New3Page() {
       title='OLake'
       description='Fastest Database to Data Lakehouse data replication tool, open sourced'
     >
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org/',
+              '@type': 'Organization',
+              name: 'OLake',
+              url: 'https://olake.io/',
+              logo: 'https://olake.io/img/logo/olake-blue.svg',
+              description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
+              foundingDate: '2023',
+              contactPoint: {
+                '@type': 'ContactPoint',
+                contactType: 'customer service',
+                email: 'hello@olake.io'
+              },
+              sameAs: [
+                'https://github.com/datazip-inc/olake',
+                'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
+              ]
+            })
+          }}
+        />
+      </Head>
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
         <main id='main-content' role='main'>
           <DataWarehouseToLakes />

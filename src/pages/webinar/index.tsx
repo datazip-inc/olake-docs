@@ -4,68 +4,6 @@ import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
 
 const WebinarsPage = () => {
-  const communityMeets = [
-    {
-      title: 'OLake 8th Community Meetup',
-      subtitle: 'Join us for an end-to-end demo of OLake\'s latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.',
-      route: '/community/8th-community-meetup',
-      img: `/img/community/8th-olake-community-call.webp`,
-      alt: 'OLake 8th Community Meetup',
-      status: 'archived',
-      button: 'secondary',
-      CTA: 'Watch Now',
-      date: '29 August 2025',
-      icon: FaVideo
-    },
-    {
-      title: 'OLake 6th Community Meetup',
-      subtitle: 'Join us for a real-world production story from PhysicsWallah showcasing their migration from Redshift to Iceberg-based lakehouse, and explore OLake\'s roadmap including Golang architecture, upcoming UI, and SMT transformations.',
-      route: '/community/6th-community-meetup',
-      img: `/img/community/6th-community-meetup-cover.webp`,
-      alt: 'OLake 6th Community Meetup',
-      status: 'archived',
-      button: 'secondary',
-      CTA: 'Watch Now',
-      date: '28 April 2025',
-      icon: FaVideo
-    },
-    {
-      title: 'OLake 5th Community Meetup',
-      subtitle: 'Join us for a showcase of new features including Apache Iceberg as a destination for AWS S3 and local setups, MongoDB to Iceberg sync capabilities, upcoming MySQL and Postgres sync features, and performance improvements with 2-3x faster syncs.',
-      route: '/community/5th-community-meetup',
-      img: `/img/community/5th-community-meetup-cover.webp`,
-      alt: 'OLake 5th Community Meetup',
-      status: 'archived',
-      button: 'secondary',
-      CTA: 'Watch Now',
-      date: '27 March 2025',
-      icon: FaVideo
-    },
-    {
-      title: 'OLake 4th Community Meetup',
-      subtitle: 'Join us for updates on recent developments including faster target writer for normalization, new stats file for performance metrics, Docker Compose for MongoDB replica sets, Split Vector Strategy, and Iceberg Writer development with schema evolution.',
-      route: '/community/4th-community-meetup',
-      img: `/img/community/4th-community-meetup-cover.webp`,
-      alt: 'OLake 4th Community Meetup',
-      status: 'archived',
-      button: 'secondary',
-      CTA: 'Watch Now',
-      date: '28 February 2025',
-      icon: FaVideo
-    },
-    {
-      title: 'OLake 3rd Community Meetup',
-      subtitle: 'Join us for updates on new features including parquet writer, MongoDB 2.0 connector, Apache Iceberg Writer integration, Postgres Writer development, and a comprehensive demo of OLake\'s CLI functionality with MongoDB to S3 syncing.',
-      route: '/community/3rd-community-meetup',
-      img: `/img/community/3rd-community-meetup-cover.webp`,
-      alt: 'OLake 3rd Community Meetup',
-      status: 'archived',
-      button: 'secondary',
-      CTA: 'Watch Now',
-      date: '13 February 2025',
-      icon: FaVideo
-    },
-  ]
   // Define webinars data directly
   const webinars = [
     {
@@ -313,31 +251,6 @@ const WebinarsPage = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-3xl -m-4"></div>
               <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
                 <WebinarGrid webinars={webinars} />
-              </div>
-            </div>
-          </section>
-
-          {/* Community Meetups Section */}
-          <section className="mb-20">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center px-4 py-2 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium mb-4">
-                <FaUsers className="w-4 h-4 mr-2" />
-                Community Driven
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-                Community Meetups
-              </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                Join our regular community meetups where we discuss real-world challenges, 
-                share experiences, and learn from each other
-              </p>
-            </div>
-            
-            <div className="relative">
-              {/* Background decoration */}
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-3xl -m-4"></div>
-              <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
-                <WebinarGrid webinars={communityMeets} />
               </div>
             </div>
           </section>

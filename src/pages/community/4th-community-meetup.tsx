@@ -4,6 +4,7 @@ import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import React from "react";
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/4th-meetup.json'
@@ -53,6 +54,10 @@ const CommunityPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="community"
+          title={communityData.title}
+        />
         <WebinarTitle
           title={communityData.title}
           tag="Community Meetup"

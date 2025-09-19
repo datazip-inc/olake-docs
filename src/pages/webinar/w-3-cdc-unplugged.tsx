@@ -6,6 +6,7 @@ import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
@@ -50,6 +51,10 @@ const WebinarPage = () => {
 
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"
