@@ -82,7 +82,7 @@ const CommunityPage = () => {
       title: 'OLake 3rd Community Meetup',
       subtitle: 'Join us for updates on new features including parquet writer, MongoDB 2.0 connector, Apache Iceberg Writer integration, Postgres Writer development, and a comprehensive demo of OLake\'s CLI functionality with MongoDB to S3 syncing.',
       route: '/community/3rd-community-meetup',
-      img: `/img/community/3rd-community-meetup-cover.png`,
+      img: `/img/community/3rd-community-meetup-cover.webp`,
       alt: 'OLake 3rd Community Meetup',
       status: 'archived',
       button: 'secondary',
