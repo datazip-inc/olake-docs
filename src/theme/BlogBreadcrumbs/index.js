@@ -86,7 +86,7 @@ export default function BlogBreadcrumbs() {
               >
                 <span itemProp="name">
                   {index === 0 ? (
-                    <HomeIcon className="w-4 h-4" />
+                    <HomeIcon className="w-4 h-4 text-gray-900 dark:text-gray-100" />
                   ) : (
                     item.label
                   )}
