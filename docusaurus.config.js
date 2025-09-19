@@ -69,13 +69,6 @@ const config = {
         googleTagManager: {
           containerId: 'GTM-TFZ2GXJP',
         },
-        // Only enable gtag in production to avoid development errors
-        ...(process.env.NODE_ENV === 'production' && {
-          gtag: {
-            trackingID: 'G-GTNTGHDNZW',
-            anonymizeIP: true,
-          },
-        }),
 
         sitemap: {
           lastmod: 'date',
@@ -93,6 +86,7 @@ const config = {
       //  satisfies Preset.Options,
     ],
   ],
+
 
   scripts: [
     {
@@ -166,25 +160,24 @@ const config = {
 
 
           { to: '/docs', label: 'Docs', position: 'right' },
-          { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/ai-lake', label: 'AILake', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
           // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
 
           {
-            // Dropdown menu in the navbar for "Learn" section
+            // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
             position: "right",
-            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
-            label: "Resources",
+            label: "Iceberg",
             items: [
               {
-                label: "Query Engine",
-                // type: 'link',
-                href: `/iceberg/query-engine`,
-                // activeBaseRegex: 'docs/zenith',
+                label: "Blog",
+                href: `/iceberg`,
               },
-
+              {
+                label: "Query Engine",
+                href: `/iceberg/query-engine`,
+              },
             ],
           },
 
@@ -270,6 +263,7 @@ const config = {
         { name: 'OLake', content: 'ETL tool, ELT tool, open source' },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:site", content: "@olake.io" },
+        { name: "msvalidate.01", content: "C36AD97FE1CEDCD4041338A807D6BC4C" },
       ],
       headTags: [
         {
@@ -281,19 +275,299 @@ const config = {
             href: "/img/logo/olake-blue.svg",
           },
         },
-        // Declare some json-ld structured data
+        // Canonical URL - Removed hardcoded canonical tag
+        // Docusaurus automatically generates proper canonical URLs for each page
+        // OpenSearch meta tags
         {
-          tagName: 'script',
+          tagName: 'link',
           attributes: {
-            type: 'application/ld+json',
+            rel: 'search',
+            type: 'application/opensearchdescription+xml',
+            title: 'OLake Documentation',
+            href: '/opensearch.xml',
           },
-          innerHTML: JSON.stringify({
-            '@context': 'https://schema.org/',
-            '@type': 'Organization',
-            name: 'OLake',
-            url: 'https://olake.io/',
-            logo: 'https://olake.io/img/logo/olake-blue.svg',
-          }),
+        },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:type',
+            content: 'website',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:url',
+            content: 'https://olake.io',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:description',
+            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:site_name',
+            content: 'OLake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:locale',
+            content: 'en_US',
+          },
+        },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:secure_url',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:type',
+            content: 'image/svg+xml',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:alt',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:updated_time',
+            content: '2025-01-15T12:00:00-05:00',
+          },
+        },
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:creator',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:site',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:description',
+            content: 'OLake is the fastest data replication platform, built to stream operational databases into Apache Iceberg in real time with full CDC, incremental sync, and zero-lag reliability.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image',
+            content: 'https://olake.io/img/logo/olake-blue.svg',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image:alt',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:label1',
+            content: 'Written by',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:data1',
+            content: 'OLake Team',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:label2',
+            content: 'Time to read',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:data2',
+            content: '5 minutes',
+          },
+        },
+        // Enhanced Bot Directives
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large',
+          },
+        },
+        // Bing Webmaster Verification
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msvalidate.01',
+            content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
+          },
+        },
+        // PWA Support Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'theme-color',
+            content: '#203FDD',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msapplication-TileColor',
+            content: '#203FDD',
+          },
+        },
+        // Enhanced Favicon Support
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/svg+xml',
+            href: '/img/logo/olake-blue.svg',
+          },
+        },
+        // Web App Manifest
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'manifest',
+            href: '/site.webmanifest',
+          },
+        },
+        // RSS Feed Links
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            type: 'application/rss+xml',
+            title: 'OLake Blog RSS Feed',
+            href: 'https://olake.io/blog/rss.xml',
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'alternate',
+            type: 'application/rss+xml',
+            title: 'OLake Iceberg Blog RSS Feed',
+            href: 'https://olake.io/iceberg/rss.xml',
+          },
+        },
+        // Additional Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'format-detection',
+            content: 'telephone=no',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'author',
+            content: 'OLake Team',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'keywords',
+            content: 'data lakehouse, apache iceberg, mongodb, etl, elt, cdc, data engineering, open source, data replication, data warehouse',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'viewport',
+            content: 'width=device-width, initial-scale=1.0',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'language',
+            content: 'en-US',
+          },
         },
       ],
 
@@ -488,6 +762,10 @@ const config = {
 
     [
       './src/plugins/tailwind-config.js', {}
+    ],
+
+    [
+      './src/plugins/indexnow/index.js', {}
     ],
 
     [
@@ -911,7 +1189,7 @@ const config = {
           },
           {
             to: '/docs/release/overview',
-            from: '/docs/release-notes'
+            from: '/docs/release-notes',
           },
           {
             to: '/docs',
@@ -986,3 +1264,4 @@ const config = {
 };
 
 export default config;
+

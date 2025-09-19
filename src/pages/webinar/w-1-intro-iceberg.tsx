@@ -4,6 +4,7 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarForm from "../../components/forms/WebinarForm";
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';
@@ -46,6 +47,11 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
+        
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"
