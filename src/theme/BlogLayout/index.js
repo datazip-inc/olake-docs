@@ -3,7 +3,6 @@ import clsx from 'clsx'
 import Layout from '@theme/Layout'
 import BlogSidebar from '@theme/BlogSidebar'
 import BlogBreadcrumbs from '@theme/BlogBreadcrumbs'
-import Head from '@docusaurus/Head'
 
 // Reading Progress Hook
 function useReadingProgress() {
@@ -113,31 +112,6 @@ export default function BlogLayout(props) {
 
   return (
     <Layout {...layoutProps}>
-      <Head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org/',
-              '@type': 'Organization',
-              name: 'OLake',
-              url: 'https://olake.io/',
-              logo: 'https://olake.io/img/logo/olake-blue.svg',
-              description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
-              foundingDate: '2023',
-              contactPoint: {
-                '@type': 'ContactPoint',
-                contactType: 'customer service',
-                email: 'hello@olake.io'
-              },
-              sameAs: [
-                'https://github.com/datazip-inc/olake',
-                'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
-              ]
-            })
-          }}
-        />
-      </Head>
       {/* Fixed Reading Progress Bar at Top */}
       <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-gray-200 dark:bg-gray-800">
         <div
