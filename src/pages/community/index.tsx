@@ -58,7 +58,7 @@ const CommunityPage = () => {
       title: 'OLake 5th Community Meetup',
       subtitle: 'Join us for a showcase of new features including Apache Iceberg as a destination for AWS S3 and local setups, MongoDB to Iceberg sync capabilities, upcoming MySQL and Postgres sync features, and performance improvements with 2-3x faster syncs.',
       route: '/community/5th-community-meetup',
-      img: `/img/community/5th-community-meetup-cover.png`,
+      img: `/img/community/5th-community-meetup-cover.webp`,
       alt: 'OLake 5th Community Meetup',
       status: 'archived',
       button: 'secondary',
