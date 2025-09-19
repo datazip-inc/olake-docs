@@ -14,11 +14,11 @@ from kubernetes import client
 # This connection tells Airflow how to authenticate with your K8s cluster.
 KUBERNETES_CONN_ID = "kubernetes_default" # <-- EDIT THIS LINE
 
-# !!! IMPORTANT: Set this to the Kubernetes namespace where Olake pods should run !!!
+# !!! IMPORTANT: Set this to the Kubernetes namespace where OLake pods should run !!!
 # Ensure ConfigMaps and the PVC exist or will be created in this namespace.
 TARGET_NAMESPACE = "olake" # <-- EDIT THIS LINE
 
-# !!! IMPORTANT: Set this to the correct Olake image for your source database !!!
+# !!! IMPORTANT: Set this to the correct OLake image for your source database !!!
 # Find images at: https://hub.docker.com/u/olakego
 # Examples: "olakego/source-mongodb:latest", "olakego/source-mysql:latest", "olakego/source-postgres:latest"
 OLAKE_IMAGE = "olakego/source-db:latest" # <-- EDIT THIS LINE
@@ -54,9 +54,9 @@ with DAG(
     # Generic tags
     tags=["kubernetes", "olake", "etl", "sync"],
     doc_md="""
-    ### Olake Sync DAG
+    ### OLake Sync DAG
 
-    This DAG runs the Olake `sync` command using pre-created ConfigMaps
+    This DAG runs the OLake `sync` command using pre-created ConfigMaps
     for source, destination, and streams configuration. It ensures a persistent
     volume claim exists before running the sync task.
 
@@ -249,7 +249,7 @@ with DAG(
             ),
         ],
 
-        # Use the container's default entrypoint (should be the Olake binary)
+        # Use the container's default entrypoint (should be the OLake binary)
         cmds=None,
         # Pass arguments for the 'sync' command
         arguments=[

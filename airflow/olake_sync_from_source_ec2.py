@@ -237,7 +237,7 @@ if [ $UPLOAD_STATE_EXIT_CODE -ne 0 ]; then
 fi
 echo "INFO: State file uploaded successfully."
 
-# Now check the Olake exit code
+# Now check the OLake exit code
 if [ $OLAKE_EXIT_CODE -ne 0 ]; then
   echo "ERROR: ETL job failed with exit code $OLAKE_EXIT_CODE."
   exit $OLAKE_EXIT_CODE
