@@ -16,7 +16,6 @@ const INDEXNOW_CONFIG = {
 // Function to submit URLs to IndexNow
 async function submitToIndexNow(urls, host = 'https://olake.io') {
   if (!INDEXNOW_CONFIG.key || INDEXNOW_CONFIG.key === 'YOUR_INDEXNOW_KEY_HERE') {
-    console.log('⚠️  IndexNow key not configured. Please set INDEXNOW_KEY environment variable.');
     return;
   }
 
@@ -27,13 +26,12 @@ async function submitToIndexNow(urls, host = 'https://olake.io') {
     urlList: urls
   };
 
-  console.log(`🚀 Submitting ${urls.length} URLs to IndexNow...`);
 
   for (const searchEngine of INDEXNOW_CONFIG.searchEngines) {
     try {
       await submitToSearchEngine(searchEngine, payload);
     } catch (error) {
-      console.error(`❌ Failed to submit to ${searchEngine}:`, error.message);
+      // Silently handle errors
     }
   }
 }
@@ -56,7 +54,6 @@ function submitToSearchEngine(url, payload) {
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
         if (res.statusCode === 200) {
-          console.log(`✅ Successfully submitted to ${url}`);
           resolve(data);
         } else {
           reject(new Error(`HTTP ${res.statusCode}: ${data}`));
@@ -75,8 +72,6 @@ function generateUrlsFromSitemap(siteDir) {
   const sitemapPath = path.join(siteDir, 'sitemap.xml');
   
   if (!fs.existsSync(sitemapPath)) {
-    console.log('⚠️  Sitemap not found at:', sitemapPath);
-    console.log('📁 Available files:', fs.readdirSync(siteDir).slice(0, 10));
     return [];
   }
 
@@ -103,22 +98,15 @@ module.exports = function indexNowPlugin(context, options) {
     name: 'indexnow-plugin',
     
     async postBuild({ siteDir, routesPaths, outDir }) {
-      console.log('🔍 IndexNow: Collecting URLs for submission...');
-      
       // Generate URLs from sitemap
       const urls = generateUrlsFromSitemap(outDir);
       
       if (urls.length === 0) {
-        console.log('⚠️  No URLs found for IndexNow submission.');
         return;
       }
-
-      console.log(`📝 Found ${urls.length} URLs to submit to IndexNow`);
       
       // Submit URLs to IndexNow
       await submitToIndexNow(urls);
-      
-      console.log('🎉 IndexNow submission completed!');
     }
   };
 };

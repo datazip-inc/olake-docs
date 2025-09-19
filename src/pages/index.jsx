@@ -70,7 +70,6 @@ export default function New3Page() {
       setTimeout(() => {
         window.scrollTo(0, formRef.current.offsetTop)
       }, 0)
-      console.log('hereee', window.location.pathname, window.location.search)
       history.replace({
         pathname: window.location.pathname,
         search: window.location.search

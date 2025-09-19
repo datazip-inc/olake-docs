@@ -8,7 +8,6 @@ const fs = require('fs').promises;
 const path = require('path');
 
 async function generateImageSitemap() {
-  console.log('🔄 Starting image sitemap generation...');
   
   const staticDir = path.join(__dirname, '../static');
   const buildDir = path.join(__dirname, '../build');
@@ -47,7 +46,6 @@ async function generateImageSitemap() {
     
     await scanDirectory(staticDir);
     
-    console.log(`📸 Found ${imageFiles.length} images for sitemap generation`);
     
     // Generate XML sitemap for images
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -136,16 +134,8 @@ async function generateImageSitemap() {
     // Write the sitemap file
     await fs.writeFile(imageSitemapPath, xml, 'utf8');
     
-    console.log(`✅ Generated image sitemap with ${imageFiles.length} images: ${imageSitemapPath}`);
     
     // Show some sample images
-    console.log('📋 Sample images included:');
-    sortedImages.slice(0, 5).forEach(image => {
-      console.log(`   - ${image.path}`);
-    });
-    if (sortedImages.length > 5) {
-      console.log(`   ... and ${sortedImages.length - 5} more images`);
-    }
     
   } catch (error) {
     console.error('❌ Error generating image sitemap:', error);
