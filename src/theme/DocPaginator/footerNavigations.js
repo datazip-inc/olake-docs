@@ -418,7 +418,7 @@ export const paginationConfig = {
   // Issues and PRs
   '/docs/community/issues-and-prs': {
     previous: {
-      title: 'Contribute to Olake',
+      title: 'Contribute to OLake',
       permalink: '/docs/community/contributing'
     },
     next: {
