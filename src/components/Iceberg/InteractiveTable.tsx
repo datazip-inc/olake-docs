@@ -83,15 +83,21 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-xl shadow-gray-200/50 dark:shadow-gray-900/50">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-xl shadow-gray-200/50 dark:bg-gray-900 dark:shadow-gray-900/50">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table
+            className="w-full"
+            role="table"
+            aria-label={title || "Data table"}
+          >
             <thead>
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850">
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`${padding} text-${column.align || 'left'} ${column.width || ''} relative group`}
+                    className={`${padding} text-${column.align || "left"} ${column.width || ""} group relative`}
+                    scope="col"
+                    aria-sort="none"
                   >
                     <div className="flex items-center space-x-2">
                       <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">
@@ -102,7 +108,9 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                           <button
                             onMouseEnter={() => setHoveredHeader(column.key)}
                             onMouseLeave={() => setHoveredHeader(null)}
-                            className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border-none"
+                            className="rounded-lg border-none p-1 transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-gray-700"
+                            aria-label={`Information about ${column.header}`}
+                            aria-describedby={`tooltip-${column.key}`}
                           >
                             <InformationCircleIcon className="w-4 h-4 text-blue-400 hover:text-gray-600 dark:hover:text-gray-300" />
                           </button>
@@ -116,9 +124,13 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                           >
-                            <div className="absolute z-50 w-64 p-3 -top-2 left-8 transform">
-                              <div className="bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-xl shadow-xl p-4 relative">
-                                <div className="absolute -left-2 top-3 w-3 h-3 bg-gray-900 dark:bg-gray-800 transform rotate-45"></div>
+                            <div
+                              id={`tooltip-${column.key}`}
+                              className="absolute -top-2 left-8 z-50 w-64 transform p-3"
+                              role="tooltip"
+                            >
+                              <div className="relative rounded-xl bg-gray-900 p-4 text-sm text-white shadow-xl dark:bg-gray-800">
+                                <div className="absolute -left-2 top-3 h-3 w-3 rotate-45 transform bg-gray-900 dark:bg-gray-800"></div>
                                 {column.tooltip}
                               </div>
                             </div>
@@ -134,11 +146,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
               {rows.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
-                  className="
-                    hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-50/50 
-                    dark:hover:from-gray-800/50 dark:hover:to-gray-800/30 
-                    transition-all duration-200 group
-                  "
+                  className="group transition-all duration-200 hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-50/50 dark:hover:from-gray-800/50 dark:hover:to-gray-800/30"
                 >
                   {columns.map((column) => {
                     const cell = row[column.key];

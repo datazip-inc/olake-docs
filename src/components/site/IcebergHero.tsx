@@ -37,7 +37,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, image }) 
 
 const IcebergHero: React.FC = () => {
   // Background URL
-  const bgUrl = '/img/site/iceberg-bg.svg'
+  const bgUrl = '/img/site/iceberg-bg.webp'
 
   return (
     <section className='relative overflow-hidden rounded-t-3xl py-20 md:py-32'>

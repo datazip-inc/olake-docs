@@ -29,35 +29,35 @@ const hosts = [
     name: "Jyoti",
     role: "Senior Data Engineer @ Pharma MNC",
     bio: "She's a Senior Data Engineer at GSK with over six years of experience in building cloud-native data platforms and delivering impact across the healthcare and life sciences domain. She brings strong domain knowledge in clinical trials and regulatory data, with hands-on experience in PII data anonymization and curation, which are crucial for compliance and data sharing in this space",
-    image: "/img/authors/jyoti.jpg",
+    image: "/img/authors/jyoti.webp",
     linkedin: "https://www.linkedin.com/in/connect-jyoti/",
   },
   {
     name: "Riya Khandelwal",
     role: "Senior Data Engineer @ KPMG",
     bio: "Experienced Data Engineer with over 5 years of expertise in designing and developing large-scale data pipelines, ETL workflows, analytics solutions, and data warehouse architectures. She has successfully delivered multi-terabyte, scalable big data solutions for leading organizations, leveraging technologies such as Python, SQL, Spark, Databricks, and Microsoft Azure",
-    image: "/img/authors/riya.jpg",
+    image: "/img/authors/riya.webp",
     linkedin: "https://www.linkedin.com/in/riyakhandelwal/",
   },
   {
     name: "Aditi Fatwani",
     role: "Data Engineer @ Evernorth, Cigna Group",
     bio: "Aditi designs systems that move and transforms data at scale, optimizes costs on the cloud, and creates real impact for businesses across healthcare, retail, and agriculture. She works primarily with AWS and tools like Glue and Spark, but what drives her every day is solving complex problems that help teams make better, faster decisions",
-    image: "/img/authors/aditi.jpg",
+    image: "/img/authors/aditi.webp",
     linkedin: "https://www.linkedin.com/in/aditifatwani/",
   },
   {
     name: "Tulsi Thakur",
     role: "Data Engineer @ Amazon",
     bio: "Results-driven professional with expertise in Python, SQL, database management, data visualization. Contributed to Redshift migration project at Amazon, saving significant AWS storage costs, focusing on optimizing storage and enhancing data processing efficiency and successfully onboarded Source-to-Sink Views pipeline",
-    image: "/img/authors/tulsi.jpg",
+    image: "/img/authors/tulsi.webp",
     linkedin: "https://www.linkedin.com/in/tulsi-thakur/",
   },
   {
     name: "Mitali Gupta",
     role: "Business Systems @ Eczachly Inc",
     bio: "At EcZachly Inc, Mitali is the jack-of-all-trades, mastering the art of systems admin, dabbling in marketing strategies and project development",
-    image: "/img/authors/mitali.jpg",
+    image: "/img/authors/mitali.webp",
     linkedin: "https://www.linkedin.com/in/mitaliz/",
   },
 ];
@@ -87,7 +87,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-5-women-in-data-engineering-cover.png" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-5-women-in-data-engineering-cover.webp" alt="Webinar Cover Image" />
           </div>
 
 

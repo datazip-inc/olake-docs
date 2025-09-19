@@ -18,7 +18,7 @@ const hosts = [
     name: "Sachin Tripathi",
     role: "[Guest] Senior Data Engineer @ EarnIn",
     bio: "Seasoned data software engineer with a track record spanning over 7 years in the Financial Products sector. Specialised in designing cost-effective and efficient data stacks for diverse teams",
-    image: "/img/authors/sachin.jpg",
+    image: "/img/authors/sachin.webp",
     linkedin: "https://www.linkedin.com/in/tripathisachin/",
   },
   {

@@ -109,17 +109,22 @@ export default function New3Page() {
         />
       </Head>
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
-        <DataWarehouseToLakes />
-        <WorkflowSection />
-        <IcebergHero />
-        <BenchmarkSection />
-        <FeatureShowcase />
-        <SetupStepsSection />
-        <RegistrationSection />
-        <BlogShowcase />
-        <div className='container mx-auto my-8 w-full max-w-[90%]'>
-          <Faq data={OLakeFaqs} showHeading={true} />
-        </div>
+        <main id='main-content' role='main'>
+          <DataWarehouseToLakes />
+          <WorkflowSection />
+          <IcebergHero />
+          <BenchmarkSection />
+          <FeatureShowcase />
+          <SetupStepsSection />
+          <RegistrationSection />
+          <BlogShowcase />
+          <section
+            className='container mx-auto my-8 w-full max-w-[90%]'
+            aria-labelledby='faq-heading'
+          >
+            <Faq data={OLakeFaqs} showHeading={true} />
+          </section>
+        </main>
       </div>
     </Layout>
   )

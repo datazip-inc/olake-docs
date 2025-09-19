@@ -1,6 +1,6 @@
 // Benchmark data constants
 
-// Full Load benchmark data
+// CDC Sync benchmark data
 export const CDC_SYNC = {
     rowsSyncedCDC: {
         value: '50 Million',
@@ -36,7 +36,7 @@ export const CDC_SYNC = {
     }
 }
 
-// CDC Sync benchmark data
+// Full Load benchmark data
 export const FULL_LOAD = {
 
     rowsSyncedFull: {
@@ -47,14 +47,14 @@ export const FULL_LOAD = {
         estuary: '0.34 Billion'
     },
     elapsedTimeFull: {
-        olake: '24 hours',
+        olake: '4.7 hours',
         airbyte: '7.5 hours (failed sync)',
         fivetran: '24 hours',
         debezium: '24 hours',
         estuary: '24 hours'
     },
     speedFull: {
-        olake: '46,262 RPS',
+        olake: '2,35,411 RPS',
         airbyte: '457 RPS',
         fivetran: '46,395 RPS',
         debezium: '14,839 RPS',
@@ -62,13 +62,13 @@ export const FULL_LOAD = {
     },
     comparisonFull: {
         olake: '-',
-        airbyte: '101× slower',
-        fivetran: 'same',
-        debezium: '3.1× slower',
-        estuary: '11.6× slower'
+        airbyte: '515.1 × slower',
+        fivetran: '5.1× slower',
+        debezium: '15.9 × slower',
+        estuary: '59.1 × slower'
     },
     costFull: {
-        olake: '$ 75',
+        olake: '$ 15',
         airbyte: '$ 5,560',
         fivetran: '$ 0 (Free full load)',
         debezium: '$ 75',

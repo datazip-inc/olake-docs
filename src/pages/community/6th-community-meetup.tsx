@@ -26,14 +26,14 @@ const hosts = [
     name: "Priyansh Khodiyar",
     role: "Ex Devrel",
     bio: "",
-    image: "/img/authors/priyansh.jpg",
+    image: "/img/authors/priyansh.webp",
     linkedin: "https://www.linkedin.com/in/zriyansh/",
   },
   {
     name: "Shubham Satish Baldava",
     role: "Co-founder @ Datazip and OLake Maintainer",
     bio: "",
-    image: "/img/authors/shubham.jpg",
+    image: "/img/authors/shubham.webp",
     linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
   },
 ];
