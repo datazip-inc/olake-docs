@@ -139,8 +139,8 @@ const docSidebar = {
     // Community
     sectionHeader("COMMUNITY"),
     'community/contributing',
-    'community/issues-and-prs',
     'community/setting-up-a-dev-env',
+    'community/issues-and-prs',
     'community/code-of-conduct',
     'community/channels',
 
