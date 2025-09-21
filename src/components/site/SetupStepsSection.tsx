@@ -9,6 +9,12 @@ const SetupStepsSection: React.FC = () => {
     { id: 'postgres', name: 'PostgreSQL', color: 'bg-gray-100', icon: '/img/site/postgres.svg' },
     { id: 'mysql', name: 'MySQL', color: 'bg-gray-100', icon: '/img/site/mysql.svg' }
   ]
+  const stepDescriptions = [
+    {step: 'Step I', title: 'Source'},
+    {step: 'Step II', title: 'Destination'},
+    {step: 'Step III', title: 'Schema'},
+    {step: 'Step IV', title: 'Job Config'}
+  ]
 
   const getConnectorUrl = () => {
     return `https://olake.io/docs/connectors/${selectedConnector}/overview`
@@ -43,8 +49,8 @@ const SetupStepsSection: React.FC = () => {
             </h2>
 
             <div className='flex flex-col'>
-              {/* Step 1 */}
-              <div className='flex'>
+              { stepDescriptions.map((item,index)=>(
+                <div key={index} className='flex'>
                 <div className='mr-4 flex flex-col items-center'>
                   {/* <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#203FDD]'> */}
                   <div className='z-40 h-2 w-2 rounded-full bg-white outline outline-2 outline-[#e5e5e5]'></div>
@@ -53,53 +59,15 @@ const SetupStepsSection: React.FC = () => {
                 </div>
                 {/* <div className='pb-10'> */}
                 <div className='flex flex-col'>
-                  <div className='mb-1 text-sm text-[#8A8A8A]'>Step I</div>
-                  <div className='text-2xl font-bold text-gray-900'>Source</div>
+                  <div className='mb-1 text-sm text-[#8A8A8A]'>{item.step}</div>
+                  <div className='text-2xl font-bold text-gray-900 dark:text-white'>{item.title}</div>
                 </div>
                 {/* </div> */}
               </div>
 
-              {/* Step 2 */}
-              <div className='-mt-2 flex'>
-                <div className='mr-4 flex flex-col items-center'>
-                  <div className='flex h-2 w-2 items-center justify-center rounded-full border-2 border-gray-300'>
-                    <div className='h-2 w-2 rounded-full bg-white outline outline-2 outline-[#e5e5e5]'></div>
-                  </div>
-                  <div className='h-20 w-0.5 bg-[#e5e5e5]'></div>
-                </div>
-
-                <div className='flex flex-col'>
-                  <div className='mb-1 text-sm text-[#8A8A8A]'>Step II</div>
-                  <div className='text-2xl font-bold text-gray-900'>Destination</div>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className='-mt-2 flex'>
-                <div className='mr-4 flex flex-col items-center'>
-                  <div className='flex h-2 w-2 items-center justify-center rounded-full border-2 border-gray-300'>
-                    <div className='h-2 w-2 rounded-full bg-white outline outline-2 outline-[#e5e5e5]'></div>
-                  </div>
-                  <div className='h-20 w-0.5 bg-[#e5e5e5]'></div>
-                </div>
-                <div className='flex flex-col'>
-                  <div className='mb-1 text-sm text-[#8A8A8A]'>Step III</div>
-                  <div className='text-2xl font-bold text-gray-900'>Schema</div>
-                </div>
-              </div>
-
-              {/* Step 4 */}
-              <div className='-mt-2 flex'>
-                <div className='mr-4 flex flex-col items-center'>
-                  <div className='flex h-2 w-2 items-center justify-center rounded-full border-2 border-gray-300'>
-                    <div className='h-2 w-2 rounded-full bg-white outline outline-2 outline-[#e5e5e5]'></div>
-                  </div>
-                </div>
-                <div>
-                  <div className='mb-1 text-sm text-[#8A8A8A]'>Step IV</div>
-                  <div className='text-2xl font-bold text-gray-900'>Job Config</div>
-                </div>
-              </div>
+              ))
+              }
+             
             </div>
           </div>
 
