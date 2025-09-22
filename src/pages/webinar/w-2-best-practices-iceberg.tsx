@@ -3,7 +3,7 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-import WebinarForm from '../../components/forms/WebinarForm';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
@@ -54,6 +54,11 @@ const WebinarPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
+        
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"
@@ -64,12 +69,6 @@ const WebinarPage = () => {
             <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
           </div>
 
-          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
-            <WebinarForm
-              source="w2-best-practices-iceberg"
-              nexturl="w-2-best-practices-iceberg-confirmation"
-            />
-          </div> */}
         </div>
 
         <Hr />

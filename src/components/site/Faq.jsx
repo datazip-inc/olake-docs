@@ -27,7 +27,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
         </div>
       </div>
       {expanded && (
-        <div className='mt-3 rounded p-3 px-2'>
+        <div className='rounded p-3 px-2 -mt-2'>
           <div className='text-sm font-normal leading-relaxed text-[#333333] dark:text-gray-300'>
             {answer}
           </div>

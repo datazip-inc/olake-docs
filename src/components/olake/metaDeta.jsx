@@ -13,9 +13,9 @@ export const mainOLakeData = {
 }
 
 export const olakeProductData = {
-  title: 'Fastest way to replicate MongoDB/JSON data in Apache Iceberg',
+  title: 'Fastest open-source tool for replicating Databases to Apache Iceberg or Data Lakehouse',
   description:
-    'Achieve fast data replication for MongoDB with near real-time transfer to data lakehouse (in Iceberg format).',
+    'Achieve fast data replication for any database with near real-time transfer to data lakehouse (in Iceberg format).',
   image: '/img/olake/olake-product-meta.webp'
 }
 

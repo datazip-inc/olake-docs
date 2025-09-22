@@ -1,7 +1,6 @@
 import React from 'react'
 
 import Link from '@docusaurus/Link'
-// import OLakeDashboard from './OLakeDashboard';
 import StatsSection from './StatsSection'
 
 interface HeroSectionProps {
@@ -39,11 +38,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         <div className='mb-8'>
 
           <div className='flex flex-col gap-4'>
-            <h1 className='mb-6 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-3xl lg:text-2xl xl:text-3xl'>
+            <h2 className='mb-6 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-3xl lg:text-2xl xl:text-3xl'>
               {title}
-            </h1>
+            </h2>
  
-            <h2 className='text-2xl text-center leading-8 lg:text-left font-normal sm:text[32px] md:text-[32px] lg:text-[28px] xl:text-[41px] 2xl:text-[50px]'>
+            <h3 className='text-2xl text-center leading-8 lg:text-left font-normal sm:text[32px] md:text-[32px] lg:text-[28px] xl:text-[41px] 2xl:text-[50px]'>
               <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Database
               </span>
@@ -51,7 +50,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
               <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-widest text-[#193AE6] dark:bg-gray-800/80 dark:text-blue-400'>
                 Data Lakehouse
               </span>
-            </h2>
+            </h3>
           </div>
 
           <div className='mt-6 px-2 mx-auto lg:mx-0 max-w-full flex flex-col sm:flex-row gap-4 justify-center lg:justify-start'>

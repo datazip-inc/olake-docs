@@ -124,13 +124,7 @@ const ContributorProgramPage = () => {
 
   const linkedinPosts = [
     { embedId: 'urn:li:share:7324402000287215616', contributor: 'Aditya SwayamSiddha' },
-    // { embedId: 'urn:li:share:0987654321', contributor: 'Jane Smith' },
-    // Add your LinkedIn post IDs here
   ]
-
-  // <iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7324402000287215616?collapsed=1" height="671" width="504" frameborder="0" allowfullscreen="" title="Embedded post"></iframe>
-
-  // https://www.linkedin.com/posts/lalit-moharana-987516191_olake-datazip-iceberg-activity-7344602591831445505-LspG/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACzFOeEByp1MK-E1FekJSaUEZpJsjXkvrrw
 
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showLinkedInPanel, setShowLinkedInPanel] = useState(false)
