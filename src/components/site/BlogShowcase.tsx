@@ -71,6 +71,7 @@ const BlogShowcase: React.FC = () => {
                         alt={blogPosts[0].title}
                         width={80}
                         height={80}
+                        loading="lazy" decoding="async"
                         className='h-auto w-full object-contain p-2'
                       />
                     </div>
@@ -129,6 +130,7 @@ const BlogShowcase: React.FC = () => {
                       alt={post.title}
                       width={64}
                       height={64}
+                      loading="lazy" decoding="async"
                       className='h-56 w-full object-contain px-2 md:h-48'
                     />
                   </div>

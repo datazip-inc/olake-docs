@@ -7,7 +7,7 @@ interface IcebergBadgeProps {
 const IcebergBadge: React.FC<IcebergBadgeProps> = ({ text = 'Exclusively for Apache Iceberg' }) => {
   return (
     <div className='inline-flex items-center rounded-xl bg-white px-4 py-1 shadow-md'>
-      <img src='/img/site/iceberg-logo.svg' alt='Iceberg' className='mr-1.5 size-10' />
+      <img src='/img/site/iceberg-logo.svg' alt='Iceberg' className='mr-1.5 size-10' loading="lazy" decoding="async" />
       <span className='text-sm font-bold text-gray-800'>{text}</span>
     </div>
   )
@@ -24,7 +24,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, image }) 
     <div className='h-full overflow-hidden rounded-3xl bg-white shadow-lg dark:bg-gray-800'>
       <div className='flex h-full flex-col p-1 md:px-2'>
         <div className='mb-6 flex items-center justify-center rounded-xl'>
-          <img src={image} alt={title} className='w-full object-contain' />
+          <img src={image} alt={title} className='w-full object-contain' loading="lazy" decoding="async" />
         </div>
         <div className='md:p-4'>
           <h3 className='mb-3 text-xl font-bold text-gray-900 dark:text-white'>{title}</h3>

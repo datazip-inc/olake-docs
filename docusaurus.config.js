@@ -83,18 +83,24 @@ const config = {
     {
       src: '/suppress-resize-observer.js', // Suppress ResizeObserver warnings
       defer: true,
+      fetchpriority: 'high'
+    },
+    {
+      src: '/ignore-resize-observer-error.js', // Suppress noisy ResizeObserver loop errors that Chrome prints
+      defer: true,
+      fetchpriority: 'high'
     },
     {
       id: "runllm-widget-script",
       type: "module",
       src: "https://widget.runllm.com",
-      crossorigin: "true",
+      crossorigin: "anonymous",
       "runllm-name": "OLake AI Assistant",
       "runllm-assistant-id": "654",
       "runllm-position": "BOTTOM_RIGHT",
       "runllm-keyboard-shortcut": "Mod+j",
       "runllm-preset": "docusaurus",
-      // async: true,
+      async: true, // Critical for performance - loads without blocking
       defer: true,
       "runllm-support-email": "hello@olake.io",
       "runllm-community-url": "https://olake.io/slack",
@@ -104,19 +110,14 @@ const config = {
       "runllm-per-user-usage-limit": "20",
       "runllm-algolia-api-key": "e33125f9089a304cef5331a186931e48",
       "runllm-algolia-application-id": "1E406NO1AX",
-      "runllm-algolia-index-name": "olake"
+      "runllm-algolia-index-name": "olake",
+      "onerror": "console.warn('RunLLM widget failed to load')" // Error handling
     },
     {
       src: '/message-listener.js', // path relative to the static directory
-      // async: false,
       defer: true, // if the script must be executed in order, set async to false
-    },
-    {
-      // Suppress noisy ResizeObserver loop errors that Chrome prints
-      src: '/ignore-resize-observer-error.js',
-      defer: true
+      fetchpriority: 'low'
     }
-
   ],
 
   themeConfig:
@@ -223,13 +224,89 @@ const config = {
         { name: "msvalidate.01", content: "C36AD97FE1CEDCD4041338A807D6BC4C" },
       ],
       headTags: [
+          // Critical resource preloads for mobile performance
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/logo/olake-blue.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/site/hero-section.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/suppress-resize-observer.js',
+              as: 'script',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/ignore-resize-observer-error.js',
+              as: 'script',
+              fetchpriority: 'high'
+            },
+          },
+           // DNS prefetch for external resources
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://widget.runllm.com'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://js.hsforms.net'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://www.google-analytics.com'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://www.googletagmanager.com'
+          },
+        },
+         // Preconnect to critical domains
         {
           tagName: 'link',
           attributes: {
             rel: 'preconnect',
-            sizes: "any",
             href: 'https://olake.io',
-            href: "/img/logo/olake-blue.svg",
+            crossorigin: 'anonymous'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'preconnect',
+            href: 'https://widget.runllm.com',
+            crossorigin: 'anonymous'
           },
         },
         // Canonical URL - Removed hardcoded canonical tag
@@ -250,13 +327,6 @@ const config = {
           attributes: {
             property: 'og:type',
             content: 'website',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:url',
-            content: 'https://olake.io',
           },
         },
         {
@@ -283,20 +353,6 @@ const config = {
         {
           tagName: 'meta',
           attributes: {
-            property: 'og:image:width',
-            content: '1200',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:image:height',
-            content: '630',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
             property: 'og:site_name',
             content: 'OLake',
           },
@@ -312,22 +368,8 @@ const config = {
         {
           tagName: 'meta',
           attributes: {
-            property: 'og:image:secure_url',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
             property: 'og:image:type',
             content: 'image/svg+xml',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:image:alt',
-            content: 'OLake - The Open Lakehouse Platform',
           },
         },
         {
@@ -344,25 +386,11 @@ const config = {
             content: '630',
           },
         },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:updated_time',
-            content: '2025-01-15T12:00:00-05:00',
-          },
-        },
         // Enhanced Twitter Meta Tags
         {
           tagName: 'meta',
           attributes: {
             name: 'twitter:creator',
-            content: '@_olake',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:site',
             content: '@_olake',
           },
         },
@@ -409,20 +437,6 @@ const config = {
             content: 'OLake Team',
           },
         },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:label2',
-            content: 'Time to read',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:data2',
-            content: '5 minutes',
-          },
-        },
         // Enhanced Bot Directives
         {
           tagName: 'meta',
@@ -439,21 +453,6 @@ const config = {
             content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
           },
         },
-        // PWA Support Meta Tags
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'theme-color',
-            content: '#203FDD',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'msapplication-TileColor',
-            content: '#203FDD',
-          },
-        },
         // Enhanced Favicon Support
         {
           tagName: 'link',
@@ -462,70 +461,7 @@ const config = {
             type: 'image/svg+xml',
             href: '/img/logo/olake-blue.svg',
           },
-        },
-        // Web App Manifest
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'manifest',
-            href: '/site.webmanifest',
-          },
-        },
-        // RSS Feed Links
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            type: 'application/rss+xml',
-            title: 'OLake Blog RSS Feed',
-            href: 'https://olake.io/blog/rss.xml',
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            type: 'application/rss+xml',
-            title: 'OLake Iceberg Blog RSS Feed',
-            href: 'https://olake.io/iceberg/rss.xml',
-          },
-        },
-        // Additional Meta Tags
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'format-detection',
-            content: 'telephone=no',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'author',
-            content: 'OLake Team',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'keywords',
-            content: 'data lakehouse, apache iceberg, mongodb, etl, elt, cdc, data engineering, open source, data replication, data warehouse',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'viewport',
-            content: 'width=device-width, initial-scale=1.0',
-          },
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'language',
-            content: 'en-US',
-          },
-        },
+        }
       ],
 
       colorMode: {

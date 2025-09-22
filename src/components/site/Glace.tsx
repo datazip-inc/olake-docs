@@ -34,8 +34,8 @@ const TallyForm: React.FC<TallyFormProps> = ({ src, title }) => {
       data-tally-src={src}
       width='100%'
       height='700'
-      frameBorder='0'
       title={title}
+      loading="lazy"
       className='w-full rounded-xl'
       style={{ border: 'none', minHeight: '600px', margin: 0 }}
     />
@@ -74,6 +74,7 @@ const Glace: React.FC<GlaceProps> = ({
                 src='/img/site/glace-cards.svg'
                 alt='Glace Illustration'
                 className='max-w-full lg:max-w-[90%]'
+                loading="lazy" decoding="async"
               />
             </div>
 

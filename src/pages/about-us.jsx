@@ -55,6 +55,7 @@ const AboutTeam = () => {
                       src={member.image}
                       alt={member.name}
                       className='h-40 w-40 rounded-full object-cover transition duration-300 hover:border hover:border-gray-300'
+                      loading="lazy" decoding="async"
                     />
                   </div>
                   <h3 className='mt-4 text-xl font-medium'>{member.name}</h3>

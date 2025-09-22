@@ -102,6 +102,7 @@ const LogoCard = ({ logo }) => {
           src={logo.image}
           alt={logo.name}
           className='h-auto w-48 rounded border object-contain'
+          loading="lazy" decoding="async"
         />
       </div>
     </div>

@@ -116,10 +116,6 @@ const OLakeProduct = () => {
       <HelmetWrapper {...olakeProductData} />
 
       <div className='mx-auto flex w-full max-w-[1440px] flex-col items-center p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12'>
-        {/* OLake Brand */}
-        {/* <div className='flex justify-center'>
-          <img src='/img/olake/olake-logo.svg' alt='olake logo' className='w-24 md:w-32' />
-        </div> */}
 
         <HeroHeading containerClassName='px-4' headingClassName='mb-2' subheadingClassName='mb-6' />
 
@@ -148,21 +144,6 @@ const OLakeProduct = () => {
         {/* Architecture Image */}
 
         <ArchitectureImage />
-
-        {/* {isMobile ? (
-          <img
-            src='/img/olake/cta-mobile.svg'
-            alt='olake-architecture'
-            className='z-10 my-4 mt-[46px] h-auto min-w-[220px] max-w-[520px]'
-          />
-        ) : (
-          <img
-            src='/img/olake/cta.svg'
-            alt='olake-architecture'
-            className='z-10 my-4 mt-[86px] h-auto min-w-[220px] max-w-[920px]'
-          />
-        )} */}
-
         {/* Benchmarks */}
         <div className='my-8 w-full'>
           <Benchmarks />
@@ -187,6 +168,7 @@ const OLakeProduct = () => {
                 src='/img/logo/olake-black.svg'
                 alt='OLake logo (light)'
                 className='h-auto w-12 dark:hidden'
+                loading="lazy" decoding="async"
               />
 
               {/* Dark Mode Logo */}
@@ -194,6 +176,7 @@ const OLakeProduct = () => {
                 src='/img/logo/olake-white.svg'
                 alt='OLake logo (dark)'
                 className='hidden h-auto w-12 dark:block'
+                loading="lazy" decoding="async"
               />
 
               <span>OLake</span>

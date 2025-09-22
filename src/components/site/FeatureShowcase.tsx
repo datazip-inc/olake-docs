@@ -69,6 +69,7 @@ const FeatureShowcase: React.FC = () => {
                   <img
                     src='/img/site/why-olake-1.svg'
                     alt='Faster Parallel & Full Load'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
@@ -84,6 +85,7 @@ const FeatureShowcase: React.FC = () => {
                   <img
                     src='/img/site/why-olake-2.svg'
                     alt='Stay updated with ingestion logs'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
@@ -99,6 +101,7 @@ const FeatureShowcase: React.FC = () => {
                   <img
                     src='/img/site/why-olake-3.svg'
                     alt='CDC Cursor Preservation'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
@@ -114,6 +117,7 @@ const FeatureShowcase: React.FC = () => {
                   <img
                     src='/img/site/why-olake-4.svg'
                     alt='Fast & Stable Connectors'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>

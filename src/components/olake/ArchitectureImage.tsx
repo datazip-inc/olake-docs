@@ -13,6 +13,7 @@ const ArchitectureImage: React.FC = () => {
       <img
         src="/img/olake/cta-mobile-light.svg"
         alt="OLake architecture (light mobile)"
+        loading="lazy" decoding="async"
         className="
           block
           dark:hidden
@@ -26,6 +27,7 @@ const ArchitectureImage: React.FC = () => {
       <img
         src="/img/olake/cta-light.svg"
         alt="OLake architecture (light desktop)"
+        loading="lazy" decoding="async"
         className="
           hidden
           sm:block
@@ -42,6 +44,7 @@ const ArchitectureImage: React.FC = () => {
       <img
         src="/img/olake/cta-mobile-dark.svg"
         alt="OLake architecture (dark mobile)"
+        loading="lazy" decoding="async"
         className="
           dark:block
           dark:sm:hidden     
@@ -56,6 +59,7 @@ const ArchitectureImage: React.FC = () => {
       <img
         src="/img/olake/cta-dark.svg"
         alt="OLake architecture (dark desktop)"
+        loading="lazy" decoding="async"
         className="
           hidden          
           sm:hidden       
