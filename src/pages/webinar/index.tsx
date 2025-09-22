@@ -73,14 +73,79 @@ const useDynamicIframeHeight = (src) => {
   return { height, iframeRef };
 };
 
-
+const WebinarsPage = () => {
+  // Use the dynamic iframe height hook
+  const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
+  
+  const communityMeets = [
+    {
+      title: 'OLake 8th Community Meetup',
+      subtitle: 'Join us for an end-to-end demo of OLake\'s latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.',
+      route: '/community/8th-community-meetup',
+      img: `/img/community/8th-olake-community-call.png`,
+      alt: 'OLake 8th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '29 August 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 6th Community Meetup',
+      subtitle: 'Join us for a real-world production story from PhysicsWallah showcasing their migration from Redshift to Iceberg-based lakehouse, and explore OLake\'s roadmap including Golang architecture, upcoming UI, and SMT transformations.',
+      route: '/community/6th-community-meetup',
+      img: `/img/community/6th-community-meetup-cover.png`,
+      alt: 'OLake 6th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 April 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 5th Community Meetup',
+      subtitle: 'Join us for a showcase of new features including Apache Iceberg as a destination for AWS S3 and local setups, MongoDB to Iceberg sync capabilities, upcoming MySQL and Postgres sync features, and performance improvements with 2-3x faster syncs.',
+      route: '/community/5th-community-meetup',
+      img: `/img/community/5th-community-meetup-cover.png`,
+      alt: 'OLake 5th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '27 March 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 4th Community Meetup',
+      subtitle: 'Join us for updates on recent developments including faster target writer for normalization, new stats file for performance metrics, Docker Compose for MongoDB replica sets, Split Vector Strategy, and Iceberg Writer development with schema evolution.',
+      route: '/community/4th-community-meetup',
+      img: `/img/community/4th-community-meetup-cover.png`,
+      alt: 'OLake 4th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 February 2025',
+      icon: FaVideo
+    },
+    {
+      title: 'OLake 3rd Community Meetup',
+      subtitle: 'Join us for updates on new features including parquet writer, MongoDB 2.0 connector, Apache Iceberg Writer integration, Postgres Writer development, and a comprehensive demo of OLake\'s CLI functionality with MongoDB to S3 syncing.',
+      route: '/community/3rd-community-meetup',
+      img: `/img/community/3rd-community-meetup-cover.png`,
+      alt: 'OLake 3rd Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '13 February 2025',
+      icon: FaVideo
+    },
+  ]
   // Define webinars data directly
   const webinars = [
     {
       title: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
       subtitle: 'As Apache Iceberg continues its rapid evolution and the catalog ecosystem expands, data engineers must make pivotal decisions about metadata management that directly influence query performance, costs, and operational complexity.',
       route: '/webinar/w-10-deep-dive-on-catalogs',
-      img: `/img/webinars/w-10-catalogs-deep-dive.webp`,
+      img: `/img/webinars/w-10-catalogs-deep-dive.png`,
       alt: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
       status: 'archived',
       button: 'secondary',
@@ -92,7 +157,7 @@ const useDynamicIframeHeight = (src) => {
       title: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
       subtitle: 'Join us for a comprehensive technical workshop exploring ClickHouse\'s experimental Iceberg support and how open table formats are revolutionizing data engineering workflows.',
       route: '/webinar/w-9-clickhouse-iceberg-workshop',
-      img: `/img/webinars/w-9-clickhouse-iceberg-write.webp`,
+      img: `/img/webinars/w-9-clickhouse-iceberg-write.png`,
       alt: 'ClickHouse Iceberg Workshop: Unified Lakehouse Architectures',
       status: 'archived',
       button: 'secondary',
@@ -104,29 +169,31 @@ const useDynamicIframeHeight = (src) => {
       title: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
       subtitle: 'Introducing OLake v0.',
       route: '/event/olake-v0-launch',
-      img: `/img/events/olake-v0-launch-cover.webp`,
+      img: `/img/events/olake-v0-launch-cover.jpg`,
       alt: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
       date: '26 June 2025',
+      // icon: FaVideo
     },
     {
       title: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines]',
       subtitle: 'This technical session examines real-world challenges and patterns in building distributed stream processing systems. We focus on scalability, fault tolerance, and latency trade-offs through a concrete case study, using specific frameworks like Apache Storm as supporting tools to illustrate production concepts',
       route: '/webinar/w-8-distributed-stream-processing-in-practice',
-      img: `/img/webinars/w-8-distributed-stream-processing-in-practice-cover.webp`,
+      img: `/img/webinars/w-8-distributed-stream-processing-in-practice-cover.jpg`,
       alt: 'Distributed Stream Processing in Practice [Scalable, Real-time Data Pipelines',
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
       date: '19 June 2025',
+      // icon: FaVideo
     },
      {
       title: 'From Source to Presto: Developer Playground for Fast Analytics',
       subtitle: 'This talk introduces a lightweight developer playground that demonstrates how to ingest change data from a transactional database (like Postgres or MySQL), register it via an open-source REST catalog (e.g., Polaris or LakeKeeper), and instantly make it queryable in Presto. The demo will walk through the setup, tools, and real-time experience of how quickly one can go from source data to interactive Presto queries using open standards and pluggable components. Ideal for developers and data engineers exploring modern lakehouse and federated query patterns',
       route: '/event/prestocon-day-2025',
-      img: `/img/events/prestocon-day-2025-cover.webp`,
+      img: `/img/events/prestocon-day-2025-cover.jpg`,
       alt: 'From Source to Presto: Developer Playground for Fast Analytics',
       status: 'archived',
       button: 'secondary',
@@ -138,7 +205,7 @@ const useDynamicIframeHeight = (src) => {
       title: 'Demystifying Lakehouse Architecture: From Theory to Practice',
       subtitle: 'Join Akshat Mathur, Senior Software Engineer at Cloudera and Apache Hive contributor, as he delivers a comprehensive technical exploration of lakehouse architecture. This session will bridge theoretical concepts with practical implementation strategies based on Akshats extensive experience with Apache Iceberg and data platform optimization',
       route: '/webinar/w-7-demystifying-lakehouse-architecture',
-      img: `/img/webinars/w-7-demystifying-lakehouse-architecture-cover.webp`,
+      img: `/img/webinars/w-7-demystifying-lakehouse-architecture-cover.png`,
       alt: 'Demystifying Lakehouse Architecture: From Theory to Practice',
       status: 'archived',
       button: 'secondary',
@@ -150,7 +217,7 @@ const useDynamicIframeHeight = (src) => {
       title: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
       subtitle: 'Join Viktor Kessler, co-founder of Vakamo and former technical leader at MongoDB and Dremio, for an in-depth technical exploration of how Apache Iceberg is fundamentally transforming the data engineering landscape',
       route: '/webinar/w-6-iceberg-lakehouse-architecture-lakekeeper',
-      img: `/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.webp`,
+      img: `/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.png`,
       alt: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
       status: 'archived',
       button: 'secondary',
@@ -162,7 +229,7 @@ const useDynamicIframeHeight = (src) => {
       title: 'Women in Data: Building Technical Expertise and Career Pathways in Data Engineering',
       subtitle: 'Join us for an in-depth technical discussion with six accomplished women data engineers who are architecting the backbone of modern data-driven organizations. This 60-minute session brings together specialists from healthcare, retail, cloud platforms, and enterprise data systems to share their technical approaches to solving complex data engineering challenges',
       route: '/webinar/w-5-women-in-data-engineering',
-      img: `/img/webinars/w-5-women-in-data-engineering-cover.webp`,
+      img: `/img/webinars/w-5-women-in-data-engineering-cover.png`,
       alt: 'Women in Data Engineering',
       status: 'archived',
       button: 'secondary',
@@ -351,6 +418,31 @@ const useDynamicIframeHeight = (src) => {
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-3xl -m-4"></div>
               <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
                 <WebinarGrid webinars={webinars} />
+              </div>
+            </div>
+          </section>
+
+          {/* Community Meetups Section */}
+          <section className="mb-20">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center px-4 py-2 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium mb-4">
+                <FaUsers className="w-4 h-4 mr-2" />
+                Community Driven
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Community Meetups
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                Join our regular community meetups where we discuss real-world challenges, 
+                share experiences, and learn from each other
+              </p>
+            </div>
+            
+            <div className="relative">
+              {/* Background decoration */}
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-3xl -m-4"></div>
+              <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
+                <WebinarGrid webinars={communityMeets} />
               </div>
             </div>
           </section>
