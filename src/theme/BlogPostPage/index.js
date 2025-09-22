@@ -15,7 +15,7 @@ export default function BlogPostPageWrapper(props) {
       <Head>
         {/* Enhanced Open Graph for Blog Posts */}
         <meta property="og:image:type" content="image/png" />
-        <meta property="og:image:secure_url" content="https://olake.io/img/logo/olake-blue.png" />
+        <meta property="og:image:secure_url" content="https://olake.io/img/logo/olake-blue.webp" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta property="og:image:alt" content="OLake" />

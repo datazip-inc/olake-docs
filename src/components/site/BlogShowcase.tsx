@@ -20,7 +20,7 @@ const BlogShowcase: React.FC = () => {
         'MongoDB has become the go-to database for modern applications, handling everything from user profiles to IoT sensor data with its flexible document model. But when it comes to analytics at scale...',
       readTime: '12 Min Read',
       bgColor: 'bg-blue-50 dark:bg-blue-900/10',
-      imageSrc: '/img/blog/cover/setup-mongodb.png'
+      imageSrc: '/img/blog/cover/setup-mongodb.webp'
     },
     {
       id: 'mysql-apache-iceberg-replication',
@@ -28,7 +28,7 @@ const BlogShowcase: React.FC = () => {
       description: 'MySQL powers countless production applications as a reliable operational database. But when it comes to analytics at scale, running heavy queries directly on MySQL can quickly become expensive...',
       readTime: '15 Min Read',
       bgColor: 'bg-sky-50 dark:bg-sky-900/10',
-      imageSrc: '/img/blog/cover/setup-sql-iceberg.png'
+      imageSrc: '/img/blog/cover/setup-sql-iceberg.webp'
     },
     {
       id: 'how-to-set-up-postgres-apache-iceberg',
@@ -36,7 +36,7 @@ const BlogShowcase: React.FC = () => {
       description: 'Ever wanted to run high-performance analytics on your PostgreSQL data without overloading your production database or breaking your budget? PostgreSQL to Apache Iceberg replication...',
       readTime: '10 Min Read',
       bgColor: 'bg-green-50 dark:bg-green-900/10',
-      imageSrc: '/img/blog/cover/postgres-apache-iceberg.png'
+      imageSrc: '/img/blog/cover/postgres-apache-iceberg.webp'
     },
     {
       id: 'iceberg-delta-lake-delete-methods-comparison',
@@ -44,7 +44,7 @@ const BlogShowcase: React.FC = () => {
       description: 'In recent years, terms such as deletion vectors, position deletes, and other related concepts have become increasingly common in discussions around modern data lakehouse technologies...',
       readTime: '8 Min Read',
       bgColor: 'bg-gray-50 dark:bg-gray-800/20',
-      imageSrc: '/img/blog/cover/deletion-formats.png'
+      imageSrc: '/img/blog/cover/deletion-formats.webp'
     }
   ]
 
