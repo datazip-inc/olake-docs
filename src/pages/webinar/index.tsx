@@ -36,17 +36,17 @@ const useDynamicIframeHeight = (src) => {
       }
 
       // Method 3: Set a reasonable default based on content type
-      // For Livestorm embeds, we'll use a responsive height
+      // For Livestorm embeds, we'll use a responsive height optimized for 2 events
       const updateResponsiveHeight = () => {
         const viewportWidth = window.innerWidth;
-        let responsiveHeight = 200;
+        let responsiveHeight = 300;
         
         if (viewportWidth < 640) {
-          responsiveHeight = 250; // Mobile: more space for single event
+          responsiveHeight = 400; // Mobile: more space for 2 events
         } else if (viewportWidth < 1024) {
-          responsiveHeight = 300; // Tablet: medium height
+          responsiveHeight = 450; // Tablet: medium height for 2 events
         } else {
-          responsiveHeight = 350; // Desktop: larger height
+          responsiveHeight = 500; // Desktop: larger height for 2 events
         }
         
         setHeight(responsiveHeight);
@@ -75,7 +75,7 @@ const useDynamicIframeHeight = (src) => {
 
 const WebinarsPage = () => {
   // Use the dynamic iframe height hook
-  const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=1');
+  const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
   
   const communityMeets = [
     {
@@ -381,14 +381,15 @@ const WebinarsPage = () => {
                     width="100%" 
                     height={iframeHeight}
                     frameBorder="0" 
-                    src="https://app.livestorm.co/datazip-inc/upcoming?limit=3" 
+                    src="https://app.livestorm.co/datazip-inc/upcoming?limit=2" 
                     title="OLake by Datazip events | Livestorm"
                     className="rounded-lg w-full"
                     style={{
-                      minHeight: '150px',
+                      minHeight: '400px',
                       height: `${iframeHeight}px`,
                       transition: 'height 0.3s ease-in-out',
-                      border: 'none'
+                      border: 'none',
+                      overflow: 'hidden'
                     }}
                   />
                 </div>
