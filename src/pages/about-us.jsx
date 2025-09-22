@@ -6,13 +6,13 @@ const teamMembers = [
     name: 'Shubham Satish Baldava',
     designation: 'CTO',
     linkedin: 'https://linkedin.com/in/shubham-baldava',
-    image: '/img/authors/shubham.jpg'
+    image: '/img/authors/shubham.webp'
   },
   {
     name: 'Sandeep Devarapalli ',
     designation: 'CEO',
     linkedin: 'https://linkedin.com/in/sandeepdevarapalli',
-    image: '/img/authors/sandeep.jpg'
+    image: '/img/authors/sandeep.webp'
   },
   {
     name: 'Rohan Khameshra',
