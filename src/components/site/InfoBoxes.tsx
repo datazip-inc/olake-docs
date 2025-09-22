@@ -40,6 +40,7 @@ const InfoBoxes: React.FC = () => {
               src={`/img/site/${item.image}`}
               alt={`Workflow image ${index + 1}`}
               className='h-[280px] w-auto object-contain'
+              loading="lazy" decoding="async"
             />
           </div>
         ))}

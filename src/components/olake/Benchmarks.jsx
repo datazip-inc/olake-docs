@@ -18,11 +18,13 @@ const Benchmarks = () => {
             className='mx-auto w-full object-contain dark:block hidden'
             src='/img/olake/olake-benchmark-1.svg'
             alt='benchmark-graph'
+            loading="lazy" decoding="async"
           />
           <img
             className='mx-auto w-full object-contain dark:hidden'
             src='/img/olake/olake-benchmark-white-1.svg'
             alt='benchmark-graph-white theme'
+            loading="lazy" decoding="async"
           />
         </div>
         <div className='flex-1 rounded border border-gray-300 p-4'>
@@ -30,12 +32,14 @@ const Benchmarks = () => {
             className='mx-auto w-full object-contain dark:block hidden'
             src='/img/olake/olake-benchmark-2.svg'
             alt='benchmark-graph'
+            loading="lazy" decoding="async"
           />
 
           <img
             className='mx-auto w-full object-contain dark:hidden'
             src='/img/olake/olake-benchmark-white-2.svg'
             alt='benchmark-graph white theme'
+            loading="lazy" decoding="async"
           />
         </div>
       </div>

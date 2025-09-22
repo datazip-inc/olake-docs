@@ -90,7 +90,8 @@ const Footer: React.FC = () => {
                                     <img
                                         src={getSocialIconSrc(social.icon)}
                                         alt={social.ariaLabel}
-                                        className="w-5 h-5 "
+                                        className="w-5 h-5"
+                                        loading="lazy" decoding="async"
                                     />
                                 </a>
                             ))}

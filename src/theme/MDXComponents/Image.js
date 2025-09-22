@@ -9,6 +9,7 @@ function Image(props) {
       border={props.border}
       id={props.id}
       width={props.width}
+      loading="lazy" decoding="async"
     />
   );
 }

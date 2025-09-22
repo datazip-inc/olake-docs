@@ -141,6 +141,8 @@ const ContributorCard: React.FC<{ contributor: ContributorProps }> = ({ contribu
               src={contributor.avatar_url || 'https://placehold.co/80x80/e2e8f0/e2e8f0?text=A'}
               alt={`${contributor.login}'s avatar`}
               className="rounded-full object-cover w-full h-full"
+              loading="lazy" 
+              decoding="async"
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/80x80/e2e8f0/e2e8f0?text=A'; }}
             />
         </div>

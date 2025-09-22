@@ -218,7 +218,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                 rel="noreferrer noopener"
                 className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
               >
-                <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
+                <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" loading="lazy" decoding="async" />
                 <span className="text-gray-400">For issues, click here (GitHub)</span>
               </a>
               {/* <span className="text-xs text-gray-500 dark:text-gray-400">For any issues click here (GitHub)</span> */}

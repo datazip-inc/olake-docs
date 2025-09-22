@@ -73,7 +73,7 @@ const BenchmarkHeader: React.FC = () => {
           </svg>
            */}
 
-          <img src='/img/site/airbyte.svg' alt='Company logo' />
+          <img src='/img/site/airbyte.svg' alt='Company logo' loading="lazy" decoding="async" />
 
           <span className='text-sm text-gray-800 dark:text-white'>Airbyte</span>
         </div>
@@ -185,7 +185,7 @@ const BenchmarkSection: React.FC = () => {
           <span className='md:ml-2'>with OLake</span>
         </h2>
         <div>
-        <img src="img/site/postgres-iceberg.svg" alt="postgres-iceberg" />
+        <img src="img/site/postgres-iceberg.svg" alt="postgres-iceberg" loading="lazy" decoding="async" />
       </div>
       </div>
 
@@ -234,7 +234,7 @@ const BenchmarkSection: React.FC = () => {
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/olake.svg' alt='OLake logo' />
+                        <img src='/img/site/olake.svg' alt='OLake logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.olake.name}</span>
                       </div>
                       <div className='text-sm text-gray-600 dark:text-gray-400'>
@@ -244,25 +244,25 @@ const BenchmarkSection: React.FC = () => {
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/airbyte.svg' alt='Airbyte logo' />
+                        <img src='/img/site/airbyte.svg' alt='Airbyte logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.airbyte.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/fivetran.svg' alt='Fivetran logo' />
+                        <img src='/img/site/fivetran.svg' alt='Fivetran logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.fivetran.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/debezium.svg' alt='Debezium logo' />
+                        <img src='/img/site/debezium.svg' alt='Debezium logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.debezium.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/estuary.svg' alt='Estuary logo' />
+                        <img src='/img/site/estuary.svg' alt='Estuary logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.estuary.name}</span>
                       </div>
                     </th>
@@ -312,22 +312,10 @@ const BenchmarkSection: React.FC = () => {
                     <th className='w-1/6 border border-gray-200 bg-gray-50 p-6 text-left text-xl font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       Metrics
                     </th>
-{/*                     
-                    <th className='w-1/6 border border-gray-200 bg-green-50/70 px-16 py-6 dark:border-gray-700 dark:bg-green-900/20'>
-                      <div className='flex flex-col items-center justify-center'>
-                      <img src='/img/site/airbyte.svg' alt='' />
-                        <div className='text-xl font-bold text-gray-800 dark:text-gray-200'>
-                          {TOOLS.olake.name}
-                        </div>
-                        <div className='text-sm text-gray-600 dark:text-gray-400'>
-                          {TOOLS.olake.description}
-                        </div>
-                      </div>
-                    </th> */}
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/olake.svg' alt='OLake logo' />
+                        <img src='/img/site/olake.svg' alt='OLake logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.olake.name}</span>
                       </div>
                       <div className='text-sm text-gray-600 dark:text-gray-400'>
@@ -337,28 +325,28 @@ const BenchmarkSection: React.FC = () => {
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/airbyte.svg' alt='Airbyte logo' />
+                        <img src='/img/site/airbyte.svg' alt='Airbyte logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.airbyte.name}</span>
                       </div>
                     </th>
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/fivetran.svg' alt='Fivetran logo' />
+                        <img src='/img/site/fivetran.svg' alt='Fivetran logo' loading="lazy" decoding="async" />
 
                         <span className='text-xl'>{TOOLS.fivetran.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/debezium.svg' alt='Debezium logo' />
+                        <img src='/img/site/debezium.svg' alt='Debezium logo' loading="lazy" decoding="async" />
 
                         <span className='text-xl'>{TOOLS.debezium.name}</span>
                       </div>
                     </th>
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/estuary.svg' alt='Estuary logo' />
+                        <img src='/img/site/estuary.svg' alt='Estuary logo' loading="lazy" decoding="async" />
 
                         <span className='text-xl'>{TOOLS.estuary.name}</span>
                       </div>

@@ -48,6 +48,7 @@ const RegistrationSection = () => {
           alt='Lake background'
           className='h-full w-full object-cover'
           role='presentation'
+          loading="lazy" decoding="async"
         />
         {/* <div className='absolute inset-0 bg-blue-900/70'></div> */}
       </div>
@@ -107,6 +108,7 @@ const RegistrationSection = () => {
                       src='/img/site/iceberg-logo.svg'
                       className='mt-1'
                       alt='Apache Iceberg logo'
+                      loading="lazy" decoding="async"
                     />
                     <div className='flex max-w-[90%] flex-col gap-2'>
                       <div className='text-lg font-semibold md:text-xl lg:text-xl'>

@@ -18,6 +18,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ videoId, title = "Embedded 
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           className="absolute top-0 left-0 w-full h-full rounded-lg"
+          loading="lazy"
         ></iframe>
       </div>
     </div>

@@ -36,8 +36,8 @@ const WebinarHosts: React.FC<WebinarHostsProps> = ({ hosts }) => {
               <Image
                 img={host.image}
                 alt={`${host.name}'s profile picture`}
-                // layout="fill"
-                // objectFit="cover"
+                loading="lazy"
+                decoding="async"
                 className="rounded-full border-2 border-blue-600"
               />
             </div>

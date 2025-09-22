@@ -148,6 +148,7 @@ const SetupStepsSection: React.FC = () => {
                       src={getSelectedConnector()?.icon}
                       alt={getSelectedConnector()?.name}
                       className='h-5 w-5'
+                      loading="lazy" decoding="async"
                     />
                   </div>
                   <span className='text-sm'>{getSelectedConnector()?.name}</span>
@@ -180,7 +181,7 @@ const SetupStepsSection: React.FC = () => {
                         <div
                           className={`mr-3 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md text-white ${connector.color}`}
                         >
-                          <img src={connector.icon} alt={connector.name} className='h-5 w-5' />
+                          <img src={connector.icon} alt={connector.name} className='h-5 w-5' loading="lazy" decoding="async" />
                         </div>
                         <span className='text-sm'>{connector.name}</span>
                         {selectedConnector === connector.id && (

@@ -11,6 +11,7 @@ const WorkflowDiagram: React.FC = () => {
                             src="/img/site/timeline.svg"
                             alt="Workflow timeline"
                             className="w-full h-auto object-contain"
+                            loading="lazy" decoding="async"
                         />
                     </div>
 
@@ -20,6 +21,7 @@ const WorkflowDiagram: React.FC = () => {
                             src="/img/site/timeline.svg"
                             alt="Workflow timeline"
                             className="block mx-auto w-[80%] h-auto"
+                            loading="lazy" decoding="async"
                         />
                     </div>
 
