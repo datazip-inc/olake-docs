@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import Layout from '@theme/Layout'
 import BlogSidebar from '@theme/BlogSidebar'
+import BlogBreadcrumbs from '@theme/BlogBreadcrumbs'
 
 // Reading Progress Hook
 function useReadingProgress() {
@@ -107,6 +108,7 @@ export default function BlogLayout(props) {
   const { sidebar, toc, children, ...layoutProps } = props
   const hasSidebar = sidebar && sidebar.items.length > 0
   const progress = useReadingProgress()
+  
 
   return (
     <Layout {...layoutProps}>
@@ -136,6 +138,7 @@ export default function BlogLayout(props) {
 
               <article className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 sm:px-8 lg:px-12 py-8 lg:py-12">
+                  <BlogBreadcrumbs />
                   {children}
                 </div>
               </article>

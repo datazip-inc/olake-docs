@@ -410,7 +410,7 @@ export const paginationConfig = {
       permalink: '/docs'
     },
     next: {
-      title: 'Issues and PRs',
+      title: 'How to Raise a PR',
       permalink: '/docs/community/issues-and-prs'
     }
   },
@@ -418,20 +418,32 @@ export const paginationConfig = {
   // Issues and PRs
   '/docs/community/issues-and-prs': {
     previous: {
-      title: 'How to contribute',
+      title: 'Contribute to Olake',
       permalink: '/docs/community/contributing'
     },
     next: {
-      title: 'Install Docker Compose CLI',
-      permalink: '/docs/install/docker-cli'
+      title: 'Seting up a Development Environment',
+      permalink: '/docs/community/setting-up-a-dev-env'
+    }
+  },
+
+  // Setting up a Development Environment
+  '/docs/community/setting-up-a-dev-env': {
+    previous: {
+      title: 'How to Raise a PR',
+      permalink: '/docs/community/issues-and-prs'
+    },
+    next: {
+      title: 'Code of Conduct',
+      permalink: '/docs/community/code-of-conduct'
     }
   },
 
   // Code of Conduct
   '/docs/community/code-of-conduct': {
     previous: {
-      title: 'Introduction',
-      permalink: '/docs'
+      title: 'Setting up a Development Environment',
+      permalink: '/docs/community/setting-up-a-dev-env'
     },
     next: {
       title: 'Channels',
@@ -442,8 +454,8 @@ export const paginationConfig = {
   // Channels
   '/docs/community/channels': {
     previous: {
-      title: 'Introduction',
-      permalink: '/docs'
+      title: 'Code of Conduct',
+      permalink: '/docs/community/code-of-conduct'
     },
     next: {
       title: 'Release Notes',

@@ -4,9 +4,9 @@ import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-import WebinarForm from '../../components/forms/WebinarForm';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
@@ -51,6 +51,10 @@ const WebinarPage = () => {
 
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"
@@ -61,28 +65,6 @@ const WebinarPage = () => {
             <WebinarCoverImage src="/img/webinars/webinar-cdc-unplugged.webp" alt="Webinar Cover Image" />
           </div>
 
-
-          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20"> */}
-
-            {/* <WebinarForm
-              source="w-3-cdc-unplugged"
-              nexturl="w-3-cdc-unplugged-confirmation"
-            /> */}
-
-
-            {/* remove this button with email collection form that leads to confirmation page of this webinar */}
-
-            {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
-                <CTAButton
-                  title="Join Our Upcoming Event"
-                  buttonText="Register Now!"
-                  icon={FaRegCalendarAlt}
-                  href="https://app.livestorm.co/datazip-inc/cdc-unplugged-modern-data-integration-with-real-world-insights"
-                  variant="secondary"
-                />
-              </div> */}
-
-          {/* </div> */}
         </div>
 
         <Hr />
