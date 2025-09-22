@@ -346,8 +346,46 @@ const CommunityPage = () => {
         </div>
       </SectionLayout>
 
-      {/* Events Section */}
+      {/* Upcoming Events Section */}
       <SectionLayout className="py-20 bg-gray-50 dark:bg-gray-900/50">
+        <SectionHeader
+          title="Upcoming Events"
+          subtitle="Join our upcoming live events and webinars"
+        />
+
+        <div className="text-center mb-4">
+          <div className="inline-flex items-center px-4 py-2 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
+            <FaVideo className="w-4 h-4 mr-2" />
+            Live Events
+          </div>
+        </div>
+
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-blue-500/5 rounded-3xl -m-4"></div>
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 lg:p-12">
+            <div className="relative w-full">
+              <iframe 
+                width="100%" 
+                height="500"
+                frameBorder="0" 
+                src="https://app.livestorm.co/datazip-inc/upcoming?limit=2" 
+                title="OLake by Datazip events | Livestorm"
+                className="rounded-lg w-full"
+                style={{
+                  minHeight: '400px',
+                  height: '500px',
+                  border: 'none',
+                  overflow: 'hidden'
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </SectionLayout>
+
+      {/* Events Section */}
+      <SectionLayout className="py-20">
         <SectionHeader
           title="Community Events & Meetups"
           subtitle="Join our regular community meetups where we discuss real-world challenges, share experiences, and learn from each other"
