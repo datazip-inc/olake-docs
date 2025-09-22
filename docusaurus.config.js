@@ -538,16 +538,12 @@ const config = {
 
         // Optional: see doc section below
         contextualSearch: true,
-
-        //   searchParameters: {},
-
         // Optional: path for search page that enabled by default (`false` to disable it)
         searchPagePath: 'search',
 
         // Optional: whether the insights feature is enabled or not on Docsearch (`false` by default)
         insights: true,
 
-        //   //... other Algolia params
       },
 
 
