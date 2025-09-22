@@ -8,6 +8,7 @@ import CTAButton from '../../components/webinars/CTAButton';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 
@@ -16,21 +17,21 @@ const hosts = [
     name: "Shivji Kumar Jha",
     role: "Staff Engineer @ Nutanix",
     bio: "Founding engineer of Nutanix's data platform team with 30+ conference talks at Apache and CNCF events. Apache Pulsar committer with deep expertise in ClickHouse, distributed systems, and open-source database technologies. Contributed to ClickHouse, MySQL, Apache Pulsar. ",
-    image: "/img/authors/shivji.jpeg",
+    image: "/img/authors/shivji.webp",
     linkedin: "https://www.linkedin.com/in/shivjijha/",
   },
   {
     name: "Saurabh Kumar Ojha",
     role: "Software Engineer @ Nutanix",
     bio: "Database internals expert with hands-on experience in lakehouse integrations. Open-source enthusiast with contributions to ClickHouse server and ecosystem, Nats, Transferia and more.",
-    image: "/img/authors/saurabh.jpeg",
+    image: "/img/authors/saurabh.webp",
     linkedin: "https://www.linkedin.com/in/ojhasaurabh2099/",
   },
   {
     name: "Akshay Kumar Sharma",
     role: "DevRel @ OLake",
     bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.jpg",
+    image: "/img/authors/akshay.webp",
     linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
   },
 ];
@@ -47,6 +48,10 @@ const WebinarPage = () => {
       description={webinarData.summary}
     >
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="webinar"
+          title={webinarData.title}
+        />
         <WebinarTitle
           title={`${webinarData.title} `}
           tag="Webinar"

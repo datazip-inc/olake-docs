@@ -16,4 +16,5 @@ declare module '*.mdx';
 interface Window {
   Calendly: any;
   docsearch: any;
+  gtag: (...args: any[]) => void;
 }

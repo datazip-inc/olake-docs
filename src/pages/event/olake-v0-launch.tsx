@@ -19,7 +19,7 @@ const hosts = [
     name: "Shubham Satish Baldava",
     role: "CTO @ Datazip",
     bio: " Technologies Shubham has worked extensively in: AWS, GCP, NoSql (Dynamodb, Cassandra), relational databases, Redshift, Databricks, Snowflake, spark, kafka, hudi, airflow, airbyte, python, scala",
-    image: "/img/authors/shubham.jpg",
+    image: "/img/authors/shubham.webp",
     linkedin: "https://www.linkedin.com/in/shubham-baldava/",
   }
 ];
@@ -28,7 +28,7 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'Fastest Apache Iceberg Native CDC: Introducing OLake',
     summary: 'OLake v0 launch webinar',
-    image_url: '/img/events/olake-v0-launch-cover.jpg',
+    image_url: '/img/events/olake-v0-launch-cover.webp',
     event_url: 'https://olake.io/event/olake-v0-launch',
     // register_link: 'https://linuxfoundation.regfox.com/prestocon-day-2025',
   };

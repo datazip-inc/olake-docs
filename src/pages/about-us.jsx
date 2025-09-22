@@ -6,19 +6,19 @@ const teamMembers = [
     name: 'Shubham Satish Baldava',
     designation: 'CTO',
     linkedin: 'https://linkedin.com/in/shubham-baldava',
-    image: '/img/authors/shubham.jpg'
-  },
-  {
-    name: 'Sandeep Devarapalli ',
-    designation: 'CEO',
-    linkedin: 'https://linkedin.com/in/sandeepdevarapalli',
-    image: '/img/authors/sandeep.jpg'
+    image: '/img/authors/shubham.webp'
   },
   {
     name: 'Rohan Khameshra',
-    designation: 'CPO',
+    designation: 'CEO',
     linkedin: 'https://linkedin.com/in/rohan-khameshra',
     image: '/img/authors/rohan.webp'
+  },
+  {
+    name: 'Sandeep Devarapalli ',
+    designation: 'CMO',
+    linkedin: 'https://linkedin.com/in/sandeepdevarapalli',
+    image: '/img/authors/sandeep.webp'
   }
   // Add more team members as needed...
 ]
@@ -34,11 +34,10 @@ const AboutTeam = () => {
               About Us
             </h2>
             <p className='mx-auto max-w-2xl text-center text-lg'>
-              Welcome to OLake – the fastest open source DB-to-Data LakeHouse pipeline designed to
-              bring your MongoDB data into modern analytics ecosystems like Apache Iceberg. OLake
-              was born out of the need to eliminate the toil of one-off ETL scripts, combat
-              performance bottlenecks, and avoid vendor lock-in with a clean, high-performing
-              solution. OLake’s primary goal is simple: to provide the fastest data pipeline from your database (starting with MongoDB) to a Data LakeHouse—in this case, Apache Iceberg.
+              OLake is an open-source, Iceberg-first engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable so your team can stop handling connectors and start focusing on models, products, and impact.
+            </p>
+            <p className='mx-auto max-w-2xl text-center text-lg mt-6'>
+              Born from real-world issues with slow, fragile ingestion, OLake gives you a clean UI/CLI, resilient CDC, and a path that keeps getting faster with every release. No vendor lock-in, no plumbing issues just a reliable way to move data into Iceberg for your modern analytics.
             </p>
           </section>
 

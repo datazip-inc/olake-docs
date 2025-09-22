@@ -4,6 +4,7 @@ import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import React from "react";
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/8th-meetup.json';
@@ -15,14 +16,14 @@ const hosts = [
     name: "Akshay Kumar Sharma",
     role: "DevRel @ OLake",
     bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.jpg",
+    image: "/img/authors/akshay.webp",
     linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
   },
   {
     name: "Schitiz Sharma",
     role: "DevOps Engineer @ OLake",
     bio: "OLake Maintainer and DevOps engineer with expertise in Kubernetes deployments, Helm charts, and infrastructure automation for data engineering platforms.",
-    image: "/img/authors/schitiz.jpg",
+    image: "/img/authors/schitiz.webp",
     linkedin: "https://www.linkedin.com/in/schitizsharma",
   },
 ];
@@ -43,6 +44,10 @@ const CommunityPage = () => {
       description={communityData.summary}
     >
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="community"
+          title={communityData.title}
+        />
         <WebinarTitle
           title={`${communityData.title}`}
           tag="Community Meetup"

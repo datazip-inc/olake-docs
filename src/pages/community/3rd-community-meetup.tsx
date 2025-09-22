@@ -1,11 +1,10 @@
 import WebinarTitle from '../../components/webinars/WebinarTitle';
-// import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
-// import WebinarForm from "../../components/forms/WebinarForm";
 import React from "react";
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/3rd-meetup.json'
@@ -23,21 +22,21 @@ const hosts = [
     name: "Priyansh Khodiyar",
     role: "Ex DevRel",
     bio: "",
-    image: "/img/authors/priyansh.jpg",
+    image: "/img/authors/priyansh.webp",
     linkedin: "https://www.linkedin.com/in/zriyansh/",
   },
   {
     name: "Shubham Satish Baldava",
     role: "Co-founder @ Datazip and OLake Maintainer",
     bio: "",
-    image: "/img/authors/shubham.jpg",
+    image: "/img/authors/shubham.webp",
     linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
   },
   {
     name: "Ankit Kumar",
     role: "Senior backend dev and OLake Maintainer",
     bio: "",
-    image: "/img/authors/ankit.jpg",
+    image: "/img/authors/ankit.webp",
     linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
   },
 ];
@@ -54,6 +53,10 @@ const CommunityPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="community"
+          title={communityData.title}
+        />
         <WebinarTitle
           title={communityData.title}
           tag="Community Meetup"
@@ -61,18 +64,7 @@ const CommunityPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
 
-          {/* <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/community/3rd-community-meetup-cover.png" alt="Meetup Cover Image" />
-          </div> */}
 
-
-
-          {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
-            <WebinarForm
-              source="w-1-intro-iceberg"
-              nexturl="w-1-intro-iceberg-confirmation"
-            />
-          </div> */}
         </div>
 
         <section className="flex justify-center mb-12">

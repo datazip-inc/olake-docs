@@ -1,4 +1,5 @@
 import Layout from '@theme/Layout'
+import Head from '@docusaurus/Head'
 import React, { useEffect, useRef } from 'react'
 import { useHistory } from 'react-router-dom'
 
@@ -16,9 +17,9 @@ import Footer from '../components/site/Footer.tsx'
 export default function New3Page() {
   const OLakeFaqs = [
     {
-      question: 'How to Get Started?',
+      question: 'What is OLake, and how does it handle database replication?',
       answer:
-        'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
+        'OLake is a data engineering tool designed to simplify and automate the real-time ingestion & normalization of complex database data. It handles the entire process — from parsing and extraction to flattening/extrapolating and transforming raw, semi-structured data into relational streams — without the need for coding.'
     },
     {
       question: 'Is OLake Really Open Source?',
@@ -74,7 +75,6 @@ export default function New3Page() {
       setTimeout(() => {
         window.scrollTo(0, formRef.current.offsetTop)
       }, 0)
-      console.log('hereee', window.location.pathname, window.location.search)
       history.replace({
         pathname: window.location.pathname,
         search: window.location.search
@@ -87,18 +87,48 @@ export default function New3Page() {
       title='OLake'
       description='Fastest Database to Data Lakehouse data replication tool, open sourced'
     >
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org/',
+              '@type': 'Organization',
+              name: 'OLake',
+              url: 'https://olake.io/',
+              logo: 'https://olake.io/img/logo/olake-blue.svg',
+              description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
+              foundingDate: '2023',
+              contactPoint: {
+                '@type': 'ContactPoint',
+                contactType: 'customer service',
+                email: 'hello@olake.io'
+              },
+              sameAs: [
+                'https://github.com/datazip-inc/olake',
+                'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
+              ]
+            })
+          }}
+        />
+      </Head>
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
-        <DataWarehouseToLakes />
-        <WorkflowSection />
-        <IcebergHero />
-        <BenchmarkSection />
-        <FeatureShowcase />
-        <SetupStepsSection />
-        <RegistrationSection />
-        <BlogShowcase />
-        <div className='container mx-auto my-8 w-full max-w-[90%]'>
-          <Faq data={OLakeFaqs} showHeading={true} />
-        </div>
+        <main id='main-content' role='main'>
+          <DataWarehouseToLakes />
+          <WorkflowSection />
+          <IcebergHero />
+          <BenchmarkSection />
+          <FeatureShowcase />
+          <SetupStepsSection />
+          <RegistrationSection />
+          <BlogShowcase />
+          <section
+            className='container mx-auto my-8 w-full max-w-[90%]'
+            aria-labelledby='faq-heading'
+          >
+            <Faq data={OLakeFaqs} showHeading={true} />
+          </section>
+        </main>
       </div>
     </Layout>
   )
