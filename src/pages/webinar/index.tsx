@@ -1,16 +1,84 @@
-import React from 'react'
-import Layout from '@theme/Layout'
+import React, { useState, useRef, useEffect } from "react";
+// @ts-ignore
+import Layout from '@theme/Layout';
 import LazyComponent from '../../components/LazyComponent'
-import {
-  FaFileVideo,
-  FaVideo,
-  FaPlay,
-  FaUsers,
-  FaCalendarAlt,
-  FaBroadcastTower
-} from 'react-icons/fa'
+import WebinarGrid from '../../components/webinars/WebinarGrid';
+import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
+
+// Custom hook for dynamic iframe height
+const useDynamicIframeHeight = (src) => {
+  const [height, setHeight] = useState(200);
+  const iframeRef = useRef(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    // Method 2: Listen for postMessage from iframe
+    const handleMessage = (event) => {
+      if (event.origin === 'https://app.livestorm.co' && event.data?.type === 'resize') {
+        setHeight(Math.max(200, event.data.height));
+      }
+    };
+
+    const updateHeight = () => {
+      // Try multiple approaches to get the right height
+      try {
+        // Method 1: Try to access iframe content (may fail due to CORS)
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc) {
+          const bodyHeight = iframeDoc.body?.scrollHeight || iframeDoc.documentElement?.scrollHeight;
+          if (bodyHeight && bodyHeight > 0) {
+            setHeight(Math.max(200, bodyHeight + 20));
+            return;
+          }
+        }
+      } catch (e) {
+        // CORS restrictions - use fallback methods
+      }
+
+      // Method 3: Set a reasonable default based on content type
+      // For Livestorm embeds, we'll use a responsive height optimized for 2 events
+      const updateResponsiveHeight = () => {
+        const viewportWidth = window.innerWidth;
+        let responsiveHeight = 300;
+        
+        if (viewportWidth < 640) {
+          responsiveHeight = 400; // Mobile: more space for 2 events
+        } else if (viewportWidth < 1024) {
+          responsiveHeight = 450; // Tablet: medium height for 2 events
+        } else {
+          responsiveHeight = 500; // Desktop: larger height for 2 events
+        }
+        
+        setHeight(responsiveHeight);
+      };
+
+      updateResponsiveHeight();
+    };
+
+    // Add event listeners
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('resize', updateHeight);
+
+    // Update height on load with a single timeout
+    const timeout = setTimeout(updateHeight, 1000);
+
+    // Cleanup function
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, [src]);
+
+  return { height, iframeRef };
+};
 
 const WebinarsPage = () => {
+  // Use the dynamic iframe height hook
+  const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
+  
   // Define webinars data directly
   const webinars = [
     {
@@ -245,8 +313,38 @@ const WebinarsPage = () => {
       </section>
 
       {/* Main Content */}
-      <div className='min-h-screen bg-gray-50 dark:bg-gray-950'>
-        <div className='container mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20'>
+      <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
+        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+          
+          {/* Upcoming Events Embed with Dynamic Sizing */}
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center px-4 py-2 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
+              <FaVideo className="w-4 h-4 mr-2" />
+              Active Events
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="relative w-full">
+              <iframe 
+                ref={iframeRef}
+                width="100%" 
+                height={iframeHeight}
+                frameBorder="0" 
+                src="https://app.livestorm.co/datazip-inc/upcoming?limit=2" 
+                title="OLake by Datazip events | Livestorm"
+                className="rounded-lg w-full"
+                style={{
+                  minHeight: '400px',
+                  height: `${iframeHeight}px`,
+                  transition: 'height 0.3s ease-in-out',
+                  border: 'none',
+                  overflow: 'hidden'
+                }}
+              />
+            </div>
+          </div>
+          
           {/* Featured Events & Webinars Section */}
           <section className='mb-20'>
             <div className='mb-12 text-center'>
@@ -277,4 +375,4 @@ const WebinarsPage = () => {
   )
 }
 
-export default WebinarsPage
+export default WebinarsPage;

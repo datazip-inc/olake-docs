@@ -126,6 +126,13 @@ const config = {
       // Replace with your project's social card
       image: 'img/logo/olake-blue.svg',
 
+      announcementBar: {
+        id: 'monthly-events-2025',
+        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200">here</a>. Check out! 🎉',
+        backgroundColor: '#193ae6',
+        textColor: 'white',
+        isCloseable: true,
+      },
 
       docs: {
         sidebar: {

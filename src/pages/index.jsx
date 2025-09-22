@@ -12,29 +12,34 @@ import LazyComponent from '../components/LazyComponent'
 export default function New3Page() {
   const OLakeFaqs = [
     {
-      question: 'What is OLake, and how does it handle database replication?',
+      question: 'How to Get Started?',
       answer:
-        'OLake is a data engineering tool designed to simplify and automate the real-time ingestion & normalization of complex database data. It handles the entire process — from parsing and extraction to flattening/extrapolating and transforming raw, semi-structured data into relational streams — without the need for coding.'
+        'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
     },
     {
-      question: 'How does OLake ensure data accuracy and prevent data loss during transformation?',
+      question: 'Is OLake Really Open Source?',
       answer:
-        'OLake provides monitoring and alerts for schema evolution, helping you detect changes and prevent data loss and inaccuracies caused by transformation logic errors. Custom alerts can be set up to notify you of schema changes, ensuring continuous data accuracy.'
+        'Yes. OLake is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1K+ developers) and use it freely without hidden costs.'
+    },
+    {
+      question: 'Is There Any Enterprise Plan?',
+      answer:
+        'We\'re actively working on providing enterprise support from professional assistance and pilot programs to helping teams scale OLake in production. You can reach out at hello@olake.io to learn more.'
+    },
+    {
+      question: 'How Can I Contribute?',
+      answer:
+        'Join our slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
+    },
+    {
+      question: 'Why Should I Use OLake?',
+      answer:
+        'OLake makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
     },
     {
       question: 'What data platforms and tools does OLake integrate with?',
       answer:
         'As of now, we are integrating with Apache Iceberg as a destination. You can query this from most of the big data platform like Snowflake, Databricks, Redshift and BigQuery'
-    },
-    {
-      question: 'How does OLake handle large data volumes and maintain performance?',
-      answer:
-        'OLake is designed to process millions of rows in minutes using a configuration-based approach, which reduces processing time from months to minutes. It supports efficient data pipelines by connecting to streaming platforms like Kafka and dynamically generating SQL code to optimize data handling.'
-    },
-    {
-      question: 'Can OLake be customized to fit my specific data pipeline needs?',
-      answer:
-        'OLake provides a highly customizable, code-free interface for tailoring data extraction, transformation, and normalization processes to your specific data pipeline requirements. It allows you to adjust settings and automate tasks to match your unique use cases.'
     }
   ]
 
