@@ -1,15 +1,14 @@
 import React from 'react'
 import WorkflowHeader from './WorkflowHeader'
-import WorkflowDiagram from './WorkflowDiagram'
-import InfoBoxes from './InfoBoxes'
+import LazyComponent from '../LazyComponent'
 
 const WorkflowSection: React.FC = () => {
   return (
     <section className='bg-white py-16 dark:bg-gray-900 md:py-16'>
       <div className=''>
         <WorkflowHeader />
-        <WorkflowDiagram />
-        <InfoBoxes />
+        <LazyComponent component='WorkflowDiagram' />
+        <LazyComponent component='InfoBoxes' />
       </div>
     </section>
   )

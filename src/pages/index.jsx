@@ -6,13 +6,8 @@ import { useHistory } from 'react-router-dom'
 import Faq from '@site/src/components/site/Faq'
 import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
 import WorkflowSection from '../components/site/WorkflowSection'
-import IcebergHero from '../components/site/IcebergHero'
-import BenchmarkSection from '../components/site/BenchmarkSection'
-import FeatureShowcase from '../components/site/FeatureShowcase'
-import SetupStepsSection from '../components/site/SetupStepsSection'
-import RegistrationSection from '../components/site/RegistrationSection'
-import BlogShowcase from '../components/site/BlogShowcase'
 import Footer from '../components/site/Footer.tsx'
+import LazyComponent from '../components/LazyComponent'
 
 export default function New3Page() {
   const OLakeFaqs = [
@@ -84,22 +79,22 @@ export default function New3Page() {
     >
       <Head>
         <script
-          type="application/ld+json"
+          type='application/ld+json'
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org/',
               '@type': 'Organization',
-              name: 'OLake',
-              url: 'https://olake.io/',
-              logo: 'https://olake.io/img/logo/olake-blue.svg',
-              description: 'Fastest way to replicate MongoDB data in Apache Iceberg',
-              foundingDate: '2023',
-              contactPoint: {
+              'name': 'OLake',
+              'url': 'https://olake.io/',
+              'logo': 'https://olake.io/img/logo/olake-blue.svg',
+              'description': 'Fastest way to replicate MongoDB data in Apache Iceberg',
+              'foundingDate': '2023',
+              'contactPoint': {
                 '@type': 'ContactPoint',
-                contactType: 'customer service',
-                email: 'hello@olake.io'
+                'contactType': 'customer service',
+                'email': 'hello@olake.io'
               },
-              sameAs: [
+              'sameAs': [
                 'https://github.com/datazip-inc/olake',
                 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
               ]
@@ -113,12 +108,12 @@ export default function New3Page() {
         <main id='main-content' role='main'>
           <DataWarehouseToLakes />
           <WorkflowSection />
-          <IcebergHero />
-          <BenchmarkSection />
-          <FeatureShowcase />
-          <SetupStepsSection />
-          <RegistrationSection />
-          <BlogShowcase />
+          <LazyComponent component='IcebergHero' />
+          <LazyComponent component='BenchmarkSection' />
+          <LazyComponent component='FeatureShowcase' />
+          <LazyComponent component='SetupStepsSection' />
+          <LazyComponent component='RegistrationSection' />
+          <LazyComponent component='BlogShowcase' />
           <section
             className='container mx-auto my-8 w-full max-w-[90%]'
             aria-labelledby='faq-heading'

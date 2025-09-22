@@ -1,12 +1,12 @@
 import React from 'react'
 import Layout from '@theme/Layout'
-import Glace from '../components/site/Glace'
+import LazyComponent from '../components/LazyComponent'
 
 const GlaceLake: React.FC = () => {
   return (
     <Layout>
       <main>
-        <Glace />
+        <LazyComponent component='Glace' />
       </main>
     </Layout>
   )
