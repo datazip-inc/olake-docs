@@ -18,7 +18,7 @@ const LeadershipForumEventDetails = () => {
             {/* Header Section */}
             <div className="mb-8 text-center">
                 <MdOutlineEvent className="mx-auto mb-4 text-4xl text-blue-600 dark:text-blue-400" />
-                <h1 className="text-3xl sm:text-4xl font-bold mb-4">About the Leadership Forum</h1>
+                <h2 className="text-3xl sm:text-4xl font-bold mb-4">About the Leadership Forum</h2>
                 {/* <p className="text-lg text-gray-700 dark:text-gray-300">
                     Join us for an intensive session bringing together senior data engineers and ML practitioners. We'll explore the intersection of modern data architecture and ML operations, focusing on building scalable platforms that serve both analytics and machine learning needs.
                 </p> */}
