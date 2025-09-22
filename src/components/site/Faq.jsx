@@ -27,16 +27,10 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
         </div>
       </div>
       {expanded && (
-        <div className='rounded p-3 px-2' style={{ marginTop: '-0.75rem' }}>
-          <div 
-            className='text-sm font-normal leading-relaxed text-[#333333] dark:text-gray-300'
-            dangerouslySetInnerHTML={{
-              __html: answer.replace(
-                /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g,
-                '<a href="mailto:$1" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>'
-              )
-            }}
-          />
+        <div className='rounded p-3 px-2 -mt-2'>
+          <div className='text-sm font-normal leading-relaxed text-[#333333] dark:text-gray-300'>
+            {answer}
+          </div>
         </div>
       )}
     </div>
