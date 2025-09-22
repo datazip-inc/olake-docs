@@ -13,9 +13,9 @@ export const mainOLakeData = {
 }
 
 export const olakeProductData = {
-  title: 'Fastest open-source tool for replicating Databases to Apache Iceberg or Data Lakehouse',
+  title: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg',
   description:
-    'Achieve fast data replication for any database with near real-time transfer to data lakehouse (in Iceberg format).',
+    'Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
   image: '/img/olake/olake-product-meta.webp'
 }
 
