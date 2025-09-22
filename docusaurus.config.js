@@ -83,18 +83,24 @@ const config = {
     {
       src: '/suppress-resize-observer.js', // Suppress ResizeObserver warnings
       defer: true,
+      fetchpriority: 'high'
+    },
+    {
+      src: '/ignore-resize-observer-error.js', // Suppress noisy ResizeObserver loop errors that Chrome prints
+      defer: true,
+      fetchpriority: 'high'
     },
     {
       id: "runllm-widget-script",
       type: "module",
       src: "https://widget.runllm.com",
-      crossorigin: "true",
+      crossorigin: "anonymous",
       "runllm-name": "OLake AI Assistant",
       "runllm-assistant-id": "654",
       "runllm-position": "BOTTOM_RIGHT",
       "runllm-keyboard-shortcut": "Mod+j",
       "runllm-preset": "docusaurus",
-      // async: true,
+      async: true, // Critical for performance - loads without blocking
       defer: true,
       "runllm-support-email": "hello@olake.io",
       "runllm-community-url": "https://olake.io/slack",
@@ -104,19 +110,14 @@ const config = {
       "runllm-per-user-usage-limit": "20",
       "runllm-algolia-api-key": "e33125f9089a304cef5331a186931e48",
       "runllm-algolia-application-id": "1E406NO1AX",
-      "runllm-algolia-index-name": "olake"
+      "runllm-algolia-index-name": "olake",
+      "onerror": "console.warn('RunLLM widget failed to load')" // Error handling
     },
     {
       src: '/message-listener.js', // path relative to the static directory
-      // async: false,
       defer: true, // if the script must be executed in order, set async to false
-    },
-    {
-      // Suppress noisy ResizeObserver loop errors that Chrome prints
-      src: '/ignore-resize-observer-error.js',
-      defer: true
+      fetchpriority: 'low'
     }
-
   ],
 
   themeConfig:
@@ -216,13 +217,89 @@ const config = {
         { name: "msvalidate.01", content: "C36AD97FE1CEDCD4041338A807D6BC4C" },
       ],
       headTags: [
+          // Critical resource preloads for mobile performance
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/logo/olake-blue.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/site/hero-section.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/suppress-resize-observer.js',
+              as: 'script',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/ignore-resize-observer-error.js',
+              as: 'script',
+              fetchpriority: 'high'
+            },
+          },
+           // DNS prefetch for external resources
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://widget.runllm.com'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://js.hsforms.net'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://www.google-analytics.com'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://www.googletagmanager.com'
+          },
+        },
+         // Preconnect to critical domains
         {
           tagName: 'link',
           attributes: {
             rel: 'preconnect',
-            sizes: "any",
             href: 'https://olake.io',
-            href: "/img/logo/olake-blue.svg",
+            crossorigin: 'anonymous'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'preconnect',
+            href: 'https://widget.runllm.com',
+            crossorigin: 'anonymous'
           },
         },
         // Canonical URL - Removed hardcoded canonical tag
