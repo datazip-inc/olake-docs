@@ -9,17 +9,18 @@ const teamMembers = [
     image: '/img/authors/shubham.webp'
   },
   {
-    name: 'Sandeep Devarapalli ',
+    name: 'Rohan Khameshra',
     designation: 'CEO',
+    linkedin: 'https://linkedin.com/in/rohan-khameshra',
+    image: '/img/authors/rohan.webp'
+  },
+  {
+    name: 'Sandeep Devarapalli ',
+    designation: 'CMO',
     linkedin: 'https://linkedin.com/in/sandeepdevarapalli',
     image: '/img/authors/sandeep.webp'
   },
-  {
-    name: 'Rohan Khameshra',
-    designation: 'CPO',
-    linkedin: 'https://linkedin.com/in/rohan-khameshra',
-    image: '/img/authors/rohan.webp'
-  }
+
   // Add more team members as needed...
 ]
 
