@@ -79,7 +79,7 @@ export default function New3Page() {
 
   return (
     <Layout
-      title='OLake'
+      title='Fastest Open Source Data Replication Tool'
       description='Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.'
     >
       <Head>
