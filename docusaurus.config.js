@@ -144,7 +144,6 @@ const config = {
       navbar: {
         hideOnScroll: false,
         // style: 'dark',
-        title: 'OLake',
         logo: {
           alt: 'OLake Logo',
           src: 'img/logo/olake-blue.svg',
