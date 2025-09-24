@@ -935,19 +935,17 @@ const config = {
   ],
 
   // Move Google Fonts to proper stylesheet links (faster than @import in CSS)
-  stylesheets: process.env.ENABLE_GOOGLE_FONTS === 'true'
-    ? [
-        {
-          href: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap',
-          rel: 'stylesheet'
-        },
-        {
-          href: 'https://fonts.gstatic.com',
-          rel: 'preconnect',
-          crossorigin: 'anonymous'
-        }
-      ]
-    : [],
+  stylesheets: [
+    {
+      href: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap',
+      rel: 'stylesheet'  // Standard, reliable approach
+    },
+    {
+      href: 'https://fonts.gstatic.com',
+      rel: 'preconnect',
+      crossorigin: 'anonymous'
+    }
+  ]
 };
 
 export default config;

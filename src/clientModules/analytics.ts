@@ -1,4 +1,4 @@
-// Client module to lazily load analytics and chat widgets without blocking LCP/INP
+// Client module to lazily load analytics without blocking LCP/INP
 // Loaded automatically by Docusaurus on the client
 
 function onFirstInteraction(callback: () => void) {
@@ -51,7 +51,6 @@ export function onClientEntry() {
       ;(window as any).gtag('js', new Date())
       
       // Load GTM container (deferred) - GTM will handle its own config
-      // Note: Keep IDs in sync with docusaurus.config.js if you re-enable inline config
       const gtmId = 'GTM-TFZ2GXJP'
       await loadScript(`https://www.googletagmanager.com/gtm.js?id=${gtmId}`)
     } catch (e) {
