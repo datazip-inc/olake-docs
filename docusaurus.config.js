@@ -49,16 +49,9 @@ const config = {
         },
         blog: false,
 
-        googleTagManager: {
-          containerId: 'GTM-TFZ2GXJP',
-        },
-          // Only enable gtag in production to avoid development errors
-          ...(process.env.NODE_ENV === 'production' && {
-            gtag: {
-              trackingID: 'G-GTNTGHDNZW',
-              anonymizeIP: true,
-            },
-          }),
+        // Defer analytics loading via clientModules (see src/clientModules/analytics.ts)
+        googleTagManager: undefined,
+        gtag: undefined,
 
         sitemap: {
           lastmod: 'date',
@@ -89,29 +82,6 @@ const config = {
       src: '/ignore-resize-observer-error.js', // Suppress noisy ResizeObserver loop errors that Chrome prints
       defer: true,
       fetchpriority: 'high'
-    },
-    {
-      id: "runllm-widget-script",
-      type: "module",
-      src: "https://widget.runllm.com",
-      crossorigin: "anonymous",
-      "runllm-name": "OLake AI Assistant",
-      "runllm-assistant-id": "654",
-      "runllm-position": "BOTTOM_RIGHT",
-      "runllm-keyboard-shortcut": "Mod+j",
-      "runllm-preset": "docusaurus",
-      async: true, // Critical for performance - loads without blocking
-      defer: true,
-      "runllm-support-email": "hello@olake.io",
-      "runllm-community-url": "https://olake.io/slack",
-      "runllm-community-type": "slack",
-      "runllm-brand-logo": "https://olake.io/img/logo/olake-blue.svg",
-      "runllm-floating-button-text": "Ask OLake",
-      "runllm-per-user-usage-limit": "20",
-      "runllm-algolia-api-key": "e33125f9089a304cef5331a186931e48",
-      "runllm-algolia-application-id": "1E406NO1AX",
-      "runllm-algolia-index-name": "olake",
-      "onerror": "console.warn('RunLLM widget failed to load')" // Error handling
     },
     {
       src: '/message-listener.js', // path relative to the static directory
@@ -242,24 +212,6 @@ const config = {
               href: '/img/site/hero-section.svg',
               as: 'image',
               type: 'image/svg+xml',
-              fetchpriority: 'high'
-            },
-          },
-          {
-            tagName: 'link',
-            attributes: {
-              rel: 'preload',
-              href: '/suppress-resize-observer.js',
-              as: 'script',
-              fetchpriority: 'high'
-            },
-          },
-          {
-            tagName: 'link',
-            attributes: {
-              rel: 'preload',
-              href: '/ignore-resize-observer-error.js',
-              as: 'script',
               fetchpriority: 'high'
             },
           },
@@ -999,6 +951,21 @@ const config = {
     ],
     '@docusaurus/theme-live-codeblock',
   ],
+
+  // Move Google Fonts to proper stylesheet links (faster than @import in CSS)
+  stylesheets: process.env.ENABLE_GOOGLE_FONTS === 'true'
+    ? [
+        {
+          href: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap',
+          rel: 'stylesheet'
+        },
+        {
+          href: 'https://fonts.gstatic.com',
+          rel: 'preconnect',
+          crossorigin: 'anonymous'
+        }
+      ]
+    : [],
 };
 
 export default config;
