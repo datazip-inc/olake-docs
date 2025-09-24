@@ -71,6 +71,11 @@ const config = {
 
   scripts: [
     {
+      src: '/font-loading-optimizer.js', // Load fonts after critical render path
+      defer: true,
+      fetchpriority: 'low'
+    },
+    {
       src: '/suppress-resize-observer.js', // Suppress ResizeObserver warnings
       defer: true,
       fetchpriority: 'high'
@@ -211,8 +216,32 @@ const config = {
               type: 'image/svg+xml',
               fetchpriority: 'high'
             },
+        },
+        // Font optimization - preconnect to Google Fonts
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'preconnect',
+            href: 'https://fonts.googleapis.com',
           },
-           // DNS prefetch for external resources
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'preconnect',
+            href: 'https://fonts.gstatic.com',
+            crossorigin: 'anonymous'
+          },
+        },
+        // Minimal font optimization - only DNS prefetch for performance
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://fonts.googleapis.com'
+          },
+        },
+         // DNS prefetch for external resources
         {
           tagName: 'link',
           attributes: {
@@ -934,18 +963,8 @@ const config = {
     '@docusaurus/theme-live-codeblock',
   ],
 
-  // Move Google Fonts to proper stylesheet links (faster than @import in CSS)
-  stylesheets: [
-    {
-      href: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap',
-      rel: 'stylesheet'  // Standard, reliable approach
-    },
-    {
-      href: 'https://fonts.gstatic.com',
-      rel: 'preconnect',
-      crossorigin: 'anonymous'
-    }
-  ]
+  // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags
+   
 };
 
 export default config;
