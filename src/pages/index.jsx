@@ -1,7 +1,6 @@
 import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
-import React, { useEffect, useRef } from 'react'
-import { useHistory } from 'react-router-dom'
+import React from 'react'
 
 import Faq from '@site/src/components/site/Faq'
 import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
@@ -43,39 +42,7 @@ export default function New3Page() {
     }
   ]
 
-  const childRef = useRef()
-  const formRef = useRef(null)
-  const history = useHistory()
-  // const isMobile = useIsMobile()
-
-  useEffect(() => {
-    if (childRef.current && childRef.current.init) {
-      childRef.current.init()
-    }
-    const script = document.createElement('script')
-    script.src = 'https://js.hsforms.net/forms/v2.js'
-    script.async = true
-    script.onload = () => {
-      window.hbspt.forms.create({
-        target: '#olake-product-form',
-        portalId: '21798546',
-        formId: '86391f69-48e0-4b35-8ffd-13ac212d8208'
-      })
-    }
-    document.body.appendChild(script)
-  }, [])
-
-  useEffect(() => {
-    if (window.location.hash === '#olake-product-form') {
-      setTimeout(() => {
-        window.scrollTo(0, formRef.current.offsetTop)
-      }, 0)
-      history.replace({
-        pathname: window.location.pathname,
-        search: window.location.search
-      })
-    }
-  }, [history, history.location.hash])
+  // HubSpot form and anchor scrolling are handled inside RegistrationSection only
 
   return (
     <Layout
@@ -111,6 +78,14 @@ export default function New3Page() {
               ]
             })
           }}
+        />
+        <link rel='preconnect' href='https://fonts.googleapis.com' />
+        <link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='' />
+        <link
+          rel='preload'
+          as='image'
+          href='/img/site/hero-section.svg'
+          imagesizes='(max-width: 1023px) 80vw, 0px'
         />
       </Head>
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>

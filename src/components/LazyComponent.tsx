@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, ComponentType } from 'react'
+import React, { Suspense, lazy, ComponentType, useEffect, useRef, useState } from 'react'
 
 // Define component types for better type safety
 type LazyComponentName =
@@ -49,8 +49,8 @@ const ActiveContributors = createLazyComponent(
 )
 
 // Loading fallback component
-const LoadingFallback: React.FC<{ componentName: string }> = ({ componentName }) => (
-  <div className='flex items-center justify-center p-8' style={{ minHeight: '200px' }}>
+const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> = ({ componentName, minHeight = 200 }) => (
+  <div className='flex items-center justify-center p-8' style={{ minHeight }}>
     <div className='flex w-full animate-pulse space-x-4'>
       <div className='h-10 w-10 rounded-full bg-gray-300'></div>
       <div className='flex-1 space-y-2 py-1'>
@@ -83,10 +83,23 @@ const COMPONENT_MAP: Record<LazyComponentName, ComponentType<any>> = {
 interface LazyComponentProps {
   component: LazyComponentName
   fallback?: React.ReactNode
+  /** IntersectionObserver root margin (e.g., '200px') */
+  rootMargin?: string
+  /** IntersectionObserver threshold */
+  threshold?: number
+  /** Placeholder min height before component loads */
+  placeholderMinHeight?: number
   [key: string]: any
 }
 
-const LazyComponent: React.FC<LazyComponentProps> = ({ component, fallback, ...props }) => {
+const LazyComponent: React.FC<LazyComponentProps> = ({
+  component,
+  fallback,
+  rootMargin = '200px',
+  threshold = 0,
+  placeholderMinHeight = 200,
+  ...props
+}) => {
   const LazyComponent = COMPONENT_MAP[component]
 
   if (!LazyComponent) {
@@ -101,10 +114,42 @@ const LazyComponent: React.FC<LazyComponentProps> = ({ component, fallback, ...p
     )
   }
 
+  // Defer mount until near viewport
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    if (isVisible) return
+    const element = containerRef.current
+    if (!element || typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      setIsVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true)
+            observer.disconnect()
+          }
+        })
+      },
+      { root: null, rootMargin, threshold }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [isVisible, rootMargin, threshold])
+
   return (
-    <Suspense fallback={fallback || <LoadingFallback componentName={component} />}>
-      <LazyComponent {...props} />
-    </Suspense>
+    <div ref={containerRef}>
+      {isVisible ? (
+        <Suspense fallback={fallback || <LoadingFallback componentName={component} minHeight={placeholderMinHeight} />}>
+          <LazyComponent {...props} />
+        </Suspense>
+      ) : (
+        fallback || <LoadingFallback componentName={component} minHeight={placeholderMinHeight} />
+      )}
+    </div>
   )
 }
 

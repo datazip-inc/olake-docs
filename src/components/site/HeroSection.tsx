@@ -28,7 +28,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             src='/img/site/hero-section.svg'
             alt='O.Lake Data Pipeline'
             className='max-w-[80%] h-auto dark:filter dark:brightness-90'
-            loading="lazy" decoding="async"
+            loading="eager" fetchpriority="high" decoding="async"
           />
         </div>
       </div>
