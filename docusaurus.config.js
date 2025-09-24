@@ -49,9 +49,6 @@ const config = {
         },
         blog: false,
 
-        // Defer analytics loading via clientModules (see src/clientModules/analytics.ts)
-        googleTagManager: undefined,
-        gtag: undefined,
 
         sitemap: {
           lastmod: 'date',
@@ -220,13 +217,6 @@ const config = {
           tagName: 'link',
           attributes: {
             rel: 'dns-prefetch',
-            href: 'https://widget.runllm.com'
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'dns-prefetch',
             href: 'https://js.hsforms.net'
           },
         },
@@ -250,14 +240,6 @@ const config = {
           attributes: {
             rel: 'preconnect',
             href: 'https://olake.io',
-            crossorigin: 'anonymous'
-          },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preconnect',
-            href: 'https://widget.runllm.com',
             crossorigin: 'anonymous'
           },
         },

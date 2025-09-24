@@ -54,27 +54,6 @@ export function onClientEntry() {
       // Note: Keep IDs in sync with docusaurus.config.js if you re-enable inline config
       const gtmId = 'GTM-TFZ2GXJP'
       await loadScript(`https://www.googletagmanager.com/gtm.js?id=${gtmId}`)
-
-      // Load RunLLM widget after GTM
-      await loadScript('https://widget.runllm.com', {
-        type: 'module',
-        id: 'runllm-widget-script',
-        crossorigin: 'anonymous',
-        'runllm-name': 'OLake AI Assistant',
-        'runllm-assistant-id': '654',
-        'runllm-position': 'BOTTOM_RIGHT',
-        'runllm-keyboard-shortcut': 'Mod+j',
-        'runllm-preset': 'docusaurus',
-        'runllm-support-email': 'hello@olake.io',
-        'runllm-community-url': 'https://olake.io/slack',
-        'runllm-community-type': 'slack',
-        'runllm-brand-logo': 'https://olake.io/img/logo/olake-blue.svg',
-        'runllm-floating-button-text': 'Ask OLake',
-        'runllm-per-user-usage-limit': '20',
-        'runllm-algolia-api-key': 'e33125f9089a304cef5331a186931e48',
-        'runllm-algolia-application-id': '1E406NO1AX',
-        'runllm-algolia-index-name': 'olake'
-      })
     } catch (e) {
       console.warn('Deferred analytics/widget load failed', e)
     }
