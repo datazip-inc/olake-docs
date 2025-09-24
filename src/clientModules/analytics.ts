@@ -43,7 +43,14 @@ export function onRouteDidUpdate() {
 export function onClientEntry() {
   onFirstInteraction(async () => {
     try {
-      // Load GTM container (deferred)
+      // Initialize GTM dataLayer (required before GTM script loads)
+      ;(window as any).dataLayer = (window as any).dataLayer || []
+      ;(window as any).gtag = function() {
+        ;(window as any).dataLayer.push(arguments)
+      }
+      ;(window as any).gtag('js', new Date())
+      
+      // Load GTM container (deferred) - GTM will handle its own config
       // Note: Keep IDs in sync with docusaurus.config.js if you re-enable inline config
       const gtmId = 'GTM-TFZ2GXJP'
       await loadScript(`https://www.googletagmanager.com/gtm.js?id=${gtmId}`)

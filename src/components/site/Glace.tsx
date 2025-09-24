@@ -31,7 +31,9 @@ const TallyForm: React.FC<TallyFormProps> = ({ src, title }) => {
       }
       document.body.appendChild(script)
       return () => {
-        document.body.removeChild(script)
+        if (script.parentNode) {
+          script.parentNode.removeChild(script)
+        }
       }
     }
   }, [isVisible])

@@ -70,7 +70,9 @@ const RegistrationSection = () => {
         { root: null, rootMargin: '600px', threshold: 0 }
       )
       observer.observe(targetEl)
-      return () => observer.disconnect()
+      return () => {
+        observer.disconnect()
+      }
     }
 
     // Fallback for very old browsers
