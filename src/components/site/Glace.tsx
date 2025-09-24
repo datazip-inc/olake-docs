@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CheckCircleOutlined } from '@ant-design/icons'
 
 const FEATURE_BADGES = [
@@ -17,28 +17,63 @@ interface TallyFormProps {
 }
 
 const TallyForm: React.FC<TallyFormProps> = ({ src, title }) => {
-  useEffect(() => {
-    // Load Tally script
-    const script = document.createElement('script')
-    script.src = 'https://tally.so/widgets/embed.js'
-    script.async = true
-    document.body.appendChild(script)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [isVisible, setIsVisible] = useState(false)
+  const scriptLoadedRef = useRef(false)
 
-    return () => {
-      document.body.removeChild(script)
+  useEffect(() => {
+    if (isVisible && !scriptLoadedRef.current) {
+      const script = document.createElement('script')
+      script.src = 'https://tally.so/widgets/embed.js'
+      script.async = true
+      script.onload = () => {
+        scriptLoadedRef.current = true
+      }
+      document.body.appendChild(script)
+      return () => {
+        document.body.removeChild(script)
+      }
     }
+  }, [isVisible])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    if (!('IntersectionObserver' in window)) {
+      setIsVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true)
+            observer.disconnect()
+          }
+        })
+      },
+      { root: null, rootMargin: '600px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [])
 
   return (
-    <iframe
-      data-tally-src={src}
-      width='100%'
-      height='700'
-      title={title}
-      loading="lazy"
-      className='w-full rounded-xl'
-      style={{ border: 'none', minHeight: '600px', margin: 0 }}
-    />
+    <div ref={containerRef}>
+      {isVisible ? (
+        <iframe
+          data-tally-src={src}
+          width='100%'
+          height='700'
+          title={title}
+          loading="lazy"
+          className='w-full rounded-xl'
+          style={{ border: 'none', minHeight: '600px', margin: 0 }}
+        />
+      ) : (
+        <div style={{ minHeight: '600px' }} className='w-full rounded-xl bg-gray-100 dark:bg-gray-800' />
+      )}
+    </div>
   )
 }
 
@@ -74,6 +109,7 @@ const Glace: React.FC<GlaceProps> = ({
                 src='/img/site/glace-cards.svg'
                 alt='Glace Illustration'
                 className='max-w-full lg:max-w-[90%]'
+                width="960" height="540"
                 loading="lazy" decoding="async"
               />
             </div>

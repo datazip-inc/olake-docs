@@ -11,6 +11,7 @@ import { useLocation } from '@docusaurus/router'
 
 import { BlogPagination } from '../BlogPagination'
 import QueryEngineAdvertisement from '../../components/Iceberg/QueryEngineAdvertisement'
+import Head from '@docusaurus/Head'
 
 function BlogListPageMetadata(props) {
   const { metadata } = props
@@ -54,6 +55,18 @@ function BlogListPageContent(props) {
 
   return (
     <BlogLayout sidebar={sidebar}>
+      {/* Preload first blog card image to improve LCP on listing */}
+      {items && items[0]?.content?.metadata?.frontMatter?.image && (
+        <Head>
+          <link
+            rel='preload'
+            as='image'
+            href={useBaseUrl(items[0].content.metadata.frontMatter.image)}
+            imagesizes='(max-width: 1024px) 100vw, 33vw'
+            fetchpriority='high'
+          />
+        </Head>
+      )}
       <BlogHomepageBanner {...props} />
       {/* Conditionally render Query Engine Advertisement */}
       {isIcebergRoute && <QueryEngineAdvertisement />}
