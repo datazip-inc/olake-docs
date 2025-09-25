@@ -34,10 +34,21 @@ export default function DocBreadcrumbsWrapper(props) {
     ];
 
     return (
-      <nav className="flex" aria-label="Breadcrumb">
+      <nav 
+        className="flex" 
+        aria-label="Breadcrumb"
+        itemScope 
+        itemType="https://schema.org/BreadcrumbList"
+      >
         <ol className="flex items-center space-x-2 text-sm">
           {customItems.map((item, index) => (
-            <li key={index} className="flex items-center">
+            <li 
+              key={index} 
+              className="flex items-center"
+              itemProp="itemListElement"
+              itemScope
+              itemType="https://schema.org/ListItem"
+            >
               {index > 0 && (
                 <span className="mx-2 text-gray-400">/</span>
               )}
@@ -46,16 +57,23 @@ export default function DocBreadcrumbsWrapper(props) {
                 <Link
                   to={item.href}
                   className="flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                  itemProp="item"
                 >
-                  {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
-                  {index === 0 ? "" : item.label}
+                  <span itemProp="name" className="flex items-center">
+                    {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
+                    {index === 0 ? "Home" : item.label}
+                  </span>
                 </Link>
               ) : (
-                <span className="flex items-center text-gray-900 dark:text-gray-100 font-medium">
+                <span 
+                  className="flex items-center text-gray-900 dark:text-gray-100 font-medium"
+                  itemProp="name"
+                >
                   {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
-                  {index === 0 ? "" : item.label}
+                  {index === 0 ? "Home" : item.label}
                 </span>
               )}
+              <meta itemProp="position" content={String(index + 1)} />
             </li>
           ))}
         </ol>

@@ -30,7 +30,7 @@ export default function BlogBreadcrumbs() {
   if (isIcebergPost) {
     const icebergBreadcrumbItems = [
       {
-        label: '',
+        label: 'Home',
         href: baseUrl,
       },
       {
@@ -108,7 +108,7 @@ export default function BlogBreadcrumbs() {
 
   const breadcrumbItems = [
     {
-      label: '',
+      label: 'Home',
       href: baseUrl,
     },
     {
