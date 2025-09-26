@@ -181,7 +181,7 @@ const config = {
           },
           {
             label: 'Talk to us',
-            href: 'https://olake.io/#olake-form-product',
+            href: '#olake-form-product',
             position: 'right',
             className: 'dev-portal-signup dev-portal-link',
           },
