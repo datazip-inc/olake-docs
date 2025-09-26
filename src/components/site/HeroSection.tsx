@@ -3,6 +3,26 @@ import React from 'react'
 import Link from '@docusaurus/Link'
 import StatsSection from './StatsSection'
 
+// Function to trigger form loading and scrolling
+const handleTalkToUsClick = (e: React.MouseEvent) => {
+  e.preventDefault()
+  
+  // Dispatch custom event to trigger form loading
+  const event = new CustomEvent('talkToUsClicked', {
+    detail: { action: 'loadFormAndScroll' }
+  })
+  window.dispatchEvent(event)
+  
+  // Also scroll to the form section as fallback
+  const formSection = document.getElementById('olake-form-product')
+  if (formSection) {
+    formSection.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'start' 
+    })
+  }
+}
+
 interface HeroSectionProps {
   title?: string
   subtitle?: string
@@ -55,12 +75,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
 
           <div className='mt-6 px-2 mx-auto lg:mx-0 max-w-full flex flex-col sm:flex-row gap-4 justify-center lg:justify-start'>
-            <Link
-              to='#olake-form-product'
+            <button
+              onClick={handleTalkToUsClick}
               className='inline-flex items-center justify-center rounded-md bg-[#203FDD] px-4 sm:px-6 py-2.5 font-medium text-white transition-colors hover:text-gray-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-sm sm:text-base'
             >
               Talk to us
-            </Link>
+            </button>
 
             <Link
               to='https://github.com/datazip-inc/olake'
