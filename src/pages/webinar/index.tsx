@@ -335,8 +335,7 @@ const WebinarsPage = () => {
                 title="OLake by Datazip events | Livestorm"
                 className="rounded-lg w-full"
                 style={{
-                  minHeight: '400px',
-                  height: `${iframeHeight}px`,
+                  height:'auto',
                   transition: 'height 0.3s ease-in-out',
                   border: 'none',
                   overflow: 'hidden'
