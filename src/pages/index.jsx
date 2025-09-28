@@ -5,7 +5,7 @@ import React from 'react'
 import Faq from '@site/src/components/site/Faq'
 import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
 import WorkflowSection from '../components/site/WorkflowSection'
-import Footer from '../components/site/Footer.tsx'
+import Footer from '@theme/DocItem/Footer'
 import LazyComponent from '../components/LazyComponent'
 
 export default function New3Page() {
