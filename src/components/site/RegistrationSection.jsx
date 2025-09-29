@@ -1,7 +1,7 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react'
 import { useHistory } from 'react-router-dom'
 
-const RegistrationSection = () => {
+const RegistrationSection = forwardRef((props, ref) => {
   const childRef = useRef()
   const formRef = useRef(null)
   const sectionRef = useRef(null)
@@ -10,38 +10,89 @@ const RegistrationSection = () => {
   const history = useHistory()
   // const isMobile = useIsMobile()
 
+  // Expose methods to parent components
+  useImperativeHandle(ref, () => ({
+    loadForm: () => {
+      loadHubSpot()
+    },
+    scrollToForm: () => {
+      if (sectionRef.current) {
+        sectionRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        })
+      }
+    },
+    loadFormAndScroll: () => {
+      loadHubSpot()
+      if (sectionRef.current) {
+        // Small delay to ensure form has time to load
+        setTimeout(() => {
+          sectionRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          })
+        }, 100)
+      }
+    }
+  }))
+
+  const loadHubSpot = () => {
+    if (formInitializedRef.current) return
+    const initialize = () => {
+      if (formInitializedRef.current) return
+      if (window.hbspt?.forms?.create) {
+        window.hbspt.forms.create({
+          target: '#olake-product-form',
+          portalId: '21798546',
+          formId: '86391f69-48e0-4b35-8ffd-13ac212d8208'
+        })
+        formInitializedRef.current = true
+      }
+    }
+
+    if (!scriptLoadedRef.current) {
+      const script = document.createElement('script')
+      script.src = 'https://js.hsforms.net/forms/v2.js'
+      script.async = true
+      script.onload = () => {
+        scriptLoadedRef.current = true
+        initialize()
+      }
+      document.body.appendChild(script)
+    } else {
+      initialize()
+    }
+  }
+
+  // Listen for custom event from "Talk to us" button
+  useEffect(() => {
+    const handleTalkToUsEvent = (event) => {
+      if (event.detail?.action === 'loadFormAndScroll') {
+        loadHubSpot()
+        // Small delay to ensure form has time to load before scrolling
+        setTimeout(() => {
+          if (sectionRef.current) {
+            sectionRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start' 
+            })
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('talkToUsClicked', handleTalkToUsEvent)
+    
+    return () => {
+      window.removeEventListener('talkToUsClicked', handleTalkToUsEvent)
+    }
+  }, [])
+
   // Defer HubSpot script & form creation until near viewport or anchor requested
   useEffect(() => {
     if (childRef.current && childRef.current.init) {
       childRef.current.init()
-    }
-
-    const loadHubSpot = () => {
-      if (formInitializedRef.current) return
-      const initialize = () => {
-        if (formInitializedRef.current) return
-        if (window.hbspt?.forms?.create) {
-          window.hbspt.forms.create({
-            target: '#olake-product-form',
-            portalId: '21798546',
-            formId: '86391f69-48e0-4b35-8ffd-13ac212d8208'
-          })
-          formInitializedRef.current = true
-        }
-      }
-
-      if (!scriptLoadedRef.current) {
-        const script = document.createElement('script')
-        script.src = 'https://js.hsforms.net/forms/v2.js'
-        script.async = true
-        script.onload = () => {
-          scriptLoadedRef.current = true
-          initialize()
-        }
-        document.body.appendChild(script)
-      } else {
-        initialize()
-      }
     }
 
     const targetEl = sectionRef.current
@@ -202,6 +253,6 @@ const RegistrationSection = () => {
       </div>
     </section>
   )
-}
+})
 
 export default RegistrationSection
