@@ -151,6 +151,7 @@ const docSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'release/overview',
         'release/v0.2.5',
         'release/v0.2.2-v0.2.4',
         'release/v0.2.0-v0.2.1',
