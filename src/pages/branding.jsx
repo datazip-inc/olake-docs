@@ -9,7 +9,7 @@ const logos = [
     description: 'The primary horizontal logo for OLake, available in high resolution.',
     image: '/img/logo/olake-white.svg',
     downloadLinkSVG: '/img/logo/olake-white.svg',
-    downloadLinkPNG: '/img/logo/olake-white.webp'
+    downloadLinkPNG: '/img/logo/olake-white.png'
   },
   {
     id: 2,
@@ -17,7 +17,7 @@ const logos = [
     description: 'A stacked version for tight vertical spaces.',
     image: '/img/logo/olake-blue.svg',
     downloadLinkSVG: '/img/logo/olake-blue.svg',
-    downloadLinkPNG: '/img/logo/olake-blue.webp'
+    downloadLinkPNG: '/img/logo/olake-blue.png'
   },
   {
     id: 3,
@@ -25,7 +25,7 @@ const logos = [
     description: 'A stacked version for tight vertical spaces.',
     image: '/img/logo/olake-black.svg',
     downloadLinkSVG: '/img/logo/olake-black.svg',
-    downloadLinkPNG: '/img/logo/olake-black.webp'
+    downloadLinkPNG: '/img/logo/olake-black.png'
   },
   {
     id: 4,
@@ -33,7 +33,7 @@ const logos = [
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-white-with-text.svg',
     downloadLinkSVG: '/img/logo/olake-white-with-text.svg',
-    downloadLinkPNG: '/img/logo/olake-white-with-text.webp'
+    downloadLinkPNG: '/img/logo/olake-white-with-text.png'
   },
   {
     id: 5,
@@ -41,7 +41,7 @@ const logos = [
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-blue-with-text.svg',
     downloadLinkSVG: '/img/logo/olake-blue-with-text.svg',
-    downloadLinkPNG: '/img/logo/olake-blue-with-text.webp'
+    downloadLinkPNG: '/img/logo/olake-blue-with-text.png'
   },
   {
     id: 6,
@@ -49,7 +49,7 @@ const logos = [
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-black-with-text.svg',
     downloadLinkSVG: '/img/logo/olake-black-with-text.svg',
-    downloadLinkPNG: '/img/logo/olake-black-with-text.webp'
+    downloadLinkPNG: '/img/logo/olake-black-with-text.png'
   }
 ]
 
