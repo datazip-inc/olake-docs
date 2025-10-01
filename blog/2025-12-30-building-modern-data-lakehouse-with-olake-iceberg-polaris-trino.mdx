@@ -1,0 +1,445 @@
+---
+slug: building-scalable-lakehouse-iceberg-trino-olake-polaris
+title: Building a Scalable Lakehouse with Iceberg, Trino, OLake & Polaris
+description: 'Iceberg is the storage "brain," OLake is the real-time "pipeline," Polaris is the "catalog" that keeps everyone on the same page, and Trino is the fast "SQL engine." Together they turn raw object storage into a governed, low-latency analytics platform—without the weight of enterprise catalog sprawl.'
+image: /img/blog/cover/scalable-lakehouse-polaris.png
+authors: [akshay]
+tags: [olake, iceberg, polaris, trino, lakehouse]
+---
+
+
+![Lakehouse Architecture](/img/blog/cover/scalable-lakehouse-polaris.png)
+
+# Building a Scalable Lakehouse with Iceberg, Trino, OLake & Polaris
+
+
+
+
+## Why choose this lakehouse stack?
+
+Modern data teams are moving toward the lakehouse architecture—combining the reliability of data warehouses with the scale and cost-efficiency of data lakes. But building one from scratch can feel overwhelming with so many moving parts.
+
+This guide walks you through building a production-ready lakehouse using four powerful open-source tools: **Apache Iceberg** (table format), **Apache Polaris** (catalog), **Trino** (query engine), and **OLake** (data ingestion). We'll show you exactly what each component does, why it matters, and how they work together—with a hands-on Docker setup you can run locally.
+
+
+
+## Understanding Apache Iceberg: The table format that changes everything
+
+Think of a data lake as a massive library where data files are scattered across random shelves with no catalog system. Finding specific data becomes nearly impossible. **Apache Iceberg** solves this by bringing structure and intelligence to data lakes—it tracks every file with rich metadata, enables time travel to previous versions, and handles schema changes gracefully.
+
+Unlike traditional data lake formats (like raw Parquet or ORC files), Iceberg provides:
+
+### Key benefits of using Iceberg
+
+* **ACID transactions on object storage**: Get database-like guarantees on cheap S3/GCS/Azure storage
+* **Schema evolution made easy**: Add, rename, or drop columns without rewriting terabytes of data
+* **Hidden partitioning**: Queries automatically prune irrelevant data without users writing complex WHERE clauses
+* **Time travel capabilities**: Query your data as it existed at any point in time for audits or debugging
+* **Production-grade performance**: Efficiently handle petabyte-scale datasets with fast metadata operations
+
+
+
+## Why you need a catalog: Keeping your lakehouse organized
+
+Here's the challenge with Iceberg: every time you make a change (add data, update schema, delete rows), Iceberg creates a new metadata file. Over time, you might have hundreds of these files. The big question becomes: **which metadata file represents the current state of your table?**
+
+This is where the **catalog** comes in. Think of it as the central registry that:
+
+- Maintains a list of all your Iceberg tables
+- Tracks which metadata file is the "current" version for each table
+- Ensures all query engines see a consistent view of your data
+
+Without a proper catalog, different tools might read different versions of your tables, leading to inconsistent results and data chaos.
+
+
+
+## Enter Apache Polaris: A lightweight, standards-based catalog
+
+**Apache Polaris** is a relatively new but powerful REST catalog for Iceberg that strikes the perfect balance between simplicity and enterprise capabilities. Unlike heavyweight proprietary catalogs, Polaris is:
+
+- **Easy to deploy**: Single container running on Quarkus/Java
+- **Standards-compliant**: Implements the Iceberg REST Catalog spec, so any Iceberg-compatible engine works seamlessly
+- **Production-ready**: Ships with Kubernetes Helm charts and supports enterprise authentication (OIDC)
+- **Cloud-agnostic**: Works with S3, MinIO, GCS, Azure Blob Storage, and more
+
+### What makes Polaris special
+
+Polaris was designed to solve the catalog complexity problem. Traditional catalogs like Hive Metastore or AWS Glue can be heavyweight, expensive, or lock you into a specific cloud provider. Polaris gives you:
+
+- **Role-based access control** out of the box
+- **Flexible authentication** (internal tokens or external OIDC providers)
+- **Lightweight architecture** that scales without the bloat
+- **Open source** with active community support
+
+> **Production tip**: For local development, you can pass S3 credentials directly to Polaris. In production environments, always use cloud-native authentication (IAM roles, OIDC), enable TLS, and implement least-privilege access controls.
+
+
+
+## OLake: Real-time data ingestion made simple
+
+Now that you have Iceberg tables and a Polaris catalog, how do you actually get data into your lakehouse? This is where **OLake** comes in.
+
+**OLake** is an open-source, high-performance tool specifically built to replicate data from operational databases directly into Iceberg format. It supports:
+
+- **Popular databases**: PostgreSQL, MySQL, MongoDB, Oracle, plus Kafka streams
+- **Change data capture (CDC)**: Captures every insert, update, and delete in real-time
+- **Native Iceberg writes**: Data lands directly in Iceberg format with proper metadata
+- **Simple configuration**: Point it at your database and catalog, and you're done
+
+### Why OLake over traditional ETL?
+
+Traditional ETL tools like Debezium + Kafka + Spark require complex pipelines with multiple moving parts. OLake simplifies this dramatically:
+
+1. **Direct to Iceberg**: No intermediate formats or complex transformations
+2. **Real-time sync**: Changes appear in your lakehouse within seconds
+3. **Catalog-aware**: Automatically registers tables with Polaris
+4. **CLI and UI**: Choose your preferred way to manage pipelines
+
+What this means in practice: your applications keep writing to operational databases (MySQL, Postgres, MongoDB) as usual. OLake continuously captures those changes and writes them to Iceberg tables that are immediately queryable via Trino or any other Iceberg-compatible engine.
+
+
+
+## Trino: Your high-performance query engine
+
+With data in Iceberg format and a Polaris catalog managing it all, you need a powerful query engine to actually analyze that data. **Trino** is perfect for this role.
+
+**Trino** is a distributed SQL engine designed for fast, interactive analytics on massive datasets. Originally created at Facebook (as Presto), it's now one of the most popular open-source query engines for data lakes.
+
+### Why Trino excels for lakehouse architectures
+
+- **Blazing fast**: MPP (massively parallel processing) architecture runs queries in seconds, not hours
+- **Standard SQL**: Use familiar ANSI SQL—no need to learn new query languages
+- **Federation**: Query across multiple data sources (Iceberg, PostgreSQL, MySQL, Kafka) in a single query
+- **Iceberg-native**: Full support for Iceberg features including time travel, schema evolution, and hidden partitioning
+- **Scales horizontally**: Add more workers to handle larger datasets and higher concurrency
+
+### Time travel and advanced features
+
+Trino's Iceberg connector supports powerful capabilities like:
+
+```sql
+-- Query data as it existed at a specific time
+SELECT * FROM orders FOR TIMESTAMP AS OF TIMESTAMP '2025-01-15 10:00:00';
+
+-- Query a specific snapshot version
+SELECT * FROM orders FOR VERSION AS OF 12345;
+```
+
+This makes auditing, debugging, and compliance workflows significantly easier.
+
+
+
+## How the pieces mesh
+
+![Architecture Diagram](/img/blog/2025/16/architecture-polaris.png)
+
+1. **Ingest**: OLake captures CDC from MySQL/Postgres/MongoDB and commits Iceberg snapshots (data + metadata) into object storage.
+2. **Catalog**: Polaris exposes those tables through the Iceberg REST API so all engines share the same view of "current."
+3. **Query**: Trino points its Iceberg connector at Polaris and runs federated SQL, including **time-travel** on Iceberg tables.
+
+### What each component brings to your lakehouse
+
+| Capability | Iceberg | Polaris | OLake | Trino |
+|------------|---------|---------|-------|-------|
+| Low-cost object storage | ✓ | – | – | – |
+| Simple REST catalog | – | ✓ | – | – |
+| Transactional snapshots | ✓ | ✓ (via REST commits) | – | – |
+| Real-time CDC ingestion | – | – | ✓ | – |
+| Time-travel queries | ✓ | – | – | ✓ |
+| Interactive SQL | – | – | – | ✓ |
+| Federated joins | – | – | – | ✓ |
+| Engine-agnostic metadata | ✓ | ✓ | ✓ | ✓ |
+
+
+
+## Hands-on guide: Running the complete stack locally
+
+Let's put everything together and run a complete lakehouse on your laptop using Docker Compose. We'll set up:
+
+- **MinIO**: S3-compatible object storage for your data files
+- **PostgreSQL**: Metadata store for Polaris
+- **Polaris**: REST catalog managing Iceberg tables
+- **Trino**: Query engine for analytics
+- **MySQL**: Source database to demonstrate OLake ingestion
+
+This setup mirrors a production environment but runs entirely locally, making it perfect for learning and testing.
+
+<details>
+<summary>Click to expand Docker Compose YAML</summary>
+
+```yaml
+version: '3.8'
+
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  db:
+    image: postgres:15
+    container_name: polaris-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: polaris
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d polaris"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  polaris:
+    image: apache/polaris:latest
+    container_name: polaris
+    environment:
+      # Quarkus/Polaris JDBC config
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/polaris
+      QUARKUS_DATASOURCE_USERNAME: postgres
+      QUARKUS_DATASOURCE_PASSWORD: postgres
+      # Enable management endpoints on port 8182 (health, metrics)
+      QUARKUS_MANAGEMENT_ENABLED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8181:8181"  # Main API
+      - "8182:8182"  # Management endpoints (health, metrics)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    depends_on:
+      polaris:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./trino/etc:/etc/trino:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: demo_db
+      MYSQL_USER: demo_user
+      MYSQL_PASSWORD: demo_password
+    command: >
+      --log-bin=mysql-bin --server-id=1 --binlog-format=ROW
+      --gtid-mode=ON --enforce-gtid-consistency=ON
+      --binlog-row-image=FULL
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  minio-data:
+  pg-data:
+  mysql-data:
+```
+
+</details>
+
+### 1) Bring up the stack
+
+```bash
+docker compose up -d
+```
+
+### 2) Create a Polaris catalog pointing at MinIO
+
+Polaris exposes a **management API** to define catalogs. For local dev on MinIO, you can set the base location and MinIO endpoint/keys directly on the catalog:
+
+```bash
+# Create an INTERNAL catalog named "lakehouse"
+curl -s -X POST http://localhost:8181/api/management/v1/catalogs \
+  -H 'Content-Type: application/json' \
+  --data '{
+    "name": "lakehouse",
+    "type": "INTERNAL",
+    "properties": {
+      "default-base-location": "s3://warehouse",
+      "s3.endpoint": "http://minio:9000",
+      "s3.path-style-access": "true",
+      "s3.region": "us-east-1",
+      "s3.access-key-id": "minio",
+      "s3.secret-access-key": "minio123"
+    }
+  }'
+```
+
+Polaris serves the **Iceberg REST** under `http://polaris:8181/api/catalog/...` inside the Docker network.
+
+> **Production note:** prefer IAM/OIDC and avoid embedding static keys; Polaris supports external identity providers via OIDC when you outgrow local dev auth.
+
+### 3) Configure Trino to use Polaris (REST)
+
+Create `./trino/etc/catalog/iceberg.properties`:
+
+```properties
+connector.name=iceberg
+iceberg.catalog.type=rest
+# Polaris REST endpoint (service name from compose)
+iceberg.rest-catalog.uri=http://polaris:8181/api/catalog
+
+# Optional: Some REST catalogs require warehouse property
+# Polaris doesn't need this when default-base-location is set in catalog config
+# iceberg.rest-catalog.warehouse=warehouse
+
+# S3/MinIO settings so Trino can read/write table data
+fs.native-s3.enabled=true
+s3.endpoint=http://minio:9000
+s3.region=us-east-1
+s3.path-style-access=true
+s3.access-key=minio
+s3.secret-key=minio123
+```
+
+This mirrors Trino's documented **REST catalog** and **S3** configuration; MinIO typically requires path-style access. Restart Trino if it's already up.
+
+> **Production Auth Note**: If you enable OAuth/OIDC on Polaris, you'll need to supply a bearer token to Trino via `iceberg.rest-catalog.oauth2.token=<token>` or use Polaris's token-based authentication. The example above uses no auth, which is fine for local/dev environments but should be secured in production.
+
+
+
+## Querying with Trino
+
+Open **Trino UI** at `http://localhost:8082/ui/` and connect with the `iceberg` catalog.
+
+### Explore catalogs & schemas
+
+```sql
+SHOW CATALOGS;
+-- you should see: iceberg
+
+-- Polaris organizes tables under namespaces (schemas)
+SHOW SCHEMAS FROM iceberg;
+```
+
+### Create a demo Iceberg table
+
+```sql
+CREATE SCHEMA IF NOT EXISTS iceberg.demo;
+CREATE TABLE IF NOT EXISTS iceberg.demo.orders (
+  order_id BIGINT,
+  customer_id BIGINT,
+  amount DOUBLE,
+  ts TIMESTAMP
+)
+WITH (
+  partitioning = ARRAY['day(ts)']  -- hidden partitioning
+);
+
+INSERT INTO iceberg.demo.orders VALUES
+  (1,101,29.9, current_timestamp),
+  (2,101,12.0, current_timestamp),
+  (3,202,79.5, current_timestamp);
+```
+
+### Time travel (version & timestamp)
+
+```sql
+-- list snapshots
+SELECT * FROM "iceberg"."demo"."orders$snapshots";
+
+-- time travel by snapshot id
+SELECT * FROM iceberg.demo.orders FOR VERSION AS OF <snapshot_id>;
+
+-- or by timestamp
+SELECT * FROM iceberg.demo.orders
+FOR TIMESTAMP AS OF TIMESTAMP '2025-03-13 08:00:00.000 UTC';
+```
+
+Trino's Iceberg connector supports both `FOR VERSION AS OF` and `FOR TIMESTAMP AS OF` for point-in-time queries.
+
+
+
+## Wiring OLake for ingestion
+
+With Polaris and Trino in place, point **OLake** at your source DB and the Polaris catalog (URI + warehouse path you created). OLake tails changes (CDC) and commits **Iceberg snapshots**, so Trino discovers new/updated tables instantly through Polaris. See OLake's README and docs for connectors & CLI/UI flows.
+
+
+
+## Deeper notes (for practitioners)
+
+* **Hidden partitioning & evolution**
+  Users don't have to include partition columns; Iceberg tracks transforms like `day(ts)` and prunes files automatically. You can later evolve from `day(ts)` to `hour(ts)` without rewriting old data; new data follows the new spec and queries still prune correctly.
+
+* **Time-travel and rollbacks**
+  Every change creates a snapshot. You can explore history via metadata tables and even roll back to a snapshot if needed (via Trino procedures). Great for audits and incident recovery.
+
+* **MinIO & S3 path-style access**
+  MinIO typically requires `s3.path-style-access=true` in Trino. Our example shows the recommended baseline configuration. If you encounter edge cases with specific Trino versions, double-check your S3 connector settings and ensure path-style access is enabled.
+
+* **Polaris health endpoints**
+  Quarkus-based Polaris exposes health checks at `/q/health` by default. If you enable management endpoints (`QUARKUS_MANAGEMENT_ENABLED=true`), you can access health and metrics on port 8182. This is useful for production monitoring and orchestration.
+
+* **Auth & governance**
+  Start simple locally; in prod, enable TLS, use short-lived tokens or OIDC, and scope roles by realm. Polaris includes docs and a Helm chart to standardize deployments.
+
+
+
+## When to choose Polaris vs. heavier catalogs
+
+| Aspect     | Enterprise catalogs      | Polaris                              |
+| - |  |  |
+| Setup time | Hours–days               | **Minutes** (container + API)        |
+| Complexity | High (OIDC/OPA/policies) | **Low**, add OIDC later if needed    |
+| Footprint  | Multi-service            | Single service + Postgres            |
+| Standard   | Varies                   | **Iceberg REST**                     |
+| Prod-ready | Yes                      | **Yes** (Helm, auth modes available) |
+
+If you need deep enterprise policy graphs today, consider the heavyweights. If you want **standards + simplicity now** with a clean path to enterprise auth, Polaris is an excellent starting point.
+
+
+
+## Conclusion
+
+This stack stays true to the lakehouse promise while avoiding yak-shaving:
+
+* **Iceberg** gives you ACID, schema/partition evolution, hidden partitioning, and time travel.
+* **Polaris** provides a simple, standards-based catalog that engines agree on.
+* **OLake** moves operational data into Iceberg quickly and continuously.
+* **Trino** makes it all feel like one fast SQL system.
+
+Spin it up, ingest a table, run a **time-travel query**, and you'll see how quickly a governed lakehouse can feel *simple*.
+
+**Happy building—welcome to the lakehouse club!**
+
+
+Trino exposes both clauses for Iceberg, making reproducible analytics and audits straightforward.
+
+
