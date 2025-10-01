@@ -56,22 +56,16 @@ function ShareButton(props) {
     ];
 
     return (
-        <div className="dropdown dropdown--hoverable pointer">
-            <a
-                target="_blank"
-                rel="noreferrer noopener"
-                style={{ marginTop: "0.45rem" }}
-            >
-                <img
-                    className="margin-right--xs"
-                    src={shareIconUrl}
-                    style={{ height: "16px", width: "18px", verticalAlign: "-0.125em" }}
-                ></img>
-            </a>
+        <div className="dropdown dropdown--hoverable pointer mr-4">
             <button
-                className="button button--lg button--link padding-horiz--none pointer share-button"
+                className="button button--lg button--link padding-horiz--none pointer share-button hover:no-underline"
                 style={{ fontWeight: 400, fontFamily: "inherit", fontSize: "inherit" }}
             >
+               <img
+                    className="margin-right--xs"
+                    src={shareIconUrl}
+                    style={{ height: "16px", verticalAlign: "-0.125em" }}
+                ></img>
                 Share
             </button>
 
