@@ -1,0 +1,401 @@
+---
+slug: building-modern-data-lakehouse-with-olake-iceberg-polaris-trino
+title: Building a Modern Lakehouse with Iceberg, OLake, Polaris & Trino — A Simpler Alternative
+description: 'Iceberg is the storage "brain," OLake is the real-time "pipeline," Polaris is the "catalog" that keeps everyone on the same page, and Trino is the fast "SQL engine." Together they turn raw object storage into a governed, low-latency analytics platform—without the weight of enterprise catalog sprawl.'
+image: /img/blog/cover/open-data-lakehouse-cover.webp
+authors: [akshay]
+tags: [olake, iceberg, polaris, trino, lakehouse]
+---
+
+![Lakehouse Architecture](/img/blog/cover/open-data-lakehouse-cover.webp)
+
+# Building a Modern Lakehouse with Iceberg, OLake, Polaris & Trino — A Simpler Alternative
+
+*December 30, 2024 · 12 min read*
+
+**TL;DR** Iceberg is the storage **brain**, OLake is the real-time **pipeline**, Polaris is the **catalog** that keeps everyone on the same page, and Trino is the fast **SQL engine**. Together they turn raw object storage into a governed, low-latency analytics platform—without the weight of enterprise catalog sprawl.
+
+---
+
+## Why this stack?
+
+Data engineering has swung toward the lakehouse: warehouse reliability on lake scale. This post gives you a friendly tour of each component—**what it is, why it matters, and how it connects**—using a setup that favors simplicity: **Apache Polaris** (Iceberg REST catalog) + **Trino** (distributed SQL) + **Iceberg** (open table format) + **OLake** (DB→Iceberg replication). We'll run it locally with MinIO to mirror S3.
+
+---
+
+## Iceberg in plain English
+
+Picture a massive library where books (files) sit on random floors with no catalog. Finding "Harry Potter 5" is chaos. **Iceberg** is the modern Dewey Decimal system for data lakes: it tracks files with rich metadata, lets you **time-travel** to a past version, evolve schemas safely, and **hide partitioning details** so users don't need brittle `WHERE dt='2025-07-21'` predicates to get fast queries.
+
+### Why Iceberg matters (quick hits)
+
+* **ACID on cheap storage** (S3/GCS/Azure/MinIO).
+* **Schema & partition evolution** without rewriting terabytes.
+* **Hidden partitioning** (pruning without user-visible partition columns).
+* **Time travel**: query as of a snapshot or timestamp.
+
+---
+
+## Catalogs: the foundation layer (and the usual bottleneck)
+
+Every Iceberg change writes a new `metadata.json`. Engines need to agree on **which one is current** and where tables live. That's the **catalog**: registry of tables + pointers to current metadata. There are file-based and service-based approaches; we'll use **Apache Polaris**, a service implementing the **Iceberg REST Catalog** that keeps engines consistent and discoverable.
+
+---
+
+## Apache Polaris (Incubating): simple, standards-based REST catalog
+
+**Polaris** exposes the standard Iceberg REST APIs, includes role-based access controls and auth options, runs on **Quarkus/Java**, and ships with a Kubernetes Helm chart for production. It's designed to be **lightweight to run** yet flexible enough for enterprise auth (OIDC) when you need it.
+
+**What you get:**
+
+* **Standards compliance**: any engine supporting the Iceberg REST catalog can talk to Polaris.
+* **Auth choices**: internal token service today; OIDC-based external IdP when needed.
+* **Straightforward deployment**: container, config, and (optionally) Helm.
+* **Works with S3/MinIO/GCS/Azure** as table storage.
+
+> **Note on simplicity vs. control**
+> In local demos, we often pass S3 credentials directly to Polaris and/or Trino. In production, prefer cloud-native auth (IAM, OIDC), TLS, and scoped roles.
+
+---
+
+## OLake: high-speed DB → Iceberg replication
+
+**OLake** positions itself as an open-source, fast path from operational databases (PostgreSQL/MySQL/MongoDB/Oracle, plus Kafka) into Iceberg—CLI and UI, CDC-aware, with a simple "point-to-catalog + warehouse" mental model. It fills the gap between generic ETL and lakehouse-native ingestion by committing snapshots that engines can read immediately.
+
+What this means in practice: you keep writing to your OLTP systems, OLake tails changes and writes **Iceberg-native** data + metadata so query engines see consistent, current tables via the catalog.
+
+---
+
+## Trino: distributed SQL on everything
+
+**Trino** is a fast, MPP SQL engine that treats your lake and databases as one giant, federated catalog—no data copies. With the **Iceberg connector**, you get DML, partition pruning, and **time-travel** (`FOR VERSION AS OF` or `FOR TIMESTAMP AS OF`). It's the "query brain" that unifies sources through ANSI SQL while scaling horizontally.
+
+---
+
+## How the pieces mesh
+
+![Architecture Diagram](/img/blog/2025/07/mesh-iceberg-trino-olake-lakekeeper.webp)
+
+1. **Ingest**: OLake captures CDC from MySQL/Postgres/MongoDB and commits Iceberg snapshots (data + metadata) into object storage.
+2. **Catalog**: Polaris exposes those tables through the Iceberg REST API so all engines share the same view of "current."
+3. **Query**: Trino points its Iceberg connector at Polaris and runs federated SQL, including **time-travel** on Iceberg tables.
+
+**What you gain**
+
+| Benefit                  | Iceberg | Polaris              | OLake | Trino |
+| ------------------------ | ------- | -------------------- | ----- | ----- |
+| Low-cost object storage  | ✓       | –                    | –     | –     |
+| Simple REST catalog      | –       | ✓                    | –     | –     |
+| Transactional snapshots  | ✓       | ✓ (via REST commits) | –     | –     |
+| Real-time ingestion      | –       | –                    | ✓     | –     |
+| Time-travel queries      | ✓       | –                    | –     | ✓     |
+| Interactive SQL          | –       | –                    | –     | ✓     |
+| Federated joins          | –       | –                    | –     | ✓     |
+| Engine-agnostic metadata | ✓       | ✓                    | ✓     | ✓     |
+
+---
+
+## Hands-on: Docker Compose 🐋
+
+We'll run **MinIO** (S3-compatible), **Postgres** (Polaris metadata), **Polaris**, **Trino**, and **MySQL** (as a source). After services are healthy, we'll create a **Polaris INTERNAL catalog** pointing at MinIO and then wire Trino to it.
+
+> The Trino → Polaris REST setting is `iceberg.catalog.type=rest` + `iceberg.rest-catalog.uri=...`. For Polaris, the Iceberg REST path is served under `/api/catalog`.
+
+<details>
+<summary>Click to expand Docker Compose YAML</summary>
+
+```yaml
+version: '3.8'
+
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  db:
+    image: postgres:15
+    container_name: polaris-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: polaris
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d polaris"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  polaris:
+    image: apache/polaris:latest
+    container_name: polaris
+    environment:
+      # Quarkus/Polaris JDBC config
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/polaris
+      QUARKUS_DATASOURCE_USERNAME: postgres
+      QUARKUS_DATASOURCE_PASSWORD: postgres
+      # optional: expose management endpoints on 8182
+      QUARKUS_MANAGEMENT_ENABLED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    depends_on:
+      polaris:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./trino/etc:/etc/trino:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: demo_db
+      MYSQL_USER: demo_user
+      MYSQL_PASSWORD: demo_password
+    command: >
+      --log-bin=mysql-bin --server-id=1 --binlog-format=ROW
+      --gtid-mode=ON --enforce-gtid-consistency=ON
+      --binlog-row-image=FULL
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  minio-data:
+  pg-data:
+  mysql-data:
+```
+
+</details>
+
+### 1) Bring up the stack
+
+```bash
+docker compose up -d
+```
+
+### 2) Create a Polaris catalog pointing at MinIO
+
+Polaris exposes a **management API** to define catalogs. For local dev on MinIO, you can set the base location and MinIO endpoint/keys directly on the catalog:
+
+```bash
+# Create an INTERNAL catalog named "lakehouse"
+curl -s -X POST http://localhost:8181/api/management/v1/catalogs \
+  -H 'Content-Type: application/json' \
+  --data '{
+    "name": "lakehouse",
+    "type": "INTERNAL",
+    "properties": {
+      "default-base-location": "s3://warehouse",
+      "s3.endpoint": "http://minio:9000",
+      "s3.path-style-access": "true",
+      "s3.region": "us-east-1",
+      "s3.access-key-id": "minio",
+      "s3.secret-access-key": "minio123"
+    }
+  }'
+```
+
+Polaris serves the **Iceberg REST** under `http://polaris:8181/api/catalog/...` inside the Docker network.
+
+> **Production note:** prefer IAM/OIDC and avoid embedding static keys; Polaris supports external identity providers via OIDC when you outgrow local dev auth.
+
+### 3) Configure Trino to use Polaris (REST)
+
+Create `./trino/etc/catalog/iceberg.properties`:
+
+```properties
+connector.name=iceberg
+iceberg.catalog.type=rest
+# Polaris REST endpoint (service name from compose)
+iceberg.rest-catalog.uri=http://polaris:8181/api/catalog
+
+# S3/MinIO settings so Trino can read/write table data
+fs.native-s3.enabled=true
+s3.endpoint=http://minio:9000
+s3.region=us-east-1
+s3.path-style-access=true
+s3.access-key=minio
+s3.secret-key=minio123
+```
+
+This mirrors Trino's documented **REST catalog** and **S3** configuration; MinIO typically requires path-style access. Restart Trino if it's already up.
+
+---
+
+## Querying with Trino
+
+Open **Trino UI** at `http://localhost:8082/ui/` and connect with the `iceberg` catalog.
+
+### Explore catalogs & schemas
+
+```sql
+SHOW CATALOGS;
+-- you should see: iceberg
+
+-- Polaris organizes tables under namespaces (schemas)
+SHOW SCHEMAS FROM iceberg;
+```
+
+### Create a demo Iceberg table
+
+```sql
+CREATE SCHEMA IF NOT EXISTS iceberg.demo;
+CREATE TABLE IF NOT EXISTS iceberg.demo.orders (
+  order_id BIGINT,
+  customer_id BIGINT,
+  amount DOUBLE,
+  ts TIMESTAMP
+)
+WITH (
+  partitioning = ARRAY['day(ts)']  -- hidden partitioning
+);
+
+INSERT INTO iceberg.demo.orders VALUES
+  (1,101,29.9, current_timestamp),
+  (2,101,12.0, current_timestamp),
+  (3,202,79.5, current_timestamp);
+```
+
+### Time travel (version & timestamp)
+
+```sql
+-- list snapshots
+SELECT * FROM "iceberg"."demo"."orders$snapshots";
+
+-- time travel by snapshot id
+SELECT * FROM iceberg.demo.orders FOR VERSION AS OF <snapshot_id>;
+
+-- or by timestamp
+SELECT * FROM iceberg.demo.orders
+FOR TIMESTAMP AS OF TIMESTAMP '2025-03-13 08:00:00.000 UTC';
+```
+
+Trino's Iceberg connector supports both `FOR VERSION AS OF` and `FOR TIMESTAMP AS OF` for point-in-time queries.
+
+---
+
+## Wiring OLake for ingestion
+
+With Polaris and Trino in place, point **OLake** at your source DB and the Polaris catalog (URI + warehouse path you created). OLake tails changes (CDC) and commits **Iceberg snapshots**, so Trino discovers new/updated tables instantly through Polaris. See OLake's README and docs for connectors & CLI/UI flows.
+
+---
+
+## Deeper notes (for practitioners)
+
+* **Hidden partitioning & evolution**
+  Users don't have to include partition columns; Iceberg tracks transforms like `day(ts)` and prunes files automatically. You can later evolve from `day(ts)` to `hour(ts)` without rewriting old data; new data follows the new spec and queries still prune correctly.
+
+* **Time-travel and rollbacks**
+  Every change creates a snapshot. You can explore history via metadata tables and even roll back to a snapshot if needed (via Trino procedures). Great for audits and incident recovery.
+
+* **Auth & governance**
+  Start simple locally; in prod, enable TLS, use short-lived tokens or OIDC, and scope roles by realm. Polaris includes docs and a Helm chart to standardize deployments.
+
+---
+
+## When to choose Polaris vs. heavier catalogs
+
+| Aspect     | Enterprise catalogs      | Polaris                              |
+| ---------- | ------------------------ | ------------------------------------ |
+| Setup time | Hours–days               | **Minutes** (container + API)        |
+| Complexity | High (OIDC/OPA/policies) | **Low**, add OIDC later if needed    |
+| Footprint  | Multi-service            | Single service + Postgres            |
+| Standard   | Varies                   | **Iceberg REST**                     |
+| Prod-ready | Yes                      | **Yes** (Helm, auth modes available) |
+
+If you need deep enterprise policy graphs today, consider the heavyweights. If you want **standards + simplicity now** with a clean path to enterprise auth, Polaris is an excellent starting point.
+
+---
+
+## Conclusion
+
+This stack stays true to the lakehouse promise while avoiding yak-shaving:
+
+* **Iceberg** gives you ACID, schema/partition evolution, hidden partitioning, and time travel.
+* **Polaris** provides a simple, standards-based catalog that engines agree on.
+* **OLake** moves operational data into Iceberg quickly and continuously.
+* **Trino** makes it all feel like one fast SQL system.
+
+Spin it up, ingest a table, run a **time-travel query**, and you'll see how quickly a governed lakehouse can feel *simple*.
+
+**Happy building—welcome to the lakehouse club!**
+
+---
+
+## Resources & further reading
+
+* **Apache Polaris docs**: https://polaris.apache.org/
+* **Polaris Quickstart**: https://polaris.apache.org/releases/1.1.0/quickstart/
+* **Polaris on MinIO**: https://polaris.apache.org/releases/1.1.0/deploying-polaris-on-minio/
+* **Trino Iceberg connector**: https://trino.io/docs/current/connector/iceberg.html
+* **Trino S3 config**: https://trino.io/docs/current/object-storage/file-system-s3.html
+* **Iceberg docs (1.5.x)**: https://iceberg.apache.org/docs/1.5.2/
+* **OLake (GitHub)**: https://github.com/datazip-inc/olake
+* **OLake docs**: https://olake.io/docs/
+
+---
+
+### Appendix: Trino time-travel cheat-sheet
+
+```sql
+-- Snapshots table
+SELECT * FROM "catalog.schema.table$snapshots";
+
+-- Point-in-time by snapshot id
+SELECT * FROM catalog.schema.table FOR VERSION AS OF <snapshot_id>;
+
+-- Point-in-time by timestamp
+SELECT * FROM catalog.schema.table
+FOR TIMESTAMP AS OF TIMESTAMP 'YYYY-MM-DD HH:MM:SS.mmm UTC';
+```
+
+Trino exposes both clauses for Iceberg, making reproducible analytics and audits straightforward.
+
+---
+
+*Image notes: diagrams are placeholders you can swap with your brand artwork.*
+
+<BlogCTA/>
