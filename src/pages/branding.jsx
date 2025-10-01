@@ -72,7 +72,7 @@ const LogoCard = ({ logo }) => {
           <a
             href={logo.downloadLinkSVG}
             download
-            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-blue-700'
+            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-black'
           >
             <FaDownload className='mr-2' />
             Download
@@ -84,7 +84,7 @@ const LogoCard = ({ logo }) => {
           <a
             href={logo.downloadLinkPNG}
             download
-            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-blue-700'
+            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-black'
           >
             <FaDownload className='mr-2' />
             Download
