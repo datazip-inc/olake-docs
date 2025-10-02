@@ -82,6 +82,19 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Mastering Iceberg Maintenance: From Compaction to Cost Optimization',
+      subtitle:
+        'Apache Iceberg has quickly become the backbone of modern data lakes, but maintaining tables efficiently is just as critical as building them. This session dives into the art of Iceberg table maintenance, from compaction strategies to metadata cleanup, with a focus on balancing query performance and compute cost.',
+      route: '/webinar/w-11-mastering-iceberg-maintenance',
+      img: `/img/webinars/w-11-mastering-iceberg-maintenance.png`,
+      alt: 'Mastering Iceberg Maintenance: From Compaction to Cost Optimization',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '15 January 2025',
+      icon: FaVideo
+    },
+    {
       title: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
       subtitle:
         'As Apache Iceberg continues its rapid evolution and the catalog ecosystem expands, data engineers must make pivotal decisions about metadata management that directly influence query performance, costs, and operational complexity.',
