@@ -17,7 +17,7 @@ const hosts = [
     name: "Amit Gilad",
     role: "CTO @ Lakeops",
     bio: "Apache Iceberg enthusiast and ex-data engineer at Cloudinary. Amit focus revolves around leveraging the power of data lakes and diving into Apache Iceberg. He's deeply focused on harnessing the potential of data lakes, orchestrating the organization and management of vast datasets to extract valuable insights.",
-    image: "/img/authors/amit-gilad.jpeg",
+    image: "/img/authors/amit.webp",
     linkedin: "https://www.linkedin.com/in/amitgilad",
   },
   {
