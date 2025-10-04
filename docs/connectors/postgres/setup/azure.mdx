@@ -6,7 +6,7 @@ sidebar_position: 4
 
 # Azure Database for PostgreSQL CDC Setup Guide
 
-Azure Database for PostgreSQL supports CDC through logical replication on **Flexible Server** deployments. The service provides built-in support for the `wal2json` plugin and logical decoding capabilities.
+Azure Database for PostgreSQL supports CDC through logical replication on **Flexible Server** deployments. Use the native `pgoutput` plugin with PostgreSQL publications for CDC.
 
 **Prerequisites:**
 
@@ -94,34 +94,49 @@ Azure Database for PostgreSQL Flexible Server does **not support logical replica
 
    ![postgres-network-settings-azure](/img/docs/cdc/postgres/postgres-network-settings-azure.webp)
 
-5. **Verify wal2json Plugin:** Azure Flexible Server includes `wal2json` by default. Test by creating a logical replication slot:
+5. **Create Publication and Verify pgoutput:** Create a publication and a test pgoutput slot:
 
    :::important Slot Name Configuration
    Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
    :::
 
    ```sql
+   -- Create publication for all tables
+   CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate');
+   -- For partitioned tables on PostgreSQL 13+:
+   -- CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
    -- For testing only - replace with your actual OLake slot name
-   SELECT * FROM pg_create_logical_replication_slot('test_slot', 'wal2json');
+   SELECT * FROM pg_create_logical_replication_slot('test_slot', 'pgoutput');
    ```
 
    ✅ **Success:** Returns slot name and LSN  
-   ❌ **Plugin not found:** Verify `wal_level = logical` and server restart
+   ❌ **Plugin not found:** Verify `wal_level = logical`, PostgreSQL 10+, and server restart
 
    List existing slots: `SELECT * FROM pg_replication_slots;`
 
-6. **Test Logical Decoding (Optional):** Create sample data and verify CDC functionality:
+6. **Test Logical Decoding (Optional):** Create sample data and verify CDC functionality with pgoutput:
 
    ```sql
    -- Create test table and insert data
    CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);
    INSERT INTO test_table (data) VALUES ('Azure CDC test');
    
-   -- Read changes from the slot
-   SELECT data FROM pg_logical_slot_get_changes('test_slot', NULL, NULL, 'pretty-print', '1');
+   -- Add table to publication and peek binary changes
+   ALTER PUBLICATION olake_publication ADD TABLE test_table;
+   SELECT lsn, xid, encode(data,'hex') AS data_hex
+   FROM pg_logical_slot_peek_binary_changes(
+     'test_slot', NULL, NULL,
+     'proto_version','1',
+     'publication_names','olake_publication'
+   );
    ```
 
-   Expected output: JSON representing the insert transaction.
+   Expected output: binary changes representing the insert transaction.
+
+   Best practices:
+   - Create the publication before creating the slot
+   - Create the slot in the same database as your OLake connection
+   - Use a unique slot name per connection; slot names cannot start with a number
 
    :::warning Cleanup (Optional)
    Drop test slots after verification: `SELECT pg_drop_replication_slot('test_slot');`
@@ -133,7 +148,7 @@ Now that you have configured the Azure database and created the CDC user, you ca
 
 - **Permission Errors:** If you see `ERROR: permission denied to create replication slot`, ensure your user has both `azure_pg_admin` and `REPLICATION` roles. The admin user should work without additional configuration.
 
-- **Plugin Not Found:** If `wal2json` is not available, verify that `wal_level = logical` is set and the server has been restarted. Azure Flexible Server includes this plugin by default.
+- **Plugin Not Found:** If `pgoutput` is not available, verify that `wal_level = logical` is set and the server has been restarted. Ensure PostgreSQL major version is 10+.
 
 - **Connection Issues:** Ensure your Azure firewall rules allow OLake's IP addresses. Also verify that the connection string includes the correct server name format: `servername.postgres.database.azure.com`.
 

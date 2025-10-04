@@ -6,7 +6,7 @@ sidebar_position: 2
 
 # Amazon RDS PostgreSQL CDC Setup Guide
 
-This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS PostgreSQL instances using logical replication and the **wal2json** plugin to enable real-time data replication with OLake.
+This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS PostgreSQL instances using logical replication with the native **pgoutput** plugin and a PostgreSQL publication for real-time data replication with OLake.
 
 **Prerequisites:**
 
@@ -25,7 +25,7 @@ This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
-| `rds.logical_replication` | `1` | Enables logical replication and wal2json |
+| `rds.logical_replication` | `1` | Enables logical replication (required for pgoutput) |
 | `wal_level` | `logical` | Usually set automatically by above |
 | `max_replication_slots` | `≥5` | Number of concurrent CDC connections |
 | `max_wal_senders` | `≥7` | Should exceed replication slots |
@@ -72,17 +72,27 @@ Save the parameter group changes.
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
    ```
 
-4. **Create a Logical Replication Slot:** 
+4. **Create Publication and Logical Replication Slot:** 
 
    :::important Slot Name Configuration
    Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
    :::
 
-   You can let OLake create the slot automatically, or manually create one for testing:
+   First, create a publication that defines which tables to replicate. Use the same publication name you will configure in OLake:
+   ```sql
+   -- Replace with your desired publication name
+   CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate');
+   -- For partitioned tables on PostgreSQL 13+:
+   -- CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
+   -- Verify
+   SELECT * FROM pg_publication;
+   ```
+
+   You can let OLake create the slot automatically, or manually create one for testing with pgoutput:
    ```sql
    -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
    SELECT * 
-   FROM pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json');
+   FROM pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
    ```
    **Common Errors:**
    
@@ -90,19 +100,31 @@ Save the parameter group changes.
    |-------|----------|
    | "must be superuser or replication role" | Use master user or grant `rds_replication` |
    | "logical decoding requires wal_level >= logical" | Check parameter group configuration |
-   | "plugin not found" | Ensure `rds.logical_replication = 1` |
+   | "plugin not found" | Ensure `rds.logical_replication = 1` and PostgreSQL 10+ |
 
 
 
-5. **Test Decoding (Optional):** As a quick test, you can generate a change and read from the slot:
+5. **Test Decoding (Optional):** With pgoutput, create a test table, add it to the publication, then peek binary changes:
    ```sql
+   CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, val TEXT);
+   ALTER PUBLICATION olake_publication ADD TABLE test_table;
    INSERT INTO test_table(val) VALUES('rds cdc test');
-   -- Replace 'your_olake_slot_name' with your actual slot name
-   SELECT data FROM pg_logical_slot_get_changes('your_olake_slot_name', NULL, NULL, 'pretty-print', '1');
    ```
-   You should see JSON change records from wal2json. This confirms CDC is capturing changes.
+   ```sql
+   SELECT lsn, xid, encode(data,'hex') AS data_hex
+   FROM pg_logical_slot_peek_binary_changes(
+     'your_olake_slot_name', NULL, NULL,
+     'proto_version','1',
+     'publication_names','olake_publication'
+   );
+   ```
 
-6. **Connect Your CDC Connector:** Use the RDS endpoint, database name, and the replication user (`cdc_user` or master) in your OLake configuration. Specify the plugin as `wal2json`. The connector will stream changes via the logical slot.
+6. **Connect Your CDC Connector:** Use the RDS endpoint, database name, and the replication user (`cdc_user` or master) in your OLake configuration. Ensure your source configuration includes `replication_slot` and `publication` names. OLake will stream changes via the pgoutput logical slot.
+
+   Best practices:
+   - Create the publication before the replication slot
+   - Create the slot in the same database OLake connects to (slots are per DB)
+   - Use unique slot names per connection; slot names cannot start with a number
 
    Make sure the network setup allows the connector to reach the RDS instance (RDS must be publicly accessible or your connector is in the same VPC/network).
 
@@ -120,7 +142,7 @@ Save the parameter group changes.
 - **Slot or Plugin Errors:** 
   - If creating a slot yields `ERROR: permission denied to create replication slot`, use the master user or a user with `rds_superuser` role to create it.
   - If you see `ERROR: logical decoding requires wal_level "logical"`, it means wal_level is not logical – double-check the parameter group (maybe the DB is still running with the old param group).
-  - If the error is about `wal2json` not found, ensure `rds.logical_replication` is enabled, as that is required to load wal2json on RDS.
+  - If the error is about `pgoutput` not found, ensure PostgreSQL is version 10+ and `rds.logical_replication` is enabled.
 
 - **WAL buildup / Disk-Full:** Similar to Aurora, an inactive logical slot on RDS will prevent WAL files from being purged. Monitor the **WAL storage** on RDS (CloudWatch metric "TransactionLogsDiskUsage"). If your CDC connector falls behind or is stopped for a while, the disk usage can grow. In extreme cases, you might get RDS events complaining that “The transaction logs have consumed XX% of storage”. To fix, either restart the CDC process to consume the backlog or drop the slot if you no longer need it. For example:
   ```sql
@@ -135,6 +157,9 @@ Save the parameter group changes.
   - If it’s publicly accessible, open the security group to the connector's IP (or corporate network) on port 5432. 
   - RDS may enforce SSL; use the SSL connection if required (check the parameter `rds.force_ssl`).
 
-- **Schema Changes:** If the schema changes (DDL statements), wal2json will emit them in the WAL (as DDL is logged), but your connector needs to handle schema refresh accordingly. 
+- **Schema and Publication:** Ensure new tables are added to your publication when needed. For tables without primary keys, set appropriate replica identity:
+  ```sql
+  ALTER TABLE my_table REPLICA IDENTITY FULL;
+  ```
 
-By following these steps, CDC should be active on your RDS PostgreSQL instance, streaming changes through wal2json.
+By following these steps, CDC should be active on your RDS PostgreSQL instance, streaming changes through pgoutput.

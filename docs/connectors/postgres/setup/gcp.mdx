@@ -6,7 +6,7 @@ sidebar_position: 5
 
 # Google Cloud SQL for PostgreSQL CDC Setup Guide
 
-Google Cloud SQL for PostgreSQL supports CDC through logical replication using the `wal2json` plugin. The service provides managed PostgreSQL with built-in support for logical decoding.
+Google Cloud SQL for PostgreSQL supports CDC through logical replication using the native `pgoutput` plugin and PostgreSQL publications. The service provides managed PostgreSQL with built-in support for logical decoding.
 
 **Prerequisites:**
 
@@ -76,15 +76,19 @@ Google Cloud SQL for PostgreSQL supports CDC through logical replication using t
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
    ```
 
-4. **Create Replication Slot:** Set up logical replication slot for wal2json:
+4. **Create Publication and Replication Slot:** Create a publication and optionally a pgoutput slot for testing:
 
    :::important Slot Name Configuration
    Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
    :::
 
    ```sql
+   -- Create publication for all tables
+   CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate');
+   -- For partitioned tables on PostgreSQL 13+:
+   -- CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
    -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
-   SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json');
+   SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
    ```
 
    **Verify Configuration:**
@@ -93,20 +97,28 @@ Google Cloud SQL for PostgreSQL supports CDC through logical replication using t
    SELECT * FROM pg_replication_slots;
    ```
 
-5. **Test Replication:** Verify that CDC is working correctly:
+5. **Test Replication:** Verify that CDC is working correctly with pgoutput:
 
    ```sql
    -- Create test data
    INSERT INTO test_table (data) VALUES ('GCP CDC test');
    
-   -- Check for changes (as the CDC user) - replace with your actual slot name
-   SELECT data FROM pg_logical_slot_get_changes(
-       'your_olake_slot_name', null, null, 
-       'pretty-print', '1'
+   -- Add the table to publication and peek binary changes
+   ALTER PUBLICATION olake_publication ADD TABLE test_table;
+   SELECT lsn, xid, encode(data,'hex') AS data_hex
+   FROM pg_logical_slot_peek_binary_changes(
+     'your_olake_slot_name', NULL, NULL,
+     'proto_version','1',
+     'publication_names','olake_publication'
    );
    ```
 
-   ✅ **Success:** Returns JSON change records from wal2json  
+   ✅ **Success:** Returns binary change records from pgoutput  
+   
+   Best practices:
+   - Create the publication before creating the slot
+   - Create the slot in the same database as your OLake connection
+   - Use a unique slot name per connection; slot names cannot start with a number
    ❌ **Permission denied:** Check user has `REPLICATION` role
 
 
@@ -130,10 +142,10 @@ Now that you have configured the Google Cloud database and created the CDC user,
   - Ensure **SSL/TLS** is configured if required
   - Test connectivity: `telnet your-instance-ip 5432`
 
-- **Replication Slot Issues:**
+- **Replication Slot and Publication Issues:**
   - Slot names cannot start with numbers
   - Each OLake connection needs a unique slot name
-  - Cloud SQL supports the `wal2json` plugin. Make sure the replication slot is created with `wal2json`.
+  - Ensure a publication exists and includes your tables (`SELECT * FROM pg_publication;`)
   - Monitor slot lag: `SELECT * FROM pg_replication_slots;`
 
 - **Read Replica Limitations:**
