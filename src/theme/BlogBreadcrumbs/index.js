@@ -4,6 +4,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import { useLocation } from '@docusaurus/router';
 import clsx from 'clsx';
+import { truncateTitle } from '../../lib/utils';
 
 // Try to import useBlogPost, handle gracefully if not available
 let useBlogPost;
@@ -11,20 +12,6 @@ try {
   useBlogPost = require('@docusaurus/plugin-content-blog/client').useBlogPost;
 } catch (e) {
   // Hook not available, we'll handle this case below
-}
-
-// Helper function to truncate long titles
-function truncateTitle(title, maxLength = 70) {
-  if (!title || title.length <= maxLength) {
-    return title;
-  }
-  // Find the last space before maxLength to avoid cutting words
-  const truncated = title.substring(0, maxLength);
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > maxLength * 0.7) { // Only use last space if it's not too far back
-    return truncated.substring(0, lastSpace) + '...';
-  }
-  return truncated + '...';
 }
 
 export default function BlogBreadcrumbs() {

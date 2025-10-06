@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
+import { truncateTitle } from '../../lib/utils';
 
 export interface BreadcrumbItem {
   label: string;
@@ -14,20 +15,6 @@ export interface CentralizedBreadcrumbsProps {
   title: string;
   customItems?: BreadcrumbItem[];
   maxTitleLength?: number;
-}
-
-// Helper function to truncate long titles
-function truncateTitle(title: string, maxLength: number = 70): string {
-  if (!title || title.length <= maxLength) {
-    return title;
-  }
-  // Find the last space before maxLength to avoid cutting words
-  const truncated = title.substring(0, maxLength);
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > maxLength * 0.7) { // Only use last space if it's not too far back
-    return truncated.substring(0, lastSpace) + '...';
-  }
-  return truncated + '...';
 }
 
 const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
