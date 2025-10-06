@@ -59,7 +59,6 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
         return [
           ...baseItems,
           { label: 'Iceberg', href: '/iceberg' },
-          { label: 'Blog', href: '/iceberg' },
           { label: displayTitle, current: true }
         ];
 

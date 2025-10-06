@@ -120,7 +120,6 @@ export default function BlogBreadcrumbs() {
     const icebergBreadcrumbItems = [
       { label: 'Home', href: baseUrl },
       { label: 'Iceberg', href: '/iceberg' },
-      { label: 'Blog', href: '/iceberg' },
       { label: truncatedTitle, href: location.pathname, current: true },
     ];
 
