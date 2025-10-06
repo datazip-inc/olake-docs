@@ -9,15 +9,31 @@ export interface BreadcrumbItem {
 }
 
 export interface CentralizedBreadcrumbsProps {
-  type: 'iceberg' | 'query-engine' | 'webinar' | 'community' | 'blog';
+  type: 'iceberg' | 'iceberg-blog' | 'query-engine' | 'webinar' | 'community' | 'blog';
   title: string;
   customItems?: BreadcrumbItem[];
+  maxTitleLength?: number;
+}
+
+// Helper function to truncate long titles
+function truncateTitle(title: string, maxLength: number = 50): string {
+  if (!title || title.length <= maxLength) {
+    return title;
+  }
+  // Find the last space before maxLength to avoid cutting words
+  const truncated = title.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > maxLength * 0.7) { // Only use last space if it's not too far back
+    return truncated.substring(0, lastSpace) + '...';
+  }
+  return truncated + '...';
 }
 
 const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   type,
   title,
-  customItems
+  customItems,
+  maxTitleLength = 50
 }) => {
   const getBreadcrumbItems = (): BreadcrumbItem[] => {
     if (customItems) {
@@ -28,12 +44,23 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
       { label: 'Home', href: '/' }
     ];
 
+    // Truncate the title
+    const displayTitle = truncateTitle(title, maxTitleLength);
+
     switch (type) {
       case 'iceberg':
         return [
           ...baseItems,
           { label: 'Iceberg', href: '/iceberg' },
-          { label: title, current: true }
+          { label: displayTitle, current: true }
+        ];
+
+      case 'iceberg-blog':
+        return [
+          ...baseItems,
+          { label: 'Iceberg', href: '/iceberg' },
+          { label: 'Blog', href: '/iceberg' },
+          { label: displayTitle, current: true }
         ];
 
       case 'query-engine':
@@ -41,28 +68,28 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
           ...baseItems,
           { label: 'Iceberg', href: '/iceberg' },
           { label: 'Query Engine', href: '/iceberg/query-engine' },
-          { label: title, current: true }
+          { label: displayTitle, current: true }
         ];
 
       case 'webinar':
         return [
           ...baseItems,
           { label: 'Webinars & Events', href: '/webinar' },
-          { label: title, current: true }
+          { label: displayTitle, current: true }
         ];
 
       case 'community':
         return [
           ...baseItems,
           { label: 'Community', href: '/community' },
-          { label: title, current: true }
+          { label: displayTitle, current: true }
         ];
 
       case 'blog':
         return [
           ...baseItems,
           { label: 'Blog', href: '/blog' },
-          { label: title, current: true }
+          { label: displayTitle, current: true }
         ];
 
       default:

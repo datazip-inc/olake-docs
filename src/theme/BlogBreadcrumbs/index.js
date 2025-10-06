@@ -5,10 +5,43 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import { useLocation } from '@docusaurus/router';
 import clsx from 'clsx';
 
+// Try to import useBlogPost, handle gracefully if not available
+let useBlogPost;
+try {
+  useBlogPost = require('@docusaurus/plugin-content-blog/client').useBlogPost;
+} catch (e) {
+  // Hook not available, we'll handle this case below
+}
+
+// Helper function to truncate long titles
+function truncateTitle(title, maxLength = 50) {
+  if (!title || title.length <= maxLength) {
+    return title;
+  }
+  // Find the last space before maxLength to avoid cutting words
+  const truncated = title.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > maxLength * 0.7) { // Only use last space if it's not too far back
+    return truncated.substring(0, lastSpace) + '...';
+  }
+  return truncated + '...';
+}
+
 export default function BlogBreadcrumbs() {
   const { siteConfig } = useDocusaurusContext();
   const location = useLocation();
   const baseUrl = useBaseUrl('/');
+
+  // Try to get blog post metadata if available
+  let blogPostMetadata = null;
+  if (useBlogPost) {
+    try {
+      const blogPost = useBlogPost();
+      blogPostMetadata = blogPost?.metadata;
+    } catch (e) {
+      // Not in a blog post context
+    }
+  }
 
   // Don't show breadcrumbs on the main blog listing page
   if (location.pathname === '/blog' || location.pathname === '/') {
@@ -80,10 +113,15 @@ export default function BlogBreadcrumbs() {
   );
 
   if (isIcebergPost) {
+    // Get the blog post title if available
+    const blogTitle = blogPostMetadata?.title || 'Blog Post';
+    const truncatedTitle = truncateTitle(blogTitle, 50);
+
     const icebergBreadcrumbItems = [
       { label: 'Home', href: baseUrl },
       { label: 'Iceberg', href: '/iceberg' },
-      { label: 'Blog', href: location.pathname, current: true },
+      { label: 'Blog', href: '/iceberg' },
+      { label: truncatedTitle, href: location.pathname, current: true },
     ];
 
     return (
@@ -104,9 +142,14 @@ export default function BlogBreadcrumbs() {
     return null;
   }
 
+  // Get the blog post title if available
+  const blogTitle = blogPostMetadata?.title || 'Blog Post';
+  const truncatedTitle = truncateTitle(blogTitle, 50);
+
   const breadcrumbItems = [
     { label: 'Home', href: baseUrl },
-    { label: 'Blog', href: '/blog', current: true },
+    { label: 'Blog', href: '/blog' },
+    { label: truncatedTitle, href: location.pathname, current: true },
   ];
 
   return (
