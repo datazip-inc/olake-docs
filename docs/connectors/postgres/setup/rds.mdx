@@ -17,7 +17,9 @@ This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS
 
 **Steps:**
 
-1. **Create and Configure a Parameter Group:** In the AWS RDS console, go to *Parameter Groups* and create a new parameter group for your PostgreSQL version (if you don’t already have one). 
+## 1. Create and Configure a Parameter Group 
+
+In the AWS RDS console, go to `Parameter Groups` and create a new parameter group for your PostgreSQL version (if you don’t already have one). 
 
 ![postgres-rds-pg-1](/img/docs/cdc/postgres/postgres-rds-pg-1.webp)
 
@@ -39,7 +41,10 @@ Save the parameter group changes.
 `rds.logical_replication` can only be turned on for **read-replica** instances that are running PostgreSQL 16 or later. If your replica is on an earlier major version the parameter will be ignored and logical decoding will NOT be available on that replica. Either upgrade the replica to v16+ or enable logical decoding only on the primary.
 :::
 
-2. **Reboot the RDS Instance:** Reboot the database instance so that the static parameters take effect. After reboot, confirm the settings:
+## 2. Reboot the RDS Instance
+
+Reboot the database instance so that the static parameters take effect. After reboot, confirm the settings:
+
    ```sql
    SELECT name, setting 
    FROM pg_settings 
@@ -47,7 +52,7 @@ Save the parameter group changes.
    ```
    The query should show `rds.logical_replication` = on, and `wal_level` = logical.
 
-3. **Set Up a Replication User:** 
+## 3. Set Up a Replication User
 
    **Option A: Use Master User** *(Recommended for simplicity)*  
    The RDS master user already has `rds_superuser` and `rds_replication` roles.
@@ -72,64 +77,154 @@ Save the parameter group changes.
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
    ```
 
-4. **Create Publication and Logical Replication Slot:** 
+## 4. Create Publication
 
-   :::important Slot Name Configuration
-   Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
-   :::
+Publications define which tables will be replicated. Create a publication for the tables you want to monitor:
 
-   First, create a publication that defines which tables to replicate. Use the same publication name you will configure in OLake:
-   ```sql
-   -- Replace with your desired publication name
-   CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate');
-   -- For partitioned tables on PostgreSQL 13+:
-   -- CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
-   -- Verify
-   SELECT * FROM pg_publication;
-   ```
+**Publication Name Configuration:**
 
-   You can let OLake create the slot automatically, or manually create one for testing with pgoutput:
-   ```sql
-   -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
-   SELECT * 
-   FROM pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
-   ```
-   **Common Errors:**
-   
-   | Error | Solution |
-   |-------|----------|
-   | "must be superuser or replication role" | Use master user or grant `rds_replication` |
-   | "logical decoding requires wal_level >= logical" | Check parameter group configuration |
-   | "plugin not found" | Ensure `rds.logical_replication = 1` and PostgreSQL 10+ |
+:::important Publication Name Configuration
+Use the exact publication name that you configure in OLake UI or CLI. The publication name must match the `publication` parameter in your OLake source configuration.
+:::
 
+```sql
+-- Create publication for all tables in the database
+CREATE PUBLICATION olake_publication FOR ALL TABLES;
 
+-- Or create publication for specific tables
+CREATE PUBLICATION olake_publication FOR TABLE public.table1, public.table2, public.table3;
 
-5. **Test Decoding (Optional):** With pgoutput, create a test table, add it to the publication, then peek binary changes:
-   ```sql
-   CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, val TEXT);
-   ALTER PUBLICATION olake_publication ADD TABLE test_table;
-   INSERT INTO test_table(val) VALUES('rds cdc test');
-   ```
-   ```sql
-   SELECT lsn, xid, encode(data,'hex') AS data_hex
-   FROM pg_logical_slot_peek_binary_changes(
-     'your_olake_slot_name', NULL, NULL,
-     'proto_version','1',
-     'publication_names','olake_publication'
-   );
-   ```
+-- Or create publication for all tables in a specific schema
+CREATE PUBLICATION olake_publication FOR TABLES IN SCHEMA public;
+```
 
-6. **Connect Your CDC Connector:** Use the RDS endpoint, database name, and the replication user (`cdc_user` or master) in your OLake configuration. Ensure your source configuration includes `replication_slot` and `publication` names. OLake will stream changes via the pgoutput logical slot.
+**Publication Options:**
 
-   Best practices:
-   - Create the publication before the replication slot
-   - Create the slot in the same database OLake connects to (slots are per DB)
-   - Use unique slot names per connection; slot names cannot start with a number
+```sql
+-- Customize what operations are published
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update,delete,truncate');
 
-   Make sure the network setup allows the connector to reach the RDS instance (RDS must be publicly accessible or your connector is in the same VPC/network).
+-- Only publish INSERT and UPDATE operations
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update');
 
-   Now that you have configured the database and created the CDC user, you can add the PostgreSQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [PostgreSQL connector overview](/docs/connectors/postgres/overview) for a high-level walkthrough.
+-- For partitioned tables (PostgreSQL 13+): publish changes via the partition root
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
+```
 
+**Verify Publication:**
+
+```sql
+-- List all publications
+SELECT * FROM pg_publication;
+
+-- View tables in a publication
+SELECT * FROM pg_publication_tables WHERE pubname = 'olake_publication';
+```
+
+**Add Tables to Existing Publication:**
+
+```sql
+-- Add a single table
+ALTER PUBLICATION olake_publication ADD TABLE public.new_table;
+
+-- Add multiple tables
+ALTER PUBLICATION olake_publication ADD TABLE public.table4, public.table5;
+
+-- Remove a table
+ALTER PUBLICATION olake_publication DROP TABLE public.old_table;
+```
+
+## 5. Create Replication Slot
+
+Set up the replication slot for OLake to consume changes:
+
+::::important Slot Name Configuration
+Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+
+Best practices:
+- Create the publication before creating the replication slot
+- Create the slot in the same database that OLake will connect to (slots are per-database)
+- Use a unique slot name per OLake connection; slot names cannot start with a number
+::::
+
+```sql
+-- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
+SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
+```
+
+**Example with common slot names:**
+```sql
+-- If your OLake source config uses "olake_slot"
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');
+
+-- If your OLake source config uses "postgres_slot"  
+SELECT pg_create_logical_replication_slot('postgres_slot', 'pgoutput');
+```
+
+**Verify Slot Creation:**
+```sql
+SELECT * FROM pg_replication_slots WHERE slot_name = 'your_olake_slot_name';
+```
+
+## 6. Test Logical Decoding
+
+Verify that CDC is working correctly with pgoutput:
+
+```sql
+-- Create test data
+CREATE TABLE IF NOT EXISTS test_table (
+    id SERIAL PRIMARY KEY, 
+    data TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Set replica identity
+ALTER TABLE test_table REPLICA IDENTITY DEFAULT;
+
+-- Add table to publication
+ALTER PUBLICATION olake_publication ADD TABLE test_table;
+
+-- Insert test data
+INSERT INTO test_table (data) VALUES ('PostgreSQL pgoutput CDC test - INSERT');
+```
+
+```sql
+SELECT lsn, xid, encode(data,'hex') AS data_hex
+FROM pg_logical_slot_peek_binary_changes(
+  'olake_slot', NULL, NULL,
+  'proto_version','1',
+  'publication_names','olake_publication'
+);
+```
+
+**Check for changes using pg_logical_slot_peek_binary_changes:**
+
+```sql
+SELECT *
+FROM pg_logical_slot_peek_binary_changes(
+  'olake_slot', NULL, NULL,
+  'proto_version','1',
+  'publication_names','olake_publication'
+);
+```
+
+**Expected Results:**
+
+✅ **Success**: Returns binary change records from pgoutput<br/>
+❌ **Permission denied**: Check user has REPLICATION role<br/>
+❌ **Publication not found**: Verify publication exists and contains tables<br/>
+❌ **Slot not found**: Check replication slot was created with pgoutput plugin<br/>
+❌ **No changes returned**: Verify table has replica identity configured and is in the publication
+
+::::important 
+- Use the RDS endpoint, database name, and the replication user (`cdc_user` or master) in your OLake configuration. Ensure your source configuration includes `replication_slot` and `publication` names. OLake will stream changes via the pgoutput logical slot.
+- Make sure the network setup allows the connector to reach the RDS instance (RDS must be publicly accessible or your connector is in the same VPC/network).
+- Now that you have configured the database and created the CDC user, you can add the PostgreSQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [PostgreSQL connector overview](/docs/connectors/postgres/overview) for a high-level walkthrough.
+::::
+  
 ## Troubleshooting
 
 - **Parameter Group Not Applying:** If `rds.logical_replication` remains off after reboot, check that:

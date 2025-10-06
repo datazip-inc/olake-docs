@@ -25,7 +25,9 @@ Azure Database for PostgreSQL Flexible Server does **not support logical replica
 
 **Steps:**
 
-1. **Configure Server Parameters:** In the Azure Portal, navigate to your PostgreSQL Flexible Server. Go to **Settings** → **Server parameters** and configure:
+## 1. Configure Server Parameters 
+
+In the Azure Portal, navigate to your PostgreSQL Flexible Server. Go to `Settings → Server parameters` and configure:
 
    | Parameter | Value | Purpose |
    |-----------|-------|---------|
@@ -40,14 +42,18 @@ Azure Database for PostgreSQL Flexible Server does **not support logical replica
    Changes to `wal_level` require a server restart. Azure will prompt you to restart when you save these changes.
    :::
 
-2. **Restart the Server:** After saving parameter changes, restart your Flexible Server to apply the configuration. Verify the settings after restart:
+## 2. Restart the Server
+
+After saving parameter changes, restart your Flexible Server to apply the configuration. Verify the settings after restart:
 
    ```sql
    SHOW wal_level;
    SELECT name, setting FROM pg_settings WHERE name IN ('max_replication_slots','max_wal_senders');
    ```
 
-3. **Create Replication User:** Azure admin users have the `azure_pg_admin` role by default. You can use the admin user or create a dedicated CDC user:
+## 3. Create Replication User
+
+Azure admin users have the `azure_pg_admin` role by default. You can use the admin user or create a dedicated CDC user:
 
    **Option A: Use Admin User** *(Recommended for simplicity)*
    ```sql
@@ -78,7 +84,9 @@ Azure Database for PostgreSQL Flexible Server does **not support logical replica
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
    ```
 
-4. **Configure Network Access:** Configure Azure's networking to allow OLake connections:
+## 4. Configure Network Access
+
+Configure Azure's networking to allow OLake connections:
 
    **For Public Access (Flexible Server):**
    1. In Azure Portal, go to your PostgreSQL Flexible Server
@@ -94,53 +102,152 @@ Azure Database for PostgreSQL Flexible Server does **not support logical replica
 
    ![postgres-network-settings-azure](/img/docs/cdc/postgres/postgres-network-settings-azure.webp)
 
-5. **Create Publication and Verify pgoutput:** Create a publication and a test pgoutput slot:
+## 5. Create Publication
 
-   :::important Slot Name Configuration
-   Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
-   :::
+Publications define which tables will be replicated. Create a publication for the tables you want to monitor:
 
-   ```sql
-   -- Create publication for all tables
-   CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate');
-   -- For partitioned tables on PostgreSQL 13+:
-   -- CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
-   -- For testing only - replace with your actual OLake slot name
-   SELECT * FROM pg_create_logical_replication_slot('test_slot', 'pgoutput');
-   ```
+**Publication Name Configuration:**
 
-   ✅ **Success:** Returns slot name and LSN  
-   ❌ **Plugin not found:** Verify `wal_level = logical`, PostgreSQL 10+, and server restart
+:::important Publication Name Configuration
+Use the exact publication name that you configure in OLake UI or CLI. The publication name must match the `publication` parameter in your OLake source configuration.
+:::
 
-   List existing slots: `SELECT * FROM pg_replication_slots;`
+```sql
+-- Create publication for all tables in the database
+CREATE PUBLICATION olake_publication FOR ALL TABLES;
 
-6. **Test Logical Decoding (Optional):** Create sample data and verify CDC functionality with pgoutput:
+-- Or create publication for specific tables
+CREATE PUBLICATION olake_publication FOR TABLE public.table1, public.table2, public.table3;
 
-   ```sql
-   -- Create test table and insert data
-   CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);
-   INSERT INTO test_table (data) VALUES ('Azure CDC test');
-   
-   -- Add table to publication and peek binary changes
-   ALTER PUBLICATION olake_publication ADD TABLE test_table;
-   SELECT lsn, xid, encode(data,'hex') AS data_hex
-   FROM pg_logical_slot_peek_binary_changes(
-     'test_slot', NULL, NULL,
-     'proto_version','1',
-     'publication_names','olake_publication'
-   );
-   ```
+-- Or create publication for all tables in a specific schema
+CREATE PUBLICATION olake_publication FOR TABLES IN SCHEMA public;
+```
 
-   Expected output: binary changes representing the insert transaction.
+**Publication Options:**
 
-   Best practices:
-   - Create the publication before creating the slot
-   - Create the slot in the same database as your OLake connection
-   - Use a unique slot name per connection; slot names cannot start with a number
+```sql
+-- Customize what operations are published
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update,delete,truncate');
 
-   :::warning Cleanup (Optional)
-   Drop test slots after verification: `SELECT pg_drop_replication_slot('test_slot');`
-   :::
+-- Only publish INSERT and UPDATE operations
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update');
+
+-- For partitioned tables (PostgreSQL 13+): publish changes via the partition root
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
+```
+
+**Verify Publication:**
+
+```sql
+-- List all publications
+SELECT * FROM pg_publication;
+
+-- View tables in a publication
+SELECT * FROM pg_publication_tables WHERE pubname = 'olake_publication';
+```
+
+**Add Tables to Existing Publication:**
+
+```sql
+-- Add a single table
+ALTER PUBLICATION olake_publication ADD TABLE public.new_table;
+
+-- Add multiple tables
+ALTER PUBLICATION olake_publication ADD TABLE public.table4, public.table5;
+
+-- Remove a table
+ALTER PUBLICATION olake_publication DROP TABLE public.old_table;
+```
+
+## 6. Create Replication Slot
+
+Set up the replication slot for OLake to consume changes:
+
+::::important Slot Name Configuration
+Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+
+Best practices:
+- Create the publication before creating the replication slot
+- Create the slot in the same database that OLake will connect to (slots are per-database)
+- Use a unique slot name per OLake connection; slot names cannot start with a number
+::::
+
+```sql
+-- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
+SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
+```
+
+**Example with common slot names:**
+```sql
+-- If your OLake source config uses "olake_slot"
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');
+
+-- If your OLake source config uses "postgres_slot"  
+SELECT pg_create_logical_replication_slot('postgres_slot', 'pgoutput');
+```
+
+**Verify Slot Creation:**
+```sql
+SELECT * FROM pg_replication_slots WHERE slot_name = 'your_olake_slot_name';
+```
+
+## 7. Test Logical Decoding
+
+Verify that CDC is working correctly with pgoutput:
+
+```sql
+-- Create test data
+CREATE TABLE IF NOT EXISTS test_table (
+    id SERIAL PRIMARY KEY, 
+    data TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Set replica identity
+ALTER TABLE test_table REPLICA IDENTITY DEFAULT;
+
+-- Add table to publication
+ALTER PUBLICATION olake_publication ADD TABLE test_table;
+
+-- Insert test data
+INSERT INTO test_table (data) VALUES ('PostgreSQL pgoutput CDC test - INSERT');
+```
+
+```sql
+SELECT lsn, xid, encode(data,'hex') AS data_hex
+FROM pg_logical_slot_peek_binary_changes(
+  'olake_slot', NULL, NULL,
+  'proto_version','1',
+  'publication_names','olake_publication'
+);
+```
+
+**Check for changes using pg_logical_slot_peek_binary_changes:**
+
+```sql
+SELECT *
+FROM pg_logical_slot_peek_binary_changes(
+  'olake_slot', NULL, NULL,
+  'proto_version','1',
+  'publication_names','olake_publication'
+);
+```
+
+**Expected Results:**
+
+✅ **Success**: Returns binary change records from pgoutput<br/>
+❌ **Permission denied**: Check user has REPLICATION role<br/>
+❌ **Publication not found**: Verify publication exists and contains tables<br/>
+❌ **Slot not found**: Check replication slot was created with pgoutput plugin<br/>
+❌ **No changes returned**: Verify table has replica identity configured and is in the publication
+
+
+:::warning Cleanup (Optional)
+Drop test slots after verification: `SELECT pg_drop_replication_slot('test_slot');`
+:::
 
 Now that you have configured the Azure database and created the CDC user, you can add the PostgreSQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [PostgreSQL connector overview](/docs/connectors/postgres/overview) for a high-level walkthrough.
 
