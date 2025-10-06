@@ -107,8 +107,10 @@ export default function BlogBreadcrumbs() {
         itemProp="item"
         itemScope
         itemType="https://schema.org/Thing" 
+        aria-label={item.fullLabel || item.label}
+        title={item.fullLabel || item.label}
       >
-        <span itemProp="name" className="flex items-center">
+        <span className="flex items-center">
           {index === 0 ? (
             <svg
               viewBox="0 0 24 24"
@@ -121,6 +123,8 @@ export default function BlogBreadcrumbs() {
             item.label
           )}
         </span>
+        {/* Hidden full title for search engines in schema.org markup */}
+        <meta itemProp="name" content={item.fullLabel || item.label} />
         <meta itemProp="@id" content={item.href} /> 
       </Link>
       <meta itemProp="position" content={String(index + 1)} />
@@ -259,7 +263,7 @@ export default function BlogBreadcrumbs() {
     const icebergBreadcrumbItems = [
       { label: 'Home', href: baseUrl },
       { label: 'Iceberg', href: '/iceberg' },
-      { label: truncatedTitle, href: location.pathname, current: true },
+      { label: truncatedTitle, fullLabel: blogTitle, href: location.pathname, current: true },
     ];
 
     return (
@@ -287,7 +291,7 @@ export default function BlogBreadcrumbs() {
   const breadcrumbItems = [
     { label: 'Home', href: baseUrl },
     { label: 'Blog', href: '/blog' },
-    { label: truncatedTitle, href: location.pathname, current: true },
+    { label: truncatedTitle, fullLabel: blogTitle, href: location.pathname, current: true },
   ];
 
   return (
