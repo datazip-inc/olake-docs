@@ -1,0 +1,199 @@
+---
+title: AWS DMS vs OLake — PostgreSQL to S3 Benchmark
+description: Objective benchmark comparing AWS DMS and OLake for PostgreSQL to S3 (Parquet/Iceberg) migrations
+sidebar_position: 3
+slug: /dmsvsolake
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## OLake vs AWS DMS Benchmark
+
+This document summarizes measured performance, environment, and cost for migrating PostgreSQL data to Parquet Writer (AWS S3) using AWS Database Migration Service (DMS) and OLake. 
+
+## Workload
+
+- **Dataset:** This benchmark uses standard **NYC Taxi Data** `trips2` and `fhv_trips` tables
+- **Total rows:** **4,008,587,913 rows** including both tables
+- **Modes evaluated:** We are performing **Full Refresh** and **CDC** workload (50 million rows)
+
+## Environment
+
+- **Source database:** Azure PostgreSQL (32 vCores, 128 GB RAM)
+- **Destination:** Amazon S3 (Parquet)
+- **Migration compute:** c6i.16xlarge (64 vCPU, 128 GB RAM)
+- **Reference compute price:** ~$3.07/hour
+
+:::note
+The **same dataset and compute** were used for both the tools.
+:::
+
+## Full Refresh Results
+
+| Tool   | Rows Processed | Total Time | Avg Throughput (rows/sec) |
+| ------ | --------------: | ---------: | -------------------------: |
+| OLake  | 4,008,587,913  | 1 h 59 m    | 558,765                  |
+| AWS DMS| 4,008,587,913 | 9 h 8 m    | 122,000                   |
+
+**Key observations:**
+
+- **OLake** completed the workload **~4.6 x faster** as compared to **DMS** for Full Refresh.
+- OLake does not require any manual partition-boundary scripting, whereas DMS required manual boundary generation to parallelize the load for PostgreSQL sources.
+
+## CDC Results (Insert-only; 50M rows)
+
+| Tool   | Rows Processed | Total Time | Avg Throughput (rows/sec) |
+| ------ | --------------: | ---------: | -------------------------: |
+| AWS DMS| 50,000,000      | 22 m 41 s  | 36,738                    |
+| OLake  | 50,000,000      | 16 m 24 s  |  50,812                  |
+
+**Key Observations:**
+
+- **OLake** completed the workload **~1.38 × faster** as compared to **DMS** for CDC.
+- OLake does not require any manual setup we simply had to select CDC option and that is it! Whereas DMS required enabling pglogical via Azure extensions, performing a complex pglogical setup, and specifying the starting LSN for replication tasks.
+
+## Resource Utilization 
+
+### 1. Full Refresh:
+
+| Memory Stats | Olake | DMS |
+|--------------|-------|-----|
+| Min          | 1.04 GB | 20 GB |
+| Max          | 46.72 GB | 40 GB |
+| Mean         | 25.70 GB | 30 GB |
+
+**Olake's** memory usage ranged from 2.12 GB to 46.72 GB, **averaging 25.70 GB** throughout the transfer. For **DMS**, the memory usage ranged from 20 GB to 40 GB, **averaging 30 GB** throughout the transfer.
+
+### 2. Change Data Capture (CDC):
+
+| Memory Stats | Olake | DMS |
+|--------------|-------|-----|
+| Min          | 20 MB |  |
+| Max          | 6.1 GB |  |
+| Mean         | 2.65 GB |  |
+
+**Olake's** memory usage ranged from 20 MB to 6.1 GB, **averaging 2.65 GB** throughout the transfer. For **DMS**, the memory usage ranged from [] GB to [] GB, **averaging [] GB** throughout the transfer.
+
+## Cost Comparison (Compute Only)
+
+Here is the cost comparison for **Full Refresh** process.
+
+| Scenario              | Instance         | Runtime  | Approx. Cost |
+| --------------------- | ---------------- | -------: | -----------: |
+| DMS Full Refresh      | c6i.16xlarge     | 9h 08m   | ~$28.03      |
+| OLake Full Refresh    | c6i.16xlarge     | 1h 59m   | ~$6.08       |
+
+**Important-** 
+
+**OLake** is delivering **4.61x cost savings** as compared to **DMS** on compute alone. When you're moving terabytes monthly, those savings add up fast!
+
+:::info[Point to Remember]
+
+OLake is open source; there are no licensing fees. Actual spend depends on user infra and storage.
+
+:::
+
+## Dataset and Table Schemas
+
+Please refer to [this GitHub repository](https://github.com/datazip-inc/nyc-taxi-data-benchmark/tree/remote-postgres) for the dataset we used to conduct these benchmarks.
+
+### `trips2` table
+
+```sql
+CREATE TABLE public.trips2 (
+    id BIGSERIAL NOT NULL,
+    cab_type_id INT NULL,
+    vendor_id INT NULL,
+    pickup_datetime TIMESTAMP NULL,
+    dropoff_datetime TIMESTAMP NULL,
+    store_and_fwd_flag BOOLEAN NULL,
+    rate_code_id INT NULL,
+    pickup_longitude NUMERIC NULL,
+    pickup_latitude NUMERIC NULL,
+    dropoff_longitude NUMERIC NULL,
+    dropoff_latitude NUMERIC NULL,
+    passenger_count INT NULL,
+    trip_distance NUMERIC NULL,
+    fare_amount NUMERIC NULL,
+    extra NUMERIC NULL,
+    mta_tax NUMERIC NULL,
+    tip_amount NUMERIC NULL,
+    tolls_amount NUMERIC NULL,
+    ehail_fee NUMERIC NULL,
+    improvement_surcharge NUMERIC NULL,
+    congestion_surcharge NUMERIC NULL,
+    airport_fee NUMERIC NULL,
+    total_amount NUMERIC NULL,
+    payment_type INT NULL,
+    trip_type INT NULL,
+    pickup_nyct2010_gid INT NULL,
+    dropoff_nyct2010_gid INT NULL,
+    pickup_location_id INT NULL,
+    dropoff_location_id INT NULL,
+    CONSTRAINT trips2_pkey PRIMARY KEY (id)
+);
+```
+
+### `fhv_trips2` table
+
+```sql
+CREATE TABLE fhv_trips (
+id bigserial NOT NULL,
+hvfhs_license_num text NULL,
+dispatching_base_num text NULL,
+originating_base_num text NULL,
+request_datetime timestamp NULL,
+on_scene_datetime timestamp NULL,
+pickup_datetime timestamp NULL,
+dropoff_datetime timestamp NULL,
+pickup_location_id int4 NULL,
+dropoff_location_id int4 NULL,
+trip_miles numeric NULL,
+trip_time numeric NULL,
+base_passenger_fare numeric NULL,
+tolls numeric NULL,
+black_car_fund numeric NULL,
+sales_tax numeric NULL,
+congestion_surcharge numeric NULL,
+airport_fee numeric NULL,
+tips numeric NULL,
+driver_pay numeric NULL,
+shared_request bool NULL,
+shared_match bool NULL,
+access_a_ride bool NULL,
+wav_request bool NULL,
+wav_match bool NULL,
+legacy_shared_ride int4 NULL,
+affiliated_base_num text NULL,
+CONSTRAINT fhv_trips_pkey PRIMARY KEY (id)
+);
+```
+
+## Implementation Considerations
+
+- DMS PostgreSQL full loads may require manual task mapping with partition boundaries to achieve higher parallelism.
+- DMS CDC for Azure PostgreSQL required enabling `pglogical` via `azure.extensions` and configuring replication sets with aligned start LSN.
+- OLake parallelization and schema handling are automatic; no manual boundary generation was required in this benchmark.
+
+## References
+
+- If you want to know in depth details regarding the benchmarking, please refer to the following blog: [AWS DMS vs OLake — The Great PostgreSQL to S3 Migration Showdown (Planning to provide the blog link here!!)](https://datazip.atlassian.net/wiki/spaces/PD/pages/81100826/AWS+DMS+vs+OLake+The+Great+PostgreSQL+to+S3+Migration+Showdown)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

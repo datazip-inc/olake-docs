@@ -25,7 +25,16 @@ const docSidebar = {
   docSidebar: [
     sectionHeader("GETTING STARTED"),
     'intro',
-    'benchmarks',
+
+    {
+      type: 'category',
+      label: 'Benchmarks',
+      link: { type: 'doc', id: 'benchmarks' },
+      items: [
+        'dmsvsolake',
+      ],
+    },
+    
 
     // GETTING STARTED
 
