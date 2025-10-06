@@ -1,6 +1,7 @@
 import React from 'react';
 import { useColorMode } from '@docusaurus/theme-common';
 import Link from '@docusaurus/Link';
+import XLogo from '@site/static/img/logo/x.svg';
 
 interface LinkItem {
     label: string;
@@ -87,12 +88,19 @@ const Footer: React.FC = () => {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
-                                    <img
-                                        src={getSocialIconSrc(social.icon)}
-                                        alt={social.ariaLabel}
-                                        className="w-5 h-5"
-                                        loading="lazy" decoding="async"
-                                    />
+                                    {social.icon === 'twitter' ? (
+                                        <XLogo
+                                            className="w-5 h-5 text-[#0F1419] dark:text-white"
+                                            aria-hidden
+                                        />
+                                    ) : (
+                                        <img
+                                            src={getSocialIconSrc(social.icon)}
+                                            alt={social.ariaLabel}
+                                            className="w-5 h-5"
+                                            loading="lazy" decoding="async"
+                                        />
+                                    )}
                                 </a>
                             ))}
                         </div>

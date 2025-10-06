@@ -10,7 +10,7 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
   title = (
     <>
       Experience the most <br className='hidden sm:block md:hidden lg:block' />
-      <span className='font-light tracking-wide text-[#333333]'>seamless</span>{' '}
+      <span className='font-light tracking-wide'>seamless</span>{' '}
       workflow
     </>
   )

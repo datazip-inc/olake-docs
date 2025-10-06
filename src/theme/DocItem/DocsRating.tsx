@@ -30,8 +30,8 @@ const DocsRating: React.FC<DocsRatingProps> = ({ label }) => {
   // Google Analytics event
   const giveFeedback = (value: number) => {
     // Check if gtag is available (only in production)
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag("event", "feedback", {
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag("event", "feedback", {
         event_category: "button",
         event_label: label,
         value: value,

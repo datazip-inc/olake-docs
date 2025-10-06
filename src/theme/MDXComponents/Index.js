@@ -88,7 +88,6 @@ import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIc
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
-import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed'
 import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
 
 import OLakeFeaturesTLDR from '../../../docs/shared/OLakeFeaturesTLDR.mdx'

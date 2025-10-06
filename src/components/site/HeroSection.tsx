@@ -28,7 +28,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             src='/img/site/hero-section.svg'
             alt='O.Lake Data Pipeline'
             className='max-w-[80%] h-auto dark:filter dark:brightness-90'
-            loading="lazy" decoding="async"
+            loading="eager" fetchPriority="high" decoding="async"
           />
         </div>
       </div>
@@ -87,7 +87,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       {/* Desktop Image - Only visible on desktop */}
       <div className='hidden lg:flex w-full lg:w-2/5 justify-center items-center'>
         <div className='flex justify-center w-full'>
-          <img src='/img/site/hero-section.svg' alt='OLake Data Pipeline' className='max-w-full h-auto dark:filter dark:brightness-90' loading="lazy" decoding="async" />
+          <img src='/img/site/hero-section.svg' alt='OLake Data Pipeline' className='max-w-full h-auto dark:filter dark:brightness-90' loading="eager" fetchPriority="high" decoding="async" />
         </div>
       </div>
 
