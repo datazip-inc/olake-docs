@@ -17,7 +17,7 @@ export interface CentralizedBreadcrumbsProps {
 }
 
 // Helper function to truncate long titles
-function truncateTitle(title: string, maxLength: number = 50): string {
+function truncateTitle(title: string, maxLength: number = 70): string {
   if (!title || title.length <= maxLength) {
     return title;
   }
@@ -34,7 +34,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   type,
   title,
   customItems,
-  maxTitleLength = 50
+  maxTitleLength = 70
 }) => {
   const getBreadcrumbItems = (): BreadcrumbItem[] => {
     if (customItems) {

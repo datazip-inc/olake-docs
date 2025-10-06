@@ -14,7 +14,7 @@ try {
 }
 
 // Helper function to truncate long titles
-function truncateTitle(title, maxLength = 50) {
+function truncateTitle(title, maxLength = 70) {
   if (!title || title.length <= maxLength) {
     return title;
   }
@@ -258,7 +258,7 @@ export default function BlogBreadcrumbs() {
   if (isIcebergPost) {
     // Get the blog post title if available
     const blogTitle = blogPostMetadata?.title || 'Blog Post';
-    const truncatedTitle = truncateTitle(blogTitle, 50);
+    const truncatedTitle = truncateTitle(blogTitle, 70);
 
     const icebergBreadcrumbItems = [
       { label: 'Home', href: baseUrl },
@@ -286,7 +286,7 @@ export default function BlogBreadcrumbs() {
 
   // Get the blog post title if available
   const blogTitle = blogPostMetadata?.title || 'Blog Post';
-  const truncatedTitle = truncateTitle(blogTitle, 50);
+  const truncatedTitle = truncateTitle(blogTitle, 70);
 
   const breadcrumbItems = [
     { label: 'Home', href: baseUrl },
