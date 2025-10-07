@@ -14,10 +14,9 @@
 5. [Content Management](#content-management)
 6. [Deployment Procedures](#deployment-procedures)
 7. [Maintenance and Updates](#maintenance-and-updates)
-8. [Troubleshooting](#troubleshooting)
-9. [Monitoring and Analytics](#monitoring-and-analytics)
-10. [Compliance and Auditing](#compliance-and-auditing)
-11. [Appendices](#appendices)
+8. [Monitoring and Analytics](#monitoring-and-analytics)
+9. [Security and Best Practices](#security-and-best-practices)
+10. [Troubleshooting](#troubleshooting)
 
 ## 1. Introduction
 
@@ -33,7 +32,6 @@ This SOP covers:
 - Content creation and maintenance workflows
 - Development and deployment procedures
 - Security protocols and compliance requirements
-- Quality assurance processes
 - Monitoring and analytics
 
 ### 1.3 Target Audience
@@ -60,11 +58,6 @@ Readers should have:
 - _Italic_ - Emphasis, new terms
 - > Blockquotes - Examples, quotes
 
-#### Command Syntax
-
-```bash
-command [required_parameter] {optional_parameter}
-```
 
 ### 1.6 Objectives
 
@@ -72,25 +65,15 @@ command [required_parameter] {optional_parameter}
    - Maintain consistent documentation standards
    - Ensure technical accuracy
    - Implement comprehensive review processes
-   - Maintain version control
 
 2. **Efficiency**
    - Streamline content deployment
    - Optimize development workflows
-   - Automate routine tasks
-   - Reduce technical debt
 
 3. **Collaboration**
    - Facilitate team coordination
-   - Standardize contribution processes
    - Enable effective communication
-   - Support knowledge sharing
 
-4. **Compliance**
-   - Ensure security standards
-   - Maintain audit trails
-   - Follow industry best practices
-   - Protect sensitive information
 
 ## 2. Repository Overview
 
@@ -118,7 +101,7 @@ olake-docs/
 │
 ├── src/                 # Source code
 │   ├── components/     # React components
-│   │   ├── site/      # Website components (Hero, Features, etc.)
+│   │   ├── site/      # Website current Home Page components (Hero, Features, etc.)
 │   │   ├── common/    # Reusable UI components
 │   │   └── layouts/   # Layout components
 │   │
@@ -227,7 +210,6 @@ olake-docs/
 - **Organization**:
   - Images organized by content type and date
   - Fonts in dedicated directory
-  - Downloads versioned appropriately
 - **Naming Convention**: `lowercase-with-hyphens.extension`
 - **Supported Formats**:
   - Images: `.png`, `.jpg`, `.svg`, `.webp` (prefer webp for more performance)
@@ -252,7 +234,6 @@ olake-docs/
 - Feature branches: `feature/feature-name`
 - Doc branches: `doc/truncated-doc-name`
 - Blog branches: `blog/truncated-blog-name`
-- Release branches: `release/vX.Y.Z`
 - Hotfix branches: `hotfix/issue-description`
 
 #### 2.3.2 Protected Branches
@@ -290,66 +271,15 @@ olake-docs/
 
 ## 3. Development Environment Setup
 
-### 3.1 System Requirements
+### 3.1 Required Software
 
-#### 3.1.1 Hardware Requirements
-
-- **CPU**: 4+ cores recommended
-- **RAM**: 8GB minimum, 16GB recommended
-- **Storage**: 10GB free space minimum
-- **Network**: Broadband internet connection
-
-#### 3.1.2 Software Requirements
-
-- **Operating System**:
-  - macOS 10.15 or later
-  - Windows 10/11 with WSL2
-  - Linux (Ubuntu 20.04+, Fedora 34+)
-- **Browser**:
-  - Chrome 90+ (recommended)
-  - Firefox 88+
-  - Safari 14+
-  - Edge 90+
-
-### 3.2 Required Software
-
-#### 3.2.1 Node.js
+#### 3.1.1 Node.js
 
 - **Version**: 18.x LTS or later
-- **Installation**:
-
-  ```bash
-  # macOS (using nvm)
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-  nvm install --lts
-  nvm use --lts
-
-  # Windows (using nvm-windows)
-  # Download and install from: https://github.com/coreybutler/nvm-windows
-  nvm install lts
-  nvm use lts
-
-  # Ubuntu/Debian
-  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-  sudo apt-get install -y nodejs
-  ```
 
 #### 3.2.2 Git
 
 - **Version**: 2.30.0 or later
-- **Installation**:
-
-  ```bash
-  # macOS
-  brew install git
-
-  # Windows
-  # Download and install from: https://git-scm.com/download/win
-
-  # Ubuntu/Debian
-  sudo apt-get update
-  sudo apt-get install git
-  ```
 
 #### 3.2.3 Code Editor
 
@@ -383,12 +313,6 @@ npm install
 ```bash
 # Start development server
 npm start
-
-# Start with specific port
-PORT=4000 npm start
-
-# Start with debugger
-npm run start:debug
 ```
 
 #### 3.4.2 Common Development Commands
@@ -449,43 +373,15 @@ npm run serve
 2. **MDX Compilation Errors**
    - Verify MDX syntax
    - Check component imports
-   - Validate frontmatter format
-
-3. **Memory Issues**
-   ```bash
-   # Increase Node memory limit
-   export NODE_OPTIONS=--max-old-space-size=8192
-   ```
 
 ### 3.6 Best Practices
 
-#### 3.6.1 Code Editor Configuration
-
-```json
-// .vscode/settings.json
-{
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "typescript.tsdk": "node_modules/typescript/lib"
-}
-```
-
-#### 3.6.2 Git Workflow
+#### 3.6.1 Git Workflow
 
 1. Create feature branch
 2. Make changes
-3. Run tests and linting
-4. Commit with conventional commits
-5. Push and create PR
-
-#### 3.6.3 Performance Optimization
-
-- Use `npm ci` for clean installs
-- Enable caching in development
-- Optimize images before commit
-- Use code splitting where appropriate
+3. Commit with conventional commits
+4. Push and create PR
 
 ## 4. Project Architecture
 
@@ -547,7 +443,6 @@ graph LR
   - Documentation framework
   - MDX support
   - Plugin system
-  - i18n support
   - Search integration
 
 #### 4.2.2 Frontend Technologies
@@ -555,14 +450,11 @@ graph LR
 - **React 18.3.1**
   - Component-based UI
   - Server Components
-  - Concurrent Mode
   - Suspense
   - Error Boundaries
 
 - **TailwindCSS 3.4.17**
   - Utility-first CSS
-  - JIT compiler
-  - Custom plugins
   - Responsive design
   - Dark mode support
 
@@ -584,8 +476,6 @@ graph LR
 
 - **ESLint**
   - Code linting
-  - Style enforcement
-  - Best practices
   - Custom rules
 
 - **Prettier**
@@ -659,16 +549,6 @@ graph TD
     F[Components] --> B
 ```
 
-#### 4.4.2 Runtime Data Flow
-
-```mermaid
-graph TD
-    A[User Interaction] --> B[React Components]
-    B --> C[State Management]
-    C --> D[UI Updates]
-    E[Search] --> F[Algolia]
-    F --> B
-```
 
 ### 4.5 Configuration Management
 
@@ -678,8 +558,8 @@ graph TD
 // docusaurus.config.js
 module.exports = {
   title: 'OLake Documentation',
-  tagline: 'Modern Data Lake Solution',
-  url: 'https://docs.olake.io',
+  tagline: ' Data Lake ',
+  url: 'https://olake.io/docs',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -812,6 +692,7 @@ The project integrates with several third-party services and plugins to enhance 
 
 - **Purpose**: Provides the search functionality for the documentation and blog.
 - **Configuration**: Algolia is configured in the `themeConfig.algolia` section of `docusaurus.config.js`. This includes the App ID, API Key, and Index Name.
+- **Updates**: Algolia DocSearch crawler visits website once every 24 hours to index the content, It uses the sitemap to discover the pages (https://olake.io/sitemap.xml) , when we push changes to master branch , github actions deploys those changes and then sitemap will be updated as algolia crawler will reindex the changes within 24 hours , search results will also be updated .
 
 #### 4.8.2 Analytics
 
@@ -826,6 +707,37 @@ The project integrates with several third-party services and plugins to enhance 
 
 - **Purpose**: The `plugin-image-zoom` and `ideal-image` plugins are used to provide better user experience with images. They enable responsive image sizes and click-to-zoom functionality.
 
+#### 4.8.5 HubSpot Forms
+
+- **Purpose**: Used for lead generation and user registration on the website. The main registration form for the pilot program is powered by HubSpot.
+- **Configuration**:
+  - Portal ID: `21798546`
+  - Form ID: `86391f69-48e0-4b35-8ffd-13ac212d8208`
+  - Location: Embedded in the `RegistrationSection` component on the homepage
+- **How it works**:
+  - The HubSpot form script loads lazily when the registration section comes into view or when users navigate directly to `#olake-form-product` anchor
+  - This improves page load performance by not loading the form script until needed
+  - Forms automatically submit lead data to HubSpot for tracking and follow-up
+- **Setup in code**: Located in `src/components/site/RegistrationSection.jsx`
+
+#### 4.8.6 Tally Forms
+
+- **Purpose**: Join the waitlist form used at /ai-lake (e.g., AILake waitlist)
+- **Configuration**: Form is  embedded using Tally's embed script
+- **Location**: Used in the `Glace` component (`src/components/site/Glace.tsx`)
+- **Advantages**: Quick to set up
+
+#### 4.8.7 IndexNow
+
+- **Purpose**: Automatically notifies search engines (Bing, Yandex, etc.) when content is updated, speeding up indexing
+- **Configuration**: Custom plugin located at `src/plugins/indexnow/index.js`
+- **How it works**:
+  - After each build, the plugin reads the generated sitemap
+  - Extracts all URLs from the sitemap
+  - Submits them to IndexNow API endpoints for Bing and Yandex
+  - Helps get new content indexed faster than waiting for search engines to crawl naturally
+- **API Key**: Stored in `INDEXNOW_KEY` environment variable (also hardcoded as fallback)
+
 ## 5. Content Management
 
 ### 5.1 Content Strategy
@@ -834,17 +746,12 @@ The project integrates with several third-party services and plugins to enhance 
 
 1. **Documentation**
    - Product documentation
-   - API references
    - Getting started guides
-   - Tutorials
-   - Conceptual guides
-   - Best practices
 
 2. **Blog Posts**
    - Product updates
    - Technical deep dives
    - Case studies
-   - Best practices
    - Community highlights
 
 3. **Component Library**
@@ -1077,33 +984,10 @@ src/
    - Check links
    - Deploy changes
 
-#### 5.5.2 Blog Post Workflow
-
-1. **Proposal**
-   - Topic suggestion
-   - Outline review
-   - Schedule planning
-
-2. **Writing**
-   - Draft content
-   - Add media
-   - Technical review
-
-3. **Review**
-   - Peer review
-   - Technical accuracy
-   - Editorial review
-
-4. **Publishing**
-   - Final approval
-   - Schedule post
-   - Social promotion
-
 ### 5.6 Quality Assurance
 
 #### 5.6.1 Content Checklist
 
-- [ ] Follows style guide
 - [ ] Technical accuracy
 - [ ] Grammar and spelling
 - [ ] Links working
@@ -1128,78 +1012,13 @@ src/
    - Clarity
    - Consistency
 
-### 5.7 Content Maintenance
-
-#### 5.7.1 Regular Tasks
-
-- Weekly link checks
-- Monthly content reviews
-- Quarterly updates
-- Annual content audit
-
-#### 5.7.2 Version Control
-
-- Content versioning
-- Change tracking
-- Archive management
-- Redirect handling
-
-#### 5.7.3 SEO Management
-
-- Keyword optimization
-- Meta descriptions
-- Image alt text
-- URL structure
-- Sitemap updates
 
 ## 6. Deployment Procedures
 
-### 6.1 Deployment Overview
 
-#### 6.1.1 Deployment Environments
-
-1. **Development**
-   - Local development
-   - Feature testing
-   - Integration testing
-
-2. **Staging**
-   - Pre-production testing
-   - Performance testing
-   - User acceptance testing
-
-3. **Production**
-   - Live environment
-   - High availability
-   - Monitoring and alerts
-
-### 6.2 Standard Deployment
-
-#### 6.2.1 Pre-deployment Checklist
-
-- [ ] All tests passing
-- [ ] No linting errors
-- [ ] Build successful locally
-- [ ] Documentation updated
-- [ ] Change log updated
-- [ ] Dependencies updated
-- [ ] Security scan completed
-- [ ] Performance benchmarks reviewed
-
-#### 6.2.2 Build Process
+#### 6.1 Build Process
 
 ```bash
-# Clean previous build
-npm run clean
-
-# Install dependencies
-npm ci
-
-# Type checking
-npm run typecheck
-
-# Run tests
-npm run test
 
 # Build the site
 npm run build
@@ -1214,7 +1033,6 @@ npm run serve
 
 # Deploy to GitHub Pages
 npm run deploy
-
 ```
 
 #### 6.2.4 Deployment Verification
@@ -1240,34 +1058,82 @@ npm run deploy
 - Service worker
 - Image optimization
 
-## 7. Maintenance and Updates
+### 6.4 Post-Deployment Tasks
 
-### Regular Maintenance Tasks
+After each deployment, the following happens automatically:
 
-1. Update dependencies regularly
-2. Monitor and optimize build performance
-3. Review and update documentation
-4. Maintain redirects in docusaurus.config.js
+1. **Sitemap Generation**:
+   - New sitemap is generated at `https://olake.io/sitemap.xml`
+   - Contains all documentation, blog posts, and pages
+   - Helps search engines discover new and updated content
 
-### Version Control Guidelines
+2. **IndexNow Notification**:
+   - IndexNow plugin automatically notifies Bing and Yandex
+   - Sends list of all URLs from sitemap
+   - Speeds up indexing of new content
 
-1. Branch naming:
-   - Feature branches: `feature/description`
-   - Blog posts: `blog/post-name`
-   - Documentation: `docs/topic-name`
+3. **Algolia Search Indexing**:
+   - Algolia crawler will reindex the site within 24 hours
+   - Can manually trigger reindex from Algolia Crawler dashboard if needed
+   - Search results will reflect new content after reindex completes
 
-2. Commit messages:
-   - Clear and descriptive
-   - Reference issue numbers when applicable
+4. **Manual verification checklist**:
+   - Check that new pages are accessible
+   - Verify images load correctly
+   - Test search functionality with new content (after 24 hours)
+   - Check mobile responsiveness
+   - Verify forms still work (HubSpot, Tally)
 
-### Content Updates
+## 7. Monitoring and Analytics
 
-1. Review and update existing documentation quarterly
-2. Maintain changelog in release notes
-3. Update API documentation as needed
-4. Keep blog content current and relevant
+### 7.1 Performance Monitoring
 
-## 8. Troubleshooting
+#### 7.1.1 Key Metrics to Track
+
+- **Page Load Time**: Should be under 3 seconds
+- **Time to Interactive**: Should be under 5 seconds
+- **First Contentful Paint**: Should be under 1.8 seconds
+- **Largest Contentful Paint**: Should be under 2.5 seconds
+- **Cumulative Layout Shift**: Should be under 0.1
+
+#### 7.1.2 Monitoring Tools
+
+1. **Google Lighthouse**:
+   - Run regular audits on key pages
+   - Track performance, accessibility, SEO scores
+   - Target: All scores above 90
+
+2. **Page Speeddev**
+   - https://pagespeed.web.dev/
+   -Run analysis on core web vitals
+
+
+### 8 Performance Best Practices
+
+#### 8.1.1 Image Guidelines
+
+- **Preferred format**: WebP / svg 
+- **Maximum size**: 100KB or lower per image
+- **Compression**: Always optimize before uploading
+- **Alt text**: Always include for accessibility
+
+#### 9.1.2 Code Quality
+
+- Follow ESLint rules
+- Use TypeScript for type safety
+- Keep components small and focused
+- Reuse components when possible
+
+#### 9.1.3 SEO Best Practices
+
+- Include meta descriptions on all pages
+- Use proper heading hierarchy (H1 → H2 → H3)
+- Add alt text to all images
+- Use descriptive URLs
+- Add structured data where appropriate
+- Keep content fresh and updated
+
+## 10. Troubleshooting
 
 ### Common Issues
 
@@ -1295,3 +1161,4 @@ npm run deploy
 - **Last Updated**: October 6, 2025
 - **Version**: 1.0
 - **Maintainers**: OLake Documentation Team
+```
