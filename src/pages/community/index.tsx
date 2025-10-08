@@ -100,7 +100,7 @@ const CommunityPage = () => {
     {
       name: 'contributing-to-olake',
       description: 'Get support on starting to contribute to OLake',
-      members: '315'
+      members: '310+'
     },
     {
       name: 'general',
