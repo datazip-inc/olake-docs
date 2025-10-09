@@ -100,32 +100,32 @@ const CommunityPage = () => {
     {
       name: 'contributing-to-olake',
       description: 'Get support on starting to contribute to OLake',
-      members: '180+'
+      members: '310+'
     },
     {
       name: 'general',
       description: 'Major community updates and announcements',
-      members: '200+'
+      members: '350+'
     },
     {
       name: 'help',
       description: "Get help from the community when you're stuck",
-      members: '200+'
+      members: '340+'
     },
     {
       name: 'discussions',
       description: "Share articles and resources you've found helpful",
-      members: '200+'
+      members: '340+'
     },
     {
       name: 'introduce-yourself',
       description: 'Best way to say hello to the community',
-      members: '170+'
+      members: '300+'
     },
     {
       name: 'social-and-events',
       description: 'Everything related to OLake social events',
-      members: '204+'
+      members: '340+'
     }
   ]
 
@@ -157,16 +157,16 @@ const CommunityPage = () => {
   ]
 
   const stats = [
-    { label: 'Community Members', value: '205+' },
-    { label: 'Contributors', value: '10+' },
-    { label: 'Pull Requests', value: '30+' },
-    { label: 'Issues Resolved', value: '76+' }
+    { label: 'Community Members', value: '350+' },
+    { label: 'Contributors', value: '25+' },
+    { label: 'Pull Requests', value: '340+' },
+    { label: 'Issues Resolved', value: '120+' }
   ]
 
   return (
     <Layout
       title='OLake Community'
-      description='Join the fastest growing data engineering community. Connect, learn, and contribute with 205+ passionate practitioners.'
+      description='Join the fastest growing data engineering community. Connect, learn, and contribute with 350+ passionate practitioners.'
     >
       {/* Hero Section */}
       <PageHeader
@@ -178,7 +178,7 @@ const CommunityPage = () => {
           </>
         }
         subtitle='Welcome to OLake Community'
-        description='Join 20+ data professionals building the future of data lakehouse technology together'
+        description='Become part of our community of 350+ builders redefining the future of data lakehouses'
         cta={
           <div className='flex flex-wrap justify-center gap-4'>
             <Button href='https://olake.io/slack' size='lg' external>
