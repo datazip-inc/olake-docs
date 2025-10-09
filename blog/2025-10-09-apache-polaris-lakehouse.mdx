@@ -1,0 +1,1038 @@
+---
+title: "Building a Scalable Lakehouse with Iceberg, Trino, OLake & Apache Polaris"
+description: "A comprehensive guide to building a production-ready lakehouse using Apache Iceberg, Apache Polaris, Trino, and OLake with hands-on Docker setup."
+slug: apache-polaris-lakehouse
+date: 2025-10-09
+authors: [akshay]
+tags: [iceberg, polaris, trino, olake, lakehouse, cdc]
+image: /img/blog/cover/polaris-blog.webp
+---
+
+# Building a Scalable Lakehouse with Iceberg, Trino, OLake & Apache Polaris
+
+## Why choose this lakehouse stack?
+
+Modern data teams are moving toward the lakehouse architecture—combining the reliability of data warehouses with the scale and cost-efficiency of data lakes. But building one from scratch can feel overwhelming with so many moving parts.
+
+This guide walks you through building a production-ready lakehouse using four powerful open-source tools: Apache Iceberg (table format), Apache Polaris (catalog), Trino (query engine), and OLake (data ingestion). We'll show you exactly what each component does, why it matters, and how they work together—with a hands-on Docker setup you can run locally.
+
+## Understanding Apache Iceberg: The table format that changes everything
+
+Apache Iceberg reimagines how we structure data lakes. Think of a data lake as a massive library where data files are scattered across random shelves with no catalog system.
+
+### Key benefits of using Iceberg
+
+- **ACID transactions on object storage**: Get database-like guarantees on cheap S3/GCS/Azure storage
+- **Schema evolution made easy**: Add, rename, or drop columns without rewriting terabytes of data
+- **Hidden partitioning**: Queries automatically prune irrelevant data without users writing complex WHERE clauses
+- **Time travel capabilities**: Query your data as it existed at any point in time for audits or debugging
+- **Production-grade performance**: Efficiently handle petabyte-scale datasets with fast metadata operations
+
+## Why you need a catalog: Keeping your lakehouse organized
+
+Here's the challenge with Iceberg: every time you make a change (add data, update schema, delete rows), Iceberg creates a new metadata file. Over time, you might have hundreds of these files. The big question becomes: which metadata file represents the current state of your table?
+
+This is where the catalog comes in. Think of it as the central registry that:
+
+- Maintains a list of all your Iceberg tables
+- Tracks which metadata file is the "current" version for each table
+- Ensures all query engines see a consistent view of your data
+
+Without a proper catalog, different tools might read different versions of your tables, leading to inconsistent results and data chaos.
+
+## Enter Apache Polaris: A lightweight, standards-based catalog
+
+Apache Polaris is a relatively new but powerful REST catalog for Iceberg that strikes the perfect balance between simplicity and enterprise capabilities. Unlike heavyweight proprietary catalogs, Polaris is:
+
+- **Easy to deploy**: Single container running on Quarkus/Java
+- **Standards-compliant**: Implements the Iceberg REST Catalog spec, so any Iceberg-compatible engine works seamlessly
+- **Production-ready**: Ships with Kubernetes Helm charts and supports enterprise authentication (OIDC)
+- **Cloud-agnostic**: Works with S3, MinIO, GCS, Azure Blob Storage, and more
+
+### What makes Polaris special
+
+Polaris was designed to solve the catalog complexity problem. Traditional catalogs like Hive Metastore or AWS Glue can be heavyweight, expensive, or lock you into a specific cloud provider. Polaris gives you:
+
+- Role-based access control out of the box
+- Flexible authentication (internal tokens or external OIDC providers)
+- Lightweight architecture that scales without the bloat
+- Open source with active community support
+
+:::tip Production tip
+For local development, you can pass S3 credentials directly to Polaris. In production environments, always use cloud-native authentication (IAM roles, OIDC), enable TLS, and implement least-privilege access controls.
+:::
+
+## OLake: Real-time data ingestion made simple
+
+Now that you have Iceberg tables and a Polaris catalog, how do you actually get data into your lakehouse? This is where OLake comes in.
+
+OLake is an open-source, high-performance tool specifically built to replicate data from operational databases directly into Iceberg format. It supports:
+
+- **Popular databases**: PostgreSQL, MySQL, MongoDB, Oracle, plus Kafka streams
+- **Change data capture (CDC)**: Captures every insert, update, and delete in real-time
+- **Native Iceberg writes**: Data lands directly in Iceberg format with proper metadata
+- **Simple configuration**: Point it at your database and catalog, and you're done
+
+### Why OLake over traditional ETL?
+
+Traditional ETL tools like Debezium + Kafka + Spark require complex pipelines with multiple moving parts. OLake simplifies this dramatically:
+
+- **Direct to Iceberg**: No intermediate formats or complex transformations
+- **Real-time sync**: Changes appear in your lakehouse within seconds
+- **Catalog-aware**: Automatically registers tables with Polaris
+- **CLI and UI**: Choose your preferred way to manage pipelines
+
+What this means in practice: your applications keep writing to operational databases (MySQL, Postgres, MongoDB) as usual. OLake continuously captures those changes and writes them to Iceberg tables that are immediately queryable via Trino or any other Iceberg-compatible engine.
+
+## Trino: Your high-performance query engine
+
+With data in Iceberg format and a Polaris catalog managing it all, you need a powerful query engine to actually analyze that data. Trino is perfect for this role.
+
+Trino is a distributed SQL engine designed for fast, interactive analytics on massive datasets. Originally created at Facebook (as Presto), it's now one of the most popular open-source query engines for data lakes.
+
+### Why Trino excels for lakehouse architectures
+
+- **Blazing fast**: MPP (massively parallel processing) architecture runs queries in seconds, not hours
+- **Standard SQL**: Use familiar ANSI SQL—no need to learn new query languages
+- **Federation**: Query across multiple data sources (Iceberg, PostgreSQL, MySQL, Kafka) in a single query
+- **Iceberg-native**: Full support for Iceberg features including time travel, schema evolution, and hidden partitioning
+- **Scales horizontally**: Add more workers to handle larger datasets and higher concurrency
+
+### Time travel and advanced features
+
+```sql
+-- Query data as it existed at a specific time
+SELECT * FROM orders FOR TIMESTAMP AS OF TIMESTAMP '2025-01-15 10:00:00';
+
+-- Query a specific snapshot version
+SELECT * FROM orders FOR VERSION AS OF 12345;
+```
+
+This makes auditing, debugging, and compliance workflows significantly easier.
+
+## How the pieces mesh
+
+![Lakehouse Architecture](/img/blog/2025/18/pieices-mesh.webp)
+
+1. **Ingest**: OLake captures CDC from MySQL/Postgres/MongoDB and commits Iceberg snapshots (data + metadata) into object storage.
+2. **Catalog**: Polaris exposes those tables through the Iceberg REST API so all engines share the same view of "current."
+3. **Query**: Trino points its Iceberg connector at Polaris and runs federated SQL, including time-travel on Iceberg tables.
+
+## Hands-On: Run the Stack with Docker Compose
+
+We'll spin up:
+- **PostgreSQL** — metadata DB for Polaris
+- **Apache Polaris** — REST catalog pointing to S3
+- **Trino** — query engine
+- **MySQL** — sample source DB
+- **OLake** — CDC ingestion
+
+### Prerequisites
+
+Before deploying OLake on AWS, ensure the following setup is complete:
+
+**EC2 Instance**
+- Must have Docker and Docker Compose installed.
+
+**IAM Role (Attached to EC2)**
+- Permission to assume itself (`sts:AssumeRole` on the same role).
+- S3 Read/Write permissions (see IAM policy example below).
+
+**S3 Bucket**
+- Used for Iceberg data storage.
+
+**Trust Policy**
+- Should allow the IAM role to assume itself.
+
+### IAM Role Trust Policy
+
+Your EC2 IAM role needs a trust policy allowing it to assume itself:
+
+**trust-policy.json:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_ROLE_NAME>"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+This allows the role to assume itself, which Polaris uses for vended credentials.
+
+### IAM Policy for S3 Access
+
+Create an IAM policy that grants Polaris access to your S3 bucket:
+
+**iam-policy.json:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<YOUR_S3_BUCKET>",
+        "arn:aws:s3:::<YOUR_S3_BUCKET>/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/<YOUR_ROLE_NAME>"
+  }
+]
+}
+```
+
+### Steps to Create IAM Role
+
+**Create the IAM Policy:**
+
+```bash
+aws iam create-policy --policy-name polaris-s3-access-policy --policy-document file://iam-policy.json
+```
+
+**Create the IAM Role:**
+
+```bash
+aws iam create-role --role-name polaris-lakehouse-role --assume-role-policy-document file://trust-policy.json
+```
+
+**Attach Policy to Role:**
+
+```bash
+aws iam attach-role-policy --role-name polaris-lakehouse-role --policy-arn arn:aws:iam::<AWS_ACCOUNT_ID>:policy/polaris-s3-access-policy
+```
+
+**Create Instance Profile:**
+
+```bash
+aws iam create-instance-profile --instance-profile-name polaris-lakehouse-profile
+```
+
+**Add Role to Instance Profile:**
+
+```bash
+aws iam add-role-to-instance-profile --instance-profile-name polaris-lakehouse-profile --role-name polaris-lakehouse-role
+```
+
+**Attach to EC2 Instance:**
+
+```bash
+aws ec2 associate-iam-instance-profile --instance-id <YOUR_EC2_INSTANCE_ID> --iam-instance-profile Name=polaris-lakehouse-profile
+```
+
+**Get the Role ARN (you'll need this for catalog creation):**
+
+```bash
+aws iam get-role --role-name polaris-lakehouse-role --query 'Role.Arn' --output text
+```
+
+This will output something like:
+
+```
+arn:aws:iam::123456789012:role/polaris-lakehouse-role
+```
+
+Save this ARN — you'll use it when creating the Polaris catalog.
+
+### docker-compose.yml
+
+```yaml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: polaris-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: polaris
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d polaris"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  polaris:
+    image: apache/polaris:latest
+    container_name: polaris
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/polaris
+      QUARKUS_DATASOURCE_USERNAME: postgres
+      QUARKUS_DATASOURCE_PASSWORD: postgres
+      QUARKUS_MANAGEMENT_ENABLED: "true"
+      AWS_REGION: <REGION_OF_S3_BUCKET>
+      POLARIS_BOOTSTRAP_CREDENTIALS: default-realm,root,secret
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8181:8181"  # API
+      - "8182:8182"  # Health/metrics
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8182/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    depends_on:
+      polaris:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./trino/etc:/etc/trino:ro
+    # AWS credentials removed - Trino uses EC2 IAM role
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: demo_db
+      MYSQL_USER: demo_user
+      MYSQL_PASSWORD: demo_password
+    command: >
+      --log-bin=mysql-bin --server-id=1 --binlog-format=ROW
+      --gtid-mode=ON --enforce-gtid-consistency=ON
+      --binlog-row-image=FULL --binlog-row-metadata=FULL
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  olake:
+    image: olakego/source-mysql:v0.2.3
+    container_name: olake
+    depends_on:
+      mysql:
+        condition: service_healthy
+      polaris:
+        condition: service_healthy
+    volumes:
+      - ./olake-config:/config
+    command:
+      - sync
+      - --config
+      - /config/source.json
+      - --destination
+      - /config/destination.json
+      - --catalog
+      - /config/catalog.json
+    environment:
+      - AWS_REGION=<REGION_OF_S3_BUCKET>
+    networks:
+      - default
+
+volumes:
+  pg-data:
+  mysql-data:
+
+networks:
+  default:
+    name: lakehouse-network
+```
+
+### Trino Configuration Files
+
+**Create ./trino/etc/config.properties:**
+
+```properties
+coordinator=true
+node-scheduler.include-coordinator=true
+http-server.http.port=8080
+discovery.uri=http://localhost:8080
+```
+
+**Create ./trino/etc/catalog/iceberg.properties:**
+
+```properties
+connector.name=iceberg
+# Iceberg REST Catalog
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://polaris:8181/api/catalog
+iceberg.rest-catalog.warehouse=warehouse
+# OAuth2
+iceberg.rest-catalog.security=OAUTH2
+iceberg.rest-catalog.oauth2.server-uri=http://polaris:8181/api/catalog/v1/oauth/tokens
+iceberg.rest-catalog.oauth2.credential=<OLAKE_USER_CLIENT_ID>:<OLAKE_USER_CLIENT_SECRET>
+iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
+iceberg.rest-catalog.oauth2.token-refresh-enabled=true
+# Use vended credentials from Polaris
+iceberg.rest-catalog.vended-credentials-enabled=true
+# AWS S3 - Uses EC2 IAM role (no explicit credentials needed)
+fs.native-s3.enabled=true
+s3.region=<REGION_OF_S3_BUCKET>
+```
+
+**Create ./trino/etc/catalog/mysql.properties:**
+
+```properties
+connector.name=mysql
+connection-url=jdbc:mysql://mysql:3306
+connection-user=demo_user
+connection-password=demo_password
+```
+
+### OLake Configuration Files
+
+Create the OLake configuration directory and files for real-time data ingestion:
+
+**1. Create ./olake-config/source.json**
+
+```json
+{
+  "hosts": "mysql",
+  "port": 3306,
+  "username": "demo_user",
+  "password": "demo_password",
+  "database": "demo_db",
+  "update_method": {
+    "type": "Standalone"
+  }
+}
+```
+
+**2. Create ./olake-config/destination.json**
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "rest_catalog_url": "http://polaris:8181/api/catalog",
+    "warehouse": "warehouse",
+    "iceberg_s3_path": "s3://<YOUR_S3_BUCKET>",
+    "iceberg_db": "lakehouse",
+    "rest_auth_type": "oauth2",
+    "oauth2_uri": "http://polaris:8181/api/catalog/v1/oauth/tokens",
+    "credential": "<OLAKE_USER_CLIENT_ID>:<OLAKE_USER_CLIENT_SECRET>",
+    "scope": "PRINCIPAL_ROLE:ALL",
+    "aws_region": "<REGION_OF_S3_BUCKET>"
+  }
+}
+```
+
+:::note
+Replace `<YOUR_S3_BUCKET>` with your bucket name, `<REGION_OF_S3_BUCKET>` with your S3 region (e.g., us-east-1). Use the **same** olake_user credentials from the Polaris setup step.
+:::
+
+**3. Create ./olake-config/catalog.json**
+
+```json
+{
+  "selected_streams": {
+    "demo_db": [
+      {
+        "normalization": true,
+        "partition_regex": "",
+        "stream_name": "orders",
+        "sync_mode": "full_refresh"
+      },
+      {
+        "normalization": true,
+        "partition_regex": "",
+        "stream_name": "customers",
+        "sync_mode": "full_refresh"
+      }
+    ]
+  }
+}
+```
+
+### Sample Data (MySQL init script)
+
+**Create ./mysql-init/01-setup.sql:**
+
+```sql
+USE demo_db;
+
+CREATE TABLE IF NOT EXISTS customers (
+  customer_id INT PRIMARY KEY AUTO_INCREMENT,
+  first_name VARCHAR(50) NOT NULL,
+  last_name  VARCHAR(50) NOT NULL,
+  email      VARCHAR(100) UNIQUE NOT NULL,
+  country    VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  order_id     INT PRIMARY KEY AUTO_INCREMENT,
+  customer_id  INT NOT NULL,
+  product_name VARCHAR(100) NOT NULL,
+  amount       DECIMAL(10,2) NOT NULL,
+  order_date   DATE NOT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
+INSERT INTO customers (first_name, last_name, email, country) VALUES
+('John','Doe','john.doe@email.com','USA'),
+('Jane','Smith','jane.smith@email.com','Canada'),
+('Bob','Johnson','bob.johnson@email.com','UK'),
+('Alice','Brown','alice.brown@email.com','Australia'),
+('Charlie','Wilson','charlie.wilson@email.com','USA');
+
+INSERT INTO orders (customer_id, product_name, amount, order_date) VALUES
+(1,'Laptop',   1299.99,'2025-01-15'),
+(1,'Mouse',      29.99,'2025-01-16'),
+(2,'Keyboard',   79.99,'2025-01-17'),
+(3,'Monitor',   299.99,'2025-01-18'),
+(4,'Headphones',149.99,'2025-01-19'),
+(5,'Tablet',    599.99,'2025-01-20'),
+(2,'Webcam',     89.99,'2025-01-21'),
+(1,'Desk',      199.99,'2025-01-22');
+```
+
+![Sample Customers Data](/img/blog/2025/18/image-1-sample-data.webp)
+
+![Sample Orders Data](/img/blog/2025/18/image-2-sample-data.webp)
+
+## Bring It Up
+
+Start all services:
+
+```bash
+docker compose up -d
+```
+
+Wait for health checks to go green:
+
+```bash
+docker compose ps
+```
+
+Monitor OLake sync (it will start automatically after Polaris is ready):
+
+```bash
+docker logs -f olake
+```
+
+![Docker Logs](/img/blog/2025/18/docker-logs.webp)
+
+### Polaris auth bootstrap
+
+Find bootstrap credentials in logs:
+
+```bash
+docker logs polaris | grep "root principal credentials"
+```
+
+![Polaris Bootstrap Credentials](/img/blog/2025/18/docker-logs-polaris-image.webp)
+
+Exchange for a bearer token:
+
+```bash
+curl -X POST http://localhost:8181/api/catalog/v1/oauth/tokens \
+  -d 'grant_type=client_credentials&client_id=<CLIENT_ID>&client_secret=<CLIENT_SECRET>&scope=PRINCIPAL_ROLE:ALL'
+```
+
+![Exchange Bearer Token](/img/blog/2025/18/exchange-bearer-image.webp)
+
+### Create a catalog in Polaris
+
+```bash
+curl -X POST http://localhost:8181/api/management/v1/catalogs \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "warehouse",
+    "type": "INTERNAL",
+    "properties": {
+      "default-base-location": "s3://<YOUR_S3_BUCKET>"
+    },
+    "storageConfigInfo": {
+      "storageType": "S3",
+      "roleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/<IAM_ROLE_NAME>",
+      "allowedLocations": ["s3://<YOUR_S3_BUCKET>"]
+    }
+  }'
+```
+
+### Create User for Trino and OLake
+
+Create user and assign roles (replace `<bearer_token>` with your bearer token). The create user command's response includes the new user's client credentials.
+
+**Create user:**
+
+```bash
+curl -X POST "http://localhost:8181/api/management/v1/principals" \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"olake_user","type":"user"}'
+```
+
+**Create principal role:**
+
+```bash
+curl -X POST "http://localhost:8181/api/management/v1/principal-roles" \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"principalRole":{"name":"olake_user_role"}}'
+```
+
+**Assign role to user:**
+
+```bash
+curl -X PUT "http://localhost:8181/api/management/v1/principals/olake_user/principal-roles" \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"principalRole":{"name":"olake_user_role"}}'
+```
+
+**Create catalog role:**
+
+```bash
+curl -X POST "http://localhost:8181/api/management/v1/catalogs/warehouse/catalog-roles" \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"catalogRole":{"name":"olake_catalog_role"}}'
+```
+
+**Assign catalog role to principal role:**
+
+```bash
+curl -X PUT "http://localhost:8181/api/management/v1/principal-roles/olake_user_role/catalog-roles/warehouse" \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"catalogRole":{"name":"olake_catalog_role"}}'
+```
+
+**Grant privileges:**
+
+```bash
+curl -X PUT "http://localhost:8181/api/management/v1/catalogs/warehouse/catalog-roles/olake_catalog_role/grants" \
+  -H "Authorization: Bearer <BEARER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"grant":{"type":"catalog","privilege":"CATALOG_MANAGE_CONTENT"}}'
+```
+
+The response from creating `olake_user` includes:
+
+```json
+{
+  "principal": {
+    "name": "olake_user",
+    "clientId": "abc123...",
+    "principalId": "...",
+    "createTimestamp": "..."
+  },
+  "credentials": {
+    "clientId": "abc123...",
+    "clientSecret": "xyz789..."
+  }
+}
+```
+
+Copy and save:
+- **clientId**: `abc123...`
+- **clientSecret**: `xyz789...`
+
+You'll use these credentials in BOTH Trino configuration (`iceberg.properties`) and OLake configuration (`destination.json`).
+
+OLake automatically syncs data from MySQL to Iceberg. Check the sync status:
+
+```bash
+docker logs olake
+```
+
+After configuration, restart Trino:
+
+```bash
+docker compose restart trino
+```
+
+## Query with Trino
+
+Open http://localhost:8082/ui/ or use CLI:
+
+```bash
+docker exec -it trino trino
+```
+
+Explore catalogs & schemas:
+
+```sql
+SHOW CATALOGS;
+```
+
+![Show Catalogs](/img/blog/2025/18/show-catalogs-image.webp)
+
+```sql
+SHOW SCHEMAS FROM iceberg;
+SHOW SCHEMAS FROM mysql;
+```
+
+### Verify MySQL Source Data
+
+Before loading data into Iceberg, let's verify our source data exists in MySQL:
+
+**Check customers table:**
+
+```bash
+docker exec mysql mysql -u demo_user -pdemo_password demo_db \
+  -e "SELECT customer_id, first_name, last_name, email, country FROM customers;" 2>&1 | grep -v "Warning"
+```
+
+![Check Customers](/img/blog/2025/18/check-customers-image.webp)
+
+*5 customers in our source database ready to replicate*
+
+**Check orders table:**
+
+```bash
+docker exec mysql mysql -u demo_user -pdemo_password demo_db \
+  -e "SELECT order_id, customer_id, product_name, amount, order_date FROM orders;" 2>&1 | grep -v "Warning"
+```
+
+![Check Orders](/img/blog/2025/18/ordders-table-image.webp)
+
+*8 orders spanning different customers and dates*
+
+### Verify Iceberg tables created by OLake
+
+OLake has already created and populated Iceberg tables automatically. Let's verify the data and explore Iceberg's capabilities.
+
+```bash
+docker exec -it trino trino
+```
+
+**Count customers:**
+
+```sql
+SELECT COUNT(*) AS customer_count FROM iceberg.lakehouse.customers;
+```
+
+![Lakehouse Customers Count](/img/blog/2025/18/select-lakehouse-customers.webp)
+
+**Count orders:**
+
+```sql
+SELECT COUNT(*) AS order_count FROM iceberg.lakehouse.orders;
+```
+
+### Federated analytics
+
+Query across MySQL and Iceberg in a single query:
+
+```sql
+SELECT c.first_name, c.last_name, c.country,
+       COUNT(o.order_id) AS total_orders,
+       SUM(o.amount)     AS total_spent
+FROM mysql.demo_db.customers c
+JOIN iceberg.lakehouse.orders o
+  ON c.customer_id = o.customer_id
+GROUP BY c.first_name, c.last_name, c.country
+ORDER BY total_spent DESC;
+```
+
+### Time travel
+
+```sql
+INSERT INTO iceberg.lakehouse.customers VALUES
+(6,'Emma','Davis','emma.davis@email.com','USA', CURRENT_TIMESTAMP);
+
+SELECT * FROM "iceberg"."lakehouse"."customers$snapshots";
+
+-- Replace with a real snapshot_id from the query above
+SELECT * FROM iceberg.lakehouse.customers
+FOR VERSION AS OF 1234567890123456789;
+
+SELECT * FROM iceberg.lakehouse.customers
+FOR TIMESTAMP AS OF TIMESTAMP '2025-01-20 10:00:00.000 UTC';
+```
+
+### Schema evolution
+
+```sql
+ALTER TABLE iceberg.lakehouse.customers
+ADD COLUMN phone_number VARCHAR;
+
+INSERT INTO iceberg.lakehouse.customers VALUES
+(7,'Michael','Brown','michael.brown@email.com','Canada', CURRENT_TIMESTAMP, '+1-555-0123');
+```
+
+## Real-World Patterns
+
+### Historical analysis
+
+```bash
+docker exec trino trino --execute "
+SELECT COUNT(*) as customer_count, 'Before Emma' as version 
+FROM iceberg.lakehouse.customers FOR VERSION AS OF 6578338355726919215 
+UNION ALL 
+SELECT COUNT(*) as customer_count, 'After Emma' as version 
+FROM iceberg.lakehouse.customers FOR VERSION AS OF 8874429124196113744;" 2>&1 | grep -v "WARNING"
+```
+
+![Historical Analysis](/img/blog/2025/18/histoircal-analysis.webp)
+
+![S3 Storage](/img/blog/2025/18/s3-image.webp)
+
+### Audit & compliance
+
+```sql
+SELECT customer_id, first_name, last_name, email
+FROM iceberg.lakehouse.customers
+FOR TIMESTAMP AS OF TIMESTAMP '2025-01-15 00:00:00.000 UTC'
+WHERE customer_id = 1;
+```
+
+![Audit Query](/img/blog/2025/18/audit.webp)
+
+### Data quality check across snapshots
+
+```sql
+WITH snaps AS (
+  SELECT snapshot_id FROM "iceberg"."lakehouse"."customers$snapshots"
+)
+SELECT s.snapshot_id, c.email, COUNT(*) AS duplicate_count
+FROM snaps s
+CROSS JOIN LATERAL (
+  SELECT email FROM iceberg.lakehouse.customers FOR VERSION AS OF s.snapshot_id
+) c
+GROUP BY s.snapshot_id, c.email
+HAVING COUNT(*) > 1;
+```
+
+## Troubleshooting
+
+### Trino → Polaris: 403 Forbidden
+
+Verify OAuth2 in `iceberg.properties`:
+
+```properties
+iceberg.rest-catalog.oauth2.credential=<OLAKE_USER_CLIENT_ID>:<OLAKE_USER_CLIENT_SECRET>
+iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
+```
+
+### S3 AccessDenied
+
+IAM role missing permissions or incorrect `roleArn` in catalog configuration.
+
+Confirm IAM policy allows bucket + objects:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:*"],
+    "Resource": [
+      "arn:aws:s3:::your-bucket-name",
+      "arn:aws:s3:::your-bucket-name/*"
+    ]
+  }]
+}
+```
+
+Verify the roleArn in your catalog creation matches your IAM role:
+
+```bash
+aws iam get-role --role-name polaris-lakehouse-role --query 'Role.Arn' --output text
+```
+
+Test S3 access from EC2:
+
+```bash
+aws s3 ls s3://<YOUR_S3_BUCKET>/
+```
+
+Ensure AWS credentials wired into Polaris & Trino containers.
+
+### Empty Iceberg tables
+
+- Check counts and S3 paths
+- Inspect snapshots via `...$snapshots`
+
+### Polaris cannot reach S3
+
+IAM role not properly attached or missing permissions.
+
+**Fix:**
+
+Verify IAM role is attached to EC2:
+
+```bash
+aws ec2 describe-instances --instance-ids <YOUR_INSTANCE_ID> --query 'Reservations[0].Instances[0].IamInstanceProfile'
+```
+
+Verify role has S3 permissions:
+
+```bash
+aws iam list-attached-role-policies --role-name polaris-lakehouse-role
+```
+
+Test S3 access from EC2:
+
+```bash
+aws s3 ls s3://<YOUR_S3_BUCKET>/
+```
+
+## Production Considerations
+
+### Security
+
+- Never commit secrets; use `.env` and `.gitignore`.
+- Prefer IAM roles/OIDC over static keys.
+- Enable TLS/HTTPS on Polaris & Trino; use VPC endpoints for S3.
+- Apply least-privilege IAM and Polaris RBAC.
+
+### Performance
+
+Partition by common filters:
+
+```sql
+CREATE TABLE orders (...) WITH (
+  partitioning = ARRAY['month(order_date)', 'country']
+);
+```
+
+Compact small files:
+
+```sql
+ALTER TABLE iceberg.lakehouse.orders EXECUTE optimize;
+```
+
+Trim old snapshots:
+
+```sql
+ALTER TABLE iceberg.lakehouse.orders EXECUTE expire_snapshots(retention_threshold => '7d');
+```
+
+### Observability
+
+- Polaris health: `curl http://localhost:8182/q/health`
+- Trino UI: http://localhost:8082/ui/ (track scans/memory/time)
+- S3 CloudWatch metrics for request/latency/errors
+
+## Ingestion (CDC)
+
+This tutorial uses **OLake** for automated CDC-based ingestion. OLake continuously monitors MySQL for changes and syncs them to Apache Iceberg in real-time.
+
+### Alternative Options
+
+If you want to explore different ingestion approaches:
+
+- **Airbyte** — GUI-based and easy to get started; supports MySQL → Iceberg pipelines.
+- **Debezium + Kafka + Flink** — Battle-tested stack for high-volume streaming CDC workloads.
+- **Manual sync** — Use SQL commands (like `INSERT ... SELECT`) for simple batch loading — example below.
+
+### Manual Incremental Pattern (Alternative to OLake)
+
+If you prefer manual control instead of OLake's automated sync, you can use this incremental loading pattern:
+
+```sql
+-- Track last sync timestamps
+CREATE TABLE IF NOT EXISTS iceberg.lakehouse.sync_metadata (
+  table_name VARCHAR,
+  last_sync_timestamp TIMESTAMP
+);
+
+-- Insert only new records since the last sync
+INSERT INTO iceberg.lakehouse.orders
+SELECT * FROM mysql.demo_db.orders
+WHERE created_at > (
+  SELECT last_sync_timestamp
+  FROM iceberg.lakehouse.sync_metadata
+  WHERE table_name = 'orders'
+);
+
+-- Update the metadata to reflect the new sync time
+UPDATE iceberg.lakehouse.sync_metadata
+SET last_sync_timestamp = CURRENT_TIMESTAMP
+WHERE table_name = 'orders';
+```
+
+:::tip
+This approach works well for small datasets or controlled syncs but lacks real-time capabilities. For production workloads, OLake or Debezium-based CDC is recommended.
+:::
+
+## Quick Start (Copy-Paste)
+
+```bash
+mkdir lakehouse-demo && cd lakehouse-demo
+mkdir -p trino/etc/catalog mysql-init olake-config
+
+# Create files from this guide
+
+docker compose up -d
+
+# Monitor OLake sync
+docker logs -f olake
+
+# Check health
+docker compose ps
+
+# Open Trino UI
+open http://localhost:8082/ui/  # macOS; use xdg-open on Linux
+
+# or CLI
+docker exec -it trino trino
+```
+
+### .gitignore
+
+```gitignore
+.env
+*.log
+.DS_Store
+```
+
+### Sample .env
+
+```bash
+AWS_REGION=us-east-1
+S3_BUCKET=your-lakehouse-bucket-name
+
+POSTGRES_PASSWORD=postgres
+MYSQL_ROOT_PASSWORD=root_password
+MYSQL_PASSWORD=demo_password
+```
+
+## Conclusion
+
+Building a modern lakehouse doesn't have to be complex. With Iceberg + Polaris + Trino, you get warehouse-grade guarantees on low-cost object storage—with open standards and speed to match.
+
+Welcome to the lakehouse era. 🚀
+
