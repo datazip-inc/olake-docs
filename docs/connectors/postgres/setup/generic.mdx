@@ -6,13 +6,12 @@ sidebar_position: 6
 
 # Generic PostgreSQL CDC Setup Guide
 
-This guide covers setting up Change Data Capture (CDC) for PostgreSQL running on any server infrastructure including EC2 instances, virtual machines, bare metal servers, or on-premises installations. The setup uses logical replication with the **wal2json** plugin for real-time data streaming.
+This guide covers setting up Change Data Capture (CDC) for PostgreSQL running on any server infrastructure including EC2 instances, virtual machines, bare metal servers, or on-premises installations. The setup uses logical replication with the **pgoutput** plugin (native to PostgreSQL 10+) for real-time data streaming.
 
 **Prerequisites:**
 
-- PostgreSQL version 9.4+ (version 10+ recommended for full logical replication support)
+- PostgreSQL version 10+ (pgoutput is built-in from version 10 onwards)
 - Superuser access or ability to modify `postgresql.conf` and `pg_hba.conf`
-- The `wal2json` plugin installed (or ability to install it)
 - TLS/SSL enabled for secure connections (recommended)
 - Sufficient disk space for WAL retention
 
@@ -26,35 +25,16 @@ This guide covers setting up Change Data Capture (CDC) for PostgreSQL running on
 
 **Steps:**
 
-## 1. Install wal2json Plugin
+## 1. Verify pgoutput availability
 
-The `wal2json` plugin is required for logical decoding. Installation varies by system:
+The `pgoutput` plugin is built into PostgreSQL 10 and later versions. No separate installation is required.
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get update
-sudo apt-get install postgresql-15-wal2json  # Replace 15 with your version
-```
-
-**CentOS/RHEL/Amazon Linux:**
-```bash
-sudo yum install postgresql15-wal2json  # Replace 15 with your version
-# Or for newer versions:
-sudo dnf install postgresql15-wal2json
-```
-
-**From Source (if package not available):**
-```bash
-git clone https://github.com/eulerto/wal2json.git
-cd wal2json
-make USE_PGXS=1
-sudo make USE_PGXS=1 install
-```
-
-**Verify Installation:**
+**Verify your PostgreSQL version:**
 ```sql
-SELECT * FROM pg_available_extensions WHERE name = 'wal2json';
+SELECT version();
 ```
+
+If you see PostgreSQL 10.0 or higher, pgoutput is automatically available.
 
 ## 2. Configure PostgreSQL Parameters
 
@@ -160,26 +140,135 @@ GRANT SELECT ON ALL TABLES IN SCHEMA schema1 TO cdc_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA schema1 GRANT SELECT ON TABLES TO cdc_user;
 ```
 
-## 6. Create Logical Replication Slot
+## 6. Configure Replica Identity for Tables
 
-Set up the replication slot for OLake to consume changes:
+**Critical for pgoutput:** Tables must have a proper replica identity to track UPDATE and DELETE operations.
 
-:::important Slot Name Configuration
-Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+**Understanding Replica Identity:**
+- `DEFAULT`: Uses the primary key (if exists)
+- `FULL`: Uses all columns (highest overhead, works without primary key)
+- `INDEX`: Uses a specific unique index
+- `NOTHING`: Only INSERT operations are replicated
+
+**Set Replica Identity for Tables:**
+
+```sql
+-- Option 1: Use primary key (recommended, works if table has PK)
+ALTER TABLE public.my_table REPLICA IDENTITY DEFAULT;
+
+-- Option 2: Use all columns (works for tables without PK, but higher overhead)
+ALTER TABLE public.my_table REPLICA IDENTITY FULL;
+
+-- Option 3: Use a specific unique index
+ALTER TABLE public.my_table REPLICA IDENTITY USING INDEX my_unique_index;
+
+-- Option 4: Do not log old row values (NOTHING)
+ALTER TABLE public.my_table REPLICA IDENTITY NOTHING;
+```
+
+**Verify Replica Identity:**
+
+```sql
+SELECT 
+    n.nspname AS schema_name,
+    c.relname AS table_name,
+    CASE c.relreplident
+        WHEN 'd' THEN 'DEFAULT'
+        WHEN 'n' THEN 'NOTHING'
+        WHEN 'f' THEN 'FULL'
+        WHEN 'i' THEN 'INDEX'
+    END AS replica_identity
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'r' 
+AND n.nspname = 'public';
+```
+
+## 7. Create Publication
+
+Publications define which tables will be replicated. Create a publication for the tables you want to monitor:
+
+**Publication Name Configuration:**
+
+:::important Publication Name Configuration
+Use the exact publication name that you configure in OLake UI or CLI. The publication name must match the `publication` parameter in your OLake source configuration.
 :::
 
 ```sql
+-- Create publication for all tables in the database
+CREATE PUBLICATION olake_publication FOR ALL TABLES;
+
+-- Or create publication for specific tables
+CREATE PUBLICATION olake_publication FOR TABLE public.table1, public.table2, public.table3;
+
+-- Or create publication for all tables in a specific schema
+CREATE PUBLICATION olake_publication FOR TABLES IN SCHEMA public;
+```
+
+**Publication Options:**
+
+```sql
+-- Customize what operations are published
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update,delete,truncate');
+
+-- Only publish INSERT and UPDATE operations
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update');
+
+-- For partitioned tables (PostgreSQL 13+): publish changes via the partition root
+CREATE PUBLICATION olake_publication FOR ALL TABLES
+WITH (publish = 'insert,update,delete,truncate', publish_via_partition_root = true);
+```
+
+**Verify Publication:**
+
+```sql
+-- List all publications
+SELECT * FROM pg_publication;
+
+-- View tables in a publication
+SELECT * FROM pg_publication_tables WHERE pubname = 'olake_publication';
+```
+
+**Add Tables to Existing Publication:**
+
+```sql
+-- Add a single table
+ALTER PUBLICATION olake_publication ADD TABLE public.new_table;
+
+-- Add multiple tables
+ALTER PUBLICATION olake_publication ADD TABLE public.table4, public.table5;
+
+-- Remove a table
+ALTER PUBLICATION olake_publication DROP TABLE public.old_table;
+```
+
+## 8. Create Logical Replication Slot
+
+Set up the replication slot for OLake to consume changes:
+
+::::important Slot Name Configuration
+Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+
+Best practices:
+- Create the publication before creating the replication slot
+- Create the slot in the same database that OLake will connect to (slots are per-database)
+- Use a unique slot name per OLake connection; slot names cannot start with a number
+::::
+
+```sql
 -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
-SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json');
+SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
 ```
 
 **Example with common slot names:**
 ```sql
 -- If your OLake source config uses "olake_slot"
-SELECT pg_create_logical_replication_slot('olake_slot', 'wal2json');
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');
 
 -- If your OLake source config uses "postgres_slot"  
-SELECT pg_create_logical_replication_slot('postgres_slot', 'wal2json');
+SELECT pg_create_logical_replication_slot('postgres_slot', 'pgoutput');
 ```
 
 **Verify Slot Creation:**
@@ -187,27 +276,52 @@ SELECT pg_create_logical_replication_slot('postgres_slot', 'wal2json');
 SELECT * FROM pg_replication_slots WHERE slot_name = 'your_olake_slot_name';
 ```
 
-## 7. Test Logical Decoding
+## 9. Test Logical Decoding
 
-Verify that CDC is working correctly:
+Verify that CDC is working correctly with pgoutput:
 
 ```sql
 -- Create test data
-CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, data TEXT);
-INSERT INTO test_table (data) VALUES ('Generic PostgreSQL CDC test');
+CREATE TABLE IF NOT EXISTS test_table (
+    id SERIAL PRIMARY KEY, 
+    data TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Check for changes (replace 'your_olake_slot_name' with your actual slot name)
-SELECT data FROM pg_logical_slot_get_changes(
-    'your_olake_slot_name', null, null, 
-    'pretty-print', '1'
+-- Set replica identity
+ALTER TABLE test_table REPLICA IDENTITY DEFAULT;
+
+-- Add table to publication
+ALTER PUBLICATION olake_publication ADD TABLE test_table;
+
+-- Insert test data
+INSERT INTO test_table (data) VALUES ('PostgreSQL pgoutput CDC test - INSERT');
+```
+
+**Check for changes using pg_logical_slot_peek_binary_changes:**
+
+```sql
+SELECT *
+FROM pg_logical_slot_peek_binary_changes(
+  'olake_slot', NULL, NULL,
+  'proto_version','1',
+  'publication_names','olake_publication'
 );
 ```
 
-✅ **Success:** Returns JSON change records from wal2json  
-❌ **Permission denied:** Check user has `REPLICATION` role  
-❌ **Plugin not found:** Verify wal2json installation and wal_level setting
+**Expected Results:**
 
-## 8. Configure TLS/SSL (Recommended)
+✅ **Success**: Returns binary change records from pgoutput<br/>
+❌ **Permission denied**: Check user has REPLICATION role<br/>
+❌ **Publication not found**: Verify publication exists and contains tables<br/>
+❌ **Slot not found**: Check replication slot was created with pgoutput plugin<br/>
+❌ **No changes returned**: Verify table has replica identity configured and is in the publication
+
+::::important 
+Ensure your source configuration includes `replication_slot` and `publication` names. OLake will stream changes via the pgoutput logical slot.
+::::
+
+## 10. Configure TLS/SSL (Recommended)
 
 For secure connections, configure SSL in `postgresql.conf`:
 
@@ -229,7 +343,7 @@ sudo -u postgres openssl req -new -x509 -days 365 -nodes -text \
 sudo -u postgres chmod 600 /var/lib/pgsql/15/data/server.key
 ```
 
-## 9. Firewall Configuration
+## 11. Firewall Configuration
 
 Ensure PostgreSQL port (default 5432) is accessible:
 
@@ -254,11 +368,11 @@ Now that you have configured the PostgreSQL server and created the CDC user, you
 
 ### Configuration Issues
 
-- **wal2json Plugin Not Found:** 
+- **pgoutput Plugin Not Found:** 
   ```sql
-  ERROR: could not access file "wal2json": No such file or directory
+  ERROR: could not access file "pgoutput": No such file or directory
   ```
-  **Solution:** Install the wal2json package for your PostgreSQL version or compile from source.
+  **Solution:** Please make sure you have installed PostgreSQL 10 or higher.
 
 - **WAL Level Not Logical:**
   ```sql
@@ -270,6 +384,34 @@ Now that you have configured the PostgreSQL server and created the CDC user, you
   - Verify you edited the correct `postgresql.conf` file: `SHOW config_file;`
   - Ensure PostgreSQL was restarted after changes
   - Check PostgreSQL logs for configuration errors
+
+### Publication Issues
+
+**Publication Not Found:**
+
+```
+ERROR: publication "publication_name" does not exist
+```
+
+**Solution**: Create the publication or verify the name matches exactly (case-sensitive):
+
+```sql
+-- Check existing publications
+SELECT * FROM pg_publication;
+
+-- Create publication if missing
+CREATE PUBLICATION olake_publication FOR ALL TABLES;
+```
+
+**Publication Required Error:**
+
+```
+ERROR: publication is required for pgoutput
+ERROR: failed to validate cdc configuration for slot: publication is required for pgoutput
+```
+
+**Solution:** Ensure the publication parameter is specified in your source.json configuration with the exact name of an existing PostgreSQL publication.
+
 
 ### Permission Issues
 
@@ -325,8 +467,6 @@ Now that you have configured the PostgreSQL server and created the CDC user, you
   ```sql
   ALTER TABLE my_table REPLICA IDENTITY FULL;  -- For tables without PK
   ```
-
-- **DDL Changes Not Captured:** wal2json captures DDL in WAL, but OLake may need schema refresh for structural changes.
 
 - **Large Transaction Handling:** For very large transactions, monitor:
   - WAL disk space usage
