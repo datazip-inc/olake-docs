@@ -178,7 +178,7 @@ const CommunityPage = () => {
           </>
         }
         subtitle='Welcome to OLake Community'
-        description='Join 350+ data professionals building the future of data lakehouse technology together'
+        description='Become part of our community of 350+ builders redefining the future of data lakehouses'
         cta={
           <div className='flex flex-wrap justify-center gap-4'>
             <Button href='https://olake.io/slack' size='lg' external>
