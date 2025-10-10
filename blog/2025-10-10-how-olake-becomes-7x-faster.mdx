@@ -19,57 +19,43 @@ This post explains the technical changes, architectural decisions, and performan
 
 Our original destination pipeline had several issues:
 
-1. **Performance bottlenecks** from inefficient batching and serialization
-2. **Schema evolution complexity** requiring manual intervention
-3. **Complex GRPC Server And Writer Logic**
-4. **UnOptimized File Size**
+1. **Debezium-centric code bloat**: too much parsing/processing logic tightly coupled to Debezium message formats
+2. **Slow throughput**: inefficient data processing pipeline resulted in poor ingestion performance
+3. **High memory consumption**: excessive serialization/deserialization and large JSON envelopes increased CPU and memory pressure
+4. **No proper file sizing**: inconsistent file sizes led to suboptimal query performance and storage efficiency
+5. **No clean interface for `iceberg-go`**: writer path wasn't abstracted to allow a Go-native Iceberg integration
+6. **Schema unaware Go path**: parallel schema evolutions could conflict because Go lacked first-class knowledge of table schema
 ---
 
 ## Architecture Overview
 
 The refactor splits responsibilities between Go and Java components:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Source (Postgres/MySQL/MongoDB/Oracle Incremental, CDC or Full Load)          │
-└─────────────────┬───────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Go Data Plane                                              │
-│  • Concurrency & batching (10k records default)            │
-│  • Per-thread schema tracking                               │
-│  • Schema evolution detection & promotion                   │
-│  • Typed protobuf serialization                            │
-└─────────────────┬───────────────────────────────────────────┘
-                  │ gRPC (typed, small payloads)
-                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Java Iceberg Writer (per thread)                           │
-│  • Equality deletes for upserts (RowDelta)                 │
-│  • Append mode for backfills (AppendFiles)                 │
-│  • Atomic commits with table.refresh()                     │
-│  • Explicit writer refresh on schema evolution             │
-└─────────────────┬───────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Apache Iceberg Table (S3/GCS + Glue/JDBC/REST/Hive)      │
-│  • Atomic snapshot commits                                  │
-│  • Exactly-once visible state                              │
-└─────────────────────────────────────────────────────────────┘
-                  │
-                  ▼ (only after successful commit)
-┌─────────────────────────────────────────────────────────────┐
-│  Source Cursor Advanced (LSN/Offset ACK)                    │
-└─────────────────────────────────────────────────────────────┘
-```
+<img
+  src="/img/blog/2025/10/olake-dest-refactor-arch.png"
+  alt="OLake Destination Refactor Architecture"
+  style={{ width: '100%', height: 'auto' }}
+/>
 
 **Key Design Principles:**
 - **Go** handles concurrency, batching, and schema intent
 - **Java** performs Iceberg-native I/O with atomic commit semantics
 - **Typed gRPC** keeps the hot path fast and small
 - **Explicit lifecycle management** for writers and commits
+
+### Two-level Batching (Local → Main → Java)
+
+<img
+  src="/img/blog/2025/10/batching-flow.png"
+  alt="Two-Level Batching Flow"
+  style={{ width: '100%', height: 'auto' }}
+/>
+
+- **Local thread batch**: each writer thread buffers records in-memory up to a per-thread threshold.
+- **Java submit**: after the local batch crosses a threshold, we send a compact typed payload to the Java Iceberg writer for writing in file.
+- **Once the chunk or threshold hit (time or size) we push data to iceberg**
+
+This reduces RPC chatter, keeps working sets bounded, and yields more consistent Parquet/ORC file sizes.
 
 ---
 
@@ -166,6 +152,12 @@ func (p *Postgres) PostCDC(ctx context.Context, _ types.StreamInterface, noErr b
 ## Schema Evolution
 
 Schema changes are handled through a deliberate evolution process:
+
+<img
+  src="/img/blog/2025/10/schema-evolution.png"
+  alt="Schema Evolution Flow"
+  style={{ width: '100%', height: 'auto' }}
+/>
 
 ### Detection and Promotion
 
@@ -535,6 +527,19 @@ message RecordIngestResponse {
 - **Typed `oneof`** uses less memory than generic `google.protobuf.Value`
 - **Single RPC** simplifies client/server logic
 - **Clear intent** via `PayloadType` enum
+- **No Debezium envelope** on the wire; the payload is purpose-built for Iceberg writes
+
+---
+
+## Serialization Path: Before vs After
+
+<img
+  src="/img/blog/2025/10/data-serialization.png"
+  alt="Serialization Path Comparison"
+  style={{ width: '100%', height: 'auto' }}
+/>
+
+Eliminating the Debezium envelope removes a full encode/decode cycle, reducing CPU, allocations, and memory footprint.
 
 ---
 
@@ -574,6 +579,22 @@ public BaseTaskWriter<Record> create(Table icebergTable) {
 
 ---
 
+## Partition Fanout Writer
+
+<img
+  src="/img/blog/2025/10/fanout-writer.png"
+  alt="Partition Fanout Writer"
+  style={{ width: '100%', height: 'auto' }}
+/>
+
+The previous partitioned writer could not hold multiple partition writers open concurrently, leading to frequent rolls and smaller files. The new fanout writer:
+
+- Opens writers for multiple partitions concurrently when safe to do so
+- Buffers per-partition to target larger, consistent files
+- Reduces writer churn and improves throughput on highly partitioned tables
+
+---
+
 ## Performance Optimizations
 
 The 7× performance improvement comes from several optimizations:
@@ -591,6 +612,10 @@ The 7× performance improvement comes from several optimizations:
 ---
 
 ## Operational Details
+
+### Parallel Normalization and Schema Detection
+
+Normalization and schema evolution checks run in parallel at thread level. Each thread builds a local candidate schema from its batch, compares against the stream's global schema, and only acquires the stream-level schema lock if a difference is detected, minimizing contention.
 
 ### Per-Thread Java Writers
 
@@ -767,6 +792,22 @@ No background deduplication. Tables reflect the correct state after each commit.
 
 ---
 
+## Concurrency and Locking
+
+- **Thread-local schema first**: threads compute and cache their candidate schema.
+- **Global schema lock only on change**: a stream-scoped lock is taken to evolve schema in the table only when the thread detects divergence from the global schema.
+- **Commit lock**: per-thread commits are serialized with table.refresh() to ensure atomic visibility without cross-thread partial state.
+
+This design keeps hot paths lock-free and confines blocking to rare schema transitions and final commits.
+
+---
+
+## File Size Target
+
+We standardize on a default target file size of ~350 MB for steady compaction and reader performance.
+
+---
+
 ## Conclusion
 
 The destination refactor delivers:
@@ -784,10 +825,10 @@ The split between Go (data plane) and Java (Iceberg I/O) provides the right abst
 
 We're continuing to invest in:
 
-- **Postgres pgoutput support** (in addition to wal2json)
 - **Iceberg merge-on-read optimizations**
 - **Multi-region catalog resilience**
 - **Real-time metrics and observability**
+- **DLQ/SMT hooks**: leverage the typed contract and schema awareness to add dead-lettering and smart transforms without reintroducing JSON envelopes
 
 ---
 
