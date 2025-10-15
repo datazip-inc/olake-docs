@@ -586,6 +586,15 @@ const config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
+        // Auto-create redirects from trailing slash to non-trailing slash URLs
+        createRedirects(existingPath) {
+          // Only create redirect if path doesn't already end with /
+          if (!existingPath.endsWith('/')) {
+            // Create redirect from path/ to path
+            return [`${existingPath}/`];
+          }
+          return undefined; // Don't create redirects for paths already ending with /
+        },
         redirects: [
           {
             to: '/docs/benchmarks?tab=mongodb',
@@ -948,6 +957,8 @@ const config = {
           },
 
           // END
+          // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
+          // via canonical tags in the theme files, not through redirects
 
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
@@ -961,6 +972,11 @@ const config = {
       },
     ],
     '@docusaurus/theme-live-codeblock',
+    
+    // Trailing slash redirect plugin
+    [
+      './src/plugins/trailing-slash-redirect/index.js', {}
+    ],
   ],
 
   // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags

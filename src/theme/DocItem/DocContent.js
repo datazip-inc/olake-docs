@@ -44,6 +44,10 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     absolute: true,
   });
 
+  // Strip trailing slashes from permalink for canonical URL
+  const cleanPermalink = permalink?.replace(/\/$/, '') || permalink;
+  const canonicalUrl = cleanPermalink ? siteUrl + cleanPermalink : null;
+
   return (
     <>
       <Head>
@@ -55,8 +59,8 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
         {metaImage && <meta property="og:image" content={metaImageUrl} />}
         {metaImage && <meta name="twitter:image" content={metaImageUrl} />}
         {metaImage && <meta name="twitter:image:alt" content={`Image for ${title}`} />}
-        {permalink && <meta property="og:url" content={siteUrl + permalink} />}
-        {permalink && <link rel="canonical" href={siteUrl + permalink} />}
+        {cleanPermalink && <meta property="og:url" content={canonicalUrl} />}
+        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
       </Head>
 
       <div className="row md:ml-8">
