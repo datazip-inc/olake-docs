@@ -82,6 +82,19 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Apache Iceberg + Polaris: Breaking Catalog Vendor Lock-in',
+      subtitle:
+        'This session explores the evolution of metadata catalogs in the lakehouse era, the challenges organizations face with traditional solutions, and why open catalog standards are critical for interoperability. Featuring Apache Polaris, an Iceberg-native, open catalog designed to eliminate vendor lock-in.',
+      route: '/webinar/w-12-apache-iceberg-polaris-catalog',
+      img: `/img/webinars/w-12-alex-merced-polaris.webp`,
+      alt: 'Apache Iceberg + Polaris: Breaking Catalog Vendor Lock-in',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '9 October 2025',
+      icon: FaVideo
+    },
+    {
       title: 'Mastering Iceberg Maintenance: From Compaction to Cost Optimization',
       subtitle:
         'Apache Iceberg has quickly become the backbone of modern data lakes, but maintaining tables efficiently is just as critical as building them. This session dives into the art of Iceberg table maintenance, from compaction strategies to metadata cleanup, with a focus on balancing query performance and compute cost.',
