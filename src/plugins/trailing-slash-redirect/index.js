@@ -28,23 +28,12 @@ module.exports = function trailingSlashRedirectPlugin(context, options) {
                 // Only redirect if:
                 // 1. Path ends with /
                 // 2. Path is not just "/" (root)
-                // 3. Not already redirected (avoid loops)
-                if (path !== '/' && path.endsWith('/') && !sessionStorage.getItem('ts_redirected')) {
-                  // Remove trailing slash
+                if (path !== '/' && path.endsWith('/')) {
+                  // Remove trailing slash and redirect
                   var newPath = path.slice(0, -1);
                   var newUrl = newPath + search + hash;
-                  
-                  // Set flag to avoid redirect loops
-                  sessionStorage.setItem('ts_redirected', '1');
-                  
-                  // Perform redirect
                   window.location.replace(newUrl);
                 }
-                
-                // Clear the redirect flag after page loads
-                window.addEventListener('load', function() {
-                  sessionStorage.removeItem('ts_redirected');
-                });
               })();
             `,
           },
