@@ -32,7 +32,12 @@ module.exports = function trailingSlashRedirectPlugin(context, options) {
                   // Remove trailing slash and redirect
                   var newPath = path.slice(0, -1);
                   var newUrl = newPath + search + hash;
-                  window.location.replace(newUrl);
+                  // Use history.replaceState to avoid a full page reload and prevent redirect loops
+                  if (window.history && typeof window.history.replaceState === 'function') {
+                    window.history.replaceState(null, '', newUrl);
+                  } else {
+                    window.location.replace(newUrl);
+                  }
                 }
               })();
             `,

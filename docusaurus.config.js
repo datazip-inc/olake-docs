@@ -586,14 +586,10 @@ const config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
-        // Auto-create redirects from trailing slash to non-trailing slash URLs
-        createRedirects(existingPath) {
-          // Only create redirect if path doesn't already end with /
-          if (!existingPath.endsWith('/')) {
-            // Create redirect from path/ to path
-            return [`${existingPath}/`];
-          }
-          return undefined; // Don't create redirects for paths already ending with /
+        // Disable auto trailing-slash redirects to avoid conflicts with static servers
+        // that force directory slashes 
+        createRedirects() {
+          return undefined;
         },
         redirects: [
           {
