@@ -586,6 +586,11 @@ const config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
+        // Disable auto trailing-slash redirects to avoid conflicts with static servers
+        // that force directory slashes 
+        createRedirects() {
+          return undefined;
+        },
         redirects: [
           {
             to: '/docs/benchmarks?tab=mongodb',
@@ -948,6 +953,8 @@ const config = {
           },
 
           // END
+          // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
+          // via canonical tags in the theme files, not through redirects
 
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
@@ -961,6 +968,11 @@ const config = {
       },
     ],
     '@docusaurus/theme-live-codeblock',
+    
+    // Trailing slash redirect plugin
+    [
+      './src/plugins/trailing-slash-redirect/index.js', {}
+    ],
   ],
 
   // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags
