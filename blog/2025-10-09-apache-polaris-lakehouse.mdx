@@ -271,12 +271,12 @@ curl -i -X POST http://localhost:8181/api/management/v1/catalogs \
     "name": "olake_catalog",
     "type": "INTERNAL",
     "properties": {
-      "default-base-location": "s3://your-bucket-name"
+      "default-base-location": "s3://<your-bucket-name>"
     },
     "storageConfigInfo": {
       "storageType": "S3",
       "roleArn": "<your-iam-role-arn>",
-      "allowedLocations": ["s3://your-bucket-name"]
+      "allowedLocations": ["s3://<your-bucket-name>"]
     }
   }'
 ```
@@ -345,16 +345,15 @@ curl -i -X PUT "http://localhost:8181/api/management/v1/catalogs/olake_catalog/c
 ```
 
 :::info External Access Requirements
-When accessing the Polaris REST Catalog from outside the EC2 instance, the following steps must be completed:
+When accessing the Polaris REST Catalog from outside the EC2 instance:
+1. **Use a reachable host**: Replace `localhost` with the EC2 instance's public IP or a DNS name.
+2. **Production note**: For internet-facing deployments, enable HTTPS and update URLs to `https://`.
 
-1. **Enable HTTPS**: SSL/TLS certificates must be configured and all URLs updated from `http://` to `https://`
-3. **Update URLs**: The EC2 instance's public IP address or domain name must be used instead of `localhost`
-
-**Example External Configuration:**
+**Example External Configuration (non‑TLS/testing):**
 ```json
 {
-     "rest_catalog_url": "https://polaris.olake.io/api/catalog",
-     "oauth2_uri": "https://polaris.olake.io/api/catalog/v1/oauth/tokens"
+  "rest_catalog_url": "http://polaris.olake.io/api/catalog",
+  "oauth2_uri": "http://polaris.olake.io/api/catalog/v1/oauth/tokens"
 }
 ```
 :::
@@ -469,8 +468,12 @@ docker exec mysql mysql -u demo_user -pdemo_password demo_db \
 
 *8 orders spanning different customers and dates*
 
-### OLake
+For this simple test, both the source (MySQL) and OLake are running on the same EC2 instance. However, in a real-world scenario, the source can be hosted anywhere.
 
+### OLake
+:::info
+Ensure the instance running **OLake** has AWS permissions equivalent to those attached to the instance hosting **Polaris** (for example, the same S3 access via IAM role/policy).
+:::
 Start OLake UI
 
 ```bash
@@ -489,9 +492,16 @@ For more detailed instructions on how to run your first job using OLake refer to
 
 After you have successfully created your source and destination, you can [configure your streams](/docs/getting-started/creating-first-pipeline#5-configure-streams) to start replicating your data.
 
+![Create Source](/img/blog/2025/18/olake-ui-select-streams.webp)
+
 ## Trino
 
-Now, once you have your Polaris Catalog hosted on your EC2 instance, you can query your Iceberg Table from anywhere using Trino. Set up your Trino service according to this directory structure:
+:::info
+You can run **Trino** from any machine without attaching AWS IAM roles. Trino connects to **Polaris** over REST using OAuth2, and Polaris accesses S3 with its own IAM role, so no AWS credentials are needed on the Trino host.
+:::
+
+Setup your Trino according to the following directory structure:
+
 ```bash
 ├── docker-compose.yml
 └── etc
@@ -520,11 +530,14 @@ services:
 ```properties
 connector.name=iceberg
 iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=https://<POLARIS_REST_ENDPOINT>/api/catalog
+iceberg.rest-catalog.uri=http://<POLARIS_REST_ENDPOINT>/api/catalog
 iceberg.rest-catalog.security=OAUTH2
 iceberg.rest-catalog.oauth2.credential=<OLAKE_USER_CLIENT_ID>:<OLAKE_USER_CLIENT_SECRET>
 iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
 iceberg.rest-catalog.warehouse=<POLARIS_CATALOG_NAME>
+iceberg.rest-catalog.vended-credentials-enabled=true
+iceberg.file-format=PARQUET
+fs.native-s3.enabled=true
 ```
 
 </details>
@@ -592,103 +605,29 @@ SHOW SCHEMAS FROM iceberg;
 
 OLake has already created and populated Iceberg tables automatically. Let's verify the data and explore Iceberg's capabilities.
 
-**Count customers:**
+**Select Table:**
 
 ```sql
-SELECT COUNT(*) AS customer_count FROM iceberg.lakehouse.customers;
+SELECT * FROM iceberg.<NAMESPACE>.customers LIMIT 10;
 ```
 
-![Lakehouse Customers Count](/img/blog/2025/18/select-lakehouse-customers.webp)
+![Lakehouse Customers Count](/img/blog/2025/18/trino-query-one.webp)
 
-**Count orders:**
+**List Snapshots for an Iceberg Table**
 
 ```sql
-SELECT COUNT(*) AS order_count FROM iceberg.lakehouse.orders;
+SELECT * FROM iceberg.<NAMESPACE>."customers$snapshots" ORDER BY committed_at DESC LIMIT 5;
 ```
 
-### Federated analytics
+![Lakehouse Customers Count](/img/blog/2025/18/trino-query-two.webp)
 
-Query across MySQL and Iceberg in a single query:
+**Time Travel Query by Snapshot ID**
 
 ```sql
-SELECT c.first_name, c.last_name, c.country,
-       COUNT(o.order_id) AS total_orders,
-       SUM(o.amount)     AS total_spent
-FROM mysql.demo_db.customers c
-JOIN iceberg.lakehouse.orders o
-  ON c.customer_id = o.customer_id
-GROUP BY c.first_name, c.last_name, c.country
-ORDER BY total_spent DESC;
+SELECT * FROM iceberg.<NAMESPACE>.customers FOR VERSION AS OF <SNAPSHOT_ID> LIMIT 10;
 ```
 
-### Time travel
-
-```sql
-INSERT INTO iceberg.lakehouse.customers VALUES
-(6,'Emma','Davis','emma.davis@email.com','USA', CURRENT_TIMESTAMP);
-
-SELECT * FROM "iceberg"."lakehouse"."customers$snapshots";
-
--- Replace with a real snapshot_id from the query above
-SELECT * FROM iceberg.lakehouse.customers
-FOR VERSION AS OF 1234567890123456789;
-
-SELECT * FROM iceberg.lakehouse.customers
-FOR TIMESTAMP AS OF TIMESTAMP '2025-01-20 10:00:00.000 UTC';
-```
-
-### Schema evolution
-
-```sql
-ALTER TABLE iceberg.lakehouse.customers
-ADD COLUMN phone_number VARCHAR;
-
-INSERT INTO iceberg.lakehouse.customers VALUES
-(7,'Michael','Brown','michael.brown@email.com','Canada', CURRENT_TIMESTAMP, '+1-555-0123');
-```
-
-## Real-World Patterns
-
-### Historical analysis
-
-```bash
-docker exec trino trino --execute "
-SELECT COUNT(*) as customer_count, 'Before Emma' as version
-FROM iceberg.lakehouse.customers FOR VERSION AS OF 6578338355726919215
-UNION ALL
-SELECT COUNT(*) as customer_count, 'After Emma' as version
-FROM iceberg.lakehouse.customers FOR VERSION AS OF 8874429124196113744;" 2>&1 | grep -v "WARNING"
-```
-
-![Historical Analysis](/img/blog/2025/18/histoircal-analysis.webp)
-
-![S3 Storage](/img/blog/2025/18/s3-image.webp)
-
-### Audit & compliance
-
-```sql
-SELECT customer_id, first_name, last_name, email
-FROM iceberg.lakehouse.customers
-FOR TIMESTAMP AS OF TIMESTAMP '2025-01-15 00:00:00.000 UTC'
-WHERE customer_id = 1;
-```
-
-![Audit Query](/img/blog/2025/18/audit.webp)
-
-### Data quality check across snapshots
-
-```sql
-WITH snaps AS (
-  SELECT snapshot_id FROM "iceberg"."lakehouse"."customers$snapshots"
-)
-SELECT s.snapshot_id, c.email, COUNT(*) AS duplicate_count
-FROM snaps s
-CROSS JOIN LATERAL (
-  SELECT email FROM iceberg.lakehouse.customers FOR VERSION AS OF s.snapshot_id
-) c
-GROUP BY s.snapshot_id, c.email
-HAVING COUNT(*) > 1;
-```
+![Lakehouse Customers Count](/img/blog/2025/18/trino-query-three.webp)
 
 ## Troubleshooting
 
@@ -762,46 +701,9 @@ Test S3 access from EC2:
 aws s3 ls s3://<YOUR_S3_BUCKET>/
 ```
 
-## Production Considerations
-
-### Security
-
-- Never commit secrets; use `.env` and `.gitignore`.
-- Prefer IAM roles/OIDC over static keys.
-- Enable TLS/HTTPS on Polaris & Trino; use VPC endpoints for S3.
-- Apply least-privilege IAM and Polaris RBAC.
-
-### Performance
-
-Partition by common filters:
-
-```sql
-CREATE TABLE orders (...) WITH (
-  partitioning = ARRAY['month(order_date)', 'country']
-);
-```
-
-Compact small files:
-
-```sql
-ALTER TABLE iceberg.lakehouse.orders EXECUTE optimize;
-```
-
-Trim old snapshots:
-
-```sql
-ALTER TABLE iceberg.lakehouse.orders EXECUTE expire_snapshots(retention_threshold => '7d');
-```
-
-### Observability
-
-- Polaris health: `curl http://localhost:8182/q/health`
-- Trino UI: http://localhost:8082/ui/ (track scans/memory/time)
-- S3 CloudWatch metrics for request/latency/errors
-
 ## Ingestion (CDC)
 
-This tutorial uses **OLake** for automated CDC-based ingestion. OLake continuously monitors MySQL for changes and syncs them to Apache Iceberg in real-time.
+This tutorial uses **OLake** for CDC-based ingestion. OLake continuously monitors MySQL for changes and syncs them to Apache Iceberg in real-time.
 
 ### Alternative Options
 
@@ -810,32 +712,6 @@ If you want to explore different ingestion approaches:
 - **Airbyte** — GUI-based and easy to get started; supports MySQL → Iceberg pipelines.
 - **Debezium + Kafka + Flink** — Battle-tested stack for high-volume streaming CDC workloads.
 - **Manual sync** — Use SQL commands (like `INSERT ... SELECT`) for simple batch loading — example below.
-
-### Manual Incremental Pattern (Alternative to OLake)
-
-If you prefer manual control instead of OLake's automated sync, you can use this incremental loading pattern:
-
-```sql
--- Track last sync timestamps
-CREATE TABLE IF NOT EXISTS iceberg.lakehouse.sync_metadata (
-  table_name VARCHAR,
-  last_sync_timestamp TIMESTAMP
-);
-
--- Insert only new records since the last sync
-INSERT INTO iceberg.lakehouse.orders
-SELECT * FROM mysql.demo_db.orders
-WHERE created_at > (
-  SELECT last_sync_timestamp
-  FROM iceberg.lakehouse.sync_metadata
-  WHERE table_name = 'orders'
-);
-
--- Update the metadata to reflect the new sync time
-UPDATE iceberg.lakehouse.sync_metadata
-SET last_sync_timestamp = CURRENT_TIMESTAMP
-WHERE table_name = 'orders';
-```
 
 ## Conclusion
 
