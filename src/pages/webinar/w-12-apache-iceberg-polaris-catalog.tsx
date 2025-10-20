@@ -16,7 +16,7 @@ const hosts = [
   {
     name: "Alex Merced",
     role: "Head of DevRel @ Dremio",
-    bio: "Alex Merced is a leading voice in the data lakehouse ecosystem and a prolific contributor to the Apache Iceberg community. He is the co-author of O'Reilly's Definitive Guide to Apache Iceberg and Polaris, and author of Manning's Architecting an Iceberg Lakehouse. As Head of Developer Relations at Dremio, Alex champions open-source data technologies and helps organizations navigate modern data architectures. He's also a LinkedIn Learning instructor and creator of DataLakehouseHub.com, where he shares insights on building scalable data platforms. Through his extensive blog contributions, conference talks, and hands-on tutorials, Alex has helped countless data engineers adopt Apache Iceberg and implement production-ready lakehouse solutions.",
+    bio: "Alex Merced is a leading voice in the data lakehouse ecosystem and a prolific contributor to the Apache Iceberg community. He is the co-author of O'Reilly's Definitive Guide to Apache Iceberg and Polaris, and author of Manning's Architecting an Iceberg Lakehouse. As Head of Developer Relations at Dremio, Alex champions open-source data technologies and helps organizations navigate modern data architectures. He's also a LinkedIn Learning instructor and creator of DataLakehouseHub.com, where he shares insights on building scalable data platforms.",
     image: "/img/authors/alex-merced.webp",
     linkedin: "https://www.linkedin.com/in/alexmerced",
   },
