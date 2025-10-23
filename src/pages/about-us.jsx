@@ -53,7 +53,7 @@ const AboutTeam = () => {
                   <div className='mx-auto h-40 w-40'>
                     <img
                       src={member.image}
-                      alt={member.name}
+                      alt={`${member.name} | Olake ${member.designation}`}
                       className='h-40 w-40 rounded-full object-cover transition duration-300 hover:border hover:border-gray-300'
                       loading="lazy" decoding="async"
                     />

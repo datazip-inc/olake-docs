@@ -58,7 +58,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/webinar-intro-iceberg.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/webinar-intro-iceberg.webp" alt="Webinar on setting up OLAP analysis from NoSQL databases using Apache Iceberg, hosted by Varun Bainsla from Nira Finance" />
           </div>
         </div>
 

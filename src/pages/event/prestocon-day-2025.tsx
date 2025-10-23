@@ -81,7 +81,7 @@ const WebinarPage = () => {
 
           <div className="flex flex-col md:flex-row ">
             <div className=" md:w-1/2 ">
-              <Image img={webinarData.image_url} alt="events Cover Image" />
+              <Image img={webinarData.image_url} alt="PrestoCon Day session on fast analytics with Presto, speaker from Datazip" />
             </div>
 
 

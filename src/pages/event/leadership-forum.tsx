@@ -50,7 +50,7 @@ const WebinarPage = () => {
           <div className=" md:w-1/2 ">
 
 
-            <Image img={`/img/events/e-1-leadership-forum.webp`} alt="events Cover Image" />
+            <Image img={`/img/events/e-1-leadership-forum.webp`} alt="Data Engineers and MLOps Connect event, December 21, 2024" />
           </div>
 
           <div className="md:w-1/3 md:relative md:left-56 p-4">

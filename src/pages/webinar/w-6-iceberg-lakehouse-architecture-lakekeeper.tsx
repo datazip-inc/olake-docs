@@ -57,7 +57,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.webp" alt="Iceberg Lakehouse webinar with Vakamo co-founder Viktor Kessler" />
           </div>
 
 
