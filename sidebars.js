@@ -44,6 +44,7 @@ const docSidebar = {
       items: [
         'getting-started/quickstart',
         'getting-started/creating-first-pipeline',
+        'getting-started/clear-dest',
         'getting-started/playground',
       ],
     },
