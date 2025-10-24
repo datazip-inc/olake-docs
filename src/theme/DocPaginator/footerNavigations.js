@@ -38,16 +38,28 @@ export const paginationConfig = {
       permalink: '/docs/getting-started/quickstart'
     },
     next: {
-      title: 'Compatability with Query Engines',
-      permalink: '/docs/understanding/compatibility-engines'
+      title: 'Clear Destination',
+      permalink: '/docs/getting-started/clear-dest'
+    }
+  },
+
+  // Clear Destination
+  '/docs/getting-started/clear-dest': {
+    previous: {
+      title: 'Create first job Pipeline',
+      permalink: '/docs/getting-started/creating-first-pipeline'
+    },
+    next: {
+      title: 'Playground',
+      permalink: '/docs/getting-started/playground'
     }
   },
 
   //Playground
   '/docs/getting-started/playground': {
     previous: {
-      title: 'Introduction',
-      permalink: '/docs'
+      title: 'Clear Destination',
+      permalink: '/docs/getting-started/clear-dest'
     },
     next: {
       title: 'Quickstart',
