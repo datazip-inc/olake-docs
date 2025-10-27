@@ -21,6 +21,10 @@ function BlogListPageMetadata(props) {
   const { blogDescription, blogTitle, permalink } = metadata
   const isBlogOnlyMode = permalink === '/'
   const title = isBlogOnlyMode ? siteTitle : blogTitle
+  const location = useLocation()
+  
+  // Check if this is a pagination page (page/2, page/3, etc.)
+  const isPaginationPage = /\/page\/\d+/.test(location.pathname)
 
   return (
     <>
@@ -33,6 +37,7 @@ function BlogListPageMetadata(props) {
         <meta property="og:url" content={`${siteUrl}${permalink}`} />
         <meta property="og:site_name" content="OLake" />
         <meta property="og:locale" content="en_US" />
+        {isPaginationPage && <meta name="robots" content="noindex, follow" />}
       </Head>
     </>
   )
