@@ -327,13 +327,6 @@ const config = {
             content: 'en_US',
           },
         },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:url',
-            content: 'https://olake.io',
-          },
-        },
         // Enhanced Open Graph Meta Tags
         {
           tagName: 'meta',
