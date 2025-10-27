@@ -52,6 +52,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     <>
       <Head>
         <title>{title}</title>
+        <meta property="og:type" content="website" />
         <meta property="og:title" content={title} />
         {description && <meta name="description" content={description} />}
         {description && <meta property="og:description" content={description} />}
@@ -60,6 +61,8 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
         {metaImage && <meta name="twitter:image" content={metaImageUrl} />}
         {metaImage && <meta name="twitter:image:alt" content={`Image for ${title}`} />}
         {cleanPermalink && <meta property="og:url" content={canonicalUrl} />}
+        <meta property="og:site_name" content="OLake" />
+        <meta property="og:locale" content="en_US" />
         {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
       </Head>
 
