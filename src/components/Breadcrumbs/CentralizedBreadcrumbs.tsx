@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { truncateTitle } from '../../lib/utils';
 
 export interface BreadcrumbItem {
@@ -23,6 +24,9 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   customItems,
   maxTitleLength = 70
 }) => {
+  const { siteConfig } = useDocusaurusContext();
+  const siteUrl = siteConfig.url || 'https://olake.io';
+  
   const getBreadcrumbItems = (): BreadcrumbItem[] => {
     if (customItems) {
       return customItems;
@@ -125,6 +129,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
                 </span>
                 {/* Hidden full title for search engines in schema.org markup */}
                 <meta itemProp="name" content={item.fullLabel || item.label} />
+                <meta itemProp="@id" content={`${siteUrl}${item.href}`} />
               </Link>
             ) : (
               <span 
