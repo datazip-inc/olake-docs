@@ -22,7 +22,7 @@ const config = {
 
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
-  trailingSlash: false,
+  trailingSlash: true,
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -968,11 +968,6 @@ const config = {
       },
     ],
     '@docusaurus/theme-live-codeblock',
-    
-    // Trailing slash redirect plugin
-    [
-      './src/plugins/trailing-slash-redirect/index.js', {}
-    ],
   ],
 
   // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags
