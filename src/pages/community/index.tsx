@@ -1,6 +1,9 @@
 // src/pages/community/index.tsx
 import React from 'react'
 import Layout from '@theme/Layout'
+import Head from '@docusaurus/Head'
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
+import { useLocation } from '@docusaurus/router'
 import Link from '@docusaurus/Link'
 import {
   FaSlack,
@@ -28,6 +31,11 @@ import SectionLayout from '../../components/community/SectionLayout'
 import StatCard from '@site/src/components/community/improved/StatCard'
 
 const CommunityPage = () => {
+  const { siteConfig } = useDocusaurusContext()
+  const location = useLocation()
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
+
   const communityMeets = [
     {
       title: 'OLake 8th Community Meetup',
@@ -168,6 +176,15 @@ const CommunityPage = () => {
       title='OLake Community'
       description='Join the fastest growing data engineering community. Connect, learn, and contribute with 350+ passionate practitioners.'
     >
+      <Head>
+        <meta property='og:type' content='website' />
+        <meta property='og:title' content='OLake Community' />
+        <meta property='og:description' content='Join the fastest growing data engineering community. Connect, learn, and contribute with 350+ passionate practitioners.' />
+        <meta property='og:url' content={canonicalUrl} />
+        <meta property='og:site_name' content='OLake' />
+        <meta property='og:locale' content='en_US' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+      </Head>
       {/* Hero Section */}
       <PageHeader
         title={
