@@ -133,7 +133,7 @@ const config = {
             label: "Iceberg",
             items: [
               {
-                label: "Blog",
+                label: "Iceberg Blogs",
                 href: `/iceberg`,
               },
               {
