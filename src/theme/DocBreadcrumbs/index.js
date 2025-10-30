@@ -1,9 +1,12 @@
 import React from 'react';
 import DocBreadcrumbs from '@theme-original/DocBreadcrumbs';
 import Link from '@docusaurus/Link';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 // Using Docusaurus home icon SVG instead of Heroicons
 
 export default function DocBreadcrumbsWrapper(props) {
+  const { siteConfig } = useDocusaurusContext();
+  const siteUrl = siteConfig.url || 'https://olake.io';
   // Check if this is a query engine page
   const isQueryEnginePage = props.items && props.items.some(item => 
     item.href && item.href.includes('/iceberg/query-engine')
@@ -63,6 +66,7 @@ export default function DocBreadcrumbsWrapper(props) {
                     {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
                     {index === 0 ? "Home" : item.label}
                   </span>
+                  <meta itemProp="@id" content={`${siteUrl}${item.href}`} />
                 </Link>
               ) : (
                 <span 

@@ -310,7 +310,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:image',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
           },
         },
         {
@@ -332,7 +332,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:image:type',
-            content: 'image/svg+xml',
+            content: 'image/webp',
           },
         },
         {
@@ -375,7 +375,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             name: 'twitter:image',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
           },
         },
         {

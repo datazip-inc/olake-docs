@@ -1,6 +1,9 @@
 // src/pages/community/contributors/index.tsx
 import React, { useEffect, useState, useMemo } from 'react'
 import Layout from '@theme/Layout'
+import Head from '@docusaurus/Head'
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
+import { useLocation } from '@docusaurus/router'
 import {
   FaGithub,
   FaTrophy,
@@ -22,6 +25,10 @@ import SectionHeader from '../../../components/community/improved/SectionHeader'
 
 import clsx from 'clsx'
 const ContributorsPage = () => {
+  const { siteConfig } = useDocusaurusContext()
+  const location = useLocation()
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
   const [contributors, setContributors] = useState<ContributorProps[]>([])
 
 
@@ -104,6 +111,15 @@ const ContributorsPage = () => {
       title='OLake Contributors' 
       description='Meet the amazing contributors who make OLake possible. Join them in building the future of data lakehouse technology.'
     >
+      <Head>
+        <meta property='og:type' content='website' />
+        <meta property='og:title' content='OLake Contributors' />
+        <meta property='og:description' content='Meet the amazing contributors who make OLake possible. Join them in building the future of data lakehouse technology.' />
+        <meta property='og:url' content={canonicalUrl} />
+        <meta property='og:site_name' content='OLake' />
+        <meta property='og:locale' content='en_US' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+      </Head>
       {/* Hero Section */}
       <PageHeader
         title={

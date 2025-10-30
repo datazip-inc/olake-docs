@@ -4,7 +4,10 @@ import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-
 
 const ContactPage = () => {
     return (
-        <Layout>
+        <Layout 
+            title="Contact Us - OLake"
+            description="Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool."
+        >
             <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 py-12 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-4xl mx-auto">
                     <h1 className="text-4xl font-extrabold text-center mb-10">Contact Us</h1>

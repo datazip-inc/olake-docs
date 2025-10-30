@@ -47,7 +47,7 @@ async function generateImageSitemap() {
     await scanDirectory(staticDir);
     
     
-    // Generate XML sitemap for images
+    // Generate XML sitemap for images only (no page URLs to avoid duplicates)
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n';
     xml += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
@@ -55,12 +55,23 @@ async function generateImageSitemap() {
     // Sort images by path for consistent output
     const sortedImages = imageFiles.sort((a, b) => a.path.localeCompare(b.path));
     
-    // Group images by their page context
+    // Only include images that are referenced on actual pages
+    // Skip standalone images that aren't used on pages
+    const pageImages = sortedImages.filter(image => {
+      // Only include images that are likely used on pages
+      return image.path.includes('/blog/') || 
+             image.path.includes('/docs/') || 
+             image.path.includes('/webinar/') ||
+             image.path.includes('/connectors/') ||
+             image.path.includes('/iceberg/') ||
+             image.path.includes('/logo/') ||
+             image.path.includes('/authors/');
+    });
+    
+    // Group images by their page context for better organization
     const imagesByPage = {};
     
-    for (const image of sortedImages) {
-      const imageUrl = `${siteUrl}${image.path}`;
-      
+    for (const image of pageImages) {
       // Determine the page URL based on image path
       let pageUrl = siteUrl + '/';
       if (image.path.includes('/blog/')) {
@@ -117,6 +128,10 @@ async function generateImageSitemap() {
           caption = `Connector image: ${title}`;
         } else if (image.path.includes('/iceberg/')) {
           caption = `Iceberg image: ${title}`;
+        } else if (image.path.includes('/logo/')) {
+          caption = `OLake logo: ${title}`;
+        } else if (image.path.includes('/authors/')) {
+          caption = `Author image: ${title}`;
         }
         
         xml += `      <image:caption>${caption}</image:caption>\n`;

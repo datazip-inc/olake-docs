@@ -4,7 +4,10 @@ import LazyComponent from '../components/LazyComponent'
 
 const GlaceLake: React.FC = () => {
   return (
-    <Layout>
+    <Layout 
+      title="AI Lake - OLake"
+      description="Explore OLake's AI-powered data lake capabilities for intelligent data processing and analytics with Apache Iceberg."
+    >
       <main>
         <LazyComponent component='Glace' />
       </main>
