@@ -13,7 +13,7 @@ export default function New3Page() {
     {
       question: 'How to Get Started?',
       answer:
-        'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
+        'Check the <a href="/docs/getting-started/quickstart" class="text-[#193AE6] hover:underline">Quickstart Guide</a>. With a single Docker command you can spin up OLake and access the UI.'
     },
     {
       question: 'Is OLake Really Open Source?',
