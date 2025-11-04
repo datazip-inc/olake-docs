@@ -1,0 +1,382 @@
+---
+title: "Postgres → Iceberg → Doris: A Smooth Lakehouse Journey Powered by Olake"
+description: "Learn how to build a complete lakehouse architecture using PostgreSQL, Apache Iceberg, and Apache Doris for real-time analytics. Step-by-step guide with OLake for seamless data ingestion."
+slug: postgres-iceberg-doris-lakehouse-olake
+date: 2025-11-04
+authors: [badal]
+tags: [iceberg, doris, olake]
+image: /img/blog/2025/20/olake-iceberg-dors-architecture.webp
+---
+
+# Postgres → Iceberg → Doris: A Smooth Lakehouse Journey Powered by Olake
+
+If you've been working with data lakes, you've probably felt the friction of keeping your analytics engine separate from your storage layer. With your data neatly sitting in Iceberg, the next challenge is querying it efficiently without moving it around.
+
+That's a pretty fair reason to bring Doris in.
+
+Building a modern data lakehouse shouldn't require stitching together a dozen tools or writing complex Spark jobs. In this guide, I'll show you how to create a complete, production-ready lakehouse architecture that:
+
+- Captures real-time changes from PostgreSQL using CDC (Change Data Capture)
+- Stores data in open Apache Iceberg format on object storage
+- Queries data at lightning speed with Apache Doris
+- All orchestrated seamlessly by OLake
+
+By the end, you'll have a running system that syncs database changes in real-time and lets you query them with sub-second latency — without moving or duplicating data.
+
+## So, what is Apache Doris?
+
+Apache Doris is a real-time analytical database built on MPP (Massively Parallel Processing) architecture, designed to handle complex analytical queries at scale — often delivering sub-second query latency, even on large datasets.
+
+Probably, too much of technical jargon, isn't it? Here is what it means in simple terms:
+
+**"A fast, intelligent query engine that lets you analyze your Iceberg tables directly, without having to move or duplicate your data anywhere else."**
+
+### Why Doris for Your Lakehouse?
+
+At its core, Doris combines three powerful execution capabilities:
+
+**Vectorized Execution Engine**: Unlike traditional row-by-row processing, Doris processes data in batches (vectors), allowing it to leverage modern CPU capabilities like SIMD (Single Instruction, Multiple Data) instructions. This translates to faster query execution on the same hardware.
+
+**Pipeline Execution Model**: Doris breaks down complex queries into pipeline stages that can execute in parallel across multiple cores and machines. Think of it like an assembly line where each stage processes data simultaneously, rather than waiting for the previous step to complete entirely.
+
+**Advanced Query Optimizer**: The query optimizer automatically rewrites your SQL queries to find the most efficient execution plan. It handles complex operations like multi-table joins, aggregations, and sorting without you having to manually optimize your queries.
+
+We are currently at version 3.0+ of Apache Doris, and it has introduced comprehensive support for Apache Iceberg's core features.
+
+### What Doris brings to your Iceberg tables:
+
+- **Universal Catalog Support**: Works with all major Iceberg catalog types — REST, AWS Glue, Hive Metastore, Hadoop, Google Dataproc Metastore, and DLF.
+- **Full Delete File Support**: Reads both Equality Delete Files and Positional Delete Files, which is crucial for CDC workloads where updates and deletes happen frequently.
+- **Time Travel Queries**: Query historical snapshots of your Iceberg tables to see how data looked at any point in time.
+- **Snapshot History**: Access complete snapshot metadata via table functions to understand data evolution.
+- **Transparent Query Routing**: Doris automatically routes queries to materialized views when available, accelerating common query patterns without changing your SQL.
+
+## The Data Pipeline: How the Pieces Fit Together
+
+Let's understand the complete data flow from your operational database to real-time analytics.
+
+### The Architecture
+
+Here's how data flows through our lakehouse stack:
+
+1. **Source Database (PostgreSQL)**: Your operational database continues running normally, handling transactional workloads.
+
+2. **OLake CDC Engine**: Captures changes from PostgreSQL using logical replication (via WAL - Write-Ahead Logs) and writes them directly to Apache Iceberg format.
+
+3. **Apache Iceberg Tables**: Your data lands in Iceberg tables stored in object storage (MinIO/S3), maintaining full ACID guarantees with snapshot isolation.
+
+4. **REST Catalog**: Tracks the current state of your Iceberg tables, managing metadata pointers so query engines always read the latest consistent snapshot.
+
+5. **Apache Doris**: Queries your Iceberg tables directly from object storage, delivering sub-second analytics without moving data.
+
+### Why This Stack?
+
+**No Data Duplication**: Unlike traditional ETL pipelines that copy data multiple times, your source data is written once to Iceberg and queried directly by Doris.
+
+**Real-Time Insights**: Changes in PostgreSQL appear in your analytics within seconds, not hours. OLake's CDC captures inserts, updates, and deletes as they happen.
+
+**Cost-Effective Storage**: Object storage (S3/MinIO) costs a fraction of traditional data warehouse storage, while Iceberg's efficient metadata handling keeps query performance high.
+
+**Decoupled Compute and Storage**: Scale your query engine (Doris) independently from storage. Need more query power? Add Doris nodes. Need more storage? Just expand your object store.
+
+### About OLake
+
+OLake is an open-source CDC tool specifically built for lakehouse architectures. It supports these sources: **PostgreSQL, MySQL, MongoDB, Oracle, and Kafka**. You can check out our [official documentation](/docs) for detailed source configurations.
+
+What makes OLake different? It writes directly to Apache Iceberg format with proper metadata management, schema evolution support, and automatic handling of CDC operations (inserts, updates, deletes). No need for complex Spark jobs or Kafka pipelines — OLake handles the entire ingestion flow.
+
+We support all major Iceberg catalogs — AWS Glue, REST (Nessie, Polaris, Tabulario), JDBC, and Hive Metastore. Check our [catalog documentation](/docs/writers/iceberg) for more details.
+
+### Our Demo Setup
+
+For this tutorial, we're using:
+
+- **tabulario/iceberg-rest**: A lightweight REST catalog implementation
+- **MinIO**: S3-compatible object storage that runs locally
+- **Apache Doris**: Hosted on a cloud instance for remote querying
+
+This setup mirrors what Apache Doris recommends in their [official lakehouse documentation](https://doris.apache.org/docs/2.1/lakehouse/best-practices/doris-iceberg).
+
+### Prerequisites
+
+Before we dive into the setup:
+
+- A cloud instance (AWS EC2, Azure VM, or GCP Compute Engine) with SSH access
+- Docker and Docker Compose installed
+- At least 4GB RAM and 20GB disk space
+- Basic familiarity with Linux terminal commands
+
+Let's get started.
+
+## Step 1 – Start your REST Catalog + MinIO + Doris
+
+### Configure System Parameters
+
+First, we need to configure a critical Linux kernel parameter. Apache Doris uses memory-mapped files extensively for its storage engine, and the default limit is too low.
+
+```bash
+sudo sysctl -w vm.max_map_count=2000000
+```
+
+This sets the maximum number of memory map areas a process can have. Without this, Doris Backend (BE) nodes will fail to start with memory allocation errors.
+
+Make it permanent across reboots:
+
+```bash
+echo "vm.max_map_count=2000000" >> /etc/sysctl.conf
+```
+
+Verify the setting:
+
+```bash
+sysctl vm.max_map_count
+```
+
+You should see `vm.max_map_count = 2000000`.
+
+### Deploy the Lakehouse Stack
+
+Apache Doris provides a convenient docker-compose setup that includes everything we need:
+
+```bash
+git clone https://github.com/apache/doris.git
+```
+
+Navigate to the lakehouse sample directory:
+
+```bash
+cd doris/samples/datalake/iceberg_and_paimon
+```
+
+This directory contains:
+- **Doris FE (Frontend)**: Handles query parsing, planning, and metadata management
+- **Doris BE (Backend)**: Executes queries and manages data storage
+- **MinIO**: S3-compatible object storage for Iceberg tables
+- **Iceberg REST Catalog**: Manages Iceberg table metadata
+- **Sample data and configurations**: Pre-configured to work together
+
+Start all services:
+
+```bash
+bash ./start_all.sh
+```
+
+This script will:
+1. Pull required Docker images (first run takes 5-10 minutes depending on your connection)
+2. Start MinIO and create necessary buckets
+3. Initialize the Iceberg REST catalog
+4. Start Doris Frontend and Backend nodes
+5. Wait for all services to be healthy
+
+You'll see output as each service starts. Wait until you see:
+
+![Doris lakehouse stack running successfully](/img/blog/2025/20/olake-iceberg-dors-architecture.webp)
+
+### Access the Doris CLI
+
+```bash
+bash start_doris_client.sh
+```
+
+This opens the Doris SQL client. You're now connected to the Doris Frontend and can run queries against your lakehouse. We'll use this later to query the Iceberg tables.
+
+## Step 2 – Set Up OLake for CDC Ingestion
+
+Now we'll configure OLake to capture changes from your PostgreSQL database and write them to Iceberg tables.
+
+### Start OLake UI
+
+Open a new terminal session on your cloud instance and deploy OLake:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - up -d
+```
+
+This starts the OLake UI and backend services. OLake runs on port 8000, but since it's on your remote cloud instance, you'll need to access it from your local machine.
+
+### Set Up SSH Port Forwarding
+
+To access both OLake UI and MinIO from your local browser, create SSH tunnels. Run these commands **on your local machine** (not on the cloud instance):
+
+```bash
+ssh -L 8000:localhost:8000 olake-server
+ssh -L 19002:localhost:19002 olake-server
+```
+
+**What's happening here?**
+- `-L 8000:localhost:8000`: Forwards local port 8000 to the instance's port 8000 (OLake UI)
+- `-L 19002:localhost:19002`: Forwards local port 19002 to the instance's port 19002 (MinIO)
+
+:::tip SSH Configuration
+If you haven't configured an SSH alias, add this to your local `~/.ssh/config`:
+
+```
+Host olake-server
+  HostName <YOUR_INSTANCE_PUBLIC_IP>
+  User azureuser
+  IdentityFile <PATH_TO_YOUR_PEM_FILE>
+```
+
+Replace the values with your instance details. This lets you use `olake-server` instead of typing the full SSH command each time.
+:::
+
+### Access the Web Interfaces
+
+With port forwarding active, open your browser:
+
+**OLake UI**: http://INSTANCE_IP:8000
+**MinIO Console**: http://INSTANCE_IP:19002
+
+### Prepare MinIO Storage
+
+MinIO needs a bucket to store Iceberg table data:
+
+1. Open MinIO at http://INSTANCE_IP:19002
+2. Login with default credentials (typically `admin` / `password`)
+3. Create a new bucket named `warehouse`
+
+This bucket will hold all your Iceberg table data files (Parquet) and metadata (JSON/Avro).
+
+### Configure OLake Job
+
+Now let's configure OLake to sync data from your source database to Iceberg.
+
+**Create Source Connection**:
+1. In OLake UI, navigate to **Sources** → **Add Source**
+2. Choose your source database type (PostgreSQL, MySQL, MongoDB, etc.)
+3. Enter connection details:
+   - Host, port, database name
+   - Username and password
+   - For PostgreSQL CDC: Enable logical replication and provide publication/slot names
+
+**Create Destination (Iceberg)**:
+1. Navigate to **Destinations** → **Add Destination**
+2. Select **Iceberg** as the destination type
+3. Configure the Iceberg catalog:
+   - **Catalog Type**: REST
+   - **Catalog URI**: `http://localhost:8181` (the REST catalog from Step 1)
+   - **Warehouse Path**: `s3://warehouse/` (the MinIO bucket we created)
+   - **Storage Config**: MinIO endpoint and credentials
+
+**Create and Run Job**:
+1. Navigate to **Jobs** → **Create Job**
+2. Select your source and destination
+3. Choose tables/collections to sync
+4. Select sync mode:
+   - **Full Refresh + CDC**: Initial snapshot followed by real-time changes
+   - **CDC Only**: Stream only new changes
+5. Start the sync
+
+### For destination, setup the config like this:
+
+
+
+You can check out our [official documentation](/docs/getting-started/creating-first-pipeline) for a detailed workflow from creating your job pipeline to managing ongoing sync operations.
+
+## Step 3 – Query Your Iceberg Tables with Doris
+
+With OLake continuously syncing data to Iceberg, it's time to query that data using Apache Doris. Let's explore your lakehouse!
+
+### Connect to Doris
+
+Return to the Doris CLI terminal from Step 1. If you closed it, reconnect:
+
+```bash
+bash start_doris_client.sh
+```
+
+### Discover Your Catalogs
+
+List all available catalogs in Doris:
+
+```sql
+SHOW CATALOGS;
+```
+
+You should see the `iceberg` catalog listed. This catalog was pre-configured in the docker-compose setup to point to the REST catalog.
+
+### Refresh Catalog Metadata
+
+The Iceberg catalog might not immediately reflect newly created tables. Refresh it to pull the latest metadata:
+
+```sql
+REFRESH CATALOG iceberg;
+```
+
+**Why refresh?** Doris caches catalog metadata for performance. When OLake creates new tables or updates schemas, refreshing ensures Doris sees the latest state.
+
+### Switch to Iceberg Catalog
+
+Set the Iceberg catalog as your active context:
+
+```sql
+SWITCH iceberg;
+```
+
+Now all queries will run against Iceberg tables unless you explicitly specify another catalog.
+
+### Explore Your Data
+
+List all databases (namespaces in Iceberg terminology):
+
+```sql
+SHOW DATABASES;
+```
+
+Switch to your database:
+
+```sql
+USE <database_name>;
+```
+
+List all tables:
+
+```sql
+SHOW TABLES;
+```
+
+### Query Your Synced Data
+
+Now run a simple query:
+
+```sql
+SELECT * FROM iceberg.<database_name>.<table_name> LIMIT 10;
+```
+
+**What you're seeing**: Real-time data from your source database, stored in Iceberg format, queried through Doris's MPP engine. No data movement, no duplication — just direct querying from object storage.
+
+### Understanding CDC Columns
+
+Notice the extra columns OLake added? These are CDC metadata columns:
+
+- `_olake_id`: Unique identifier for each record
+- `_olake_timestamp`: When OLake processed this record
+- `_op_type`: Operation type (`I` for insert, `U` for update, `D` for delete)
+- `_cdc_timestamp`: When the change occurred in the source database
+
+These columns help you track data lineage and build accurate CDC pipelines.
+
+## Troubleshooting
+
+### ERROR 1105 (HY000): errCode = 2, detailMessage = There is no scanNode Backend available.[10002: not alive]
+
+You need to set `vm.max_map_count` to 2000000 under root. So, run this command:
+
+```bash
+sudo sysctl -w vm.max_map_count=2000000
+```
+
+and then restart your Doris BE:
+
+```bash
+docker exec doris-iceberg-paimon-doris bash -c "cd /opt/doris/be && bash bin/start_be.sh --daemon"
+```
+
+and then run your table query command and it should work fine.
+
+<br></br>
+<br></br>
+
+
+**Happy Engineering! Happy Iceberg!**
+
