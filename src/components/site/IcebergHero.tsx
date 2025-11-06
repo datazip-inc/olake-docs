@@ -90,21 +90,21 @@ const IcebergHero: React.FC = () => {
             description='Apache Iceberg enables seamless schema evolution by supporting column additions, deletions, renames, and reordering ensuring reliable analytics on evolving datasets without rewriting historical data.'
             image='/img/site/iceberg-1.svg'
             imageAlt='Schema evolution'
-            learnMoreLink='/docs/features?tab=schema-evolution#schema-evolution'
+            learnMoreLink='/docs/features/?tab=schema-evolution'
           />
           <FeatureCard
             title='Schema datatype changes'
             description='Apache Iceberg enables safe and forward-compatible data type evolutions. This guarantees robust schema evolution without the need to rewrite existing data or disrupt downstream queries.'
             image='/img/site/iceberg-2.svg'
             imageAlt='Schema type mapping migration'
-            learnMoreLink='/docs/features?tab=schema-evolution#schema-data-type-changes'
+            learnMoreLink='/docs/features/?tab=overview#3-schema-evolution--data-types-changes'
           />
           <FeatureCard
             title='Partitioning and partition evolution'
             description='Apache Iceberg supports flexible partitioning without requiring data to be physically rewritten. Partition evolution allows you to safely change partition strategies over time without impacting existing data.'
             image='/img/site/iceberg-3.svg'
             imageAlt='Database partitions data flow'
-            learnMoreLink='/iceberg/iceberg-partitioning-and-writing-strategies'
+            learnMoreLink='/docs/writers/iceberg/partitioning/'
           />
         </div>
       </div>

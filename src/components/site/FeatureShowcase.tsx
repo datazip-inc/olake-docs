@@ -89,7 +89,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#C7ECFF] dark:bg-blue-900/20'
-              href='/blog/what-makes-olake-fast'
+              href='/docs/features/#3-stateful-resumable-syncs'
             />
 
             <FeatureCard
@@ -123,7 +123,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
-              href='/blog/what-makes-olake-fast'
+              href='/blog/olake-architecture-deep-dive/#cdc-sync'
             />
 
             <FeatureCard
@@ -140,7 +140,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#DDF3FF] dark:bg-blue-900/20'
-              href='/blog/how-to-set-up-postgres-apache-iceberg'
+              href='/blog/what-makes-olake-fast'
             />
           </div>
         </div>
