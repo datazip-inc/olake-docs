@@ -63,9 +63,9 @@ const WebinarPage = () => {
         />
 
         <section className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+          <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
             Thank You for Registering!
-          </h1>
+          </h2>
 
         </section>
 

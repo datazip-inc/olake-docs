@@ -144,7 +144,10 @@ const ColorSwatch = ({ color }) => {
 
 const BrandingPage = () => {
   return (
-    <Layout>
+    <Layout 
+      title="OLake Branding Assets"
+      description="Download official OLake logos, color palettes, and media assets. Brand guidelines and resources for partners and community."
+    >
       <div className='container mx-auto px-4 py-10'>
         <header className='mb-12 text-center'>
           <h1 className='text-4xl font-bold text-gray-800 dark:text-gray-100'>OLake Branding</h1>
