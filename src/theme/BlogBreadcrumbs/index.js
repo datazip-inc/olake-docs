@@ -18,6 +18,7 @@ export default function BlogBreadcrumbs() {
   const { siteConfig } = useDocusaurusContext();
   const location = useLocation();
   const baseUrl = useBaseUrl('/');
+  const siteUrl = siteConfig.url || 'https://olake.io';
 
   // Try to get blog post metadata if available
   let blogPostMetadata = null;
@@ -112,7 +113,7 @@ export default function BlogBreadcrumbs() {
         </span>
         {/* Hidden full title for search engines in schema.org markup */}
         <meta itemProp="name" content={item.fullLabel || item.label} />
-        <meta itemProp="@id" content={item.href} /> 
+        <meta itemProp="@id" content={`${siteUrl}${item.href}`} /> 
       </Link>
       <meta itemProp="position" content={String(index + 1)} />
     </li>

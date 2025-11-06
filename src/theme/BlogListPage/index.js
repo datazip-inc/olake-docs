@@ -16,16 +16,29 @@ import Head from '@docusaurus/Head'
 function BlogListPageMetadata(props) {
   const { metadata } = props
   const {
-    siteConfig: { title: siteTitle }
+    siteConfig: { title: siteTitle, url: siteUrl }
   } = useDocusaurusContext()
   const { blogDescription, blogTitle, permalink } = metadata
   const isBlogOnlyMode = permalink === '/'
   const title = isBlogOnlyMode ? siteTitle : blogTitle
+  const location = useLocation()
+  
+  // Check if this is a pagination page (page/2, page/3, etc.)
+  const isPaginationPage = /\/page\/\d+/.test(location.pathname)
 
   return (
     <>
       <PageMetadata title={title} description={blogDescription} />
       <SearchMetadata tag='blog_posts_list' />
+      <Head>
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        {blogDescription && <meta property="og:description" content={blogDescription} />}
+        <meta property="og:url" content={`${siteUrl}${permalink}`} />
+        <meta property="og:site_name" content="OLake" />
+        <meta property="og:locale" content="en_US" />
+        {isPaginationPage && <meta name="robots" content="noindex, follow" />}
+      </Head>
     </>
   )
 }
