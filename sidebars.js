@@ -43,8 +43,14 @@ const docSidebar = {
       label: 'Getting Started',      
       items: [
         'getting-started/quickstart',
-        'getting-started/creating-first-pipeline',
-        'getting-started/clear-dest',
+        {
+          type: 'category',
+          label: 'Create Your First Job Pipeline',
+          link: { type: 'doc', id: 'getting-started/creating-first-pipeline' },
+          items: [
+            'getting-started/job-level-properties',
+          ],
+        },
         'getting-started/playground',
       ],
     },

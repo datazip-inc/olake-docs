@@ -38,18 +38,6 @@ export const paginationConfig = {
       permalink: '/docs/getting-started/quickstart'
     },
     next: {
-      title: 'Clear Destination',
-      permalink: '/docs/getting-started/clear-dest'
-    }
-  },
-
-  // Clear Destination
-  '/docs/getting-started/clear-dest': {
-    previous: {
-      title: 'Create first job Pipeline',
-      permalink: '/docs/getting-started/creating-first-pipeline'
-    },
-    next: {
       title: 'Playground',
       permalink: '/docs/getting-started/playground'
     }
@@ -58,8 +46,8 @@ export const paginationConfig = {
   //Playground
   '/docs/getting-started/playground': {
     previous: {
-      title: 'Clear Destination',
-      permalink: '/docs/getting-started/clear-dest'
+      title: 'Create first job Pipeline',
+      permalink: '/docs/getting-started/creating-first-pipeline'
     },
     next: {
       title: 'Quickstart',
