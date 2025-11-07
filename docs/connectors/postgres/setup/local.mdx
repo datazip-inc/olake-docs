@@ -1,6 +1,7 @@
 ---
-title: 3. Local Setup for Testing
-description: Setup Postgres via Docker Compose with OLake UI
+title: "Local PostgreSQL Setup for OLake | Docker & Logical Replication"
+description: Start a local Postgres with wal2json using Docker for OLake testing. Configure replication slot, connect OLake UI, run syncs, and troubleshoot.
+sidebar_label: 3. Local Setup for Testing
 sidebar_position: 3
 ---
 
@@ -15,16 +16,7 @@ This compose file is not for production use. It is meant for local development a
 **New!** You can now use the **OLake UI** for a visual, web-based experience to create sources, configure jobs, and monitor data synchronization. The UI provides an intuitive alternative to CLI commands.
 :::
 
-{/* ### Enable wal2json
-
-To enable the `wal2json` plugin, you need to add the following line to the `postgresql.conf` file:
-
-```conf
-wal_level = logical
-max_wal_senders = 10
-max_replication_slots = 10
-```
-::: */}
+{/* Deprecated: wal2json plugin notes removed in favor of native pgoutput */}
 
 
 Navigate to `./drivers/postgres/config` (if building locally) OR just create a directory (say `OLAKE_DIRECTORY`) anywhere in your system if you want to use Dockerized OLake and create these files:
@@ -36,7 +28,7 @@ Navigate to `./drivers/postgres/config` (if building locally) OR just create a d
 
 ## 1. Starting `docker-compose.yml` 
 This compose file does the following:
-- **Primary Postgres Service**: Runs a Postgres container with the `wal2json` plugin installed for logical replication.
+- **Primary Postgres Service**: Runs a Postgres container with logical replication enabled (pgoutput is built-in; no plugin install required).
 - **Data Loader Service**: Loads sample data into the Postgres database and creates a logical replication slot.
 - **Network**: Sets up a custom network for the Postgres services.
 - **Volume**: Uses a named volume to persist Postgres data across container restarts.
@@ -56,19 +48,16 @@ services:
       POSTGRES_USER: main                          # Set the default Postgres username.
       POSTGRES_PASSWORD: password                  # Set the password for the Postgres user.
       POSTGRES_DB: main                            # Create a default database named "main".
-    # Custom command to install the wal2json plugin for logical decoding and then start Postgres.
+    # Start Postgres with logical replication enabled (pgoutput is native, no plugin install needed).
     command: >
-      bash -c "apt-get update && apt-get install -y postgresql-15-wal2json && exec docker-entrypoint.sh postgres -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10 -c wal_sender_timeout=0"
+      bash -c "exec docker-entrypoint.sh postgres -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10 -c wal_sender_timeout=0"
     # Explanation of the command:
-      # 1. Update the package list.
-      # 2. Install the postgresql-15-wal2json package, which is used to convert WAL (Write-Ahead Logging)
-      #    into JSON format for logical replication.
-      # 3. Use exec to run the default docker-entrypoint script provided by the Postgres image.
-      # 4. Start Postgres with additional configuration parameters:
+      # 1. Use exec to run the default docker-entrypoint script provided by the Postgres image.
+      # 2. Start Postgres with additional configuration parameters:
       #    - wal_level=logical: Enable logical replication.
       #    - max_wal_senders=10: Allow up to 10 concurrent WAL sender processes.
       #    - max_replication_slots=10: Allow up to 10 replication slots for logical decoding.
-#    - wal_sender_timeout=0: Disable sender timeout so long-running snapshots do not drop the connection.
+      #    - wal_sender_timeout=0: Disable sender timeout so long-running snapshots do not drop the connection.
     volumes:
       - pg-data:/var/lib/postgresql/data          # Use a named volume (pg-data) to persist Postgres data.
     networks:
@@ -104,16 +93,17 @@ services:
         echo \"Inserting one test row...\"; 
         # Insert a sample row into the table.
         psql -h primary_postgres -U main -d main -c \"INSERT INTO sample_data (str_col, num_col) VALUES ('Hello world', 123);\"; 
-        echo \"Creating logical replication slot...\"; 
-        # Create a logical replication slot using the wal2json output plugin.
-        psql -h primary_postgres -U main -d main -c \"SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'wal2json');\"; 
+        echo \"Creating publication and logical replication slot...\"; 
+        # Create a publication and a logical replication slot using the pgoutput plugin.
+        psql -h primary_postgres -U main -d main -c \"CREATE PUBLICATION olake_publication FOR ALL TABLES WITH (publish = 'insert,update,delete,truncate');\"; 
+        psql -h primary_postgres -U main -d main -c \"SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'pgoutput');\"; 
         echo \"Done. Data and replication slot should now exist.\" 
       "
     # Explanation of the entrypoint:
     # - Wait until Postgres is ready to accept connections using pg_isready.
     # - Create a table named "sample_data" with three columns: id, str_col, and num_col.
     # - Insert a sample row into the table.
-    # - Create a logical replication slot named "postgres_slot" using the wal2json plugin.
+    # - Create a publication and a logical replication slot named "postgres_slot" using the pgoutput plugin.
     restart: "no"                                  # Do not automatically restart the container after completion.
     networks:
       - pg-cluster                                # Connect to the same custom network "pg-cluster".
@@ -170,9 +160,13 @@ Follow the [OLake UI setup guide](../../../getting-started/olake-ui) to run the 
    - **Username:** `main`
    - **Password:** `password`
    - **SSL Mode:** `disable`
-5. Click **Create →**
+5. For CDC, configure the Update Method:
+   - **Update Method:** `CDC`
+   - **Replication Slot:** `postgres_slot` (or your chosen slot name)
+   - **Publication:** `olake_publication` (or your chosen publication name)
+6. Click **Create →**
 
-![olake-source-postgres](/img/docs/sources/olake-source-postgres.png)
+![olake-source-postgres](/img/docs/sources/olake-source-postgres.webp)
 
 ## 5. Create a Job
 
@@ -207,6 +201,7 @@ Update your source configuration file (`source.json`) to connect to Postgres as 
     },
     "update_method": {
         "replication_slot": "postgres_slot",
+        "publication": "olake_publication",
         "initial_wait_time": 10
     },
     "reader_batch_size": 100000,
@@ -256,6 +251,7 @@ Update your source configuration file (`source.json`) to connect to Postgres as 
     },
     "update_method": {
         "replication_slot": "postgres_slot",
+        "publication": "olake_publication",
         "initial_wait_time": 10
     },
     "reader_batch_size": 100000,
@@ -267,7 +263,7 @@ Update your source configuration file (`source.json`) to connect to Postgres as 
 </Tabs>
 
 :::info
-Now that you have configured the local database, you can either follow the [getting-started guide](../../../getting-started/postgres#step-2-generate-a-streams-file) to start syncing data or review the broader [PostgreSQL connector overview](/docs/connectors/postgres/overview) to understand the complete ELT flow with OLake.
+Now that you have configured the local database, you can either follow the [streams configuration](/docs/install/docker-cli#streams-config) to start syncing data or review the broader [PostgreSQL connector overview](/docs/connectors/postgres/overview) to understand the complete ELT flow with OLake.
 :::
 
 ## 4. Perform DDL and DML operations to test OLake (optional)
@@ -298,164 +294,23 @@ You can perform some basic DDL and DML operations to test your OLake setup. Here
 
 Enter the password when prompted, in this case, its `password` and then you can use any of the below commands to interact.
 
-### Some handy PostgreSQL commands
+### Insert a row to test CDC
 
-<details>
-  <summary>Click to expand</summary>
-
-
-Below are additional PostgreSQL commands—in the familiar psql style—for both Data Definition Language (DDL) and Data Manipulation Language (DML) operations. These examples use your configuration with the database **main** and, for instance, the table **sample_data**. You can run these commands in your psql shell.
+Run this one-liner inside the Postgres container or any psql connected to the container DB:
 
 ```sql
--- List all databases on the PostgreSQL server
-\l;
-
--- Switch to the "main" database
-\c main;
-
--- List all tables in the "main" database
-\dt;
-
--- Describe the schema of the "sample_data" table
-\d sample_data;
-
--- List all users and their roles
-\du;
-
--- Show help on all available psql meta-commands
-\?;
-
--- Quit the psql interactive terminal
-\q;
-
--- Toggle expanded display mode for query results (useful for wide outputs)
-\x;
-
--- Display current connection information for the session
-\conninfo;
-
--- Toggle query execution timing display (show how long each query takes)
-\timing on;      -- Enable timing
--- \timing off;  -- Disable timing
-
--- Execute a shell command from within psql (e.g., list files in the current directory)
-\! ls;
-
--- Export query results from the "sample_data" table to a CSV file named output.csv
-\copy (SELECT * FROM sample_data) TO 'output.csv' CSV HEADER;
+INSERT INTO sample_data (str_col, num_col) VALUES ('CDC test row', 456);
 ```
 
+## 5. Sync the data again
 
-### DDL (Data Definition Language) Commands
+After running the commands in "4. Perform DDL and DML operations to test OLake":
 
-```sql
--- Create a new table named sample_data_new with example columns.
-CREATE TABLE sample_data_new (
-    id SERIAL PRIMARY KEY,         -- Auto-incrementing primary key.
-    description TEXT,              -- A text column for descriptions.
-    created_at TIMESTAMP DEFAULT NOW()  -- Automatically record the creation time.
-);
-
--- Alter the existing sample_data table by adding a new column named updated_at.
-ALTER TABLE sample_data ADD COLUMN updated_at TIMESTAMP;
-
--- Create an index on the sample_data table to speed up queries on the str_col column.
-CREATE INDEX idx_sample_data_str ON sample_data (str_col);
-
--- Drop the table sample_data_new if it is no longer needed.
-DROP TABLE IF EXISTS sample_data_new;
-
--- List all indexes on tables matching sample_data* using the meta-command.
-\di sample_data*
-```
-
-### DML (Data Manipulation Language) Commands
-
-```sql
--- Insert a new row into the sample_data table.
-INSERT INTO sample_data (str_col, num_col) VALUES ('New entry', 456);
-
--- Update the num_col value for the row in sample_data with id = 1.
-UPDATE sample_data SET num_col = 789 WHERE id = 1;
-
--- Delete the row from sample_data where id equals 1.
-DELETE FROM sample_data WHERE id = 1;
-
--- Retrieve all data from sample_data.
-SELECT * FROM sample_data;
-
--- Display the count of records in sample_data.
-SELECT COUNT(*) FROM sample_data;
-```
-
-</details>
-
-### Enable Logical Replication Settings via SQL
-
-Instead of modifying postgresql.conf, use SQL commands to apply runtime settings (if your Postgres setup allows it):
-
-```sql
--- Enable logical WAL level 
-ALTER SYSTEM SET wal_level = 'logical';  
--- Set max replication slots and senders 
-ALTER SYSTEM SET max_replication_slots = 4; 
-ALTER SYSTEM SET max_wal_senders = 4;  
--- Disable timeout on sender (to avoid snapshot disconnects)
-ALTER SYSTEM SET wal_sender_timeout = 0;
--- Apply the changes 
-SELECT pg_reload_conf(); 
-```
-
-Note: Some cloud-hosted databases (like RDS or Cloud SQL) require you to modify these settings via the provider’s console or parameter groups.
-
-### Grant User Permissions
-
-**Basic Replication Access:**
-```sql
-ALTER ROLE olake_user WITH REPLICATION; 
-```
-
-**Optional: Read-only Access for Initial Snapshot**
-
-For stricter security, add explicit read permissions:
-
-```sql
--- Example for the "public" schema in database main
-GRANT CONNECT ON DATABASE main TO olake_user;
-GRANT USAGE ON SCHEMA public TO olake_user;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO olake_user;
--- Ensure future tables are covered automatically
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO olake_user;
-``` 
-
-### Create a Logical Replication Slot
-
-:::important Slot Name Configuration
-Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
-:::
-
-OLake reads changes via a logical replication slot. Create one using:
-
-```sql
--- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
-SELECT * FROM pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json'); 
-```
-
-**Example with common slot names used in local setup:**
-```sql
--- If your OLake source config uses "postgres_slot" (as shown in docker-compose example)
-SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'wal2json');
-
--- If your OLake source config uses "olake_slot"  
-SELECT * FROM pg_create_logical_replication_slot('olake_slot', 'wal2json');
-```
-
-This slot starts tracking changes from the current WAL position, allowing OLake to stream inserts, updates, and deletes.
+- Using OLake UI: open your Postgres job and click "Sync Now" to run an incremental CDC sync.
+- Using Docker CLI: follow the Streams + State steps in the CLI guide and re-run the sync to capture the new changes. See: [/docs/install/docker-cli#streams-config](/docs/install/docker-cli#streams-config).
 
 
-
-
-## 5. Stop the Container
+## 6. Stop the Container
 - **To stop the container, perform**:
 
   ```bash
@@ -484,7 +339,3 @@ This will forcefully remove the specified container by its ID.
   docker rmi -f IMAGE_ID
   ```
 This will forcefully remove the specified image by its ID.
-
-## Additional References
-
-<AdditionalReferences/>

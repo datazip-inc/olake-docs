@@ -6,9 +6,9 @@ import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-import WebinarForm from '../../components/forms/WebinarForm';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';

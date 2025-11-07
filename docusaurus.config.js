@@ -1,17 +1,11 @@
-import { themes as prismThemes } from 'prism-react-renderer';
-// import type { Config } from '@docusaurus/types';
-// import type * as Preset from '@docusaurus/preset-classic';
-// import tailwindPlugin from "./plugins/tailwind-config.cjs"; 
-
 const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriority-rehype-plugin');
 
-// const CustomSolutionsNavbarItem = require('./src/components/CustomSolutionsNavbarItem').default;
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'OLake',
-  tagline: 'Fastest way to replicate MongoDB data in Apache Iceberg',
+  title: 'Fastest Open Source Data Replication Tool',
+  tagline: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
   favicon: 'img/logo/olake-blue.svg',
 
   // Set the production url of your site here
@@ -28,7 +22,7 @@ const config = {
 
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
-  trailingSlash: false,
+  trailingSlash: true,
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -39,6 +33,7 @@ const config = {
   },
 
   future: {
+    v4: true,
     experimental_faster: true
   },
 
@@ -48,31 +43,12 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: false,
-        // {
-        //   routeBasePath: '/docs',
-        //   sidebarPath: './sidebars.js',
-        //   showLastUpdateAuthor: true,
-        //   showLastUpdateTime: true,
-        //   rehypePlugins: [imageFetchPriorityRehypePlugin],
-
-        //   // Please change this to your repo.
-        //   // Remove this to remove the "edit this page" links.
-        //   editUrl:
-        //     'https://github.com/datazip-inc/olake-docs/tree/master/',
-        // },
 
         theme: {
           customCss: './src/css/custom.css',
         },
         blog: false,
 
-        googleTagManager: {
-          containerId: 'GTM-TFZ2GXJP',
-        },
-        gtag: {
-          trackingID: 'G-GTNTGHDNZW',
-          anonymizeIP: true,
-        },
 
         sitemap: {
           lastmod: 'date',
@@ -91,44 +67,29 @@ const config = {
     ],
   ],
 
+
+
   scripts: [
+    {
+      src: '/font-loading-optimizer.js', // Load fonts after critical render path
+      defer: true,
+      fetchpriority: 'low'
+    },
     {
       src: '/suppress-resize-observer.js', // Suppress ResizeObserver warnings
       defer: true,
+      fetchpriority: 'high'
     },
     {
-      id: "runllm-widget-script",
-      type: "module",
-      src: "https://widget.runllm.com",
-      crossorigin: "true",
-      "runllm-name": "OLake AI Assistant",
-      "runllm-assistant-id": "654",
-      "runllm-position": "BOTTOM_RIGHT",
-      "runllm-keyboard-shortcut": "Mod+j",
-      "runllm-preset": "docusaurus",
-      // async: true,
+      src: '/ignore-resize-observer-error.js', // Suppress noisy ResizeObserver loop errors that Chrome prints
       defer: true,
-      "runllm-support-email": "hello@olake.io",
-      "runllm-community-url": "https://olake.io/slack",
-      "runllm-community-type": "slack",
-      "runllm-brand-logo": "https://olake.io/img/logo/olake-blue.svg",
-      "runllm-floating-button-text": "Ask OLake",
-      "runllm-per-user-usage-limit": "20",
-      "runllm-algolia-api-key": "e33125f9089a304cef5331a186931e48",
-      "runllm-algolia-application-id": "1E406NO1AX",
-      "runllm-algolia-index-name": "olake"
+      fetchpriority: 'high'
     },
     {
       src: '/message-listener.js', // path relative to the static directory
-      // async: false,
       defer: true, // if the script must be executed in order, set async to false
-    },
-    {
-      // Suppress noisy ResizeObserver loop errors that Chrome prints
-      src: '/ignore-resize-observer-error.js',
-      defer: true
+      fetchpriority: 'low'
     }
-
   ],
 
   themeConfig:
@@ -136,6 +97,14 @@ const config = {
     ({
       // Replace with your project's social card
       image: 'img/logo/olake-blue.svg',
+
+      announcementBar: {
+        id: 'monthly-events-2025',
+        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200">here</a>. Check out! 🎉',
+        backgroundColor: '#193ae6',
+        textColor: 'white',
+        isCloseable: true,
+      },
 
       docs: {
         sidebar: {
@@ -153,34 +122,24 @@ const config = {
           src: 'img/logo/olake-blue.svg',
         },
         items: [
-          // {
-          //   type: 'docSidebar',
-          //   // sidebarId: 'tutorialSidebar',
-          //   position: 'left',
-          //   label: 'Docs',
-          // },
-
-
           { to: '/docs', label: 'Docs', position: 'right' },
-          { to: '/iceberg', label: 'Iceberg', position: 'right' },
           { to: '/ai-lake', label: 'AILake', position: 'right' },
           { to: '/blog', label: 'Blogs', position: 'right' },
-          // { to: '/webinar', label: 'Webinars & Events', position: 'right' },
 
           {
-            // Dropdown menu in the navbar for "Learn" section
+            // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
             position: "right",
-            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
-            label: "Resources",
+            label: "Iceberg",
             items: [
               {
-                label: "Query Engine",
-                // type: 'link',
-                href: `/iceberg/query-engine`,
-                // activeBaseRegex: 'docs/zenith',
+                label: "Iceberg Blogs",
+                href: `/iceberg`,
               },
-
+              {
+                label: "Query Engine",
+                href: `/iceberg/query-engine`,
+              },
             ],
           },
 
@@ -188,62 +147,35 @@ const config = {
             // Dropdown menu in the navbar for "Learn" section
             type: "dropdown",
             position: "right",
-            // activeBaseRegex: 'docs/zenith', // Highlight if in the Zenith section
             label: "Community",
             items: [
               {
                 label: "Webinars & Events",
-                // type: 'link',
                 href: `/webinar`,
-                // activeBaseRegex: 'docs/zenith',
               },
               {
                 label: "OLake Community",
-                // type: 'link',
                 href: `/community`,
-                // activeBaseRegex: 'docs/zenith',
               },
               {
                 label: "Top Contributors",
-                // type: 'link',
                 href: `/community/contributors`,
-                // activeBaseRegex: 'docs/zenith',
               },
               {
                 label: "Contributor's Program",
-                // type: 'link',
                 href: `/community/contributor-program`,
-                // activeBaseRegex: 'docs/catena',
               },
             ],
           },
 
-          // {
-          //   type: 'html',
-          //   position: 'right',
-          //   component: CustomSolutionsNavbarItem,
-
-          //   // label: 'Dropdown'
-          // },
-
-
           {
-            href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
-            // label: 'Join Slack',
+            href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
             position: 'right',
             className: 'header-slack-link',
           },
-
-          // {
-          //   href: 'https://olake.io#olake-product-form',
-          //   label: 'Join Waitlist',
-          //   position: 'left',
-          // },
           {
             href: 'https://github.com/datazip-inc/olake',
-            // label: 'GitHub',
             position: 'right',
-            // position: 'right',
             className: 'header-github-link',
 
           },
@@ -253,11 +185,6 @@ const config = {
             position: 'right',
             className: 'dev-portal-signup dev-portal-link',
           },
-          // {
-          //   type: 'html',
-          //   position: 'right',
-          //   value: '<Button>Talk to us</Button>',
-          // },
         ],
       },
 
@@ -266,31 +193,238 @@ const config = {
         { name: 'OLake', content: 'ETL tool, ELT tool, open source' },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:site", content: "@olake.io" },
+        { name: "msvalidate.01", content: "C36AD97FE1CEDCD4041338A807D6BC4C" },
       ],
       headTags: [
+          // Critical resource preloads for mobile performance
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/logo/olake-blue.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
+          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/site/hero-section.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
+        },
+        // Font optimization - preconnect to Google Fonts
         {
           tagName: 'link',
           attributes: {
             rel: 'preconnect',
-            sizes: "any",
-            href: 'https://olake.io',
-            href: "/img/logo/olake-blue.svg",
+            href: 'https://fonts.googleapis.com',
           },
         },
-        // Declare some json-ld structured data
         {
-          tagName: 'script',
+          tagName: 'link',
           attributes: {
-            type: 'application/ld+json',
+            rel: 'preconnect',
+            href: 'https://fonts.gstatic.com',
+            crossorigin: 'anonymous'
           },
-          innerHTML: JSON.stringify({
-            '@context': 'https://schema.org/',
-            '@type': 'Organization',
-            name: 'OLake',
-            url: 'https://olake.io/',
-            logo: 'https://olake.io/img/logo/olake-blue.svg',
-          }),
         },
+        // Minimal font optimization - only DNS prefetch for performance
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://fonts.googleapis.com'
+          },
+        },
+         // DNS prefetch for external resources
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://js.hsforms.net'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://www.google-analytics.com'
+          },
+        },
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'dns-prefetch',
+            href: 'https://www.googletagmanager.com'
+          },
+        },
+         // Preconnect to critical domains
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'preconnect',
+            href: 'https://olake.io',
+            crossorigin: 'anonymous'
+          },
+        },
+        // Canonical URL - Removed hardcoded canonical tag
+        // Docusaurus automatically generates proper canonical URLs for each page
+        // OpenSearch meta tags
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'search',
+            type: 'application/opensearchdescription+xml',
+            title: 'OLake Documentation',
+            href: '/opensearch.xml',
+          },
+        },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:type',
+            content: 'website',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:description',
+            content: 'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:site_name',
+            content: 'OLake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:locale',
+            content: 'en_US',
+          },
+        },
+        // Enhanced Open Graph Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:type',
+            content: 'image/webp',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:creator',
+            content: '@_olake',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:title',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:description',
+            content: 'OLake is the fastest data replication platform, built to stream operational databases into Apache Iceberg in real time with full CDC, incremental sync, and zero-lag reliability.',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:image:alt',
+            content: 'OLake - The Open Lakehouse Platform',
+          },
+        },
+        // Enhanced Twitter Meta Tags
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:label1',
+            content: 'Written by',
+          },
+        },
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'twitter:data1',
+            content: 'OLake Team',
+          },
+        },
+        // Enhanced Bot Directives
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'robots',
+            content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large',
+          },
+        },
+        // Bing Webmaster Verification
+        {
+          tagName: 'meta',
+          attributes: {
+            name: 'msvalidate.01',
+            content: 'C36AD97FE1CEDCD4041338A807D6BC4C',
+          },
+        },
+        // Enhanced Favicon Support
+        {
+          tagName: 'link',
+          attributes: {
+            rel: 'icon',
+            type: 'image/svg+xml',
+            href: '/img/logo/olake-blue.svg',
+          },
+        }
       ],
 
       colorMode: {
@@ -302,14 +436,9 @@ const config = {
       imageZoom: {
         // CSS selector to apply the plugin to, defaults to '.markdown img'
         selector: '.markdown img',
-        // Optional medium-zoom options
-        // see: https://www.npmjs.com/package/medium-zoom#options
         options: {
           margin: 24,
           background: '#000000',
-          // scrollOffset: 0,
-          // container: '#zoom-container',
-          // template: '#zoom-template',
         },
       },
 
@@ -325,165 +454,32 @@ const config = {
         // Optional: see doc section below
         contextualSearch: true,
 
-        //   // Optional: Specify domains where the navigation should occur through window.location instead on history.push. Useful when our Algolia config crawls multiple documentation sites and we want to navigate with window.location.href to them.
-        //   externalUrlRegex: 'external\\.com|domain\\.com',
-
-        //   // Optional: Replace parts of the item URLs from Algolia. Useful when using the same search index for multiple deployments using a different baseUrl. You can use regexp or string in the `from` param. For example: localhost:3000 vs myCompany.com/docs
-        //   // replaceSearchResultPathname: {
-        //   //   from: '/docs/', // or as RegExp: /\/docs\//
-        //   //   to: '/',
-        //   // },
-
-        //   // Optional: Algolia search parameters
-        //   searchParameters: {},
 
         // Optional: path for search page that enabled by default (`false` to disable it)
         searchPagePath: 'search',
 
         // Optional: whether the insights feature is enabled or not on Docsearch (`false` by default)
         insights: true,
-
-        //   //... other Algolia params
       },
 
-      // footer: {
-      //   style: 'dark',
-      //   links: [
-      //     {
-      //       title: 'Socials',
-      //       items: [
-      //         {
-      //           label: 'LinkedIn',
-      //           href: 'https://www.linkedin.com/company/datazipio',
-      //         },
-      //         {
-      //           label: 'X (Twitter)',
-      //           href: 'https://x.com/_olake',
-      //         },
-      //         {
-      //           label: 'YouTube',
-      //           href: 'https://www.youtube.com/@olakeio',
-      //         },
-      //         {
-      //           label: 'Slack Community',
-      //           href: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
-      //         },
-      //         {
-      //           label: 'Instagram',
-      //           href: 'https://instagram.com/olake_io',
-      //         },
-      //       ],
-      //     },
-      //     {
-      //       title: 'Resources',
-      //       items: [
-      //         {
-      //           label: 'Docs',
-      //           to: '/docs',
-      //         },
-      //         {
-      //           label: 'Blogs',
-      //           to: '/blog',
-      //         },
-      //         {
-      //           label: 'Search',
-      //           to: '/search',
-      //         },
-      //         {
-      //           label: 'Slack Archive',
-      //           href: 'https://meetwaves.com/library/olake',
-      //         },
-      //       ],
-      //     },
-      //     {
-      //       title: 'Top Reads',
-      //       items: [
-      //         {
-      //           label: 'Issues with Debezium ',
-      //           to: '/blog/issues-debezium-kafka',
-      //         },
-      //         {
-      //           label: 'OLake Architecture',
-      //           to: '/blog/olake-architecture',
-      //         },
-      //       ],
-      //     },
-      //     {
-      //       title: 'Company',
-      //       items: [
-      //         {
-      //           label: 'About us',
-      //           to: '/about-us',
-      //         },
-      //         {
-      //           label: 'Contact us',
-      //           to: '/contact',
-      //         },
-      //         {
-      //           label: 'Branding',
-      //           to: '/branding',
-      //         },
-      //         {
-      //           label: 'Terms of Use',
-      //           href: 'https://datazip.io/terms-of-use',
-      //         },
-      //         {
-      //           label: 'Privacy (Visitors)',
-      //           href: 'https://datazip.io/privacy-policy',
-      //         },
-      //         {
-      //           label: 'Privacy (Customers)',
-      //           href: 'https://datazip.io/privacy-policy-customer',
-      //         },
-      //       ],
-      //     },
-      //   ],
-      //   // logo: {
-      //   //   alt: 'name',
-      //   //   src: 'img/logo-blue.svg',
-      //   //   srcDark: 'img/logo-white.svg',
-      //   //   width: 200,
-      //   // },
-      //   copyright: `Copyright © ${new Date().getFullYear()} Datazip. All rights reserved. <br> Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA`,
-      // },
-      // prism: {
-      //   theme: prismThemes.github,
-      //   darkTheme: prismThemes.dracula,
-      //   additionalLanguages: ['java', 'bash', 'yaml', 'regex', 'mongodb', 'docker'],
 
-      // },
     }),
-  // satisfies Preset.ThemeConfig,
 
   markdown: {
     mermaid: true,
   },
   themes: ['@docusaurus/theme-mermaid'],
 
-  // themes: [
-  //   [
-  //     require.resolve('@easyops-cn/docusaurus-search-local'),
-  //     {
-  //       indexPages: true,
-  //       docsRouteBasePath: '/docs',
-  //       hashed: true,
-  //       language: ['en'],
-  //       highlightSearchTermsOnTargetPage: false,
-  //       searchResultContextMaxLength: 50,
-  //       searchResultLimits: 8,
-  //       searchBarShortcut: true,
-  //       searchBarShortcutHint: true
-  //     }
-  //   ]
-  // ],
 
   plugins: [
     'plugin-image-zoom',
-    // 'docusaurus-plugin-sass',
-    // tailwindPlugin,
 
     [
       './src/plugins/tailwind-config.js', {}
+    ],
+
+    [
+      './src/plugins/indexnow/index.js', {}
     ],
 
     [
@@ -587,18 +583,27 @@ const config = {
 
       }
     ],
-    // '@gracefullight/docusaurus-plugin-tailwind',
-    // {
-    //   includePaths: ["node_modules/infima/scss"],
-    // },
     [
       '@docusaurus/plugin-client-redirects',
       {
-        // fromExtensions: ['html', 'htm'], // /myPage.html -> /myPage
-        // toExtensions: ['exe', 'zip'], // /myAsset -> /myAsset.zip (if latter exists)
+        // Disable auto trailing-slash redirects to avoid conflicts with static servers
+        // that force directory slashes 
+        createRedirects() {
+          return undefined;
+        },
         redirects: [
-          // /docs/oldDoc -> /docs/newDoc
-          // write path after the base path URL
+          {
+            to: '/docs/benchmarks?tab=mongodb',
+            from: '/docs/connectors/mongodb/benchmarks',
+          },
+          {
+            to: '/docs/benchmarks?tab=postgres',
+            from: '/docs/connectors/postgres/benchmarks',
+          },
+          {
+            to: '/docs/benchmarks?tab=mysql',
+            from: '/docs/connectors/mysql/benchmarks',
+          },
           {
             to: '/docs',
             from: '/olake/mongodb',
@@ -616,7 +621,7 @@ const config = {
             from: '/olake/mongodb/framework',
           },
           {
-            to: '/docs/connectors/mongodb/benchmarks',
+            to: '/docs/benchmarks?tab=mongodb',
             from: '/olake/mongodb/benchmark',
           },
           {
@@ -636,12 +641,16 @@ const config = {
             from: '/blog/top-mongodb-etl-tools-a-comprehensive-guide-to-syncing-your-nosql-data',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/getting-started/',
           },
           {
             to: '/docs',
             from: '/docs/',
+          },
+          {
+            to: '/docs/getting-started/playground',
+            from: '/docs/playground/olake-iceberg-presto',
           },
           {
             to: '/',
@@ -707,8 +716,16 @@ const config = {
           },
 
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/getting-started',
+          },
+          {
+            to: '/docs/install/docker-cli',
+            from: '/docs/install/docker',
+          },
+          {
+            to: '/docs/install/docker-cli',
+            from: '/docs/install/docker.mdx',
           },
 
 
@@ -838,23 +855,19 @@ const config = {
             from: '/docs/category/destinations-writers',
           },
           {
-            to: '/docs/install/setup',
-            from: '/docs/category/install',
-          },
-          {
             to: '/docs/resources/olake-terminologies',
             from: '/docs/category/resources',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup-1',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup-2',
           },
           {
@@ -923,7 +936,7 @@ const config = {
             from: '/docs/writers/catalog/overview',
           },
           {
-            to: '/docs/getting-started/overview',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/writers/getting-started/overview',
           },
           {
@@ -940,25 +953,26 @@ const config = {
           },
 
           // END
+          // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
+          // via canonical tags in the theme files, not through redirects
 
           {
-            to: 'https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag',
+            to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
             from: '/slack',
           },
           {
             to: 'https://github.com/datazip-inc/olake',
             from: '/github',
           },
-          // Redirect from multiple old paths to the new path
-          // {
-          //   to: '/docs/newDoc2',
-          //   from: ['/docs/oldDocFrom2019', '/docs/legacyDocFrom2016'],
-          // },
         ],
       },
     ],
     '@docusaurus/theme-live-codeblock',
   ],
+
+  // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags
+   
 };
 
 export default config;
+

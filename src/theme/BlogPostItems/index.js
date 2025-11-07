@@ -37,6 +37,8 @@ export default function BlogPostItems({
                       img={useBaseUrl(frontMatter.image)}
                       alt={title}
                       loading="lazy"
+                      width={1280}
+                      height={720}
                     />
                   </div>
                   {/* Image overlay on hover */}

@@ -71,7 +71,7 @@ const WebinarTitle: React.FC<WebinarTitleProps> = ({ title, tag }) => {
           {tag}
         </span>
       )}
-      <h1 className="text-4xl font-extralight lg:text-7xl lg:leading-[5rem] text-gray-800 dark:text-white">
+      <h1 className="text-4xl font-extralight lg:text-6xl lg:leading-[5rem] text-gray-800 dark:text-white">
         {title}
       </h1>
     </div>

@@ -4,7 +4,10 @@ import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-
 
 const ContactPage = () => {
     return (
-        <Layout>
+        <Layout 
+            title="Contact Us - OLake"
+            description="Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool."
+        >
             <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 py-12 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-4xl mx-auto">
                     <h1 className="text-4xl font-extrabold text-center mb-10">Contact Us</h1>
@@ -22,8 +25,8 @@ const ContactPage = () => {
                                     </div>
                                     <div className="flex items-center space-x-4">
                                         <FaPhone className="text-2xl" />
-                                        <a href="tel:+917978307903" className="hover:underline">
-                                            +91 7978307903 | +91 9748485583
+                                        <a href="tel:+919748485583" className="hover:underline">
+                                            +91 9748485583
                                         </a>
                                     </div>
                                     <div className="flex items-start space-x-4">
@@ -54,18 +57,6 @@ const ContactPage = () => {
                         <div className="space-y-8">
                             <h2 className="text-2xl font-bold mb-3">Connect with Our Team on LinkedIn</h2>
                             <ul className="space-y-4">
-                                <li className="flex items-center space-x-4">
-                                    <FaLinkedin className="text-2xl" />
-                                    <a href="https://www.linkedin.com/in/zriyansh/" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        Priyansh
-                                    </a>
-                                </li>
-                                <li className="flex items-center space-x-4">
-                                    <FaLinkedin className="text-2xl" />
-                                    <a href="https://www.linkedin.com/in/hashcode-ankit/" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        Ankit
-                                    </a>
-                                </li>
                                 <li className="flex items-center space-x-4">
                                     <FaLinkedin className="text-2xl" />
                                     <a href="https://www.linkedin.com/in/sandeepdevarapalli/" target="_blank" rel="noopener noreferrer" className="hover:underline">

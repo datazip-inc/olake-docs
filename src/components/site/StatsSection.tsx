@@ -28,9 +28,9 @@ interface StatsSectionProps {
 const StatsSection: React.FC<StatsSectionProps> = ({
   title = 'Get the OLake Advantage',
   linkText = 'View all Performance Benchmarks',
-  linkUrl = '/docs/connectors/postgres/benchmarks',
+  linkUrl = '/docs/benchmarks',
   stats = [
-    { value: '3 - 100X', label: 'Faster than traditional tools' },
+    { value: '5 - 500X', label: 'Faster than traditional tools' },
     { value: '90%', label: 'Cost Savings with OSS' },
     // { value: '3x', label: 'Less CPU' }
   ]

@@ -5,9 +5,18 @@ import Link from "@docusaurus/Link";
 import ArrowLeft from "@site/static/img/logo/arrowleft.svg";
 import ArrowRight from "@site/static/img/logo/arrowright.svg";
 import clsx from "clsx";
+import { useLocation } from "@docusaurus/router";
+import { paginationConfig} from "@site/src/theme/DocPaginator/footerNavigations";
+
+const customPagination = paginationConfig;
 
 export default function DocPaginator(props) {
   const { previous, next } = props;
+  const location = useLocation();
+  
+  const customNav = customPagination[location.pathname];
+  const finalPrevious = customNav?.previous || previous;
+  const finalNext = customNav?.next || next;
 
   return (
     <div className="olake-bottom-footer">
@@ -20,7 +29,7 @@ export default function DocPaginator(props) {
           description: "The ARIA label for the docs pagination",
         })}
       >
-        {previous ? (
+        {finalPrevious ? (
           <Link
             className={clsx(
               "font-medium text-sm leading-5 py-2 px-4",
@@ -32,16 +41,16 @@ export default function DocPaginator(props) {
               "dark:hover:bg-gray-700 dark:hover:text-gray-50",
               "transition-colors"
             )}
-            to={previous?.permalink}
+            to={finalPrevious?.permalink}
           >
             <ArrowLeft />
-            <span className="flex-1">{previous?.title}</span>
+            <span className="flex-1">{finalPrevious?.title}</span>
           </Link>
         ) : (
           <i></i>
         )}
 
-        {next && (
+        {finalNext && (
           <Link
             className={clsx(
               "font-medium text-sm leading-5 py-2 px-4",
@@ -53,9 +62,9 @@ export default function DocPaginator(props) {
               "dark:hover:bg-gray-700 dark:hover:text-gray-50",
               "transition-colors"
             )}
-            to={next?.permalink}
+            to={finalNext?.permalink}
           >
-            <span className="flex-1">{next?.title}</span>
+            <span className="flex-1">{finalNext?.title}</span>
             <ArrowRight />
           </Link>
         )}

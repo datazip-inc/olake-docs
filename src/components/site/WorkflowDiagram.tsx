@@ -9,8 +9,9 @@ const WorkflowDiagram: React.FC = () => {
                     <div className="w-full lg:hidden">
                         <img
                             src="/img/site/timeline.svg"
-                            alt="Workflow timeline"
+                            alt="OLake data pipeline flow to Iceberg catalogs"
                             className="w-full h-auto object-contain"
+                            loading="lazy" decoding="async"
                         />
                     </div>
 
@@ -18,8 +19,9 @@ const WorkflowDiagram: React.FC = () => {
                     <div className="hidden lg:block">
                         <img
                             src="/img/site/timeline.svg"
-                            alt="Workflow timeline"
+                            alt="OLake data pipeline flow to Iceberg catalogs"
                             className="block mx-auto w-[80%] h-auto"
+                            loading="lazy" decoding="async"
                         />
                     </div>
 

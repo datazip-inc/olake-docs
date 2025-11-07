@@ -4,9 +4,9 @@ import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 const BlogCTA = () => {
   return (
     <div className="bg-white dark:bg-black/70 rounded-2xl p-8 max-w-3xl w-full shadow-lg text-center transition-colors">
-      <h1 className="text-4xl font-bold mb-4 text-gray-800 dark:text-white">
+      <h2 className="text-4xl font-bold mb-4 text-gray-800 dark:text-white">
         OLake
-      </h1>
+      </h2>
       <p className="text-lg font-light text-gray-700 dark:text-gray-300 mb-8">
         Achieve 5x speed data replication to Lakehouse format with OLake, our open source platform for efficient, quick and scalable big data ingestion for real-time analytics.
       </p>
@@ -33,7 +33,7 @@ const BlogCTA = () => {
         </a>
 
         <a
-          href="https://github.com/olake"
+          href="https://github.com/datazip-inc/olake"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center text-lg font-medium text-white bg-black dark:bg-white dark:text-black rounded-full px-6 py-3 transition transform hover:-translate-y-1 hover:opacity-90 min-w-[150px]"

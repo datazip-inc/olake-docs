@@ -2,21 +2,21 @@ export const mainMetaData = {
   title: 'Making Data Engineers 10x More Productive',
   description:
     'Ingest, store, organize, and query all your data at one place while we take care of the infra scale, enabling data quality and data access.',
-  image: '/img/olake/onestack-meta.png'
+  image: '/img/olake/onestack-meta.webp'
 }
 
 export const mainOLakeData = {
   title: 'Composable Lakehouse Platform',
   description:
     'Leverage open data formats to decouple storage, metadata, and compute for best-in-class analytics.',
-  image: '/img/olake/olake-meta.png'
+  image: '/img/olake/olake-meta.webp'
 }
 
 export const olakeProductData = {
-  title: 'Fastest way to replicate MongoDB/JSON data in Apache Iceberg',
+  title: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg',
   description:
-    'Achieve fast data replication for MongoDB with near real-time transfer to data lakehouse (in Iceberg format).',
-  image: '/img/olake/olake-product-meta.png'
+    'Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+  image: '/img/olake/olake-product-meta.webp'
 }
 
 export const aboutMetaData = {

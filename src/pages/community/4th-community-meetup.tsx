@@ -1,11 +1,10 @@
 import WebinarTitle from '../../components/webinars/WebinarTitle';
-// import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
-// import WebinarForm from "../../components/forms/WebinarForm";
 import React from "react";
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/4th-meetup.json'
@@ -21,23 +20,23 @@ const decks: Slide[] = [
 const hosts = [
   {
     name: "Priyansh Khodiyar",
-    role: "DevRel and OLake Maintainer",
+    role: "Ex DevRel",
     bio: "",
-    image: "/img/authors/priyansh.jpg",
+    image: "/img/authors/priyansh.webp",
     linkedin: "https://www.linkedin.com/in/zriyansh/",
   },
   {
     name: "Shubham Satish Baldava",
     role: "Co-founder @ Datazip and OLake Maintainer",
     bio: "",
-    image: "/img/authors/shubham.jpg",
+    image: "/img/authors/shubham.webp",
     linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
   },
   {
     name: "Ankit Kumar",
     role: "Senior backend dev and OLake Maintainer",
     bio: "",
-    image: "/img/authors/ankit.jpg",
+    image: "/img/authors/ankit.webp",
     linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
   },
 ];
@@ -55,6 +54,10 @@ const CommunityPage = () => {
     >
 
       <main className="container mx-auto lg:px-36 py-12">
+        <CentralizedBreadcrumbs
+          type="community"
+          title={communityData.title}
+        />
         <WebinarTitle
           title={communityData.title}
           tag="Community Meetup"

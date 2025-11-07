@@ -5,7 +5,7 @@ import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
-import WebinarForm from "../../components/forms/WebinarForm";
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Layout from '@theme/Layout';
 import Hr from '../../components/Hr';

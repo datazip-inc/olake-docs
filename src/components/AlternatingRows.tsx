@@ -32,6 +32,7 @@ const AlternatingRows: React.FC<AlternatingRowsProps> = ({ items }) => {
                 src={item.image}
                 alt={item.title}
                 className="w-full h-auto object-cover"
+                loading="lazy" decoding="async"
               />
             </div>
           </div>

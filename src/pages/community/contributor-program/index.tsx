@@ -1,6 +1,9 @@
 // src/pages/community/contributor-program/index.tsx
 import React, { useEffect, useState } from 'react'
 import Layout from '@theme/Layout'
+import Head from '@docusaurus/Head'
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
+import { useLocation } from '@docusaurus/router'
 import clsx from 'clsx'
 import Link from '@docusaurus/Link'
 import {
@@ -23,6 +26,11 @@ import FeatureCard from '../../../components/community/improved/FeatureCard'
 import SectionLayout from '../../../components/community/SectionLayout'
 
 const ContributorProgramPage = () => {
+  const { siteConfig } = useDocusaurusContext()
+  const location = useLocation()
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
+
   const contributionTypes = [
     {
       icon: <LuUnplug />,
@@ -124,13 +132,7 @@ const ContributorProgramPage = () => {
 
   const linkedinPosts = [
     { embedId: 'urn:li:share:7324402000287215616', contributor: 'Aditya SwayamSiddha' },
-    // { embedId: 'urn:li:share:0987654321', contributor: 'Jane Smith' },
-    // Add your LinkedIn post IDs here
   ]
-
-  // <iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7324402000287215616?collapsed=1" height="671" width="504" frameborder="0" allowfullscreen="" title="Embedded post"></iframe>
-
-  // https://www.linkedin.com/posts/lalit-moharana-987516191_olake-datazip-iceberg-activity-7344602591831445505-LspG/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACzFOeEByp1MK-E1FekJSaUEZpJsjXkvrrw
 
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showLinkedInPanel, setShowLinkedInPanel] = useState(false)
@@ -163,6 +165,15 @@ const ContributorProgramPage = () => {
       title='OLake Contributor Program'
       description='Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.'
     >
+      <Head>
+        <meta property='og:type' content='website' />
+        <meta property='og:title' content='OLake Contributor Program' />
+        <meta property='og:description' content='Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.' />
+        <meta property='og:url' content={canonicalUrl} />
+        <meta property='og:site_name' content='OLake' />
+        <meta property='og:locale' content='en_US' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+      </Head>
       {/* Hero Section */}
       <PageHeader
         title={

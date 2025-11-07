@@ -31,9 +31,10 @@ const GetStarted = () => {
             src="/img/olake/olake-github.svg"
             alt="get-started-item"
             className="max-h-[120px] object-contain"
+            loading="lazy" decoding="async"
           />
           <div className="mt-[20px] flex items-center text-center text-[12px] font-normal text-[#407bff]">
-            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
+            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" loading="lazy" decoding="async" />
             Quick Results
           </div>
           <div
@@ -72,7 +73,7 @@ const GetStarted = () => {
             className="max-h-[120px] object-contain"
           />
           <div className="mt-[20px] flex items-center text-center text-[12px] font-normal text-[#407bff]">
-            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
+            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" loading="lazy" decoding="async" />
             For Enterprise solutions
           </div>
           <div
@@ -107,9 +108,10 @@ const GetStarted = () => {
             src="/img/olake/olake-byoc.svg"
             alt="get-started-item"
             className="max-h-[120px] object-contain"
+            loading="lazy" decoding="async"
           />
           <div className="mt-[20px] flex items-center text-center text-[12px] font-normal text-[#407bff]">
-            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" />
+            <img src="/img/olake/meteor.svg" alt="meteor" className="mr-1" loading="lazy" decoding="async" />
             Control your cloud
           </div>
           <div

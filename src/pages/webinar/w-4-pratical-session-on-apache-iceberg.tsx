@@ -5,11 +5,10 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-// import WebinarForm from '../../components/forms/WebinarForm';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
-// import CTAButton from '../../components/webinars/CTAButton';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
 import { FaRegCalendarAlt } from 'react-icons/fa';
@@ -19,7 +18,7 @@ const hosts = [
     name: "Sachin Tripathi",
     role: "[Guest] Senior Data Engineer @ EarnIn",
     bio: "Seasoned data software engineer with a track record spanning over 7 years in the Financial Products sector. Specialised in designing cost-effective and efficient data stacks for diverse teams",
-    image: "/img/authors/sachin.jpg",
+    image: "/img/authors/sachin.webp",
     linkedin: "https://www.linkedin.com/in/tripathisachin/",
   },
   {

@@ -38,6 +38,7 @@ const OLakeBlogList = () => {
               src={blog.image}
               alt={blog.heading}
               className='mb-4 h-auto w-full object-contain'
+              loading="lazy" decoding="async"
             />
             {/* Tag */}
             <div className='mt-4 flex items-center justify-center self-start rounded-full bg-gray-300 px-3 text-[12px] font-medium text-gray-900 dark:bg-[#333] dark:text-white'>
@@ -59,7 +60,7 @@ const OLakeBlogList = () => {
               className='flex items-center gap-1 text-[16px] font-semibold leading-[16px] text-gray-900 dark:text-white'
             >
               Read more
-              <img src='/img/olake/ArrowSquareOut.svg' alt='arrow right' className='ml-1 h-4 w-4' />
+              <img src='/img/olake/ArrowSquareOut.svg' alt='arrow right' className='ml-1 h-4 w-4' loading="lazy" decoding="async" />
             </a>
           </div>
         ))}

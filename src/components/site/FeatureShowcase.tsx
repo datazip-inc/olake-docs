@@ -68,7 +68,8 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
                   <img
                     src='/img/site/why-olake-1.svg'
-                    alt='Faster Parallel & Full Load'
+                    alt='schema connecting to data lake with faster resumable full load'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
@@ -83,7 +84,8 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-28 w-full items-center justify-center sm:h-28 md:h-32'>
                   <img
                     src='/img/site/why-olake-2.svg'
-                    alt='Stay updated with ingestion logs'
+                    alt='Schema-aware logs and alerts for data integrity'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
@@ -98,7 +100,8 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-44 w-full items-center pr-11 justify-end sm:h-28 md:h-44'>
                   <img
                     src='/img/site/why-olake-3.svg'
-                    alt='CDC Cursor Preservation'
+                    alt='CDC cursor preservation with MongoDB source'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
@@ -113,7 +116,8 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-36 w-full items-center justify-center sm:h-28 md:h-44'>
                   <img
                     src='/img/site/why-olake-4.svg'
-                    alt='Fast & Stable Connectors'
+                    alt='Connector selection for real-time database sync'
+                    loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>

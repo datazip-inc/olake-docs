@@ -84,6 +84,7 @@ export const ImprovedContributorCard: React.FC<{ contributor: ContributorProps }
               src={imageError ? '/img/authors/author.webp' : contributor.avatar_url}
               alt={`${contributor.login}'s avatar`}
               onError={() => setImageError(true)}
+              loading="lazy" decoding="async"
               className="object-cover w-full h-full"
             />
           </div>

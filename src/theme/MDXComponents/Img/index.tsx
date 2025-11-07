@@ -13,7 +13,7 @@ export default function MDXImg(props: Props): ReactNode {
     // eslint-disable-next-line jsx-a11y/alt-text
     <img
       decoding="async"
-      // loading="lazy"
+      loading="lazy"
       {...props}
       className={transformImgClassName(props.className)}
     />

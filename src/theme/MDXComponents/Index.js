@@ -51,18 +51,23 @@ import MySQLSourceConfig from '../../../docs/shared/config/MySQLSourceConfig.mdx
 import MySQLSourceConfigDetails from '../../../docs/shared/config/MySQLSourceConfigDetails.mdx'
 import MySQLStateConfig from '../../../docs/shared/config/MySQLStateConfig.mdx'
 import MySQLStateConfigDetails from '../../../docs/shared/config/MySQLStateConfigDetails.mdx'
+import MySQLToIcebergDatatypes from '../../../docs/shared/config/MySQLToIcebergDatatypes.mdx'
 
 import PostgresSourceConfig from '../../../docs/shared/config/PostgresSourceConfig.mdx'
 import PostgresSourceConfigDetails from '../../../docs/shared/config/PostgresSourceConfigDetails.mdx'
 import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig.mdx'
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
+import PostgresToIcebergDatatypes from '../../../docs/shared/config/PostgresToIcebergDatatypes.mdx'
 
 import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.mdx'
-import OracleSourceConfigDetails from '../../../docs/shared/config/OracleSourceConfigDetails.mdx'
+import OraclePermissions from '../../../docs/shared/config/OraclePermissions.mdx'
+import OracleToIcebergDatatypes from '../../../docs/shared/config/OracleToIcebergDatatypes.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
+import S3ConfigGCS from '../../../docs/shared/config/S3ConfigGCS.mdx'
+import S3ConfigMinIO from '../../../docs/shared/config/S3ConfigMinIO.mdx'
 import S3ConfigDetails from '../../../docs/shared/config/S3ConfigDetails.mdx'
 import S3ConfigUIDetails from '../../../docs/shared/config/S3ConfigUIDetails.mdx'
 
@@ -83,7 +88,6 @@ import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIc
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
-import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed'
 import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
 
 import OLakeFeaturesTLDR from '../../../docs/shared/OLakeFeaturesTLDR.mdx'
@@ -96,6 +100,7 @@ import SelectedStreamsOnlyDetails from '../../../docs/shared/streams/SelectedStr
 import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
 import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
 import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
+import StreamsConfiguration from '../../../docs/shared/streams/StreamsConfiguration.mdx'
 
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
 import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
@@ -155,16 +160,21 @@ const MDXComponents = {
   MySQLSourceConfigDetails,
   MySQLStateConfig,
   MySQLStateConfigDetails,
-
+  MySQLToIcebergDatatypes,
+  
   PostgresSourceConfig,
   PostgresSourceConfigDetails,
   PostgresStateConfig,
   PostgresStateConfigDetails,
+  PostgresToIcebergDatatypes,
 
   OracleSourceConfig,
-  OracleSourceConfigDetails,
+  OraclePermissions,
+  OracleToIcebergDatatypes,
 
   S3Config,
+  S3ConfigGCS,
+  S3ConfigMinIO,
   S3ConfigDetails,
   S3ConfigUIDetails,
   LocalParquetConfig,
@@ -200,6 +210,7 @@ const MDXComponents = {
   StreamsFull,
   StreamsOnly,
   StreamsOnlyDetails,
+  StreamsConfiguration,
 
   OLakePathInfo,
   StreamSelectionExample

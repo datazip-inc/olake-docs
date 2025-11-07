@@ -4,18 +4,13 @@ import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
-import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-// import WebinarForm from '../../components/forms/WebinarForm';
-// import MeetupNotes from '../../components/MeetupNotes';
-// import meetupData from '../../data/webinar/6th.json'
 
-import CTAButton from '../../components/webinars/CTAButton';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
-// import { FaRegCalendarAlt } from 'react-icons/fa';
 
 const hosts = [
 
@@ -30,7 +25,7 @@ const hosts = [
     name: "Hasan Geren",
     role: "Data Engineer @ ProcurePro",
     bio: "Hasan's career includes Data Engineering, where he has: • Designed and optimised 𝘀𝗰𝗮𝗹𝗮𝗯𝗹𝗲 𝗱𝗮𝘁𝗮𝗯𝗮𝘀𝗲𝘀 and cloud storage architectures. • Built 𝗹𝗼𝘄-𝗹𝗮𝘁𝗲𝗻𝗰𝘆 𝗱𝗮𝘁𝗮 𝗽𝗶𝗽𝗲𝗹𝗶𝗻𝗲𝘀 to support real-time applications and analytics dashboards. • Developed AI/ML-based solutions, including 𝗟𝗦𝗧𝗠 𝗺𝗼𝗱𝗲𝗹𝘀 and 𝗿𝗲𝗰𝗼𝗺𝗺𝗲𝗻𝗱𝗮𝘁𝗶𝗼𝗻 𝘀𝘆𝘀𝘁𝗲𝗺𝘀 to enhance user engagement. • Collaborated across teams to drive actionable insights, ensuring data solutions align with business goals.",
-    image: "/img/authors/hasan.jpg",
+    image: "/img/authors/hasan.webp",
     linkedin: "https://www.linkedin.com/in/hasan-geren/",
   },
 ];

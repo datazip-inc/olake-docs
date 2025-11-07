@@ -1,0 +1,230 @@
+---
+title: "OLake UI Installation Guide - Docker Compose Setup & Configuration"
+description: Quickly deploy OLake UI with Docker Compose. Manage jobs, configure encryption, customize data directory, and troubleshoot common deployment issues.
+sidebar_label: Docker Compose (UI)
+sidebar_position: 1
+---
+
+# Docker Compose (OLake UI)
+
+OLake UI provides a complete Docker Compose stack for running the replication sync using different sources with orchestration.
+
+## Components
+
+- **OLake UI**: Main web interface for job management and configuration
+- **Temporal Worker**: Background worker for processing data replication jobs
+- **PostgreSQL**: Primary database for storing job data, configurations, and sync state
+- **Temporal Server**: Workflow orchestration engine for managing job execution
+- **Temporal UI**: Web interface for monitoring workflows and debugging
+- **Elasticsearch**: Search and indexing backend for Temporal workflow data
+- **Signup Init**: One-time initialization service that creates the default admin user
+
+<div style={{textAlign: 'center'}}>
+
+![OLake platform Docker Compose architecture showing user, core services, containers, and external data sources.](/img/docker-compose-architecture.webp)
+
+</div>
+
+## Prerequisites
+
+The following requirements must be met before starting:
+- [Docker](https://docs.docker.com/get-docker/) installed (Docker Desktop recommended)
+- [Docker Compose](https://docs.docker.com/compose/) (included with Docker Desktop)
+- Port 8000 available on the system
+- System Requirements:
+  - Minimum: 8 vCPU, 16 GB RAM
+  - Recommended: 16 vCPU, 32 GB RAM
+
+## Quick Start
+
+### One-Command Setup
+
+The fastest way to get OLake UI running is with a single command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - up -d
+```
+
+This command will:
+- Download the latest docker-compose.yml file
+- Pull all required Docker images
+- Start all services in the background
+- Create a default admin user automatically
+
+### Access the Application
+
+- **OLake UI**: [http://localhost:8000](http://localhost:8000)
+
+### Login
+
+The default credentials are:
+- **Username**: `admin`
+- **Password**: `password`
+
+![Login page with fields for admin username and password](/img/docs/jobs/olake-job-0.webp)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/docs/jobs/olake-job.webp" alt="OLake UI Jobs" width="800" loading="lazy" decoding="async" />
+</div>
+
+For detailed job creation instructions, see [Create Jobs](../jobs/create-jobs).
+
+## Service Configuration
+
+### Changing Admin Credentials
+
+The default admin user can be customized by editing the `docker-compose.yml` file before starting:
+
+```yaml
+x-signup-defaults:
+  username: &defaultUsername "your-username"
+  password: &defaultPassword "your-secure-password"
+  email: &defaultEmail "your-email@example.com"
+```
+
+### Updating OLake UI Version
+
+To update OLake UI to the latest version, use the following command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - down && \
+curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - up -d
+```
+
+**Note**: Your data and configurations will be preserved as they are stored in persistent volumes and the `olake-data` directory.
+
+### Encryption Key Configuration
+
+OLake supports encryption of source and destination configurations stored in the database. Configure the encryption key in `docker-compose.yml`:
+
+- **Custom String**: Provide any string (OLake generates SHA-256 hash):
+
+  ```yaml
+  x-encryption:
+    key: &encryptionKey "your-passphrase"
+  ```
+
+- **AWS KMS**: Use a AWS KMS key ARN (recommended for production):
+
+  ```yaml
+  x-encryption:
+    key: &encryptionKey "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+  ```
+
+- **Disable Encryption**: Use empty string:
+
+  ```yaml
+  x-encryption:
+    key: &encryptionKey ""  # No Encryption
+  ```
+
+### Customizing Data Directory
+
+The default data directory can be changed by modifying the host persistence path:
+
+```yaml
+x-app-defaults:
+  host_persistence_path: &hostPersistencePath /custom/path/to/olake-data
+  worker_config_volume_details: &workerConfigVolumeDetails
+    type: bind
+    source: *hostPersistencePath
+    target: /tmp/olake-config
+```
+
+This will create and use `/custom/path/to/olake-data` instead of the default `./olake-data` directory.
+
+### Service Environment Variables
+
+Key environment variables that can be customized within specific services:
+
+```yaml
+services:
+  olake-ui:
+    environment:
+      PERSISTENT_DIR: *hostPersistencePath
+      POSTGRES_DB: "postgres://olake:olake@postgresql:5432/olakedb"
+      OLAKE_SECRET_KEY: *encryptionKey
+```
+
+### Data Persistence
+
+The Docker Compose setup creates the following data storage:
+
+#### OLake Config Directory
+- `olake-data`: Local directory created in the current working directory
+  - Contains streams configurations, connection settings, and sync state
+  - Persists across container restarts and recreations
+  - Used by OLake UI and Temporal Worker services
+
+#### Docker Volumes
+- `temporal-postgresql-data`: PostgreSQL database storage
+  - Contains workflow execution history, job metadata and sync state
+  - Used by the PostgreSQL service
+- `temporal-elasticsearch-data`: Elasticsearch search index storage
+  - Used by the Elasticsearch service
+
+### Log Retention
+OLake includes an automated log retention system that helps manage disk space by automatically cleaning up old log files. This prevents log files from accumulating indefinitely and consuming excessive storage space.
+
+#### What It Does
+- Runs daily at midnight (00:00 server's local timezone) using a cron job
+- Deletes entire log directories that are older than the configured retention period (defaults to 30 days)
+
+#### Configuration
+Set the `LOG_RETENTION_PERIOD` environment variable in the docker-compose of [olake-ui](https://github.com/datazip-inc/olake-ui)  to control how long logs are kept:
+
+```yml
+# In docker-compose.yml
+services:
+  temporal-worker:
+    environment:
+      LOG_RETENTION_PERIOD: "30"  # Keep logs for 30 days
+```
+
+#### Monitoring Log Cleaner
+The log cleanup process can be monitored through the logs of the `temporal-worker` service defined in the docker-compose configuration for [olake-ui](https://github.com/datazip-inc/olake-ui).
+
+When the log cleaner starts, it emits a log entry indicating the beginning of the process:
+```
+Log cleaner started... 
+```
+
+Every time the cron job runs, it emits the following log:
+```
+Running log cleaner...
+```
+
+As each log directory is deleted, a log entry is generated showing the full path of the directory being removed:
+```
+Deleting folder /path/to/olake/logs
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Port Conflicts
+If port binding errors occur:
+1. Check what's using the ports: `lsof -i :8000` (on macOS/Linux)
+2. Stop conflicting services or change ports in `docker-compose.yml`
+
+#### Database Connection Issues
+- Ensure PostgreSQL container is healthy: `docker compose ps`
+- Check PostgreSQL logs: `docker compose logs postgresql`
+
+#### Memory Issues
+- Ensure Docker has at least 4GB RAM allocated
+- Check Docker resource usage: `docker stats`
+
+#### Permission Issues
+- On Linux, ensure the user is in the docker group
+- Check file permissions for the `./olake-data/` directory (or custom path if modified)
+
+### Reset Everything
+
+The stack can be completely reset with:
+```bash
+docker compose down -v  # Removes containers and volumes
+docker compose up -d    # Fresh start
+```
+
+**Warning**: This will delete all job data and configurations.

@@ -1,12 +1,15 @@
 import React from 'react'
 import Layout from '@theme/Layout'
-import Glace from '../components/site/Glace'
+import LazyComponent from '../components/LazyComponent'
 
 const GlaceLake: React.FC = () => {
   return (
-    <Layout>
+    <Layout 
+      title="AI Lake - OLake"
+      description="Explore OLake's AI-powered data lake capabilities for intelligent data processing and analytics with Apache Iceberg."
+    >
       <main>
-        <Glace />
+        <LazyComponent component='Glace' />
       </main>
     </Layout>
   )

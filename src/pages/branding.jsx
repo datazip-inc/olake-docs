@@ -72,7 +72,7 @@ const LogoCard = ({ logo }) => {
           <a
             href={logo.downloadLinkSVG}
             download
-            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-blue-700'
+            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:text-black'
           >
             <FaDownload className='mr-2' />
             Download
@@ -84,7 +84,7 @@ const LogoCard = ({ logo }) => {
           <a
             href={logo.downloadLinkPNG}
             download
-            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-blue-700'
+            className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:text-black'
           >
             <FaDownload className='mr-2' />
             Download
@@ -102,6 +102,7 @@ const LogoCard = ({ logo }) => {
           src={logo.image}
           alt={logo.name}
           className='h-auto w-48 rounded border object-contain'
+          loading="lazy" decoding="async"
         />
       </div>
     </div>
@@ -143,7 +144,10 @@ const ColorSwatch = ({ color }) => {
 
 const BrandingPage = () => {
   return (
-    <Layout>
+    <Layout 
+      title="OLake Branding Assets"
+      description="Download official OLake logos, color palettes, and media assets. Brand guidelines and resources for partners and community."
+    >
       <div className='container mx-auto px-4 py-10'>
         <header className='mb-12 text-center'>
           <h1 className='text-4xl font-bold text-gray-800 dark:text-gray-100'>OLake Branding</h1>

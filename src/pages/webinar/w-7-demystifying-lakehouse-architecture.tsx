@@ -5,17 +5,12 @@ import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
 import WebinarOverview from '../../components/webinars/WebinarOverview';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
-// import WebinarForm from '../../components/forms/WebinarForm';
-import MeetupNotes from '../../components/MeetupNotes';
-import meetupData from '../../data/webinar/6th.json'
-
-import CTAButton from '../../components/webinars/CTAButton';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 
 import Layout from '@theme/Layout';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
-import { FaRegCalendarAlt } from 'react-icons/fa';
 
 const hosts = [
 
@@ -30,7 +25,7 @@ const hosts = [
     name: "Akshat Mathur",
     role: "Senior Software Engineer @ Cloudera",
     bio: "As a senior software engineer at Cloudera, Akshat Mathur works on developing and maintaining scalable, reliable, and secure data solutions using Apache Iceberg, Hive, Tez, Trino, and other big data technologies. He collaborates with cross-functional teams to deliver high-quality products and services that meet the needs and expectations of clients and users. He also contributes to the open source community actively as an Apache contributor, where he helps to improve the performance, functionality, and usability of the projects.",
-    image: "/img/authors/akshat.jpg",
+    image: "/img/authors/akshat.webp",
     linkedin: "https://www.linkedin.com/in/devakshatmathur/",
   },
 ];

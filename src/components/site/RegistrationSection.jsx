@@ -4,50 +4,95 @@ import { useHistory } from 'react-router-dom'
 const RegistrationSection = () => {
   const childRef = useRef()
   const formRef = useRef(null)
+  const sectionRef = useRef(null)
+  const scriptLoadedRef = useRef(false)
+  const formInitializedRef = useRef(false)
   const history = useHistory()
   // const isMobile = useIsMobile()
 
+  // Defer HubSpot script & form creation until near viewport or anchor requested
   useEffect(() => {
     if (childRef.current && childRef.current.init) {
       childRef.current.init()
     }
-    const script = document.createElement('script')
-    script.src = 'https://js.hsforms.net/forms/v2.js'
-    script.async = true
-    script.onload = () => {
-      window.hbspt.forms.create({
-        target: '#olake-product-form',
-        portalId: '21798546',
-        formId: '86391f69-48e0-4b35-8ffd-13ac212d8208'
-      })
-    }
-    document.body.appendChild(script)
-  }, [])
 
-  useEffect(() => {
-    if (window.location.hash === '#olake-product-form') {
-      setTimeout(() => {
-        window.scrollTo(0, formRef.current.offsetTop)
-      }, 0)
-      console.log('hereee', window.location.pathname, window.location.search)
-      history.replace({
-        pathname: window.location.pathname,
-        search: window.location.search
-      })
+    const loadHubSpot = () => {
+      if (formInitializedRef.current) return
+      const initialize = () => {
+        if (formInitializedRef.current) return
+        if (window.hbspt?.forms?.create) {
+          window.hbspt.forms.create({
+            target: '#olake-product-form',
+            portalId: '21798546',
+            formId: '86391f69-48e0-4b35-8ffd-13ac212d8208'
+          })
+          formInitializedRef.current = true
+        }
+      }
+
+      if (!scriptLoadedRef.current) {
+        const script = document.createElement('script')
+        script.src = 'https://js.hsforms.net/forms/v2.js'
+        script.async = true
+        script.onload = () => {
+          scriptLoadedRef.current = true
+          initialize()
+        }
+        document.body.appendChild(script)
+      } else {
+        initialize()
+      }
     }
-  }, [history, history.location.hash])
+
+    const targetEl = sectionRef.current
+    if (!targetEl) return
+
+    // If user arrived with anchor, load immediately and scroll
+    if (window.location.hash === '#olake-form-product') {
+      loadHubSpot()
+      requestAnimationFrame(() => {
+        window.scrollTo(0, targetEl.offsetTop)
+        history.replace({ pathname: window.location.pathname, search: window.location.search })
+      })
+      return
+    }
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              loadHubSpot()
+              observer.disconnect()
+            }
+          })
+        },
+        { root: null, rootMargin: '600px', threshold: 0 }
+      )
+      observer.observe(targetEl)
+      return () => {
+        observer.disconnect()
+      }
+    }
+
+    // Fallback for very old browsers
+    loadHubSpot()
+  }, [history])
 
   return (
     <section
       id='olake-form-product'
+      ref={sectionRef}
       className='w-5/5 relative mx-auto overflow-hidden rounded-xl p-6 2xl:w-4/5'
     >
       {/* Background lake image */}
       <div className='absolute inset-0 z-0'>
         <img
-          src='/img/site/registration-bg.jpg'
+          src='/img/site/registration-bg.webp'
           alt='Lake background'
           className='h-full w-full object-cover'
+          role='presentation'
+          loading="lazy" decoding="async"
         />
         {/* <div className='absolute inset-0 bg-blue-900/70'></div> */}
       </div>
@@ -84,6 +129,8 @@ const RegistrationSection = () => {
                 OLake makes data replication faster by parallelising full loads, leveraging change
                 streams for real-time sync, and pulling data in a lake house
               </div>
+
+
             </div>
 
             {/* Right side - Feature Text */}
@@ -101,7 +148,12 @@ const RegistrationSection = () => {
                 {/* Feature 1 */}
                 <div>
                   <div className='mb-3 flex items-start gap-4'>
-                    <img src='/img/site/iceberg-logo.svg' className='mt-1' />
+                    <img
+                      src='/img/site/iceberg-logo.svg'
+                      className='mt-1'
+                      alt='Iceberg catalog logo'
+                      loading="lazy" decoding="async"
+                    />
                     <div className='flex max-w-[90%] flex-col gap-2'>
                       <div className='text-lg font-semibold md:text-xl lg:text-xl'>
                         Iceberg Native
@@ -122,6 +174,7 @@ const RegistrationSection = () => {
                       viewBox='0 0 24 24'
                       fill='none'
                       xmlns='http://www.w3.org/2000/svg'
+                      aria-label='Lightning bolt icon representing speed'
                     >
                       <path
                         d='M13 10V3L4 14H11V21L20 10H13Z'

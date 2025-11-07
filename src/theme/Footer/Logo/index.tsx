@@ -25,19 +25,19 @@ function LogoImage({ logo }: Props) {
         {/* Social icons row */}
         <div className={styles.socialIcons}>
           <a href="https://www.linkedin.com/company/datazipio" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
-            <img src="/img/social/linkedin.svg" alt="LinkedIn" />
+            <img src="/img/social/linkedin.svg" alt="Linkedin logo" loading="lazy" decoding="async" />
           </a>
           <a href="https://www.youtube.com/@olakeio" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
-            <img src="/img/social/youtube.svg" alt="YouTube" />
+            <img src="/img/social/youtube.svg" alt="Youtube logo" loading="lazy" decoding="async"/>
           </a>
-          <a href="https://join.slack.com/t/getolake/shared_invite/zt-2utw44do6-g4XuKKeqBghBMy2~LcJ4ag" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
-            <img src="/img/social/slack.svg" alt="Slack" />
+          <a href="https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw" className={styles.socialIcon} target="_blank"  rel="noopener noreferrer">
+            <img src="/img/social/slack.svg" alt="Slack logo" loading="lazy" decoding="async" />
           </a>
           <a href="https://instagram.com/olake_io" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
-            <img src="/img/social/instagram.svg" alt="Instagram" />
+            <img src="/img/social/instagram.svg" alt="Instagram logo" loading="lazy" decoding="async" />
           </a>
           <a href="https://x.com/_olake" className={styles.socialIcon} target="_blank" rel="noopener noreferrer">
-            <img src="/img/social/x.svg" alt="X (Twitter)" />
+            <img src="/img/social/x.svg" alt="X (Twitter)" loading="lazy" decoding="async" />
           </a>
         </div>
       </div>

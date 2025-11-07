@@ -80,7 +80,7 @@ const WebinarGrid: React.FC<WebinarGridProps> = ({ webinars }) => {
               </div>
 
               {/* Title - Enhanced typography */}
-              <h3 className="font-bold text-xl text-gray-900 dark:text-gray-50 leading-tight line-clamp-2 group-hover:text-[#193ae6] dark:group-hover:text-blue-400 transition-colors duration-300">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-gray-50 leading-tight line-clamp-2 group-hover:text-[#193ae6] dark:group-hover:text-blue-400 transition-colors duration-300">
                 {webinar.title}
               </h3>
 

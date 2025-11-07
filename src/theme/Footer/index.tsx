@@ -1,6 +1,7 @@
 import React from 'react';
 import { useColorMode } from '@docusaurus/theme-common';
 import Link from '@docusaurus/Link';
+import XLogo from '@site/static/img/logo/x.svg';
 
 interface LinkItem {
     label: string;
@@ -22,8 +23,7 @@ const Footer: React.FC = () => {
         { label: 'Contact us', href: '/contact' },
         { label: 'Branding', href: '/branding' },
         { label: 'Terms of Use', href: 'https://datazip.io/terms-of-use' },
-        { label: 'Privacy (Users)', href: 'https://datazip.io/privacy-policy' },
-        { label: 'Privacy (Customers)', href: 'https://datazip.io/privacy-policy-customer' },
+        { label: 'Privacy Policy', href: 'https://datazip.io/privacy-policy' },
     ];
 
     const resourceLinks: LinkItem[] = [
@@ -39,10 +39,10 @@ const Footer: React.FC = () => {
     ];
 
     const socialLinks: SocialLinkItem[] = [
-        { icon: 'linkedin', href: 'https://www.linkedin.com/company/datazipio/', ariaLabel: 'LinkedIn' },
-        { icon: 'youtube', href: 'https://www.youtube.com/@olakeio', ariaLabel: 'YouTube' },
-        { icon: 'slack', href: 'https://olake.io/slack', ariaLabel: 'Slack' },
-        { icon: 'instagram', href: 'https://instagram.com/olake_io', ariaLabel: 'Instagram' },
+        { icon: 'linkedin', href: 'https://www.linkedin.com/company/datazipio/', ariaLabel: 'Linkedin logo' },
+        { icon: 'youtube', href: 'https://www.youtube.com/@olakeio', ariaLabel: 'Youtube logo' },
+        { icon: 'slack', href: 'https://olake.io/slack', ariaLabel: 'Slack logo' },
+        { icon: 'instagram', href: 'https://instagram.com/olake_io', ariaLabel: 'Instagram logo' },
         { icon: 'twitter', href: 'https://x.com/_olake', ariaLabel: 'Twitter' },
     ];
 
@@ -88,11 +88,19 @@ const Footer: React.FC = () => {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
-                                    <img
-                                        src={getSocialIconSrc(social.icon)}
-                                        alt={social.ariaLabel}
-                                        className="w-5 h-5 "
-                                    />
+                                    {social.icon === 'twitter' ? (
+                                        <XLogo
+                                            className="w-5 h-5 text-[#0F1419] dark:text-white"
+                                            aria-hidden
+                                        />
+                                    ) : (
+                                        <img
+                                            src={getSocialIconSrc(social.icon)}
+                                            alt={social.ariaLabel}
+                                            className="w-5 h-5"
+                                            loading="lazy" decoding="async"
+                                        />
+                                    )}
                                 </a>
                             ))}
                         </div>

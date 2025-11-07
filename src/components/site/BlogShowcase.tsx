@@ -14,37 +14,37 @@ const BlogShowcase: React.FC = () => {
   // Sample blog data
   const blogPosts: BlogPost[] = [
     {
-      id: 'issues-debezium-kafka',
-      title: 'Common Challenges Using Debezium and Kafka Connect for CDC',
+      id: 'how-to-set-up-mongodb-apache-iceberg',
+      title: 'How to Set Up MongoDB Apache Iceberg: Complete Guide to Building a Modern Data Lakehouse',
       description:
-        'Uncover the key challenges of extracting, transforming, and loading data from MongoDB into a data lakehouse. Learn be...',
-      readTime: '14 Min Read',
+        'MongoDB has become the go-to database for modern applications, handling everything from user profiles to IoT sensor data with its flexible document model. But when it comes to analytics at scale...',
+      readTime: '12 Min Read',
       bgColor: 'bg-blue-50 dark:bg-blue-900/10',
-      imageSrc: '/img/site/blog-1.svg'
+      imageSrc: '/img/blog/cover/setup-mongodb.webp'
     },
     {
-      id: 'mongodb-etl-challenges',
-      title: 'Four Critical MongoDB ETL Challenges and Ho...',
-      description: 'Uncover the key challenges of extracting, transforming, and loading data fr...',
-      readTime: '14 Min Read',
+      id: 'mysql-apache-iceberg-replication',
+      title: 'MySQL to Apache Iceberg: Transform Your Slow Analytics Into Lightning-Fast Lakehouse Performance',
+      description: 'MySQL powers countless production applications as a reliable operational database. But when it comes to analytics at scale, running heavy queries directly on MySQL can quickly become expensive...',
+      readTime: '15 Min Read',
       bgColor: 'bg-sky-50 dark:bg-sky-900/10',
-      imageSrc: '/img/site/blog-2.svg'
+      imageSrc: '/img/blog/cover/setup-sql-iceberg.webp'
     },
     {
-      id: 'troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors',
-      title: 'Troubleshooting Common Issues and Solutions to Mo...',
-      description: 'Uncover the key challenges of extracting, transforming, and loading data fr...',
-      readTime: '08 Min Read',
+      id: 'how-to-set-up-postgres-apache-iceberg',
+      title: 'How to Set Up PostgreSQL to Apache Iceberg Replication for Real-Time Analytics: Complete Guide',
+      description: 'Ever wanted to run high-performance analytics on your PostgreSQL data without overloading your production database or breaking your budget? PostgreSQL to Apache Iceberg replication...',
+      readTime: '10 Min Read',
       bgColor: 'bg-green-50 dark:bg-green-900/10',
-      imageSrc: '/img/site/blog-3.svg'
+      imageSrc: '/img/blog/cover/postgres-apache-iceberg.webp'
     },
     {
-      id: 'debezium-vs-olake',
-      title: 'Problems with Debezium and How we (OLake, Open...',
-      description: 'Uncover the key challenges of extracting, transforming, and loading data fr...',
-      readTime: '18 Min Read',
+      id: 'iceberg-delta-lake-delete-methods-comparison',
+      title: 'Comparison of Delete Strategies in Apache Iceberg and Delta Lake: Equality, Position, and Performance',
+      description: 'In recent years, terms such as deletion vectors, position deletes, and other related concepts have become increasingly common in discussions around modern data lakehouse technologies...',
+      readTime: '8 Min Read',
       bgColor: 'bg-gray-50 dark:bg-gray-800/20',
-      imageSrc: '/img/site/blog-4.svg'
+      imageSrc: '/img/blog/cover/deletion-formats.webp'
     }
   ]
 
@@ -71,6 +71,7 @@ const BlogShowcase: React.FC = () => {
                         alt={blogPosts[0].title}
                         width={80}
                         height={80}
+                        loading="lazy" decoding="async"
                         className='h-auto w-full object-contain p-2'
                       />
                     </div>
@@ -129,6 +130,7 @@ const BlogShowcase: React.FC = () => {
                       alt={post.title}
                       width={64}
                       height={64}
+                      loading="lazy" decoding="async"
                       className='h-56 w-full object-contain px-2 md:h-48'
                     />
                   </div>
