@@ -1,3 +1,5 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import Layout from '@theme/Layout';
 import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
@@ -43,62 +45,86 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'Best Practices for Migrating to Apache Iceberg',
     summary: 'Join us for an in-depth session on planning your Iceberg project. We will cover the best practices, tools, and strategies to ensure a smooth and efficient migration.',
+    image_url: '/img/webinars/webinar-iceberg.webp',
+    event_url: 'https://olake.io/webinar/w-2-best-practices-iceberg-confirmation',
   };
   return (
+    <>
+      <Head>
+        <title>{webinarData.title}</title>
 
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
+        <meta name="description" content={webinarData.summary} />
 
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="webinar"
-          title={webinarData.title}
-        />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
 
-        <WebinarTitle
-          title="Best Practices for Migrating to Apache Iceberg"
-          tag="Webinar"
-        />
+        <meta property="og:title" content={webinarData.title} />
 
-        <section className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            Thank You for Registering!
-          </h2>
+        <meta property="og:description" content={webinarData.summary} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
 
-        </section>
+        <meta property="og:url" content={webinarData.event_url} />
 
-        {/* Embedded YouTube Video */}
-        <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="8gnkqmrbGeY" className="max-w-6xl" />
-        </section>
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
 
-        <WebinarOverview
-          date="December 15, 2024"
-          time="10:00 AM - 11:30 AM"
-          duration="1.5 hours"
-          summary={webinarData.summary}
-          bulletPoints={[
-            "Understanding Apache Iceberg",
-            "Migration strategies and best practices",
-            "Tools and technologies involved",
-            "Common challenges and how to overcome them",
-            "Real-world case studies",
-          ]}
-        />
+        <meta name="twitter:title" content={webinarData.title} />
 
-        <Hr />
-        <br />
+        <meta name="twitter:description" content={webinarData.summary} />
 
-        <WebinarHosts hosts={hosts} />
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
+      </Head>
 
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
+      <Layout
+        title={webinarData.title}
+        description={webinarData.summary}
+      >
 
-      </main>
-    </Layout>
+        <main className="container mx-auto lg:px-36 py-12">
+
+          <WebinarTitle
+            title="Best Practices for Migrating to Apache Iceberg"
+            tag="Webinar"
+          />
+
+          <section className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+              Thank You for Registering!
+            </h1>
+
+          </section>
+
+          {/* Embedded YouTube Video */}
+          <section className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="8gnkqmrbGeY" className="max-w-6xl" />
+          </section>
+
+          <WebinarOverview
+            date="December 15, 2024"
+            time="10:00 AM - 11:30 AM"
+            duration="1.5 hours"
+            summary={webinarData.summary}
+            bulletPoints={[
+              "Understanding Apache Iceberg",
+              "Migration strategies and best practices",
+              "Tools and technologies involved",
+              "Common challenges and how to overcome them",
+              "Real-world case studies",
+            ]}
+          />
+
+          <Hr />
+          <br />
+
+          <WebinarHosts hosts={hosts} />
+
+          <WebinarCTA
+            CTAText={"Ready to Join our next webinar?"}
+          />
+
+        </main>
+      </Layout>
+    </>
   );
 };
 

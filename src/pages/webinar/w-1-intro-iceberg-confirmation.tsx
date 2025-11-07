@@ -1,3 +1,5 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
@@ -36,59 +38,84 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'A Journey into Data Lake: Introducing Apache Iceberg',
     summary: 'Learn how to set up OLAP system/platform for analysis from NoSQL Databases (MongoDB & DynamoDB) using Apache Iceberg.',
+    image_url: '/img/webinars/webinar-intro-iceberg.webp',
+    event_url: 'https://olake.io/webinar/w-1-intro-iceberg-confirmation',
   };
   return (
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
+    <>
+      <Head>
+        <title>{webinarData.title}</title>
 
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="webinar"
-          title={webinarData.title}
-        />
+        <meta name="description" content={webinarData.summary} />
 
-        <WebinarTitle
-          title={webinarData.title}
-          tag="Webinar"
-        />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
 
-        <section className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            Thank You for Registering!
-          </h2>
+        <meta property="og:title" content={webinarData.title} />
 
-        </section>
+        <meta property="og:description" content={webinarData.summary} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
 
-        <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
-        </section>
+        <meta property="og:url" content={webinarData.event_url} />
 
-        <WebinarOverview
-          date="October 03, 2024"
-          time="08:30 PM - 09:30 PM IST"
-          duration="1 hours"
-          summary={webinarData.summary}
-          bulletPoints={[
-            "The Data Landscape - OLTP -> ETL -> OLAP",
-            "Traditional ETL Process",
-            "Brief about Features of Iceberg",
-            "Benefits and Impact: How Iceberg Transformed Our Data Strategy"
-          ]}
-        />
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
 
-        <Hr /> <br />
+        <meta name="twitter:title" content={webinarData.title} />
 
-        <WebinarHosts hosts={hosts} />
+        <meta name="twitter:description" content={webinarData.summary} />
 
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
+      </Head>
 
-      </main>
+      <Layout
+        title={webinarData.title}
+        description={webinarData.summary}
+      >
 
-    </Layout>
+        <main className="container mx-auto lg:px-36 py-12">
+
+          <WebinarTitle
+            title={webinarData.title}
+            tag="Webinar"
+          />
+
+          <section className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+              Thank You for Registering!
+            </h1>
+
+          </section>
+
+          <section className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
+          </section>
+
+          <WebinarOverview
+            date="October 03, 2024"
+            time="08:30 PM - 09:30 PM IST"
+            duration="1 hours"
+            summary={webinarData.summary}
+            bulletPoints={[
+              "The Data Landscape - OLTP -> ETL -> OLAP",
+              "Traditional ETL Process",
+              "Brief about Features of Iceberg",
+              "Benefits and Impact: How Iceberg Transformed Our Data Strategy"
+            ]}
+          />
+
+          <Hr /> <br />
+
+          <WebinarHosts hosts={hosts} />
+
+          <WebinarCTA
+            CTAText={"Ready to Join our next webinar?"}
+          />
+
+        </main>
+
+      </Layout>
+    </>
   );
 };
 

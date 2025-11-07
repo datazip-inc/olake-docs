@@ -79,15 +79,14 @@ const useDynamicIframeHeight = (src) => {
 };
 
 const WebinarsPage = () => {
-  const { siteConfig } = useDocusaurusContext()
-  const location = useLocation()
-  const siteUrl = siteConfig?.url || 'https://olake.io'
-  const canonicalUrl = `${siteUrl}${location.pathname}`
-  // Use the dynamic iframe height hook
-  const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
-  
-  // Define webinars data directly
-  const webinars = [
+  const pageData = {
+    title: 'OLake Events & Webinars',
+    summary: 'Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices. Deep dive into Apache Iceberg, CDC strategies, and modern data engineering practices with industry experts and practitioners.',
+    image_url: '/img/webinars/webinar-intro-iceberg.webp',
+    event_url: 'https://olake.io/webinar',
+  };
+
+  const communityMeets = [
     {
       title: 'Apache Iceberg + Polaris: Breaking Catalog Vendor Lock-in',
       subtitle:
@@ -285,20 +284,36 @@ const WebinarsPage = () => {
   ]
 
   return (
-    <Layout
-      title='OLake Events & Webinars'
-      description='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices'
-    >
+    <>
       <Head>
-        <meta property='og:type' content='website' />
-        <meta property='og:title' content='OLake Events & Webinars' />
-        <meta property='og:description' content='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices' />
-        <meta property='og:url' content={canonicalUrl} />
-        <meta property='og:site_name' content='OLake' />
-        <meta property='og:locale' content='en_US' />
-        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
-        <meta name='twitter:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        <title>{pageData.title}</title>
+
+        <meta name="description" content={pageData.summary} />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+
+        <meta property="og:title" content={pageData.title} />
+
+        <meta property="og:description" content={pageData.summary} />
+        <meta property="og:image" content={`https://olake.io${pageData.image_url}`} />
+
+        <meta property="og:url" content={pageData.event_url} />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={pageData.title} />
+
+        <meta name="twitter:description" content={pageData.summary} />
+
+        <meta name="twitter:image" content={`https://olake.io${pageData.image_url}`} />
       </Head>
+
+      <Layout
+        title={pageData.title}
+        description={pageData.summary}
+      >
       {/* Hero Section */}
       <section className='relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-16 dark:from-gray-900 dark:via-gray-800 dark:to-blue-950/20 lg:py-24'>
         {/* Background decorative elements */}
@@ -414,7 +429,8 @@ const WebinarsPage = () => {
         </div>
       </div>
     </Layout>
-  )
-}
+    </>
+  );
+};
 
 export default WebinarsPage;

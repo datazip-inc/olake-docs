@@ -1,3 +1,5 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
@@ -36,73 +38,116 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'Iceberg Lakehouse Architecture: Game-Changing Capabilities and the Critical Function of REST Catalog',
     summary: 'Join Viktor Kessler, co-founder of Vakamo and former technical leader at MongoDB and Dremio, for an in-depth technical exploration of how Apache Iceberg is fundamentally transforming the data engineering landscape.',
+    image_url: '/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.png',
+    event_url: 'https://olake.io/webinar/w-6-iceberg-lakehouse-architecture-lakekeeper',
   };
 
   return (
+    <>
+      <Head>
+        <title>{webinarData.title}</title>
 
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
+        <meta name="description" content={webinarData.summary} />
 
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="webinar"
-          title={webinarData.title}
-        />
-        <WebinarTitle
-          title={webinarData.title}
-          tag="Webinar"
-        />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
 
-        <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
-          <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.webp" alt="Iceberg Lakehouse webinar with Vakamo co-founder Viktor Kessler" />
+        <meta property="og:title" content={webinarData.title} />
+
+        <meta property="og:description" content={webinarData.summary} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
+
+        <meta property="og:url" content={webinarData.event_url} />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={webinarData.title} />
+
+        <meta name="twitter:description" content={webinarData.summary} />
+
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
+      </Head>
+
+      <Layout
+        title={webinarData.title}
+        description={webinarData.summary}
+      >
+
+        <main className="container mx-auto lg:px-36 py-12">
+          <WebinarTitle
+            title={webinarData.title}
+            tag="Webinar"
+          />
+
+          <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
+            <div className="w-full md:w-2/3 flex justify-center">
+              <WebinarCoverImage src="/img/webinars/w-6-iceberg-lakehouse-architecture-lakekeeper-cover.png" alt="Webinar Cover Image" />
+            </div>
+
+
+            <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+
+              {/* <WebinarForm
+                source="w-4-pratical-session-on-apache-iceberg"
+                nexturl="w-3-cdc-unplugged-confirmation"
+              /> */}
+
+
+              {/* remove this button with email collection form that leads to confirmation page of this webinar */}
+
+              {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
+                <CTAButton
+                  title="Join Our Upcoming Event"
+                  buttonText="Register Now!"
+                  icon={FaRegCalendarAlt}
+                  href="https://app.livestorm.co/datazip-inc/women-in-data"
+                  variant="secondary"
+                />
+              </div> */}
+
+            </div>
+          </div>
+
+          <Hr />
+          <br />
+
+          {/* <div className="flex justify-center mb-12">
+            Video Coming soon!
+          </div> */}
+
+          <div className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="Z0tEClkIT_8" className="max-w-6xl" />
           </div>
 
 
-          <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+          <WebinarOverview
+            date="May 15, 2025"
+            time="11:00 AM EST, 08:30 PM [IST]"
+            duration="60 mins"
+            summary={webinarData.summary}
+            bulletPoints={[
+              "Lakehouse Architecture Components: Understand the technical foundations that enable Iceberg to deliver both data lake flexibility and data warehouse performance",
+              "REST Catalog Deep Dive: Explore the critical role of distributed metadata management through REST Catalog and how it enables multi-engine compatibility",
+              "Metadata Optimisation Techniques: Learn how Iceberg's advanced metadata layer delivers substantial query performance improvements and scales efficiently",
+              "Enterprise-Grade Governance: Discover how Iceberg's fine-grained access controls provide robust security that satisfies even the most demanding CISO requirements",
+            ]}
+          />
 
+          <Hr />
+          <br />
 
-          </div>
-        </div>
+          <WebinarHosts hosts={hosts} />
 
-        <Hr />
-        <br />
+          <MeetupNotes data={meetupData} />
 
+          <WebinarCTA
+            CTAText={"Ready to Join our next webinar?"}
+          />
 
-        <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="Z0tEClkIT_8" className="max-w-6xl" />
-        </div>
-
-
-        <WebinarOverview
-          date="May 15, 2025"
-          time="11:00 AM EST, 08:30 PM [IST]"
-          duration="60 mins"
-          summary={webinarData.summary}
-          bulletPoints={[
-            "Lakehouse Architecture Components: Understand the technical foundations that enable Iceberg to deliver both data lake flexibility and data warehouse performance",
-            "REST Catalog Deep Dive: Explore the critical role of distributed metadata management through REST Catalog and how it enables multi-engine compatibility",
-            "Metadata Optimisation Techniques: Learn how Iceberg's advanced metadata layer delivers substantial query performance improvements and scales efficiently",
-            "Enterprise-Grade Governance: Discover how Iceberg's fine-grained access controls provide robust security that satisfies even the most demanding CISO requirements",
-          ]}
-        />
-
-        <Hr />
-        <br />
-
-        <WebinarHosts hosts={hosts} />
-
-        <MeetupNotes data={meetupData} />
-
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
-
-      </main>
-    </Layout>
-
+        </main>
+      </Layout>
+    </>
   );
 };
 

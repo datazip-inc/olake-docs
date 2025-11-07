@@ -1,3 +1,5 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarCoverImage from '../../components/webinars/WebinarCoverImage';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
@@ -38,65 +40,96 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'A Journey into Data Lake: Introducing Apache Iceberg',
     summary: 'Learn how to set up OLAP system/platform for analysis from NoSQL Databases (MongoDB & DynamoDB) using Apache Iceberg.',
+    image_url: '/img/webinars/webinar-intro-iceberg.webp',
+    event_url: 'https://olake.io/webinar/w-1-intro-iceberg',
   };
   return (
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
+    <>
+      <Head>
+        <title>{webinarData.title}</title>
 
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="webinar"
-          title={webinarData.title}
-        />
-        
-        <WebinarTitle
-          title={webinarData.title}
-          tag="Webinar"
-        />
+        <meta name="description" content={webinarData.summary} />
 
-        <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
-          <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/webinar-intro-iceberg.webp" alt="Webinar on setting up OLAP analysis from NoSQL databases using Apache Iceberg, hosted by Varun Bainsla from Nira Finance" />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+
+        <meta property="og:title" content={webinarData.title} />
+
+        <meta property="og:description" content={webinarData.summary} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
+
+        <meta property="og:url" content={webinarData.event_url} />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={webinarData.title} />
+
+        <meta name="twitter:description" content={webinarData.summary} />
+
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
+      </Head>
+
+      <Layout
+        title={webinarData.title}
+        description={webinarData.summary}
+      >
+
+        <main className="container mx-auto lg:px-36 py-12">
+          <WebinarTitle
+            title={webinarData.title}
+            tag="Webinar"
+          />
+
+          <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
+            <div className="w-full md:w-2/3 flex justify-center">
+              <WebinarCoverImage src="/img/webinars/webinar-intro-iceberg.webp" alt="Webinar Cover Image" />
+            </div>
+
+            {/* <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+              <WebinarForm
+                source="w-1-intro-iceberg"
+                nexturl="w-1-intro-iceberg-confirmation"
+              />
+            </div> */}
           </div>
-        </div>
 
 
-        <Hr />
+          <Hr />
 
-        <br />
+          <br />
 
-        <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
+          <div className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="TO2W-5cTI6I" className="max-w-6xl" />
 
-          {/* comming soon */}
-        </div>
+            {/* comming soon */}
+          </div>
 
-        
-        <WebinarOverview
-          date="October 03, 2024"
-          time="08:30 PM - 09:30 PM IST"
-          duration="1 hours"
-          summary={webinarData.summary}
-          bulletPoints={[
-            "The Data Landscape - OLTP -> ETL -> OLAP",
-            "Traditional ETL Process",
-            "Brief about Features of Iceberg",
-            "Benefits and Impact: How Iceberg Transformed Our Data Strategy"
-          ]}
-        />
-        <Hr />
-        <br />
+          
+          <WebinarOverview
+            date="October 03, 2024"
+            time="08:30 PM - 09:30 PM IST"
+            duration="1 hours"
+            summary={webinarData.summary}
+            bulletPoints={[
+              "The Data Landscape - OLTP -> ETL -> OLAP",
+              "Traditional ETL Process",
+              "Brief about Features of Iceberg",
+              "Benefits and Impact: How Iceberg Transformed Our Data Strategy"
+            ]}
+          />
+          <Hr />
+          <br />
 
-        <WebinarHosts hosts={hosts} />
+          <WebinarHosts hosts={hosts} />
 
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
+          <WebinarCTA
+            CTAText={"Ready to Join our next webinar?"}
+          />
 
-      </main>
-    </Layout>
+        </main>
+      </Layout>
+    </>
   );
 };
 

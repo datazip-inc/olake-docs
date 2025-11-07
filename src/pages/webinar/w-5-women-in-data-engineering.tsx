@@ -1,3 +1,5 @@
+import Head from '@docusaurus/Head'; // or 'next/head' if you're using Next.js
+
 import WebinarTitle from '../../components/webinars/WebinarTitle';
 import WebinarHosts from '../../components/webinars/WebinarHosts';
 import WebinarCTA from '../../components/webinars/WebinarCTA';
@@ -64,74 +66,115 @@ const WebinarPage = () => {
   const webinarData = {
     title: 'Women in Data: Building Technical Expertise and Career Pathways in Data Engineering',
     summary: 'Join us for an in-depth technical discussion with six accomplished women data engineers who are architecting the backbone of modern data-driven organizations. This 60-minute session brings together specialists from healthcare, retail, cloud platforms, and enterprise data systems to share their technical approaches to solving complex data engineering challenges.',
+    image_url: '/img/webinars/w-5-women-in-data-engineering-cover.png',
+    event_url: 'https://olake.io/webinar/w-5-women-in-data-engineering',
   };
 
   return (
+    <>
+      <Head>
+        <title>{webinarData.title}</title>
 
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
+        <meta name="description" content={webinarData.summary} />
 
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="webinar"
-          title={webinarData.title}
-        />
-        <WebinarTitle
-          title={webinarData.title}
-          tag="Webinar"
-        />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
 
-        <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
-          <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-5-women-in-data-engineering-cover.webp" alt="Panel of women in data engineering, event on April 30, 2025" />
+        <meta property="og:title" content={webinarData.title} />
+
+        <meta property="og:description" content={webinarData.summary} />
+        <meta property="og:image" content={`https://olake.io${webinarData.image_url}`} />
+
+        <meta property="og:url" content={webinarData.event_url} />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={webinarData.title} />
+
+        <meta name="twitter:description" content={webinarData.summary} />
+
+        <meta name="twitter:image" content={`https://olake.io${webinarData.image_url}`} />
+      </Head>
+
+      <Layout
+        title={webinarData.title}
+        description={webinarData.summary}
+      >
+
+        <main className="container mx-auto lg:px-36 py-12">
+          <WebinarTitle
+            title={webinarData.title}
+            tag="Webinar"
+          />
+
+          <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
+            <div className="w-full md:w-2/3 flex justify-center">
+              <WebinarCoverImage src="/img/webinars/w-5-women-in-data-engineering-cover.png" alt="Webinar Cover Image" />
+            </div>
+
+
+            <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+
+              {/* <WebinarForm
+                source="w-4-pratical-session-on-apache-iceberg"
+                nexturl="w-3-cdc-unplugged-confirmation"
+              /> */}
+
+
+              {/* remove this button with email collection form that leads to confirmation page of this webinar */}
+
+              {/* <div className="flex justify-center items-center p-10 bg-gray-100 dark:bg-gray-800">
+                <CTAButton
+                  title="Join Our Upcoming Event"
+                  buttonText="Register Now!"
+                  icon={FaRegCalendarAlt}
+                  href="https://app.livestorm.co/datazip-inc/women-in-data"
+                  variant="secondary"
+                />
+              </div> */}
+
+            </div>
+          </div>
+
+          <Hr />
+          <br />
+
+
+          <div className="flex justify-center mb-12">
+            <YouTubeEmbed videoId="7fuvICHBvbc" className="max-w-6xl" />
+
+            {/* comming soon */}
           </div>
 
 
-          <div className="w-full md:w-1/3 flex mt-4 md:mt-0 justify-center pl-0 md:pl-20">
+          <WebinarOverview
+            date="April 30, 2025"
+            time="11:00 AM EST, 08:30 PM [IST]"
+            duration="60 mins"
+            summary={webinarData.summary}
+            bulletPoints={[
+              "Domain-Specific Technical Solutions: Discover specialized approaches for healthcare compliance pipelines, retail real-time analytics, and optimizing cloud data architectures",
+              "Performance Engineering: Technical strategies that have achieved measurable results, including how to design systems that move from batch to real-time with minimal latency",
+              "The Engineer's Technical Toolkit: Practical progression from foundational skills (SQL/Python) to advanced distributed systems design, with guidance on specialization vs. generalization",
+              "Business Impact Focus: How technical decisions in data engineering directly influence organizational outcomes, cost optimization, and scalability",
+            ]}
+          />
 
-          </div>
-        </div>
+          <Hr />
+          <br />
 
-        <Hr />
-        <br />
+          <WebinarHosts hosts={hosts} />
 
+          <MeetupNotes data={meetupData} />
 
-        <div className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="7fuvICHBvbc" className="max-w-6xl" />
+          <WebinarCTA
+            CTAText={"Ready to Join our next webinar?"}
+          />
 
-          {/* comming soon */}
-        </div>
-
-
-        <WebinarOverview
-          date="April 30, 2025"
-          time="11:00 AM EST, 08:30 PM [IST]"
-          duration="60 mins"
-          summary={webinarData.summary}
-          bulletPoints={[
-            "Domain-Specific Technical Solutions: Discover specialized approaches for healthcare compliance pipelines, retail real-time analytics, and optimizing cloud data architectures",
-            "Performance Engineering: Technical strategies that have achieved measurable results, including how to design systems that move from batch to real-time with minimal latency",
-            "The Engineer's Technical Toolkit: Practical progression from foundational skills (SQL/Python) to advanced distributed systems design, with guidance on specialization vs. generalization",
-            "Business Impact Focus: How technical decisions in data engineering directly influence organizational outcomes, cost optimization, and scalability",
-          ]}
-        />
-
-        <Hr />
-        <br />
-
-        <WebinarHosts hosts={hosts} />
-
-        <MeetupNotes data={meetupData} />
-
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
-
-      </main>
-    </Layout>
-
+        </main>
+      </Layout>
+    </>
   );
 };
 
