@@ -10,11 +10,27 @@ import WorkflowSection from '../components/site/WorkflowSection'
 import Footer from '@theme/DocItem/Footer'
 import LazyComponent from '../components/LazyComponent'
 
+const stripTrailingSlash = (value) => {
+  if (!value) {
+    return ''
+  }
+
+  return value.endsWith('/') ? value.slice(0, -1) : value
+}
+
+const ensureTrailingSlash = (value) => {
+  if (!value) {
+    return '/'
+  }
+
+  return value.endsWith('/') ? value : `${value}/`
+}
+
 export default function New3Page() {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = siteConfig?.url || 'https://olake.io'
-  const canonicalUrl = `${siteUrl}${location.pathname || '/'}`
+  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
+  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
   const ogTitle = 'Fastest Open Source Data Replication Tool'
   const ogDescription = 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.'
   const ogImage = 'https://olake.io/img/logo/olake-blue.webp'

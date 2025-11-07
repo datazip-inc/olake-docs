@@ -24,11 +24,27 @@ import PageHeader from '../../../components/community/improved/PageHeader'
 import SectionHeader from '../../../components/community/improved/SectionHeader'
 
 import clsx from 'clsx'
+
+const stripTrailingSlash = (value?: string) => {
+  if (!value) {
+    return ''
+  }
+
+  return value.endsWith('/') ? value.slice(0, -1) : value
+}
+
+const ensureTrailingSlash = (value: string) => {
+  if (!value) {
+    return '/'
+  }
+
+  return value.endsWith('/') ? value : `${value}/`
+}
 const ContributorsPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = siteConfig?.url || 'https://olake.io'
-  const canonicalUrl = `${siteUrl}${location.pathname}`
+  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
+  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
   const [contributors, setContributors] = useState<ContributorProps[]>([])
 
 
