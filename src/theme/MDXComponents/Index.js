@@ -63,6 +63,8 @@ import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.m
 import OraclePermissions from '../../../docs/shared/config/OraclePermissions.mdx'
 import OracleToIcebergDatatypes from '../../../docs/shared/config/OracleToIcebergDatatypes.mdx'
 
+import KafkaSourceConfig from '../../../docs/shared/config/KafkaSourceConfig.mdx'
+
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
@@ -171,6 +173,8 @@ const MDXComponents = {
   OracleSourceConfig,
   OraclePermissions,
   OracleToIcebergDatatypes,
+
+  KafkaSourceConfig,
 
   S3Config,
   S3ConfigGCS,
