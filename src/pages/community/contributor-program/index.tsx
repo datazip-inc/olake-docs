@@ -47,6 +47,58 @@ const ContributorProgramPage = () => {
   const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
   const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
 
+  const resolveUrl = (value: string) => {
+    if (!value) {
+      return canonicalUrl
+    }
+
+    if (value.startsWith('http')) {
+      return value
+    }
+
+    return ensureTrailingSlash(`${siteUrl}${value}`)
+  }
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'OLake',
+    alternateName: 'Datazip, Inc. (OLake project)',
+    url: 'https://olake.io/',
+    logo: 'https://olake.io/img/logo/olake-blue.svg',
+    sameAs: [
+      'https://github.com/datazip-inc/olake',
+      'https://olake.io/slack/',
+      'https://olake.io/webinar/'
+    ],
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '16192 COASTAL HWY',
+      addressLocality: 'LEWES',
+      addressRegion: 'DE',
+      postalCode: '19958',
+      addressCountry: 'US'
+    }
+  }
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    url: 'https://olake.io/',
+    name: 'Fastest Open Source Data Replication Tool',
+    description:
+      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake'
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://olake.io/search?q={search_term_string}',
+      'query-input': 'required name=search_term_string'
+    }
+  }
+
   const contributionTypes = [
     {
       icon: <LuUnplug />,
@@ -150,6 +202,89 @@ const ContributorProgramPage = () => {
     { embedId: 'urn:li:share:7324402000287215616', contributor: 'Aditya SwayamSiddha' },
   ]
 
+  const howToGetStarted = {
+    '@type': 'ItemList',
+    name: 'How to Get Started',
+    itemListElement: steps.map((step, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: step.title,
+      item: resolveUrl(step.link)
+    }))
+  }
+
+  const rewardTiersList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Reward Tiers',
+    url: canonicalUrl,
+    itemListElement: rewardTiers.map((tier, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: `${tier.name} (${tier.points} points)`,
+      description: tier.benefits.join(', ')
+    }))
+  }
+
+  const contributorProgramPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: canonicalUrl,
+    name: 'OLake Contributor Program',
+    description:
+      'Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.',
+    isPartOf: {
+      '@type': 'WebSite',
+      url: 'https://olake.io/',
+      name: 'OLake'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake',
+      url: 'https://olake.io/',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://olake.io/img/logo/olake-blue.svg',
+        width: 32,
+        height: 32
+      }
+    },
+    mainEntity: howToGetStarted
+  }
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://olake.io/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Community',
+        item: 'https://olake.io/community/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: 'Contributor Program',
+        item: canonicalUrl
+      }
+    ]
+  }
+
+  const jsonLdSchemas = [
+    { id: 'organization', data: organizationSchema },
+    { id: 'website', data: websiteSchema },
+    { id: 'webPage', data: contributorProgramPageSchema },
+    { id: 'breadcrumb', data: breadcrumbSchema },
+    { id: 'rewardTiers', data: rewardTiersList }
+  ]
+
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showLinkedInPanel, setShowLinkedInPanel] = useState(false)
 
@@ -189,6 +324,15 @@ const ContributorProgramPage = () => {
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
         <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        {jsonLdSchemas.map((schema) => (
+          <script
+            key={schema.id}
+            type='application/ld+json'
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(schema.data)
+            }}
+          />
+        ))}
       </Head>
       {/* Hero Section */}
       <PageHeader
