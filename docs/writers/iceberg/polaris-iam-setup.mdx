@@ -1,0 +1,170 @@
+---
+title: "How to Attach IAM Role to EC2 Instance"
+description: "Step-by-step guide to configure IAM roles and attach them to EC2 instances"
+---
+
+# How to Attach IAM Role to EC2 Instance
+
+This guide provides detailed instructions for configuring IAM roles and attaching them to EC2 instances to use catalogs (e.g., Apache Polaris) with AWS S3 storage.
+
+The process involves:
+
+1. **Trust Policy** - Allows the IAM role to assume itself (required for vended credentials)
+2. **IAM Policy** - Grants necessary S3 permissions
+3. **IAM Role** - Combines the trust policy and permissions
+4. **Instance Profile** - Allows EC2 instances to use the role
+5. **Attach to EC2** - Associate the role with your running EC2 instance
+
+## Prerequisites
+
+- AWS CLI installed and configured with appropriate permissions
+- An existing EC2 instance
+- An S3 bucket for storing Iceberg data
+- IAM permissions to create roles, policies, and instance profiles
+
+## IAM Role Trust Policy
+
+The EC2 IAM role requires a trust policy that allows it to assume itself. A file named `trust-policy.json` must be created:
+
+```json title="trust-policy.json"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_ROLE_NAME>"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+:::info
+This trust policy allows the role to assume itself, which is used for vended credentials. `<ACCOUNT_ID>` must be replaced with the AWS account ID and `<YOUR_ROLE_NAME>` with the desired role name.
+:::
+
+## IAM Policy for S3 Access
+
+An IAM policy that grants access to the S3 bucket must be created. A file named `iam-policy.json` must be created:
+
+```json title="iam-policy.json"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<YOUR_S3_BUCKET>",
+        "arn:aws:s3:::<YOUR_S3_BUCKET>/*"
+      ]
+    }
+  ]
+}
+```
+
+:::tip
+`<YOUR_S3_BUCKET>` must be replaced with the actual S3 bucket name, `<AWS_ACCOUNT_ID>` with the AWS account ID, and `<YOUR_ROLE_NAME>` with the role name.
+:::
+
+## Step-by-Step Setup
+
+The following steps must be followed to create the IAM role and policies:
+
+### 1. Create the IAM Policy
+
+```bash
+aws iam create-policy \
+  --policy-name polaris-s3-access-policy \
+  --policy-document file://iam-policy.json
+```
+
+### 2. Create the IAM Role
+
+```bash
+aws iam create-role \
+  --role-name polaris-lakehouse-role \
+  --assume-role-policy-document file://trust-policy.json
+```
+
+### 3. Attach Policy to Role
+
+```bash
+aws iam attach-role-policy \
+  --role-name polaris-lakehouse-role \
+  --policy-arn arn:aws:iam::<AWS_ACCOUNT_ID>:policy/polaris-s3-access-policy
+```
+
+### 4. Create Instance Profile
+
+```bash
+aws iam create-instance-profile \
+  --instance-profile-name polaris-lakehouse-profile
+```
+
+### 5. Add Role to Instance Profile
+
+```bash
+aws iam add-role-to-instance-profile \
+  --instance-profile-name polaris-lakehouse-profile \
+  --role-name polaris-lakehouse-role
+```
+
+### 6. Attach IAM Role to EC2 Instance
+
+This is the crucial step that allows the EC2 instance to use the IAM role for AWS S3 access.
+
+```bash
+aws ec2 associate-iam-instance-profile \
+  --instance-id <YOUR_EC2_INSTANCE_ID> \
+  --iam-instance-profile Name=polaris-lakehouse-profile
+```
+
+### 7. Get the Role ARN
+
+```bash
+aws iam get-role \
+  --role-name polaris-lakehouse-role \
+  --query 'Role.Arn' \
+  --output text
+```
+
+This will output something like:
+```
+arn:aws:iam::123456789012:role/polaris-lakehouse-role
+```
+
+## Verification
+
+To verify the setup is correct:
+
+1. **Test IAM Role from EC2 Instance** (SSH into the EC2 instance and run):
+   ```bash
+   # Check if instance can assume the role
+   aws sts get-caller-identity
+
+   # Test S3 access
+   aws s3 ls s3://<YOUR_S3_BUCKET>
+   ```
+
+## Next Steps
+
+After completing the IAM setup:
+
+1. Return to the [REST Catalog setup guide](./catalog/rest.mdx#setup-steps) to continue with catalog creation
+2. The Role ARN from step 7 must be used when creating the Polaris catalog
+3. The setup should be tested by creating tables and querying data

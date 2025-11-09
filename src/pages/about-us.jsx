@@ -26,7 +26,10 @@ const teamMembers = [
 
 const AboutTeam = () => {
   return (
-    <Layout>
+    <Layout 
+      title="About Us - OLake Team"
+      description="Meet the OLake team behind the fastest open-source data replication tool. Learn about our mission to simplify database to Apache Iceberg workflows."
+    >
       <div className='bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100'>
         <div className='mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8'>
           {/* About Us Section */}
@@ -53,7 +56,7 @@ const AboutTeam = () => {
                   <div className='mx-auto h-40 w-40'>
                     <img
                       src={member.image}
-                      alt={member.name}
+                      alt={`${member.name} | Olake ${member.designation}`}
                       className='h-40 w-40 rounded-full object-cover transition duration-300 hover:border hover:border-gray-300'
                       loading="lazy" decoding="async"
                     />

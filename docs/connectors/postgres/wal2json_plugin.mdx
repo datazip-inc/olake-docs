@@ -1,0 +1,272 @@
+# PostgreSQL CDC Setup Guide using `wal2json` plugin:
+
+This guide covers setting up Change Data Capture (CDC) for PostgreSQL running on any server infrastructure including EC2 instances, virtual machines, bare metal servers, or on-premises installations. The setup uses logical replication with the **wal2json** plugin for real-time data streaming.
+
+**Prerequisites:**
+
+- PostgreSQL version 9.4+ (version 10+ recommended for full logical replication support)
+- Superuser access or ability to modify `postgresql.conf` and `pg_hba.conf`
+- The `wal2json` plugin installed (or ability to install it)
+- TLS/SSL enabled for secure connections (recommended)
+- Sufficient disk space for WAL retention
+
+:::info Read Replica Support
+**PostgreSQL 16+:** Logical replication on read replicas is supported but may have limitations. Row deletions and vacuum operations on the primary can affect replication slot stability.
+
+**PostgreSQL 15 and earlier:** Read replicas cannot act as publishers for logical replication. Connect OLake to the **primary instance** for CDC functionality.
+
+**Recommendation:** Use the primary instance for production CDC workloads to ensure reliability.
+:::
+
+**Steps:**
+
+## 1. Install wal2json Plugin
+
+The `wal2json` plugin is required for logical decoding. Installation varies by system:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install postgresql-15-wal2json  # Replace 15 with your version
+```
+
+**CentOS/RHEL/Amazon Linux:**
+```bash
+sudo yum install postgresql15-wal2json  # Replace 15 with your version
+# Or for newer versions:
+sudo dnf install postgresql15-wal2json
+```
+
+**From Source (if package not available):**
+```bash
+git clone https://github.com/eulerto/wal2json.git
+cd wal2json
+make USE_PGXS=1
+sudo make USE_PGXS=1 install
+```
+
+**Verify Installation:**
+```sql
+SELECT * FROM pg_available_extensions WHERE name = 'wal2json';
+```
+
+## 2. Configure PostgreSQL Parameters
+
+Edit `postgresql.conf` (usually in `/etc/postgresql/15/main/` or `/var/lib/pgsql/15/data/`):
+
+```conf
+# Enable logical replication
+wal_level = logical
+
+# Set replication limits
+max_replication_slots = 10
+max_wal_senders = 10
+
+# Optional: Prevent timeouts during long snapshots
+wal_sender_timeout = 0
+
+# Optional: Control WAL retention
+max_slot_wal_keep_size = 1GB
+
+# Performance tuning (adjust based on your workload)
+checkpoint_timeout = 15min
+max_wal_size = 2GB
+```
+
+| Parameter | Recommended Value | Purpose |
+|-----------|-------------------|---------|
+| `wal_level` | `logical` | Enable logical decoding |
+| `max_replication_slots` | `≥5` | Number of concurrent CDC connections |
+| `max_wal_senders` | `≥7` | Should exceed replication slots |
+| `wal_sender_timeout` | `0` | Prevents snapshot timeouts |
+| `max_slot_wal_keep_size` | `1GB+` | Prevents WAL accumulation |
+
+## 3. Configure Client Authentication
+
+Edit `pg_hba.conf` to allow replication connections. Add entries for your OLake client:
+
+```conf
+# Allow replication connections from OLake
+host    replication     cdc_user        10.0.0.0/16         md5
+host    all             cdc_user        10.0.0.0/16         md5
+
+# For SSL connections (recommended)
+hostssl replication     cdc_user        10.0.0.0/16         md5
+hostssl all             cdc_user        10.0.0.0/16         md5
+```
+
+Replace `10.0.0.0/16` with your actual network range or specific IP addresses.
+
+## 4. Restart PostgreSQL
+
+Apply configuration changes by restarting PostgreSQL:
+
+```bash
+# Ubuntu/Debian
+sudo systemctl restart postgresql
+
+# CentOS/RHEL
+sudo systemctl restart postgresql-15  # Replace with your version
+
+# Or using pg_ctl
+sudo -u postgres pg_ctl restart -D /var/lib/pgsql/15/data/
+```
+
+**Verify Configuration:**
+```sql
+SELECT name, setting FROM pg_settings 
+WHERE name IN ('wal_level', 'max_replication_slots', 'max_wal_senders');
+```
+
+## 5. Create Replication User
+
+Connect as a superuser (usually `postgres`) and create a dedicated CDC user:
+
+```sql
+-- Create user with replication privileges
+CREATE USER cdc_user WITH PASSWORD 'strongpassword';
+ALTER ROLE cdc_user WITH REPLICATION;
+```
+
+**Grant Database Access:**
+```sql
+-- Grant connection to specific database
+GRANT CONNECT ON DATABASE mydb TO cdc_user;
+```
+
+**Optional: Read-only Access for Initial Snapshot**
+
+For stricter security, grant explicit read permissions:
+
+```sql
+-- Example for the "public" schema in database mydb
+GRANT USAGE ON SCHEMA public TO cdc_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+-- Ensure future tables are covered automatically
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
+```
+
+**Multiple Schema Access:**
+```sql
+-- Repeat for each schema you want to sync
+GRANT USAGE ON SCHEMA schema1 TO cdc_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA schema1 TO cdc_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA schema1 GRANT SELECT ON TABLES TO cdc_user;
+```
+
+## 6. Create Logical Replication Slot
+
+Set up the replication slot for OLake to consume changes:
+
+:::important Slot Name Configuration
+Use the **exact replication slot name** that you configure in OLake UI or CLI. The slot name must match the `replication_slot` parameter in your OLake source configuration.
+:::
+
+```sql
+-- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
+SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'wal2json');
+```
+
+**Example with common slot names:**
+```sql
+-- If your OLake source config uses "olake_slot"
+SELECT pg_create_logical_replication_slot('olake_slot', 'wal2json');
+
+-- If your OLake source config uses "postgres_slot"  
+SELECT pg_create_logical_replication_slot('postgres_slot', 'wal2json');
+```
+
+**Verify Slot Creation:**
+```sql
+SELECT * FROM pg_replication_slots WHERE slot_name = 'your_olake_slot_name';
+```
+
+## 7. Test Logical Decoding
+
+Verify that CDC is working correctly:
+
+```sql
+-- Create test data
+CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, data TEXT);
+INSERT INTO test_table (data) VALUES ('Generic PostgreSQL CDC test');
+
+-- Check for changes (replace 'your_olake_slot_name' with your actual slot name)
+SELECT data FROM pg_logical_slot_get_changes(
+    'your_olake_slot_name', null, null, 
+    'pretty-print', '1'
+);
+```
+
+✅ **Success:** Returns JSON change records from wal2json  
+❌ **Permission denied:** Check user has `REPLICATION` role  
+❌ **Plugin not found:** Verify wal2json installation and wal_level setting
+
+## Troubleshooting
+
+### Configuration Issues
+
+- **wal2json Plugin Not Found:** 
+  ```sql
+  ERROR: could not access file "wal2json": No such file or directory
+  ```
+  **Solution:** Install the wal2json package for your PostgreSQL version or compile from source.
+
+- **WAL Level Not Logical:**
+  ```sql
+  ERROR: logical decoding requires wal_level >= logical
+  ```
+  **Solution:** Set `wal_level = logical` in `postgresql.conf` and restart PostgreSQL.
+
+- **Configuration Not Applied:** If settings don't take effect:
+  - Verify you edited the correct `postgresql.conf` file: `SHOW config_file;`
+  - Ensure PostgreSQL was restarted after changes
+  - Check PostgreSQL logs for configuration errors
+
+### Permission Issues
+
+- **Replication Slot Creation Failed:**
+  ```sql
+  ERROR: permission denied to create replication slot
+  ```
+  **Solution:** Ensure the user has `REPLICATION` role: `ALTER ROLE cdc_user WITH REPLICATION;`
+
+- **Table Access Denied:**
+  ```sql
+  ERROR: permission denied for table "some_table"
+  ```
+  **Solution:** Grant SELECT privileges on the schema and tables the user needs to access.
+
+### Performance and Monitoring
+
+- **WAL Accumulation:** Monitor disk usage as inactive slots retain WAL files:
+  ```sql
+  SELECT slot_name, active, restart_lsn, confirmed_flush_lsn 
+  FROM pg_replication_slots;
+  ```
+  **Solution:** Drop unused slots or ensure CDC consumers are actively reading.
+
+- **High CPU/Memory Usage:** Tune checkpoint settings:
+  ```conf
+  checkpoint_timeout = 15min
+  checkpoint_completion_target = 0.9
+  max_wal_size = 2GB
+  ```
+
+- **Slow Snapshots:** For large tables, consider:
+  - Increasing `work_mem` for the CDC session
+  - Using `wal_sender_timeout = 0` to prevent timeouts
+  - Running snapshots during low-activity periods
+
+### Schema and Data Issues
+
+- **Missing Changes for Updates/Deletes:** Ensure tables have primary keys or set replica identity:
+  ```sql
+  ALTER TABLE my_table REPLICA IDENTITY FULL;  -- For tables without PK
+  ```
+
+- **DDL Changes Not Captured:** wal2json captures DDL in WAL, but OLake may need schema refresh for structural changes.
+
+- **Large Transaction Handling:** For very large transactions, monitor:
+  - WAL disk space usage
+  - Replication slot lag
+  - Memory usage during decoding

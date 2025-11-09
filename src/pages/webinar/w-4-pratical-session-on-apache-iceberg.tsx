@@ -53,7 +53,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-4-pratical-session-on-apache-iceberg-cover.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-4-pratical-session-on-apache-iceberg-cover.webp" alt="Apache Iceberg webinar by Sachin Tripathi at EarnIn, March 28, 2025" />
           </div>
         </div>
         {/* </div> */}

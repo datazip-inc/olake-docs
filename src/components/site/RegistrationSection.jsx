@@ -151,7 +151,7 @@ const RegistrationSection = () => {
                     <img
                       src='/img/site/iceberg-logo.svg'
                       className='mt-1'
-                      alt='Apache Iceberg logo'
+                      alt='Iceberg catalog logo'
                       loading="lazy" decoding="async"
                     />
                     <div className='flex max-w-[90%] flex-col gap-2'>

@@ -1,7 +1,10 @@
 ---
-title: Postgres
-description: OLake Postgres Connector
+title: "Postgres Source Connector Guide | OLake Data Sync & CDC"
+description: Learn to configure OLake Postgres Connector for fast full refresh, incremental sync, and CDC. Tips on chunking, setup, and troubleshooting errors included.
+sidebar_label: Postgres
 ---
+
+import DateTimeHandling from '@site/src/components/DateTimeHandling';
 
 # Overview {#overview}
 
@@ -14,10 +17,16 @@ The OLake Postgres Source connector supports multiple synchronization modes. It 
 - **CDC Only**
 - **Full Refresh + Incremental**
 
+:::danger **wal2json for CDC Deprecated**
+OLake has deprecated the `wal2json`-based CDC method. Please use the native `pgoutput` plugin, which is faster and more reliable.
+
+For users who previously set up jobs using the wal2json plugin: [wal2json plugin documentation](/docs/connectors/postgres/wal2json_plugin.mdx)
+:::
+
 ## Prerequisites
 
     ### Version Prerequisites
-        A Postgres server version 9.5 or above (for Full Load and Incremental(Bookmark/cursor)).
+        A Postgres server version 10 or above is required.
     ### CDC Prerequisite
     To set up PostgreSQL, follow the appropriate setup guide for your PostgreSQL environment:
     - <a href="/docs/connectors/postgres/setup/aurora" target="_blank" rel="noopener noreferrer">Aurora Postgres – CDC Setup Guide</a>
@@ -52,7 +61,7 @@ The OLake Postgres Source connector supports multiple synchronization modes. It 
 
 - Enter Postgres credentials.
   <div className='flex w-full justify-center'>
-    <div className='w-3/5'>![Source tab](/img/docs/sources/postgres/postgres-config.webp)</div>
+    <div className='w-3/5'>![Form for creating a Postgres source in OLake, showing fields for endpoint configuration, authentication, and connection options](/img/docs/sources/postgres/postgres-config.webp)</div>
   </div>
 
 | Field                               | Description                                                                                                                                                                   | Example Value                                                                                            |
@@ -62,13 +71,18 @@ The OLake Postgres Source connector supports multiple synchronization modes. It 
 | Database Name `required`            | The name of the target database to connect to.                                                                                                                                | `olake-db`                                                                                               |
 | Password `required`                 | The password corresponding to the provided username for authentication.                                                                                                       | `pgpwd`                                                                                                  |
 | Username `required`                 | Database user used to authenticate the connection.                                                                                                                            | `pg-user`                                                                                                |
-| Update Method                       | <ul> <li>Standalone : If only Full refresh and Incremental will be used.</li> <li>CDC : If CDC related modes will be used.</li> </ul>                                         | `CDC`                                                                                                    |
-| Initial Wait Time                   | Idle timeout for WAL log reading                                                                                                                                              | `120`                                                                                                    |
+| Update Method                       | <ul> <li>Standalone : Supports only Full Refresh and Incremental sync modes.</li> <li>CDC : If CDC related modes will be used.</li> </ul>                                         | `CDC`                                                                                                    |
+| Initial Wait Time                   | Idle timeout for pgoutput log reading                                                                                                                                         | `120`                                                                                                    |
 | Max Threads                         | Maximum number of worker threads the connector can spin up for parallel tasks.                                                                                                | `10`                                                                                                     |
-| Replication Slot `required for CDC` | Slot to retain WAL logs for consistent replication.                                                                                                                           | `olake-repl-slot`                                                                                        |
+| Replication Slot `required for CDC` | Logical replication slot (pgoutput) that retains WAL segments until read, ensuring consistent CDC.                                                                            | `olake-repl-slot`                                                                                        |
+| Publication `required for CDC`      | Name of the PostgreSQL publication that defines which tables and operations (INSERT, UPDATE, DELETE, TRUNCATE) to replicate. Must exist in the same database as the replication slot and include all tables for CDC capture. | `postgres_pub` |
 | JDBC URL Parameters                 | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                                   | `{"connectTimeout":"20"}`                                                                                |
 | SSL Mode                            | SSL configuration for the database connection. Contains details such as the SSL mode.                                                                                         | `disable`                                                                                                |
 | SSH Config                          | Configure OLake to connect through an SSH tunnel. See [SSH Config details](/docs/understanding/terminologies/olake#1-ssh-configuration) for the list of supported parameters. | <ul> <li>`No Tunnel`</li> <li>`SSH Key Authentication`</li> <li>`SSH Password Authentication`</li> </ul> |
+
+:::warning Important: Unique Replication Slot Required
+Do not reuse the same `replication slot` and `publication` across multiple OLake jobs. Sharing them will result in data loss and inconsistencies.
+:::
 
 ### 3. Test Connection
 
@@ -99,14 +113,16 @@ An example `source.json` file will look like this:
 | database `required`                  | The name of the target database to connect to.                                                                                                                      | `"olake-db"`                                                                                           | String                                                           |
 | password `required`                  | The password corresponding to the provided username for authentication.                                                                                             | `"pgpwd"`                                                                                              | String                                                           |
 | username `required`                  | Database user used to authenticate the connection.                                                                                                                  | `"pg-user"`                                                                                            | String                                                           |
-| update_method `required for CDC`     | Required for CDC sync configuration                                                                                                                                 | object                                                                                                 | `{"replication_slot": "postgres_slot","initial_wait_time": 120}` |
-| initial_wait_time `required for CDC` | Idle timeout for WAL log reading                                                                                                                                    | `120`                                                                                                  | Integer                                                          |
-| replication_slot `required for CDC`  | Slot to retain WAL logs for consistent replication.                                                                                                                 | `"olake-repl-slot"`                                                                                    | String                                                           |
+| update_method `required for CDC`     | Required for CDC sync configuration                                                                                                                                 | object                                                                                                 | `{"replication_slot": "postgres_slot", "publication": "postgres_pub", "initial_wait_time": 120}` |
+| initial_wait_time `required for CDC` | Idle timeout for pgoutput log reading                                                                                                                               | `120`                                                                                                  | Integer                                                          |
+| replication_slot `required for CDC`  | Logical replication slot (pgoutput) that retains WAL segments until read, ensuring consistent CDC.                                                                  | `"olake-repl-slot"`                                                                                    | String                                                           |
+| publication `required for CDC`       | Name of the PostgreSQL publication that defines which tables and operations (INSERT, UPDATE, DELETE, TRUNCATE) to replicate. Must exist in the same database as the replication slot and include all tables for CDC capture.  | `"postgres_pub"`                        | String                                                           |
 | max_threads                          | Maximum number of worker threads the connector can spin up for parallel tasks.                                                                                      | `10`                                                                                                   | Integer                                                          |
 | retry_count                          | Number of times the retry will take place incase of timeout before failing the sync.                                                                                | `3`                                                                                                    | Integer                                                          |
 | jdbc_url_params                      | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                         | `{"connectTimeout":"20"}`                                                                              | Object                                                           |
 | ssl                                  | SSL configuration for the database connection. Contains details such as the SSL mode.                                                                               | `{"mode": "disable"}`                                                                                  | Object                                                           |
 | ssh_config                           | Configure OLake to connect through an SSH tunnel. See [SSH Config details](/docs/understanding/terminologies/olake#1-ssh-configuration) for parameter descriptions. | `{"host": "my-tunnel-host", "port": 22 , "username": "my-tunnel-user", "password": "tunnel-password"}` | Object                                                           |
+
 
 Similarly, `destination.json` file can be created inside this folder. For more information, see destination documentation.
 
@@ -135,6 +151,12 @@ check \
 ## Data Type Mapping {#data-type-mapping}
 
 <PostgresToIcebergDatatypes />
+
+---
+
+## Date and Time Handling
+
+<DateTimeHandling />
 
 ---
 

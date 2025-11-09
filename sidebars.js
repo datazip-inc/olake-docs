@@ -25,7 +25,16 @@ const docSidebar = {
   docSidebar: [
     sectionHeader("GETTING STARTED"),
     'intro',
-    'benchmarks',
+
+    {
+      type: 'category',
+      label: 'Benchmarks',
+      link: { type: 'doc', id: 'benchmarks' },
+      items: [
+        'dmsvsolake',
+      ],
+    },
+    
 
     // GETTING STARTED
 
@@ -145,7 +154,8 @@ const docSidebar = {
       label: 'Versions',
       items: [
         'release/overview',
-        'release/v0.2.5',
+        'release/v0.2.8',
+        'release/v0.2.5-v0.2.7',
         'release/v0.2.2-v0.2.4',
         'release/v0.2.0-v0.2.1',
         'release/v0.1.9-v0.1.11',

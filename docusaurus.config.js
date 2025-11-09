@@ -22,7 +22,7 @@ const config = {
 
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
-  trailingSlash: false,
+  trailingSlash: true,
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -133,7 +133,7 @@ const config = {
             label: "Iceberg",
             items: [
               {
-                label: "Blog",
+                label: "Iceberg Blogs",
                 href: `/iceberg`,
               },
               {
@@ -310,7 +310,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:image',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
           },
         },
         {
@@ -332,7 +332,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:image:type',
-            content: 'image/svg+xml',
+            content: 'image/webp',
           },
         },
         {
@@ -375,7 +375,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             name: 'twitter:image',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
           },
         },
         {
@@ -586,6 +586,11 @@ const config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
+        // Disable auto trailing-slash redirects to avoid conflicts with static servers
+        // that force directory slashes 
+        createRedirects() {
+          return undefined;
+        },
         redirects: [
           {
             to: '/docs/benchmarks?tab=mongodb',
@@ -948,6 +953,8 @@ const config = {
           },
 
           // END
+          // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
+          // via canonical tags in the theme files, not through redirects
 
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
