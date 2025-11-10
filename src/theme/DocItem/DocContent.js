@@ -25,6 +25,14 @@ const stripTrailingSlash = (value) => {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 };
 
+const ensureTrailingSlash = (value) => {
+  if (!value) {
+    return value;
+  }
+
+  return value.endsWith("/") ? value : `${value}/`;
+};
+
 export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
   const { siteConfig } = useDocusaurusContext();
   const { pluginId } = useActivePlugin({ failfast: true });
@@ -52,33 +60,8 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     absolute: true,
   });
 
-  const trailingSlashDisabled = siteConfig?.trailingSlash === false;
-  const normalizePath = (value) => {
-    if (!value) {
-      return null;
-    }
-
-    if (value === "/") {
-      return "/";
-    }
-
-    if (trailingSlashDisabled) {
-      return value.replace(/\/+$/, "");
-    }
-
-    return value.endsWith("/") ? value : `${value}/`;
-  };
-
-  const canonicalPath = normalizePath(permalink);
-  let canonicalUrl = null;
-
-  if (canonicalPath) {
-    if (canonicalPath === "/") {
-      canonicalUrl = trailingSlashDisabled ? baseUrl : `${baseUrl}/`;
-    } else {
-      canonicalUrl = `${baseUrl}${canonicalPath}`;
-    }
-  }
+  const canonicalPath = ensureTrailingSlash(permalink);
+  const canonicalUrl = canonicalPath ? `${baseUrl}${canonicalPath}` : null;
 
   return (
     <>
