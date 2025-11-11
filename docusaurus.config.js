@@ -6,7 +6,7 @@ const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriorit
 const config = {
   title: 'Fastest Open Source Data Replication Tool',
   tagline: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
-  favicon: 'img/logo/olake-blue.svg',
+  favicon: 'img/logo/olake-blue-with-text.webp',
 
   // Set the production url of your site here
   url: 'https://olake.io',
@@ -96,7 +96,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
-      image: 'img/logo/olake-blue.svg',
+      image: 'img/logo/olake-blue-with-text.webp',
 
       announcementBar: {
         id: 'monthly-events-2025',
@@ -116,10 +116,10 @@ const config = {
       navbar: {
         hideOnScroll: false,
         // style: 'dark',
-        title: 'OLake',
+        title: '',
         logo: {
           alt: 'OLake Logo',
-          src: 'img/logo/olake-blue.svg',
+          src: 'img/logo/olake-blue-with-text.webp',
         },
         items: [
           { to: '/docs', label: 'Docs', position: 'right' },
@@ -201,9 +201,9 @@ const config = {
             tagName: 'link',
             attributes: {
               rel: 'preload',
-              href: '/img/logo/olake-blue.svg',
+              href: '/img/logo/olake-blue-with-text.webp',
               as: 'image',
-              type: 'image/svg+xml',
+              type: 'image/webp',
               fetchpriority: 'high'
             },
           },
@@ -421,8 +421,8 @@ const config = {
           tagName: 'link',
           attributes: {
             rel: 'icon',
-            type: 'image/svg+xml',
-            href: '/img/logo/olake-blue.svg',
+            type: 'image/webp',
+            href: '/img/logo/olake-blue-with-text.webp',
           },
         }
       ],
