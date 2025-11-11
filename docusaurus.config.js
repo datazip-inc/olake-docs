@@ -22,7 +22,7 @@ const config = {
 
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
-  trailingSlash: false,
+  trailingSlash: true,
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -133,7 +133,7 @@ const config = {
             label: "Iceberg",
             items: [
               {
-                label: "Blog",
+                label: "Iceberg Blogs",
                 href: `/iceberg`,
               },
               {
@@ -310,7 +310,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:image',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
           },
         },
         {
@@ -332,7 +332,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             property: 'og:image:type',
-            content: 'image/svg+xml',
+            content: 'image/webp',
           },
         },
         {
@@ -375,7 +375,7 @@ const config = {
           tagName: 'meta',
           attributes: {
             name: 'twitter:image',
-            content: 'https://olake.io/img/logo/olake-blue.svg',
+            content: 'https://olake.io/img/logo/olake-blue.webp',
           },
         },
         {
@@ -968,11 +968,6 @@ const config = {
       },
     ],
     '@docusaurus/theme-live-codeblock',
-    
-    // Trailing slash redirect plugin
-    [
-      './src/plugins/trailing-slash-redirect/index.js', {}
-    ],
   ],
 
   // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags

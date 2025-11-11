@@ -470,8 +470,8 @@ export const paginationConfig = {
       permalink: '/docs/community/channels'
     },
     next: {
-      title: 'OLake v0.2.5-v0.2.7',
-      permalink: '/docs/release/v0.2.5-v0.2.7'
+      title: 'OLake v0.2.8',
+      permalink: '/docs/release/v0.2.8'
     }
   }
 }

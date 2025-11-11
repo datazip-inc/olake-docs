@@ -73,7 +73,7 @@ const BenchmarkHeader: React.FC = () => {
           </svg>
            */}
 
-          <img src='/img/site/airbyte.svg' alt='Company logo' loading="lazy" decoding="async" />
+          <img src='/img/site/airbyte.svg' alt='Airbyte logo' loading="lazy" decoding="async" />
 
           <span className='text-sm text-gray-800 dark:text-white'>Airbyte</span>
         </div>
@@ -185,7 +185,7 @@ const BenchmarkSection: React.FC = () => {
           <span className='md:ml-2'>with OLake</span>
         </h2>
         <div>
-        <img src="img/site/postgres-iceberg.svg" alt="postgres-iceberg" loading="lazy" decoding="async" />
+        <img src="img/site/postgres-iceberg.svg" alt="Postgres to Apache Iceberg data pipeline" loading="lazy" decoding="async" />
       </div>
       </div>
 
@@ -234,7 +234,7 @@ const BenchmarkSection: React.FC = () => {
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/olake.svg' alt='OLake logo' loading="lazy" decoding="async" />
+                        <img src='/img/site/olake.svg' alt='OLake platform logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.olake.name}</span>
                       </div>
                       <div className='text-sm text-gray-600 dark:text-gray-400'>
@@ -315,7 +315,7 @@ const BenchmarkSection: React.FC = () => {
 
                     <th className='w-1/6 border border-gray-200 bg-gray-50 px-16 py-6 text-left font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'>
                       <div className='flex items-center justify-center space-x-2'>
-                        <img src='/img/site/olake.svg' alt='OLake logo' loading="lazy" decoding="async" />
+                        <img src='/img/site/olake.svg' alt='OLake platform logo' loading="lazy" decoding="async" />
                         <span className='text-xl'>{TOOLS.olake.name}</span>
                       </div>
                       <div className='text-sm text-gray-600 dark:text-gray-400'>
