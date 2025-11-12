@@ -38,16 +38,16 @@ export const paginationConfig = {
       permalink: '/docs/getting-started/quickstart'
     },
     next: {
-      title: 'Compatability with Query Engines',
-      permalink: '/docs/understanding/compatibility-engines'
+      title: 'Playground',
+      permalink: '/docs/getting-started/playground'
     }
   },
 
   //Playground
   '/docs/getting-started/playground': {
     previous: {
-      title: 'Introduction',
-      permalink: '/docs'
+      title: 'Create first job Pipeline',
+      permalink: '/docs/getting-started/creating-first-pipeline'
     },
     next: {
       title: 'Quickstart',
