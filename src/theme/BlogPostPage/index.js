@@ -3,22 +3,6 @@ import BlogPostPage from '@theme-original/BlogPostPage';
 import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-const ensureTrailingSlash = (value) => {
-  if (!value) {
-    return value;
-  }
-
-  return value.endsWith('/') ? value : `${value}/`;
-};
-
-const stripTrailingSlash = (value) => {
-  if (!value) {
-    return value;
-  }
-
-  return value.endsWith('/') ? value.slice(0, -1) : value;
-};
-
 export default function BlogPostPageWrapper(props) {
   const { content: BlogPostContent } = props;
   const { metadata } = BlogPostContent;
@@ -27,12 +11,12 @@ export default function BlogPostPageWrapper(props) {
   // Extract author name and reading time
   const authorName = metadata.authors?.[0]?.name || 'OLake Team';
   const readingTime = metadata.readingTime || '5 minutes';
-
-  const baseUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io');
-  const permalink = metadata.permalink || '';
-  const canonicalUrl = permalink ? ensureTrailingSlash(`${baseUrl}${permalink}`) : null;
-  const normalizedPermalink = ensureTrailingSlash(permalink || '');
-  const imageUrl = metadata.image ? `${baseUrl}${metadata.image}` : 'https://olake.io/img/logo/olake-blue.svg';
+  
+  // Strip trailing slashes from permalink for canonical URL
+  const cleanPermalink = metadata.permalink?.replace(/\/$/, '') || metadata.permalink;
+  const canonicalUrl = cleanPermalink ? `${siteConfig.url}${cleanPermalink}` : null;
+  const normalizedPermalink = metadata.permalink || '';
+  const imageUrl = metadata.image ? `${siteConfig.url}${metadata.image}` : 'https://olake.io/img/logo/olake-blue.svg';
 
   const organizationSchema = {
     '@context': 'https://schema.org',
@@ -2882,7 +2866,7 @@ export default function BlogPostPageWrapper(props) {
     <>
       <Head>
         {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+        {cleanPermalink && <meta property="og:url" content={canonicalUrl} />}
         
         {/* Enhanced Open Graph for Blog Posts */}
         <meta property="og:image:type" content="image/webp" />

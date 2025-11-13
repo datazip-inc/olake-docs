@@ -25,27 +25,11 @@ import FeatureCard from '../../../components/community/improved/FeatureCard'
 // import StatCard from '../../../components/community/improved/StatCard'
 import SectionLayout from '../../../components/community/SectionLayout'
 
-const stripTrailingSlash = (value?: string) => {
-  if (!value) {
-    return ''
-  }
-
-  return value.endsWith('/') ? value.slice(0, -1) : value
-}
-
-const ensureTrailingSlash = (value: string) => {
-  if (!value) {
-    return '/'
-  }
-
-  return value.endsWith('/') ? value : `${value}/`
-}
-
 const ContributorProgramPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
-  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
 
   const resolveUrl = (value: string) => {
     if (!value) {
@@ -56,7 +40,7 @@ const ContributorProgramPage = () => {
       return value
     }
 
-    return ensureTrailingSlash(`${siteUrl}${value}`)
+    return `${siteUrl}${value}`
   }
 
   const organizationSchema = {

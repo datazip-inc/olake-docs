@@ -8,22 +8,6 @@ import LazyComponent from '../../components/LazyComponent'
 import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
 
-const stripTrailingSlash = (value?: string) => {
-  if (!value) {
-    return '';
-  }
-
-  return value.endsWith('/') ? value.slice(0, -1) : value;
-};
-
-const ensureTrailingSlash = (value: string) => {
-  if (!value) {
-    return '/';
-  }
-
-  return value.endsWith('/') ? value : `${value}/`;
-};
-
 // Custom hook for dynamic iframe height
 const useDynamicIframeHeight = (src) => {
   const [height, setHeight] = useState(200);
@@ -97,8 +81,8 @@ const useDynamicIframeHeight = (src) => {
 const WebinarsPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
-  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
   // Use the dynamic iframe height hook
   const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
 
