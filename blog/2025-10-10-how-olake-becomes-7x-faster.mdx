@@ -10,84 +10,131 @@ image: /img/blog/cover/how-olake-becomes-7x-faster-cover.webp
 
 ## Overview
 
-Data ingestion performance is critical for modern data platforms. When your CDC pipeline becomes a bottleneck, it affects everything downstream—from real-time analytics to machine learning workflows. We recently faced this exact challenge with Olake's destination pipeline and decided to rebuild it from the ground up.
+Data ingestion performance is critical when you are writing in Iceberg format to data lake. When your pipeline becomes a bottleneck, it affects everything downstream—from real-time analytics to machine learning workflows. We started with OneStack in Datazip to solve the problem of Data Analytics, but then we were bound to see the problem on Data Ingestion itself. To solve this problem for iceberg native writes we built Olake. At first we created basic Iceberg writer, but then we saw the issues with it (I will be writing about the issues in a new section). Today we have resolved all those bottlenecks.
 
-The result? A **7× performance improvement** and **exactly-once visible state** in Apache Iceberg—without the complexity of background deduplication jobs or eventual consistency mechanisms.
+The result? A **7× performance improvement** in Apache Iceberg, without the complexity of background deduplication jobs or eventual consistency mechanisms.
 
-This blog takes you through the technical journey: the challenges we faced, the architectural decisions we made, and the specific optimizations that delivered these dramatic improvements. Whether you're building data pipelines, optimizing existing systems, or simply curious about high-performance data engineering, there are insights here for you.
+In this blog I am going to explain how we achieved this, so let us start. If you are just interested in what boosted performance, read the section <a href="#olake-new-iceberg-writer-what-we-changed-to-make-it-fast">What We Changed</a>.
+
 
 ---
 
-## The Challenge
+## Issues with Previous Iceberg Writer
 
-Our original destination pipeline had several issues:
+If you've worked with JVM-based data processing systems, you're probably familiar with the heavy memory usage and JSON schema evolution problems. These are well-known challenges, but when you're building a production system, they become real bottlenecks.
 
-1. **Debezium-centric code bloat**: too much parsing/processing logic tightly coupled to Debezium message formats
-2. **Slow throughput**: inefficient data processing pipeline resulted in poor ingestion performance
-3. **High memory consumption**: excessive serialization/deserialization and large JSON envelopes increased CPU and memory pressure
-4. **No proper file sizing**: inconsistent file sizes led to suboptimal query performance and storage efficiency
-5. **Schema unaware Go path**: parallel schema evolutions could conflict because Go lacked first-class knowledge of table schema
+Let me share the specific issues we encountered that were creating bottlenecks and preventing us from extending our codebase with new features. You might recognize some of these in your own systems:
+
+1. **RPC Server Format**: In previous implementation we were using Debezium Formats to communicate between Olake and Java Iceberg server, which had large metadata that was mostly unused.
+
+2. **Serialization And Deserialization using JsonSchema**: At multiple places serialization and deserialization were happening, resulting in less throughput, high memory and CPU consumption.
+
+3. **Inconsistent and Small File Size**: In previous implementation we were flushing buffers on reaching a specific memory threshold, which was resulting in inconsistent and small file sizes after compression.
+
+4. **Heavy Processing On Java Side**: Most of the processing like schema discovery, conversions, and concurrency management was happening on the Java side, so JVM overhead was again the problem, making it a bottleneck for new features like DLQ etc.
+
+5. **Partition Writer**: The partition writer that was previously being used was closing files whenever a different partition record came.
+
+6. **Data Buffers**: We were using two buffers to maintain batches of data, which again pushed large batches to the Java server.
 ---
 
-## Architecture Overview
+## Fundamentals of Iceberg Distributed Writers
 
-The refactor fundamentally changes how we handle data processing by splitting responsibilities between Go and Java components based on their respective strengths. This separation of concerns allows each component to focus on what it does best while maintaining clean interfaces between them.
+After identifying these issues, the first step to solving them was understanding Iceberg's distributed writing model. You might be thinking, "Iceberg sounds complex, is this going to be hard to understand?" Don't worry. While Iceberg might seem complex at first glance, the core concepts are straightforward once you understand the fundamentals.
+
+Remember learning about ACID properties in databases? Those guarantees weren't present in legacy data lakes, which made things like concurrent writes and schema changes tricky. But Iceberg table format brings ACID properties to data lakes, making your machine learning and analytics use cases much easier. The key thing to understand here is that we need atomicity while writing to Iceberg—either all your data commits successfully, or none of it does.
+
+You might have heard the Iceberg community suggest retrying failed commits. But here's the thing: this advice has limitations. If your data is fundamentally incompatible with the schema (for example, trying to insert a string value into an integer column), retrying won't help—the operation will fail regardless of how many times you retry. Think about it: if you're trying to put a square peg in a round hole, trying harder won't make it fit.
+
+Also, let me set the right expectations: **Iceberg is not designed for real-time streaming use cases (until the small file problem is solved)**. Even popular streaming tools like Tableflow batch data based on time periods before writing to Iceberg. So if you're looking for sub-second latency, you'll need to look elsewhere—at least for now.
+
+If you have worked with parquet, if there is schema change you have to close the previous parquet and use the new one. The same applies with writers in iceberg. Each writer acomodate its own schema and you can push only the same schema data to that particular writer.
+
+So, here we have three things:
+
+- Write and commit data files atomically
+- Iceberg is for batch use cases
+- Don't retry if you are fundamentally wrong
+- Close writers based on schema changes.
+
+Besides this, we must know something about type promotions that are possible in Iceberg. We can evolve from int to bigint and float to double. For others, you can refer to this doc: https://iceberg.apache.org/docs/latest/schemas/. 
+
+## Olake New Iceberg Writer: What We Changed To Make It Fast 
+
+So, how did we achieve this 7× improvement? The refactor fundamentally changes how we handle data processing by splitting responsibilities between Go and Java components based on their respective strengths. Think of it like a restaurant: you have chefs (Go) who prepare the ingredients quickly, and specialized equipment (Java) that handles the final cooking. This separation of concerns allows each component to focus on what it does best while maintaining clean interfaces between them.
 
 <img
   src="/img/blog/2025/10/how-olake-becomes-7x-faster-1.webp"
   alt="OLake Destination Refactor Architecture"
+  loading="lazy"
+  decoding="async"
   style={{ width: '100%', height: 'auto' }}
 />
 
-**Key Design Principles:**
+We established several design principles before proceeding with the refactoring:
 
-- **Go Data Plane**: Handles concurrency, intelligent batching, and schema coordination. Go's strengths in concurrent programming and lightweight threading make it ideal for managing multiple writer threads and coordinating schema evolution across streams.
+- **Golang for processing**: Golang excels at fast data processing and concurrency management, making it ideal for our processing layer.
+- **Java for Iceberg I/O**: The Java Iceberg library is the most mature implementation, with new features arriving in Java first.
+- **Minimal batching**: We minimize batching overhead and write data directly to Parquet format.
+- **Java as API layer**: The Java Iceberg server acts as a focused API layer for writing data in Iceberg format. 
 
-- **Java Iceberg I/O**: Performs native Iceberg operations with atomic commit semantics. Java's mature Iceberg ecosystem and optimized I/O libraries provide the most efficient path for file operations and table management.
+This refactored architecture enables each component to operate at peak efficiency while maintaining the strong consistency guarantees required for production data pipelines.
 
-- **Typed gRPC Interface**: Maintains a fast, efficient communication layer between components. The strongly-typed contract eliminates serialization overhead and provides compile-time safety.
+Before we dive deeper, let me clarify some terms you'll see throughout this blog. If you're already familiar with these, feel free to skip ahead:
 
-- **Explicit Lifecycle Management**: Ensures proper resource management and cleanup. Writers and commits have well-defined lifecycles that prevent resource leaks and ensure data consistency.
+#### Schema Evolution
 
-This architecture enables each component to operate at peak efficiency while maintaining the strong consistency guarantees required for production data pipelines.
+Schema evolution refers to updating the table schema when new columns are added or when existing columns change types. Picture this: your source table adds a new `email` column, or a column type changes from `int` to `bigint`. The Iceberg table schema needs to evolve to accommodate these changes and it needs to do this without breaking existing queries or losing data.
 
-### Two-level Batching (Local Batch → Java Writer → Commit )
+#### Normalization
 
-The two-level batching system is a key optimization that balances memory usage, network efficiency, and file size consistency. This approach ensures that we make optimal use of both local memory and network resources while producing well-sized files for downstream processing.
+Normalization is the process of extracting columns from incoming records and transforming them to match the target table's schema. It's like unpacking a nested box and organizing the contents into a flat structure.
+
+Here are the optimizations that we have done:
+
+### Removal of Large Data Buffers
+
+Remember those two buffers I mentioned earlier? In the previous implementation, we had one buffer for each local thread that would push to a global table buffer after reaching a certain memory limit, which then pushed data to the Java Iceberg server to write to files. This double buffering approach added unnecessary overhead.
+
+In our new writer implementation, we simplified this to just one buffer with a 10k batch size (which you can configure based on your needs). This leads to less memory footprint and higher throughput. Here's the key improvement: our writer now commits only after finishing a full chunk of 4GB, which compresses down to about 350 MB. This means fewer, larger files instead of many small ones—which is exactly what you want for query performance.
+
+**How New Batching works:**
+
+In the image below you can see how the current batching works.
 
 <img
   src="/img/blog/2025/10/how-olake-becomes-7x-faster-2.webp"
   alt="Two-Level Batching Flow"
+  loading="lazy"
+  decoding="async"
   style={{ width: '100%', height: 'auto' }}
 />
 
-**How the two-level batching works:**
-
 - **Local thread batch**: Each writer thread buffers records in-memory up to a per-thread threshold (typically 10,000 records). This local buffering allows for efficient in-memory processing and schema detection before sending data over the network.
 
-- **Java writer**: After the local batch crosses a threshold (either record count or time-based), we send a compact, typed payload to the Java Iceberg writer. This payload is optimized for Iceberg operations and eliminates unnecessary serialization overhead. The Java writer automatically closes files and pushes them to storage once the target file size is reached.
+- **Java writer**: After the local batch crosses a threshold, we send a compact, typed payload to the Java Iceberg writer. This payload is optimized for Iceberg operations and eliminates unnecessary serialization overhead. The Java writer automatically closes files and pushes them to storage once the target file size is reached.
 
 - **Data visibility after commit**: Files are created and data is written, but it only becomes visible in the Iceberg table after an explicit commit operation. This ensures atomic visibility and maintains exactly-once semantics.
 
 **Benefits of this approach:**
-
 - **Reduced RPC chatter**: Fewer, larger batches mean fewer network round trips
 - **Bounded working sets**: Memory usage is predictable and controlled
-- **Consistent file sizes**: Better query performance and storage efficiency
-- **Efficient processing**: Local batching allows for optimizations like schema detection and data flattening before network transmission
-
+- **Efficient processing**: Local batching allows for optimizations like schema detection and data normalization before network transmission
 ---
 
-## Exactly-Once Guarantees
+### Atomic Commits And Schema Evolution
 
-Exactly-once semantics is one of the most critical requirements for data pipelines. In traditional CDC systems, achieving exactly-once guarantees often requires complex background deduplication jobs or eventual consistency mechanisms. Our refactored destination pipeline achieves exactly-once visible state through two key mechanisms that work together:
+As we discussed in the fundamentals, we require atomic data updates in Iceberg table, so here is how we are doing it in the new Iceberg writer:
 
-### 1. Atomic Iceberg Commits
+#### 1. Committing Data Files
 
-The foundation of our exactly-once guarantee lies in Apache Iceberg's native atomic commit primitives. Unlike traditional file-based systems where partial writes can leave tables in inconsistent states, Iceberg's commit model ensures that either all changes in a batch become visible simultaneously, or none do.
+Initially, all batches are sent to the Java server and converted into Parquet files. The Java writer internally stores these files and pushes them to the configured object store (such as S3 or Azure Blob Storage). However, these files are not yet registered in the Iceberg table, they need to be explicitly committed to become visible.
 
-Here's how our atomic commit mechanism works:
+While registering them, we take a table level lock on the Go side and commit all data and delete files if any. 
 
+You might be wondering: "Why not take a lock while writing files? Won't that cause conflicts?" Great question! Here's the key insight: each writer maintains its own data file, and we create writers equal to the number of threads we've opened. So there's no write happening in the same file with two different writers, each thread has its own file, eliminating the need for file level locking during writes.
+
+Below is the commit logic which is on the Java side:
 ```java title="IcebergTableOperator.java"
 // destination/iceberg/olake-iceberg-java-writer/src/main/java/io/debezium/server/iceberg/tableoperator/IcebergTableOperator.java
 public void commitThread(String threadId, Table table) {
@@ -138,102 +185,96 @@ public void commitThread(String threadId, Table table) {
 }
 ```
 
-**Key insight**: The commit is atomic. Either the entire batch becomes visible in the Iceberg table, or nothing does. No partial state. This atomicity is crucial because it means readers will never see inconsistent intermediate states, even during concurrent operations.
+**Key insight**: The commit is atomic. Either the entire batch becomes visible in the Iceberg table, or nothing does, there's no partial state. This atomicity is crucial because it means readers will never see inconsistent intermediate states, even during concurrent operations. For example, if you're committing 1000 records and the commit fails halfway through, none of those records will be visible in the table.
 
 The commit process handles two scenarios:
-- **Append mode**: For pure inserts (like backfill operations), we use `AppendFiles` which simply adds new data files to the table
-- **Upsert mode**: For CDC operations with updates/deletes, we use `RowDelta` which atomically adds both data files and delete files, enabling Iceberg's native upsert semantics
+- **Append mode**: For pure inserts (like backfill operations or initial data loads), we use `AppendFiles` which simply adds new data files to the table. This is the simplest and fastest mode.
+- **Upsert mode**: For CDC operations with updates/deletes, we use `RowDelta` which atomically adds both data files and delete files, enabling Iceberg's native upsert semantics. For example, if a record is updated, we write the new version to a data file and mark the old version for deletion in a delete file—all in a single atomic operation.
 
-### 2. Source Acknowledgment Only After Successful Commit
+#### 2. Atomic Schema Evolution
 
-The second pillar of our exactly-once guarantee is the careful ordering of operations. We only acknowledge source cursors (LSNs/offsets) after Iceberg has successfully committed the data. This ensures that if a failure occurs, the source will replay the same data, and our system will handle it correctly through upsert semantics.
+Now we know how files are being committed atomically, but you might be asking: "What about schema changes? How does Olake handle type promotions and schema evolution in Iceberg tables?" 
 
-Here's how the acknowledgment mechanism works:
+For schema evolution, we reuse the same global table atomic lock, which ensures that for any particular table, only one thread evolves the schema at a time. This prevents race conditions and ensures consistency.
 
-```go title="cdc.go"
-// drivers/postgres/internal/cdc.go
-func (p *Postgres) PostCDC(ctx context.Context, _ types.StreamInterface, noErr bool) error {
-	defer p.Socket.Cleanup(ctx)
-	if noErr {
-		// Only set global LSN state if no error occurred
-		p.state.SetGlobal(waljs.WALState{LSN: p.Socket.ClientXLogPos.String()})
-		// Acknowledge LSN to Postgres replication slot
-		return p.Socket.AcknowledgeLSN(ctx, false)
-	}
-	return nil
-}
-```
+But here's an interesting challenge: how do other threads know if the schema has changed? This is where our schema coordination comes in. We maintain a schema for each thread as well as a global schema on the Golang side. When any thread updates the schema, we update both the global schema and that thread's Go-side schema. Each thread periodically checks the global schema; if there's any difference, it updates both its Java-side writer and Go-side writer. This way, all Go-side threads stay aware of what schema is actually being written and what should be committed.
 
-### Correctness Guarantees
-
-The combination of atomic commits and careful acknowledgment ordering provides strong correctness guarantees across all failure scenarios:
-
-| Scenario | Behavior | Why It Works |
-|----------|----------|--------------|
-| **Crash before Iceberg commit** | Nothing visible; source not acked; retry produces same batch | Atomic commit ensures no partial state is visible; source replay provides idempotency |
-| **Crash after commit, before ack** | Replay converges via upsert; no double-materialization | Iceberg's upsert semantics handle duplicate data correctly; no background jobs needed |
-| **Network partition during commit** | Iceberg commit is atomic; either visible or not; source ack retried deterministically | Atomic operations eliminate partial visibility; deterministic retry ensures eventual consistency |
-
-**The guarantee**: Your table state is always correct. No background deduplication jobs. No "eventual consistency" with fingers crossed. The system provides strong consistency guarantees that are immediately verifiable.
-
-This approach eliminates the complexity and operational overhead of traditional CDC systems that rely on eventual consistency and background cleanup jobs.
-
----
-
-## Schema Evolution
-
-Schema evolution is one of the most complex aspects of data pipelines. As source schemas change over time, the destination must adapt without losing data or breaking existing queries. Our refactored system handles schema evolution through a deliberate, thread-safe process that ensures consistency across all writer threads.
-
-The key challenge in schema evolution is maintaining consistency across multiple concurrent writer threads while ensuring that schema changes are applied atomically. Here's how our system addresses this:
+We implemented one optimization: if there are type promotions (for example, from `int` to `long`), we don't close or refresh the writer until a record with a different incompatible type arrives in that chunk. This saves the overhead of refreshing and closing files unnecessarily.
+Here's how atomic schema evolution happens:
 
 <img
   src="/img/blog/2025/10/how-olake-becomes-7x-faster-3.webp"
   alt="Schema Evolution Flow"
+  loading="lazy"
+  decoding="async"
   style={{ width: '100%', height: 'auto' }}
 />
 
-### Detection and Promotion
-
-Schema evolution begins with detection at the thread level. Each writer thread analyzes its batch of records to determine if the schema has changed compared to the global schema for the stream. This parallel detection minimizes contention and allows for efficient schema evolution.
-
-The evolution process works as follows:
-
-1. **Thread-level detection**: Each thread compares its local schema with the global stream schema
-2. **Lock acquisition**: Only threads detecting schema changes acquire the stream-level lock
+1. **Thread level detection**: Each thread compares its local schema with the global table schema
+2. **Lock acquisition**: Only threads detecting schema changes acquire the table level lock
 3. **Schema evolution**: The first thread to acquire the lock performs the actual schema evolution
 4. **Writer refresh**: All threads refresh their writers to use the new schema
 
-Here's the implementation:
-
 ```go title="iceberg.go"
-// destination/iceberg/iceberg.go
+// compares with global schema and update schema in destination accordingly
 func (i *Iceberg) EvolveSchema(ctx context.Context, globalSchema, recordsRawSchema any) (any, error) {
 	if !i.stream.NormalizationEnabled() {
 		return i.schema, nil
 	}
 
+	// cases as local thread schema has detected changes w.r.t. batch records schema
+	//  	i.  iceberg table already have changes (i.e. no difference with global schema), in this case
+	//		    only refresh table in iceberg for this thread.
+	// 		ii. Schema difference is detected w.r.t. iceberg table (i.e. global schema), in this case
+	// 			we need to evolve schema in iceberg table
+	// NOTE: All the above cases will also complete current writer (java writer instance) as schema change in thread detected
+
 	globalSchemaMap, ok := globalSchema.(map[string]string)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert globalSchema")
+		return nil, fmt.Errorf("failed to convert globalSchema of type[%T] to map[string]string", globalSchema)
 	}
 
 	recordsSchema, ok := recordsRawSchema.(map[string]string)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert newSchemaMap")
+		return nil, fmt.Errorf("failed to convert newSchemaMap of type[%T] to map[string]string", recordsRawSchema)
 	}
 
-	// Check if table schema is different from global schema
+	// case handled:
+	// 1. returns true if promotion is possible or new column is added
+	// 2. in case of int(globalType) and string(threadType) it return false
+	//    and write method will try to parse the string (write will fail if not parsable)
+	differentSchema := func(oldSchema, newSchema map[string]string) bool {
+		for fieldName, newType := range newSchema {
+			if oldType, exists := oldSchema[fieldName]; !exists {
+				return true
+			} else if promotionRequired(oldType, newType) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// check for identifier fields setting
+	identifierField := utils.Ternary(i.config.NoIdentifierFields, "", constants.OlakeID).(string)
+	request := proto.IcebergPayload{
+		Type: proto.IcebergPayload_EVOLVE_SCHEMA,
+		Metadata: &proto.IcebergPayload_Metadata{
+			IdentifierField: &identifierField,
+			DestTableName:   i.stream.GetDestinationTable(),
+			ThreadId:        i.server.serverID,
+		},
+	}
+
+	var response string
+	var err error
+	// check if table schema is different from global schema
 	if differentSchema(globalSchemaMap, recordsSchema) {
 		logger.Infof("Thread[%s]: evolving schema in iceberg table", i.options.ThreadID)
-		
-		request := proto.IcebergPayload{
-			Type: proto.IcebergPayload_EVOLVE_SCHEMA,
-			Metadata: &proto.IcebergPayload_Metadata{
-				IdentifierField: &identifierField,
-				DestTableName:   i.stream.Name(),
-				ThreadId:        i.server.serverID,
-				Schema:          /* new schema fields */,
-			},
+		for field, fieldType := range recordsSchema {
+			request.Metadata.Schema = append(request.Metadata.Schema, &proto.IcebergPayload_SchemaField{
+				Key:     field,
+				IceType: fieldType,
+			})
 		}
 
 		response, err = i.server.sendClientRequest(ctx, &request)
@@ -241,7 +282,6 @@ func (i *Iceberg) EvolveSchema(ctx context.Context, globalSchema, recordsRawSche
 			return false, fmt.Errorf("failed to evolve schema: %s", err)
 		}
 	} else {
-		// Schema already exists in table; just refresh writer
 		logger.Debugf("Thread[%s]: refreshing table schema", i.options.ThreadID)
 		request.Type = proto.IcebergPayload_REFRESH_TABLE_SCHEMA
 		response, err = i.server.sendClientRequest(ctx, &request)
@@ -250,10 +290,10 @@ func (i *Iceberg) EvolveSchema(ctx context.Context, globalSchema, recordsRawSche
 		}
 	}
 
-	// Parse updated schema and update thread-local schema
+	// only refresh table schema
 	schemaAfterEvolution, err := parseSchema(response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse schema: %s", err)
+		return nil, fmt.Errorf("failed to parse schema from resp[%s]: %s", response, err)
 	}
 
 	i.schema = copySchema(schemaAfterEvolution)
@@ -261,348 +301,70 @@ func (i *Iceberg) EvolveSchema(ctx context.Context, globalSchema, recordsRawSche
 }
 ```
 
-### Union-by-Name Evolution (Java)
+### Removal of JSON Overhead And Type Detection
 
-The Java side handles the actual schema evolution using Iceberg's native `unionByNameWith` operation. This approach is safer than union-by-position because it handles schema changes more gracefully, especially when fields are added in different orders or when optional fields are introduced.
+In previous implementation, Java JSON library used to load data, detect its type and then its conversion. But in new implementation we have removed the whole JSON overhead—now we are using RPC internal type definitions to pass data to Iceberg server. This makes it easier, with no conversion overhead and less RPC call metadata size.
 
-The key aspects of our schema evolution strategy:
+<img
+  src="/img/blog/2025/10/how-olake-becomes-7x-faster-4.webp"
+  alt="Serialization Path Comparison"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '100%', height: 'auto' }}
+/>
 
-- **Union-by-name**: Fields are matched by name rather than position, making the evolution more robust
-- **Identifier field preservation**: Primary key fields are maintained to ensure upsert functionality continues to work
-- **No-op detection**: We avoid creating unnecessary snapshots when the schema hasn't actually changed
-
-Here's the implementation:
-
-```java title="IcebergTableOperator.java"
-// destination/iceberg/olake-iceberg-java-writer/src/main/java/io/debezium/server/iceberg/tableoperator/IcebergTableOperator.java
-public void applyFieldAddition(Table icebergTable, Schema newSchema) {
-  icebergTable.refresh(); // for safe case
-  
-  UpdateSchema us = icebergTable.updateSchema().unionByNameWith(newSchema);
-  
-  if (createIdentifierFields) {
-    us.setIdentifierFields(newSchema.identifierFieldNames());
-  }
-  
-  Schema newSchemaCombined = us.apply();
-  
-  // Avoid no-op commits (Iceberg creates a new snapshot even if schema unchanged)
-  if (!icebergTable.schema().sameSchema(newSchemaCombined)) {
-    LOGGER.warn("Extending schema of {}", icebergTable.name());
-    us.commit();
-  }
-}
-```
-
-### Writer Refresh
-
-After schema evolution, we explicitly complete the current writer to ensure the next write uses the updated schema. This is crucial because Iceberg writers are schema-aware and must be recreated when the schema changes. Without this step, writes would fail with schema mismatch errors.
-
-The refresh process involves:
-
-1. **Completing the current writer**: This flushes any pending data and closes the writer
-2. **Collecting data files**: The completed writer's output files are collected for the next commit
-3. **Nullifying the writer**: This forces the creation of a new writer with the updated schema on the next write
-
-Here's how this works:
-
-```java title="OlakeRowsIngester.java"
-// destination/iceberg/olake-iceberg-java-writer/src/main/java/io/debezium/server/iceberg/rpc/OlakeRowsIngester.java
-switch (request.getType()) {
-case EVOLVE_SCHEMA:
-    SchemaConvertor convertor = new SchemaConvertor(identifierField, schemaMetadata);
-    icebergTableOperator.applyFieldAddition(this.icebergTable, convertor.convertToIcebergSchema());
-    this.icebergTable.refresh();
-    // Complete current writer so next write uses new schema
-    icebergTableOperator.completeWriter();
-    sendResponse(responseObserver, this.icebergTable.schema().toString());
-    LOGGER.info("{} Successfully applied schema evolution for table: {}", requestId, destTableName);
-    break;
-
-case REFRESH_TABLE_SCHEMA:
-    this.icebergTable.refresh();
-    // Complete current writer
-    icebergTableOperator.completeWriter();
-    sendResponse(responseObserver, this.icebergTable.schema().toString());
-    break;
-}
-```
-
-```java title="IcebergTableOperator.java"
-// destination/iceberg/olake-iceberg-java-writer/src/main/java/io/debezium/server/iceberg/tableoperator/IcebergTableOperator.java
-public void completeWriter() {
-  try {
-    if (writer == null) {
-      LOGGER.warn("no writer to complete");
-      return;
-    }
-    
-    // Complete writer and collect data/delete files
-    WriteResult writerResult = writer.complete();
-    deleteFiles.addAll(Arrays.asList(writerResult.deleteFiles()));
-    dataFiles.addAll(Arrays.asList(writerResult.dataFiles()));
-    
-  } catch (IOException e) {
-    LOGGER.error("Failed to complete writer", e);
-    throw new RuntimeException("Failed to complete writer", e);
-  } finally {
-    // Close and null the writer
-    try {
-      if (writer != null) {
-        writer.close();
-      }
-    } catch (IOException e) {
-      LOGGER.warn("Failed to close writer", e);
-    }
-    // Set to null to trigger re-initialization with new schema
-    writer = null;
-  }
-}
-```
-
-**Why this matters**: Without explicit refresh, the writer instance would continue using the old schema, leading to schema mismatches and write failures. This explicit refresh ensures that all subsequent writes use the correct, updated schema, maintaining data consistency and preventing runtime errors.
-
-The schema evolution process is designed to be:
-- **Thread-safe**: Multiple threads can detect schema changes simultaneously without conflicts
-- **Atomic**: Schema changes are applied atomically to the Iceberg table
-- **Efficient**: Only threads that detect actual schema changes participate in the evolution process
-- **Consistent**: All threads eventually use the same updated schema
-
----
-
-## Go Data Plane: Thread-Scoped Schema and Batching
-
-The Go side of our architecture is responsible for the high-level data plane operations: concurrency management, intelligent batching, and schema coordination. This design leverages Go's strengths in concurrent programming while keeping the complex Iceberg I/O operations in Java where the native libraries are most mature.
-
-The key responsibilities of the Go data plane include:
-
-- **Concurrent processing**: Managing multiple writer threads that can process different partitions or streams simultaneously
-- **Intelligent batching**: Collecting records into optimal batch sizes for efficient processing
-- **Schema coordination**: Detecting schema changes and coordinating evolution across threads
-- **Lifecycle management**: Properly initializing and cleaning up writer resources
-
-Let's examine how these components work together:
-
-### Writer Pool and Thread Setup
-
-The writer pool manages the lifecycle of writer threads, ensuring proper resource allocation and schema sharing across threads for the same stream. Each thread gets its own isolated processing context while sharing schema information to maintain consistency.
-
-Key aspects of the thread setup:
-
-- **Schema sharing**: All threads for a stream share the same schema artifact to ensure consistency
-- **Thread isolation**: Each thread has its own buffer and processing context
-- **Resource management**: Proper initialization and cleanup of writer resources
-- **Configuration**: Thread-specific options like batch sizes and timeouts
-
-Here's how new writer threads are created:
-
-```go title="writers.go"
-// destination/writers.go
-func (w *WriterPool) NewWriter(ctx context.Context, stream types.StreamInterface, options ...ThreadOptions) (*WriterThread, error) {
-	w.stats.ThreadCount.Add(1)
-
-	opts := &Options{}
-	for _, one := range options {
-		one(opts)
-	}
-
-	// Get per-stream schema artifact (shared across threads for this stream)
-	rawStreamArtifact, ok := w.writerSchema.Load(stream.ID())
-	if !ok {
-		return nil, fmt.Errorf("failed to get stream artifacts for stream[%s]", stream.ID())
-	}
-
-	streamArtifact, ok := rawStreamArtifact.(*writerSchema)
-	if !ok {
-		return nil, fmt.Errorf("failed to convert raw stream artifact")
-	}
-
-	var writerThread Writer
-	err := func() error {
-		// Initialize writer with configurations
-		writerThread = w.init()
-		w.configMutex.Lock()
-		err := utils.Unmarshal(w.config, writerThread.GetConfigRef())
-		w.configMutex.Unlock()
-		if err != nil {
-			return err
-		}
-
-		// Setup table and schema
-		streamArtifact.mu.Lock()
-		defer streamArtifact.mu.Unlock()
-
-		output, err := writerThread.Setup(ctx, stream, streamArtifact.schema, opts)
-		if err != nil {
-			return fmt.Errorf("failed to setup the writer thread: %s", err)
-		}
-
-		// First thread for this stream sets the global schema
-		if streamArtifact.schema == nil {
-			streamArtifact.schema = output
-		}
-
-		return nil
-	}()
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup writer thread: %s", err)
-	}
-
-	return &WriterThread{
-		buffer:         []types.RawRecord{},
-		batchSize:      10000, // Default batch size
-		threadID:       opts.ThreadID,
-		writer:         writerThread,
-		stats:          w.stats,
-		streamArtifact: streamArtifact,
-	}, nil
-}
-```
-
-### The Flush Path: Evolve-If-Needed, Then Write
-
-The flush operation is the heart of the data processing pipeline. It handles the critical sequence of schema evolution detection, data flattening, and writing to Iceberg. The design ensures that schema changes are detected and handled before any data is written, preventing schema mismatch errors.
-
-The flush process follows this sequence:
-
-1. **Data flattening and schema detection**: Records are flattened and analyzed for schema changes
-2. **Schema evolution**: If changes are detected, the schema is evolved atomically
-3. **Data writing**: Records are written using the correct schema
-4. **Error handling**: Any failures are properly handled and reported
-
-This approach ensures that schema evolution and data writing are properly coordinated:
-
-```go title="writers.go"
-// destination/writers.go
-func (wt *WriterThread) flush(ctx context.Context, buf []types.RawRecord) (err error) {
-	// Skip empty buffers
-	if len(buf) == 0 {
-		return nil
-	}
-
-	// Create flush context
-	flushCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Flatten data and detect schema changes
-	evolution, buf, threadSchema, err := wt.writer.FlattenAndCleanData(buf)
-	if err != nil {
-		return fmt.Errorf("failed to flatten and clean data: %s", err)
-	}
-
-	// If schema evolution detected, evolve schema
-	if evolution {
-		wt.streamArtifact.mu.Lock()
-		newSchema, err := wt.writer.EvolveSchema(flushCtx, wt.streamArtifact.schema, threadSchema)
-		if err == nil && newSchema != nil {
-			wt.streamArtifact.schema = newSchema
-		}
-		wt.streamArtifact.mu.Unlock()
-		if err != nil {
-			return fmt.Errorf("failed to evolve schema: %s", err)
-		}
-	}
-
-	// Write records
-	if err := wt.writer.Write(flushCtx, buf); err != nil {
-		return fmt.Errorf("failed to write records: %s", err)
-	}
-
-	logger.Infof("Thread[%s]: successfully wrote %d records", wt.threadID, len(buf))
-	return nil
-}
-```
-
-### Parallel Normalization and Schema Detection
-
-Normalization and schema evolution checks run in parallel at the thread level. Each thread builds a local candidate schema from its batch, compares it against the stream's global schema, and only acquires the stream-level schema lock if a difference is detected. This approach minimizes contention and allows for efficient parallel processing.
-
-**How parallel normalization works:**
-
-- **Thread-local schema detection**: Each writer thread analyzes its batch of records to build a candidate schema
-- **Parallel comparison**: Threads compare their local schema against the global stream schema without blocking
-- **Contention minimization**: Only threads that detect actual schema changes acquire the stream-level lock
-- **Efficient processing**: Multiple threads can process different batches simultaneously without schema conflicts
-
-This parallel approach is crucial for maintaining high throughput while ensuring schema consistency across all writer threads.
-
-### Concurrency and Locking
-
-The Go data plane implements a sophisticated concurrency model that minimizes contention while ensuring correctness:
-
-- **Thread-local schema first**: Threads compute and cache their candidate schema locally without any locking
-- **Global schema lock only on change**: A stream-scoped lock is taken to evolve schema in the table only when a thread detects divergence from the global schema
-- **Commit lock**: Per-thread commits are serialized with `table.refresh()` to ensure atomic visibility without cross-thread partial state
-
-This design keeps hot paths lock-free and confines blocking to rare schema transitions and final commits, enabling high concurrency while maintaining data consistency.
-
-### Explicit Commit on Thread Close
-
-When a writer thread is closed, it must ensure that all pending data is properly committed to Iceberg before shutting down. This explicit commit ensures that no data is lost during thread termination and that the exactly-once semantics are maintained.
-
-The close process involves:
-
-1. **Final commit**: All pending data files are committed to the Iceberg table
-2. **Resource cleanup**: Connections and resources are properly released
-3. **Error handling**: Any failures during shutdown are properly logged and handled
-
-This explicit commit is crucial for maintaining data consistency:
-
+Below is the code where we have done it:
 ```go title="iceberg.go"
-// destination/iceberg/iceberg.go
-func (i *Iceberg) Close(ctx context.Context) error {
-	// Skip flushing on error
-	defer func() {
-		if i.server == nil {
-			return
-		}
-		err := i.server.closeIcebergClient()
-		if err != nil {
-			logger.Errorf("Thread[%s]: error closing Iceberg client: %s", i.options.ThreadID, err)
-		}
-	}()
-
-	if i.stream == nil {
-		// For check connection no commit will happen
-		return nil
-	}
-
-	// Send commit request for this thread
-	ctx, cancel := context.WithTimeout(ctx, 300*time.Second)
-	defer cancel()
-
-	request := &proto.IcebergPayload{
-		Type: proto.IcebergPayload_COMMIT,
-		Metadata: &proto.IcebergPayload_Metadata{
-			ThreadId:      i.server.serverID,
-			DestTableName: i.stream.Name(),
-		},
-	}
-	
-	res, err := i.server.sendClientRequest(ctx, request)
-	if err != nil {
-		return fmt.Errorf("failed to send commit message: %s", err)
-	}
-
-	logger.Debugf("Thread[%s]: Sent commit message: %s", i.options.ThreadID, res)
-	return nil
+for _, field := range protoSchema {
+  val, exist := record.Data[field.Key]
+  if !exist {
+    protoColumnsValue = append(protoColumnsValue, nil)
+    continue
+  }
+  switch field.IceType {
+  case "boolean":
+    boolValue, err := typeutils.ReformatBool(val)
+    if err != nil {
+      return fmt.Errorf("failed to reformat rawValue[%v] as bool value: %s", val, err)
+    }
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_BoolValue{BoolValue: boolValue}})
+  case "int":
+    intValue, err := typeutils.ReformatInt32(val)
+    if err != nil {
+      return fmt.Errorf("failed to reformat rawValue[%v] of type[%T] as int32 value: %s", val, val, err)
+    }
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_IntValue{IntValue: intValue}})
+  case "long":
+    longValue, err := typeutils.ReformatInt64(val)
+    if err != nil {
+      return fmt.Errorf("failed to reformat rawValue[%v] of type[%T] as long value: %s", val, val, err)
+    }
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_LongValue{LongValue: longValue}})
+  case "float":
+    floatValue, err := typeutils.ReformatFloat32(val)
+    if err != nil {
+      return fmt.Errorf("failed to reformat rawValue[%v] of type[%T] as float32 value: %s", val, val, err)
+    }
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_FloatValue{FloatValue: floatValue}})
+  case "double":
+    doubleValue, err := typeutils.ReformatFloat64(val)
+    if err != nil {
+      return fmt.Errorf("failed to reformat rawValue[%v] of type[%T] as float64 value: %s", val, val, err)
+    }
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_DoubleValue{DoubleValue: doubleValue}})
+  case "timestamptz":
+    timeValue, err := typeutils.ReformatDate(val)
+    if err != nil {
+      return fmt.Errorf("failed to reformat rawValue[%v] of type[%T] as time value: %s", val, val, err)
+    }
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_LongValue{LongValue: timeValue.UnixMilli()}})
+  default:
+    protoColumnsValue = append(protoColumnsValue, &proto.IcebergPayload_IceRecord_FieldValue{Value: &proto.IcebergPayload_IceRecord_FieldValue_StringValue{StringValue: fmt.Sprintf("%v", val)}})
+  }
 }
 ```
 
----
-
-## gRPC Contract
-
-The communication between Go and Java components uses a carefully designed gRPC contract that prioritizes efficiency and type safety. Rather than using generic JSON or dynamic message formats, we use strongly-typed protobuf messages that eliminate serialization overhead and provide compile-time type checking.
-
-Key design decisions for the gRPC contract:
-
-- **Single unary RPC**: One endpoint handles all operations (records, commits, schema evolution) to reduce connection overhead
-- **Typed payloads**: Strongly-typed fields instead of generic maps reduce memory usage and serialization costs
-- **Purpose-built messages**: Messages are designed specifically for Iceberg operations, not generic CDC formats
-- **Efficient encoding**: Protobuf's binary encoding is more efficient than JSON for structured data
-
-Here's the contract definition:
+Here's the gRPC contract definition:
 
 ```protobuf title="record_ingest.proto"
 // destination/iceberg/olake-iceberg-java-writer/src/main/resources/record_ingest.proto
@@ -666,115 +428,65 @@ message RecordIngestResponse {
 }
 ```
 
-**Benefits of this design:**
+**Benefits of this protocol change:**
 
 - **Typed `oneof` fields**: Use significantly less memory than generic `google.protobuf.Value` maps, reducing both serialization overhead and memory allocations
 - **Single RPC endpoint**: Simplifies client/server logic and reduces connection management overhead
 - **Clear operation intent**: The `PayloadType` enum makes it explicit what operation is being performed
-- **No Debezium envelope**: The payload is purpose-built for Iceberg writes, eliminating unnecessary parsing and transformation steps
+- **No Debezium envelope**: The payload is purpose built for Iceberg writes, eliminating unnecessary parsing and transformation steps
 - **Efficient field encoding**: Protobuf's binary encoding is more compact and faster to parse than JSON
-- **Compile-time type safety**: Both Go and Java get compile-time validation of message structures
-
-This contract design contributes significantly to the overall performance improvement by eliminating serialization bottlenecks and reducing memory pressure.
+- **Compile time type safety**: Both Go and Java get compile time validation of message structures
 
 ---
 
-## Serialization Path: Before vs After
+### Moving Compute to Go Side
 
-One of the most significant optimizations in our refactor was eliminating the Debezium envelope from the serialization path. This change removes an entire encode/decode cycle and significantly reduces CPU usage, memory allocations, and overall processing overhead.
+In the previous architecture, all processing, type detection, and type promotion happened on the Java side. In the new writer, the Golang side is responsible for type detection, schema updates, and data writing.
 
-<img
-  src="/img/blog/2025/10/how-olake-becomes-7x-faster-4.webp"
-  alt="Serialization Path Comparison"
-  style={{ width: '100%', height: 'auto' }}
-/>
+All concurrency management happens on the Go side. Iceberg Java server just acts as an API server where each API has single responsibilities. There are some optimizations that we have done: 
+- **Concurrent processing**: Managing multiple writer threads that can process different partitions or tables simultaneously
+- **Schema coordination**: Detecting table changes and coordinating evolution across threads
+- **Normalization**: Parallel normalization of data across multiple threads 
+- **Lifecycle management**: Properly initializing and cleaning up writer resources
 
-**Before (Original Pipeline):**
-- Source data → Debezium envelope → JSON serialization → Network transmission → JSON deserialization → Debezium parsing → Iceberg format conversion → File write
+#### Parallel Normalization and Schema Detection
 
-**After (Refactored Pipeline):**
-- Source data → Go-native processing → Typed protobuf → Network transmission → Java-native Iceberg operations → File write
+Normalization and schema evolution checks run in parallel at the thread level. Each thread builds a local candidate schema from its batch, compares it against the table's global schema, and only acquires the table level schema lock if a difference is detected. This approach minimizes contention and allows for efficient parallel processing.
 
-**Key improvements:**
-- **Eliminated Debezium envelope**: Removes unnecessary metadata and formatting overhead
-- **Direct protobuf serialization**: More efficient than JSON for structured data
-- **Native format conversion**: Go and Java components work with their native data structures
-- **Reduced memory allocations**: Fewer intermediate objects and copies
-- **Faster processing**: Eliminates multiple encode/decode cycles
+**How parallel normalization works:**
 
-This optimization alone contributes significantly to the overall performance improvement by streamlining the data processing pipeline and reducing computational overhead.
+- **Thread local schema detection**: Each writer thread analyzes its batch of records to build a candidate schema
+- **Parallel comparison**: Threads compare their local schema against the global table schema without blocking
+- **Contention minimization**: Only threads that detect actual schema changes acquire the table level lock
+- **Efficient processing**: Multiple threads can process different batches simultaneously without schema conflicts
 
----
+This parallel approach is crucial for maintaining high throughput while ensuring schema consistency across all writer threads.
 
-## Partition Fanout Writer
+#### Go Maintains Schema Copy
 
-Highly partitioned tables present a unique challenge for data ingestion systems. The traditional approach of processing partitions sequentially leads to frequent writer creation and destruction, resulting in many small files and poor I/O efficiency. Our new partition fanout writer addresses these issues by maintaining multiple partition writers concurrently.
+So to reduce RPC calls and overhead of Java server, the identical writer schema copy is being maintained on the Go side, which is responsible to check if any schema evolution is required or not. In that way, we avoid unnecessary locks for the schema checks. 
 
-<img
-  src="/img/blog/2025/10/how-olake-becomes-7x-faster-5.webp"
-  alt="Partition Fanout Writer"
-  style={{ width: '100%', height: 'auto' }}
-/>
+### Partition Fanout Writer
 
-**Problems with the previous approach:**
-- **Sequential partition processing**: Only one partition writer could be active at a time
-- **Frequent writer rolls**: Small batches led to many small files
-- **Poor I/O efficiency**: Constant writer creation/destruction overhead
-- **Inconsistent file sizes**: Unpredictable file sizes hurt query performance
+Highly partitioned tables were another pain point we encountered. In the previous implementation, when a record with a different partition arrived, it would close the current writer and open a new one. This meant we were processing partitions sequentially—only one partition writer could be active at a time. This approach had several problems: frequent writer creation and destruction overhead, many small files being created, and poor I/O efficiency.
 
-**How the new fanout writer works:**
-- **Concurrent partition writers**: Multiple partition writers can be active simultaneously when memory allows
-- **Intelligent buffering**: Each partition buffers data to target larger, more consistent file sizes
-- **Reduced writer churn**: Writers are reused across batches, reducing creation/destruction overhead
-- **Better resource utilization**: More efficient use of I/O resources and memory
+The issue becomes more pronounced when you have tables with many partitions. Imagine processing a table with 50-100 partitions—you're constantly creating and destroying writers, which is expensive. Plus, all those small files hurt query performance because query engines need to read metadata from many files.
 
-**Benefits:**
-- **Improved throughput**: Especially noticeable on highly partitioned tables with many small partitions
-- **Consistent file sizes**: Better query performance and storage efficiency
-- **Reduced overhead**: Less time spent on writer lifecycle management
-- **Better scalability**: Performance scales better with the number of partitions
+In our new implementation, we maintain multiple partition writers concurrently. When memory allows, we can have several partition writers active at the same time, each handling different partitions. Each partition buffers its data to target larger, more consistent file sizes.
 
-This optimization is particularly important for tables with many partitions, where the traditional approach would create hundreds or thousands of small files, leading to poor query performance and storage inefficiency.
+The benefits are clear: improved throughput especially on highly partitioned tables, consistent file sizes that lead to better query performance, and better resource utilization. This optimization is particularly important for tables with many partitions, where the traditional approach would create hundreds or thousands of small files, leading to poor query performance and storage inefficiency.
 
 ---
 
-## Performance Optimizations
+### The Benchmarks (Success Metrics)
 
-The 7× performance improvement is the result of multiple architectural optimizations that compound together. Each optimization addresses a specific bottleneck in the original pipeline, and their combined effect creates a dramatic improvement in throughput and efficiency.
-
-Here's a detailed breakdown of each optimization:
-
-| Optimization | Technical Details |
-|--------------|-------------------|
-| **Bigger batches** | Default 10k records per batch; fewer RPC calls reduce network overhead; larger Parquet chunks improve compression and I/O efficiency; better amortization of serialization costs |
-| **Typed protobufs** | Eliminates dynamic map allocations and generic `google.protobuf.Value` overhead; compile-time type checking reduces runtime validation; binary encoding is more efficient than JSON |
-| **Thread-scoped schema** | Removes global schema locks from the hot path; writer refresh only occurs when schema actually changes; parallel schema detection reduces contention |
-| **Java-native Iceberg I/O** | Direct use of Iceberg's optimized `RowDelta`/`AppendFiles` APIs; leverages vectorized Parquet writes; eliminates intermediate format conversions |
-| **Clean commit/ack boundaries** | Reduces retry overhead and rollback churn; predictable behavior eliminates expensive error recovery; atomic operations prevent partial state issues |
-
-**Combined effect**: These optimizations compound together to achieve the **7× performance improvement**.
-
-### Why These Optimizations Compound
-
-The performance improvements compound because they address different bottlenecks in the pipeline:
-
-1. **Batch size optimization** reduces the frequency of expensive operations (RPC calls, file writes)
-2. **Typed serialization** makes each operation faster and uses less memory
-3. **Thread-scoped schema** eliminates contention that would otherwise limit concurrency
-4. **Native Iceberg I/O** leverages the most efficient data structures and algorithms
-5. **Clean boundaries** eliminate overhead from error handling and recovery
-
-Each optimization enables the others to be more effective, creating a multiplicative rather than additive improvement.
-
-### Performance Benchmarks
-
-To validate our improvements, we conducted comprehensive benchmarks across different workloads and scenarios:
+Now if you have seen our headline about 7x or 700% improvement, here is the proof:
 
 | Metric | Before | After | Improvement |
 |--------|--------|-------|-------------|
 | **Throughput** | ~46K records/sec | ~320K records/sec | **7× faster** |
 | **Memory usage** | 80GB+ | 40GB+ | **50% reduction** |
-| **File size consistency** | 50MB - 2GB range | 300-400MB target | **Consistent sizing** |
+| **File size consistency** | 30MB - 50MB range | 300-400MB target | **Consistent sizing** |
 
 **Test Environment:**
 - **Hardware**: 64-core CPU, 128GB RAM, NVMe SSD storage
@@ -786,53 +498,22 @@ To validate our improvements, we conducted comprehensive benchmarks across diffe
 **Key Insights:**
 - **Consistent performance**: The new architecture maintains performance even under high concurrency (10+ writer threads)
 - **Predictable resource usage**: Memory and CPU usage are now predictable and bounded
-- **Faster recovery**: Schema evolution and error recovery are significantly faster
 - **Better scalability**: Performance scales linearly with additional threads and partitions
 
 ---
 
-## Benefits
-
-### 1. Exactly-Once Visible State
-
-No background deduplication. Tables reflect the correct state after each commit.
-
-### 2. Performance
-
-7× throughput improvement through optimized batching, typed serialization, and efficient I/O.
-
-### 3. Operational Simplicity
-
-- Clear commit/ack boundaries
-- Deterministic behavior under failure
-- Explicit schema evolution
-- Per-thread isolation
-
-### 4. Scalability
-
-- Thread-scoped schema reduces contention
-- Bigger batches improve I/O efficiency
-- Java-native Iceberg operations leverage vectorized writes
-
-### 5. Consistent File Sizing
-
-We standardize on a default target file size of ~350 MB for steady compaction and reader performance. This consistent file sizing:
-
-- **Improves query performance**: Larger, consistently-sized files enable better query planning and execution
-- **Optimizes storage efficiency**: Reduces the number of small files that can hurt storage performance
-- **Enables better compaction**: Consistent file sizes make compaction strategies more predictable and efficient
-- **Reduces metadata overhead**: Fewer files mean less metadata to manage and process
-
----
-
 ## Lessons Learned
+
+Behind these optimizations lies a lot of experimentation and iteration. We first considered how to make the Java Iceberg server compatible with Olake. Our CTO started with a basic version that correctly supported Iceberg writes, as there was no existing tool that could write to Iceberg in a truly native way. We then decided to optimize it specifically for Olake, with our main goal being to build the best possible and most reliable solution.
+
+I started experimenting with a structure where each writer would have multiple flush threads, but encountered OOM (Out of Memory) issues. I also struggled to determine the optimal parameter for the number of flush threads per writer—too many flush threads with fewer writer threads would reduce database throughput. I eventually set the number to a constant value of 1 and moved forward. The next challenge was writer lifecycle management: when a schema change occurs, you must create a new Java writer, similar to creating a new Parquet file when the schema changes. We spent a day debugging this issue, primarily because the documentation didn't clearly state that each writer is based on a single schema. 
 
 This refactor taught us several valuable lessons about building high-performance data systems:
 
 ### 1. Correctness Enables Performance
 Starting with strong consistency guarantees (exactly-once semantics) actually made performance optimization easier. When you don't have to worry about eventual consistency or background cleanup jobs, you can focus purely on throughput and efficiency.
 
-### 2. Language-Specific Strengths Matter
+### 2. Language Specific Strengths Matter
 Using Go for concurrency and Java for I/O operations wasn't just about using the right tool for the job—it was about leveraging each language's ecosystem and optimizations. The mature Iceberg Java libraries and Go's concurrent programming model were both essential.
 
 ### 3. Eliminate Complexity Before Optimizing
@@ -852,10 +533,8 @@ The destination refactor represents a fundamental shift in how we approach data 
 
 ### Key Achievements
 
-- **Exactly-once visible state**: Achieved through atomic Iceberg commits and careful acknowledgment ordering, eliminating the need for background deduplication jobs
 - **7× performance improvement**: Result of multiple compounding optimizations including bigger batches, typed serialization, and native Iceberg I/O
-- **Clear operational boundaries**: Deterministic behavior under failure conditions with well-defined commit and acknowledgment semantics
-- **Robust schema evolution**: Thread-safe schema evolution with explicit writer refresh ensures consistency across concurrent operations
+- **Robust schema evolution**: Thread safe schema evolution with explicit writer refresh ensures consistency across concurrent operations
 - **Improved scalability**: Better resource utilization and reduced contention enable the system to handle larger workloads
 
 ### Architectural Insights
@@ -865,7 +544,7 @@ The split between Go (data plane) and Java (Iceberg I/O) provides the right abst
 - **Go's strengths**: Concurrent programming, lightweight threading, and efficient memory management make it ideal for data plane operations
 - **Java's strengths**: Mature Iceberg ecosystem, optimized I/O libraries, and vectorized operations provide the most efficient path for file operations
 - **Clean interfaces**: The typed gRPC contract eliminates serialization overhead while maintaining type safety
-- **Explicit lifecycle management**: Well-defined resource management prevents leaks and ensures consistency
+- **Explicit lifecycle management**: Well defined resource management prevents leaks and ensures consistency
 
 ### Broader Implications
 
@@ -875,36 +554,9 @@ This refactor demonstrates several important principles for building high-perfor
 2. **Leverage native capabilities**: Using each language's strengths rather than forcing a one-size-fits-all approach
 3. **Design for correctness first**: Strong consistency guarantees enable better performance optimizations
 4. **Measure and optimize systematically**: Each optimization was measured and validated before moving to the next
+5. **Extendible Code**: New features can be created easily on top of current architecture.
 
 The result is a system that is not only faster but also more reliable, maintainable, and operationally friendly.
-
----
-
-## What's Next
-
-This refactor is just the beginning. We're continuing to invest in several key areas:
-
-### Immediate Priorities (Next 3-6 months)
-
-- **Iceberg merge-on-read optimizations**: Implementing intelligent file pruning and predicate pushdown to reduce query latency
-- **Real-time metrics and observability**: Building comprehensive monitoring dashboards for throughput, latency, and error rates
-- **DLQ/SMT hooks**: Leveraging the typed contract and schema awareness to add dead-lettering and smart transforms without reintroducing JSON envelopes
-- **Adaptive batching**: Dynamic batch size adjustment based on workload characteristics and system resources
-
-### Medium-term Goals (6-12 months)
-
-- **Multi-region replication**: Extending the atomic commit model to support cross-region data replication
-- **Advanced compression**: Implementing columnar compression optimizations for better storage efficiency
-- **Query acceleration**: Pre-computed aggregations and materialized views for common query patterns
-- **Kubernetes-native deployment**: Operator-based deployment and management for cloud-native environments
-
-### Long-term Vision (12+ months)
-
-- **ML-powered optimization**: Using machine learning to predict optimal batch sizes and resource allocation
-- **Unified streaming/batch interface**: Seamless integration between real-time and batch processing workloads
-- **Cross-platform compatibility**: Extending support beyond Iceberg to other table formats (Delta Lake, Hudi)
-
-We're committed to making Olake the fastest, most reliable CDC platform for modern data architectures. The foundation we've built with this refactor enables all of these future enhancements.
 
 ---
 
