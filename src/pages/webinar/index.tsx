@@ -105,6 +105,19 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Fireside Chat: Apache Iceberg in Production',
+      subtitle:
+        'Join Jacopo Tagliabue (Co-founder/CTO, Bauplan) and Shubham Satish Baldava (CTO, OLake) for a candid discussion on how Apache Iceberg is reshaping data engineering—from CDC pipelines and branching strategies to deletion vectors and REST catalogs.',
+      route: '/webinar/w-13-fireside-chat-iceberg-ctos',
+      img: `/img/webinars/w-13-fireside-chat-placeholder.webp`,
+      alt: 'Fireside Chat: Apache Iceberg in Production',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '30 October 2025',
+      icon: FaVideo
+    },
+    {
       title: 'Apache Iceberg + Polaris: Breaking Catalog Vendor Lock-in',
       subtitle:
         'This session explores the evolution of metadata catalogs in the lakehouse era, the challenges organizations face with traditional solutions, and why open catalog standards are critical for interoperability. Featuring Apache Polaris, an Iceberg-native, open catalog designed to eliminate vendor lock-in.',
