@@ -17,7 +17,7 @@ const hosts = [
     name: "Jacopo Tagliabue",
     role: "Co-founder & CTO, Bauplan",
     bio: "Jacopo leads the technical strategy at Bauplan where he helps teams bring machine learning and analytics into production faster. He previously built the AI platform at Coveo, authored multiple papers on applied ML, and mentors startups on data platform design.",
-    image: "/img/authors/author.webp",
+    image: "/img/authors/jacopo.webp",
     linkedin: "https://www.linkedin.com/in/jacopotagliabue"
   },
   {
