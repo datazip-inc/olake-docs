@@ -109,7 +109,7 @@ const WebinarsPage = () => {
       subtitle:
         'Join Jacopo Tagliabue (Co-founder/CTO, Bauplan) and Shubham Satish Baldava (CTO, OLake) for a candid discussion on how Apache Iceberg is reshaping data engineering—from CDC pipelines and branching strategies to deletion vectors and REST catalogs.',
       route: '/webinar/w-13-fireside-chat-iceberg-ctos',
-      img: `/img/webinars/w-13-fireside-chat-placeholder.webp`,
+      img: `/img/authors/jacopo.webp`,
       alt: 'Fireside Chat: Apache Iceberg in Production',
       status: 'archived',
       button: 'secondary',
