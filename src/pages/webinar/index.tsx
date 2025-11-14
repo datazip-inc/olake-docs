@@ -1,9 +1,28 @@
 import React, { useState, useRef, useEffect } from "react";
 // @ts-ignore
 import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head'
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
+import { useLocation } from '@docusaurus/router'
 import LazyComponent from '../../components/LazyComponent'
 import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
+
+const stripTrailingSlash = (value?: string) => {
+  if (!value) {
+    return '';
+  }
+
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+};
+
+const ensureTrailingSlash = (value: string) => {
+  if (!value) {
+    return '/';
+  }
+
+  return value.endsWith('/') ? value : `${value}/`;
+};
 
 // Custom hook for dynamic iframe height
 const useDynamicIframeHeight = (src) => {
@@ -76,11 +95,28 @@ const useDynamicIframeHeight = (src) => {
 };
 
 const WebinarsPage = () => {
+  const { siteConfig } = useDocusaurusContext()
+  const location = useLocation()
+  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
+  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
   // Use the dynamic iframe height hook
   const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
   
   // Define webinars data directly
   const webinars = [
+    {
+      title: 'Fireside Chat: Apache Iceberg in Production',
+      subtitle:
+        'Join Jacopo Tagliabue (Co-founder/CTO, Bauplan) and Shubham Satish Baldava (CTO, OLake) for a candid discussion on how Apache Iceberg is reshaping data engineering—from CDC pipelines and branching strategies to deletion vectors and REST catalogs.',
+      route: '/webinar/w-13-fireside-chat-iceberg-ctos',
+      img: `/img/webinars/w-13-fireside-chat-placeholder.webp`,
+      alt: 'Fireside Chat: Apache Iceberg in Production',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '30 October 2025',
+      icon: FaVideo
+    },
     {
       title: 'Apache Iceberg + Polaris: Breaking Catalog Vendor Lock-in',
       subtitle:
@@ -282,6 +318,16 @@ const WebinarsPage = () => {
       title='OLake Events & Webinars'
       description='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices'
     >
+      <Head>
+        <meta property='og:type' content='website' />
+        <meta property='og:title' content='OLake Events & Webinars' />
+        <meta property='og:description' content='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices' />
+        <meta property='og:url' content={canonicalUrl} />
+        <meta property='og:site_name' content='OLake' />
+        <meta property='og:locale' content='en_US' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        <meta name='twitter:image' content='https://olake.io/img/logo/olake-blue.webp' />
+      </Head>
       {/* Hero Section */}
       <section className='relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-16 dark:from-gray-900 dark:via-gray-800 dark:to-blue-950/20 lg:py-24'>
         {/* Background decorative elements */}
