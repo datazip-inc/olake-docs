@@ -63,7 +63,7 @@ const CommunityPage = () => {
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
-      date: '13 November 2025',
+      date: '12 November 2025',
       icon: FaVideo
     },
     {
