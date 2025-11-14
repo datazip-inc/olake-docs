@@ -6,7 +6,7 @@ const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriorit
 const config = {
   title: 'Fastest Open Source Data Replication Tool',
   tagline: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
-  favicon: 'img/logo/olake-blue-with-text.webp',
+  favicon: 'img/logo/olake-blue.svg',
 
   // Set the production url of your site here
   url: 'https://olake.io',
@@ -421,8 +421,8 @@ const config = {
           tagName: 'link',
           attributes: {
             rel: 'icon',
-            type: 'image/webp',
-            href: '/img/logo/olake-blue-with-text.webp',
+            type: 'image/svg+xml',
+            href: '/img/logo/olake-blue.svg',
           },
         }
       ],
