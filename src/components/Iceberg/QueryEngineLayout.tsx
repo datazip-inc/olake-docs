@@ -22,13 +22,13 @@ export interface CodeExample {
 export interface UseCase {
   title: string;
   description: string;
-  scenarios: string[];
+  scenarios: (string | React.ReactNode)[];
   icon?: React.ReactNode;
 }
 
 export interface QueryEngineLayoutProps {
-  title: string;
-  description: string;
+  title: string | React.ReactNode;
+  description: string | React.ReactNode;
   features: FeatureCardProps[];
   tableData: InteractiveTableProps;
   // codeExamples?: CodeExample[];
