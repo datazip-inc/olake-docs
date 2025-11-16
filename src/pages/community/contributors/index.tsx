@@ -10,14 +10,17 @@ import {
   FaStar,
   FaCodeBranch,
   FaSearch,
-  FaFilter
+  FaFilter,
+  FaSync,
+  FaSignOutAlt
 } from 'react-icons/fa'
 
 import contributorPoints from '../../../data/contributor-points.json'
 
+import { supabase } from '../../../lib/supabaseClient'
 
 import ImprovedContributorCard from '../../../components/community/improved/ContributorCard'
-import ContributorProps from '../../../components/ContributorCard'
+import type { ContributorProps } from '../../../components/ContributorCard'
 import SectionLayout from '../../../components/community/SectionLayout'
 import Button from '../../../components/community/improved/Button'
 import PageHeader from '../../../components/community/improved/PageHeader'
@@ -54,6 +57,128 @@ const ContributorsPage = () => {
   const [sortBy, setSortBy] = useState<'points' | 'contributions' | 'name'>('points')
 
   const excludedContributors = ['zriyanshdz', 'hash-data', 'piyushsingariya', 'piyushdatazip', 'shubham19may', 'vikash390', 'vaibhav-datazip', 'vishalm0509', 'schitizsharma', 'ImDoubD-datazip', 'rkhameshra', 'tanishaAtDatazip']
+
+  // Auth/session + points state
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [githubLogin, setGithubLogin] = useState<string | null>(null)
+  const [points, setPoints] = useState<number | null>(null)
+  const [breakdown, setBreakdown] = useState<{ goodFirstMergedPRs: number; secondLevelMergedPRs: number; validIssues: number } | null>(null)
+  const [syncing, setSyncing] = useState(false)
+
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token || null
+      setAccessToken(token)
+      if (token) {
+        await fetchMe(token)
+      }
+    }
+    void init()
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const token = session?.access_token || null
+      setAccessToken(token)
+      if (token) {
+        void fetchMe(token)
+      } else {
+        setGithubLogin(null)
+        setPoints(null)
+        setBreakdown(null)
+      }
+    })
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  const fetchMe = async (token: string) => {
+    try {
+      const res = await fetch('https://kpyasaicyxmosvwuspcx.supabase.co/functions/v1/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) return
+      const json = await res.json()
+      setGithubLogin(json?.user?.github_login ?? null)
+      const score = json?.score
+      if (score) {
+        setPoints(score.total_points ?? null)
+        setBreakdown(score.breakdown ?? null)
+      }
+    } catch {
+      // ignore for v0
+    }
+  }
+
+  const handleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: { redirectTo: typeof window !== 'undefined' ? window.location.href : undefined }
+    })
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const handleRefresh = async () => {
+    if (!accessToken) return
+    try {
+      setSyncing(true)
+      const res = await fetch('https://kpyasaicyxmosvwuspcx.supabase.co/functions/v1/points-refresh', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setPoints(json?.totalPoints ?? null)
+        setBreakdown(json?.breakdown ?? null)
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  // Issues Browser state
+  type Issue = {
+    id: number
+    number: number
+    title: string
+    html_url?: string
+    url?: string
+    body?: string
+    labels?: { name?: string }[]
+  }
+  const [issuesTab, setIssuesTab] = useState<'good-first' | 'second-level' | 'all'>('good-first')
+  const [issuesLoading, setIssuesLoading] = useState(false)
+  const [issues, setIssues] = useState<Issue[]>([])
+
+  const currentLabel = issuesTab === 'good-first'
+    ? 'good first issue'
+    : issuesTab === 'second-level'
+      ? 'good second issue'
+      : undefined
+
+  const loadIssues = async (label?: string) => {
+    try {
+      setIssuesLoading(true)
+      const url = new URL('https://kpyasaicyxmosvwuspcx.supabase.co/functions/v1/issues')
+      if (label) url.searchParams.set('label', label)
+      const res = await fetch(url.toString())
+      const json = await res.json()
+      const items = Array.isArray(json?.items) ? json.items : []
+      setIssues(items)
+    } catch {
+      setIssues([])
+    } finally {
+      setIssuesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadIssues(currentLabel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issuesTab])
 
   useEffect(() => {
     const fetchContributors = async () => {
@@ -127,6 +252,32 @@ const ContributorsPage = () => {
       title='OLake Contributors' 
       description='Meet the amazing contributors who make OLake possible. Join them in building the future of data lakehouse technology.'
     >
+      {/* Top-right login/points */}
+      <div className="fixed right-4 top-4 z-50">
+        {!githubLogin ? (
+          <Button onClick={handleLogin} size="sm">
+            <FaGithub className="mr-2" /> Log in with GitHub
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-white px-3 py-1 text-sm font-semibold shadow border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+              {githubLogin} • <span className="text-[#193ae6] dark:text-blue-400">{points ?? 0} pts</span>
+            </div>
+            {syncing ? (
+              <div className="rounded-full bg-white px-3 py-1 text-sm font-semibold shadow border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                <FaSync className="animate-spin inline mr-2" /> Syncing...
+              </div>
+            ) : (
+              <Button onClick={handleRefresh} size="sm" variant="outline">
+                <FaSync className="mr-2" /> Refresh
+              </Button>
+            )}
+            <Button onClick={handleLogout} size="sm" variant="outline">
+              <FaSignOutAlt className="mr-2" /> Logout
+            </Button>
+          </div>
+        )}
+      </div>
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content='OLake Contributors' />
@@ -294,6 +445,87 @@ const ContributorsPage = () => {
               </div>
             )}
           </>
+        )}
+      </SectionLayout>
+
+      {/* Issues Browser */}
+      <SectionLayout className="py-16">
+        <SectionHeader
+          title="How to start"
+          subtitle="Pick an issue and start contributing today"
+        />
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+          <Button
+            variant={issuesTab === 'good-first' ? 'primary' : 'outline'}
+            onClick={() => setIssuesTab('good-first')}
+            size="sm"
+          >
+            Good first issues
+          </Button>
+          <Button
+            variant={issuesTab === 'second-level' ? 'primary' : 'outline'}
+            onClick={() => setIssuesTab('second-level')}
+            size="sm"
+          >
+            Second-level issues
+          </Button>
+          <Button
+            variant={issuesTab === 'all' ? 'primary' : 'outline'}
+            onClick={() => setIssuesTab('all')}
+            size="sm"
+          >
+            All open issues
+          </Button>
+          <Button
+            href="https://github.com/datazip-inc/olake/issues/new/choose"
+            variant="outline"
+            size="sm"
+            external
+          >
+            Create a new issue
+          </Button>
+        </div>
+
+        {issuesLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#193ae6]" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {issues.map((it) => {
+              const labels = (it.labels || []).map((l) => l?.name).filter(Boolean) as string[]
+              const url =
+                it.html_url ||
+                (typeof it.url === 'string' ? it.url.replace('api.github.com/repos', 'github.com') : '#')
+              const snippet =
+                (it.body || '').trim().split(/\s+/).slice(0, 30).join(' ') + ((it.body || '').length > 0 ? '…' : '')
+              return (
+                <div
+                  key={it.id}
+                  className="rounded-xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <div className="mb-2 font-semibold">{it.title}</div>
+                  <div className="mb-3 text-sm text-gray-600 dark:text-gray-400">{snippet}</div>
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {labels.slice(0, 6).map((lb) => (
+                      <span
+                        key={lb}
+                        className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#193ae6] dark:bg-gray-900 dark:text-blue-300"
+                      >
+                        {lb}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">#{it.number}</span>
+                    <Button href={url} variant="outline" size="sm" external>
+                      View on GitHub
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </SectionLayout>
 
