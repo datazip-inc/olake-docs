@@ -96,7 +96,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
-      image: 'img/logo/olake-blue.svg',
+      image: 'img/logo/olake-blue-with-text.webp',
 
       announcementBar: {
         id: 'monthly-events-2025',
@@ -116,10 +116,10 @@ const config = {
       navbar: {
         hideOnScroll: false,
         // style: 'dark',
-        title: 'OLake',
+        title: '',
         logo: {
           alt: 'OLake Logo',
-          src: 'img/logo/olake-blue.svg',
+          src: 'img/logo/olake-blue-with-text.webp',
         },
         items: [
           { to: '/docs', label: 'Docs', position: 'right' },
@@ -201,9 +201,9 @@ const config = {
             tagName: 'link',
             attributes: {
               rel: 'preload',
-              href: '/img/logo/olake-blue.svg',
+              href: '/img/logo/olake-blue-with-text.webp',
               as: 'image',
-              type: 'image/svg+xml',
+              type: 'image/webp',
               fetchpriority: 'high'
             },
           },
