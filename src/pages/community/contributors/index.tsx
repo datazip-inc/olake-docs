@@ -47,6 +47,7 @@ const ContributorsPage = () => {
   const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
   const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
   const [contributors, setContributors] = useState<ContributorProps[]>([])
+  const [showAllContributors, setShowAllContributors] = useState(false)
 
 
   const [loading, setLoading] = useState(true)
@@ -305,45 +306,20 @@ const ContributorsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issuesTab])
 
-  // Fetch contributors from GitHub GraphQL API (more reliable than REST API)
+  // Fetch all GitHub contributors (simple list for display)
   useEffect(() => {
     const fetchContributors = async () => {
       try {
         setLoading(true)
-        
-        // Use GitHub Search API to find all PR authors (more reliable than contributors endpoint)
-        const query = 'repo:datazip-inc/olake is:pr is:merged'
-        const response = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=100`)
+        const response = await fetch('https://api.github.com/repos/datazip-inc/olake/contributors?per_page=100')
 
         if (!response.ok) {
           throw new Error(`Error fetching contributors: ${response.status}`)
         }
 
         const data = await response.json()
-        
-        // Count PRs per user
-        const contributorMap = new Map<string, any>()
-        for (const pr of data.items || []) {
-          const login = pr.user?.login
-          if (!login) continue
-          
-          if (!contributorMap.has(login)) {
-            contributorMap.set(login, {
-              id: pr.user.id,
-              login: login,
-              avatar_url: pr.user.avatar_url,
-              html_url: `https://github.com/${login}`,
-              contributions: 0
-            })
-          }
-          contributorMap.get(login)!.contributions++
-        }
-        
-        const contributorsList = Array.from(contributorMap.values())
-          .sort((a, b) => b.contributions - a.contributions)
-        
-        console.log(`Found ${contributorsList.length} contributors from merged PRs`)
-        setContributors(contributorsList)
+        console.log(`✅ Found ${data.length} contributors from GitHub`)
+        setContributors(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch contributors')
         console.error('Error fetching contributors:', err)
@@ -380,14 +356,11 @@ const ContributorsPage = () => {
   const topContributors = filteredAndSortedContributors.slice(0, 3)
   const otherContributors = filteredAndSortedContributors.slice(3)
 
+  // Hardcoded stats (update manually as needed)
   const contributorStats = {
-    total: filteredAndSortedContributors.length,
-    totalContributions: filteredAndSortedContributors.reduce((sum, c) => sum + c.contributions, 0),
-    totalPoints: filteredAndSortedContributors.reduce((sum, c) => sum + c.contributions, 0),
-    averagePoints: Math.round(
-      filteredAndSortedContributors.reduce((sum, c) => sum + c.contributions, 0) / 
-      (filteredAndSortedContributors.length || 1)
-    )
+    totalContributors: '30+',
+    totalPRs: '400+',
+    openSourceFests: '3+'
   }
 
   return (
@@ -512,30 +485,24 @@ const ContributorsPage = () => {
 
       {/* Stats Section */}
       <SectionLayout className="py-16 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           <div className="text-center">
             <div className="text-4xl md:text-5xl font-bold text-[#193ae6] dark:text-blue-400 mb-2">
-              {contributorStats.total}
+              {contributorStats.totalContributors}
             </div>
             <div className="text-gray-600 dark:text-gray-400">Contributors</div>
           </div>
           <div className="text-center">
             <div className="text-4xl md:text-5xl font-bold text-[#193ae6] dark:text-blue-400 mb-2">
-              {contributorStats.totalContributions.toLocaleString()}
+              {contributorStats.totalPRs}
             </div>
             <div className="text-gray-600 dark:text-gray-400">Total PRs</div>
           </div>
           <div className="text-center">
             <div className="text-4xl md:text-5xl font-bold text-[#193ae6] dark:text-blue-400 mb-2">
-              {contributorStats.totalPoints.toLocaleString()}
+              {contributorStats.openSourceFests}
             </div>
-            <div className="text-gray-600 dark:text-gray-400">Total Points</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl md:text-5xl font-bold text-[#193ae6] dark:text-blue-400 mb-2">
-              {contributorStats.averagePoints}
-            </div>
-            <div className="text-gray-600 dark:text-gray-400">Avg. Points</div>
+            <div className="text-gray-600 dark:text-gray-400">Open Source Fests</div>
           </div>
         </div>
       </SectionLayout>
@@ -676,7 +643,7 @@ const ContributorsPage = () => {
       <SectionLayout className="py-16">
         <SectionHeader
           title="All Contributors"
-          subtitle={`${otherContributors.length} amazing developers making OLake better every day`}
+          subtitle="Over 30 contributors making OLake better every day"
         />
 
         {loading && (
@@ -694,23 +661,67 @@ const ContributorsPage = () => {
           </div>
         )}
 
-        {!loading && !error && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {otherContributors.map((contributor) => (
-                <ImprovedContributorCard key={contributor.id} contributor={contributor} />
+        {!loading && !error && contributors.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {(showAllContributors ? contributors : contributors.slice(0, 10)).map((contributor, index) => (
+                <div 
+                  key={contributor.id}
+                  className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 hover:shadow-lg transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="text-2xl font-bold text-gray-400 dark:text-gray-600 w-8">
+                        {index + 1}
+                      </div>
+                      <img 
+                        src={contributor.avatar_url} 
+                        alt={contributor.login}
+                        className="w-16 h-16 rounded-full flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-lg text-gray-900 dark:text-white truncate">
+                          {contributor.login}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {contributor.contributions} contributions
+                        </div>
+                      </div>
+                    </div>
+                    <a 
+                      href={`https://github.com/${contributor.login}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-4 py-2 rounded-lg border-2 border-[#193ae6] text-[#193ae6] hover:bg-[#193ae6] hover:text-white dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400 dark:hover:text-white transition-all text-sm font-medium whitespace-nowrap ml-4"
+                    >
+                      View Profile →
+                    </a>
+                  </div>
+                </div>
               ))}
             </div>
+            
+            {contributors.length > 10 && (
+              <div className="mt-8 text-center">
+                <Button 
+                  onClick={() => setShowAllContributors(!showAllContributors)}
+                  variant="outline"
+                  size="lg"
+                >
+                  {showAllContributors ? 'Show Less' : `View More (${contributors.length - 10} more)`}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
-            {filteredAndSortedContributors.length === 0 && (
+        {!loading && !error && contributors.length === 0 && (
               <div className="text-center py-20">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  No contributors found matching your search.
+              No contributors found.
                 </p>
               </div>
             )}
-          </>
-        )}
       </SectionLayout>
 
       {/* Rewards & Tiers Section */}
