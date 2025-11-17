@@ -1,10 +1,10 @@
 ---
 slug: olake-kafka-iceberg
 title: "Deep Dive into Kafka as a Source in OLake: Unpacking Sync, Concurrency, and Partition Mastery"
-description: Explore OLake's Kafka source connector—featuring schema discovery, custom group balancing, partition-aware concurrency, and real-time streaming to Apache Iceberg with exactly-once semantics.
+description: Explore OLake's Kafka source connector—featuring schema discovery, custom group balancing, partition-aware concurrency, and incremental batch sync to Apache Iceberg with exactly-once semantics.
 tags: [iceberg, olake, kafka]
-authors: [duke]
-image: /img/blog/2025/11/kafka_blog_cover.jpg
+authors: [duke, shubham]
+image: /img/blog/2025/11/kafka_blog_cover.webp
 ---
 
 import Tabs from '@theme/Tabs';
@@ -16,161 +16,142 @@ If you're familiar with OLake's technology, you’ll see how OLake connects effo
 
 ## What OLake Does? A Quick Primer
 
-OLake treats sources like Kafka as "streams" of data, where topics become logical streams with inferred schemas (e.g., JSON payloads augmented with Kafka metadata like offsets and partitions). OLake ingests Kafka topics in real time—no extra streaming tools required—while keeping Iceberg tables fresh with atomic commits and seamless schema evolution.
+OLake treats sources like Kafka as "streams" of data, where topics become logical streams with inferred schemas (e.g., JSON payloads augmented with Kafka metadata like offsets and partitions). OLake ingests Kafka topics into respective Iceberg tables with atomic commits (to achieve exactly-once semantics) and seamless schema evolution.
 
 Key goals:
-- **Scalability:** Handle topics with hundreds of partitions across multiple streams.
-- **Resilience:** Retry logic, offset management, state persistance, and graceful error handling.
-- **Efficiency:** Minimize latency while respecting resource limits (e.g., threads, connections).
+- **Scalability:** Handle hundreds of partitions across multiple streams/Topics.
+- **Resilience:** Retry logic, offset management, state persistence, and graceful error handling.
+- **Efficiency:** Sync while respecting resource limits (e.g., threads, connections).
 
 Under the hood, we use the segmentio/kafka-go library for its Go-native performance and simplicity—no Java dependencies, just pure concurrency via goroutines.
 
 ## Configurations: The Dial for Kafka Syncing
 
-Before diving into architecture, let's talk configurations. OLake's Kafka source is declarative, exposing configs which goes through strict early validations. Here is the schema:
+Before diving into architecture, let's talk configurations. OLake's Kafka source is declarative, exposing configs which go through strict early validations. Here is the schema:
 
 - **Bootstrap Servers**
-    - List of Kafka broker addresses that OLake will use to establish a connection to the Kafka cluster.  It is the primary entry point for the connector. Generally these addresses look something like this: `kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092`.
-    - OLake does not need a complete list of all brokers in the cluster. It needs an initial list to make its first connection, after which it will discover the rest of the brokers in the cluster automatically. However, providing at least two or three brokers (if used) is highly recommended for high availability. If one of the bootstrap servers is down, OLake can try the next one on the list.
+    - Comma-separated broker addresses (e.g., `broker-1:9092,broker-2:9092`). Provide 2+ for HA; the rest are auto-discovered.
 - **Protocol**
-    - Protocol contains all security-related Kafka configurations. It determines how the connector will authenticate with the Kafka brokers and whether the communication will be encrypted.
-    - The setting dictates the mechanism for authentication (SASL/PLAINTEXT) and encryption (SSL/TLS). 
-    - There are 3 things that come under Protocol:
-        - **Security Protocol**
-            - This defines the security level of the connection which is needed by the Kafka cluster. 
-            - Available options are:
-                - `PLAINTEXT`: No authentication and no encryption. All data is sent in cleartext. This should only be used in fully trusted and isolated networks.
-                - `SASL_PLAINTEXT`: Implements authentication via SASL (Simple Authentication and Security Layer) but does not encrypt the data traffic. This verifies the client's identity but does not protect the data in transit.
-                - `SASL_SSL`: The most secure option. It provides SASL authentication to verify identity and uses SSL/TLS to encrypt all data in transit, protecting it from eavesdropping.
-        - **SASL Mechanism**
-            - If a `SASL_`protocol is chosen, this field specifies the exact authentication mechanism to use. This is required if SecurityProtocol is `SASL_PLAINTEXT` or `SASL_SSL`.
-            - Available options are:
-                - `PLAIN` : A simple username/password mechanism. It's straightforward but less secure if not paired with SSL, as credentials can be easily intercepted.
-                - `SCRAM-SHA-512` : A more modern and secure challenge-response mechanism (Salted Challenge Response Authentication Mechanism). It allows for authentication without ever sending the password directly to the broker, making it the preferred choice for secure environments.
-        - **SASLJAASConfig**
-            - This field provides the actual credentials (username and password) required for SASL authentication. It uses the standard `JAAS (Java Authentication and Authorization Service)` configuration string format that is conventional in the Kafka ecosystem. This is required if SecurityProtocol is `SASL_PLAINTEXT` or `SASL_SSL`.
-            - The format is basically a string that specifies the login module and credentials. For example, for the **PLAIN** mechanism, the format is: `org.apache.kafka.common.security.plain.PlainLoginModule required username="your-user" password="your-password";`
+    - Security settings for auth/encryption:
+        - **Security Protocol**: `PLAINTEXT` | `SASL_PLAINTEXT` | `SASL_SSL`.
+        - **SASL Mechanism** (when `SASL_*`): `PLAIN` | `SCRAM-SHA-512`.
+        - **SASL JAAS Config** (when `SASL_*`): JAAS credential string, e.g., `org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="pass";`
 - **Consumer Group ID**
-    - This identifies the consumer group that the OLake connector will join. A consumer group is a **set of consumer members that work together to consume topics (or partitions)**. Kafka uses the group ID to load-balance partitions among its members and to track committed offsets.
-    - This is an `Optional` field so if provided, then OLake will use the specified ID or else OLake will generate a new, unique, timestamp-based group ID for the sync. The format of OLake-generated consumer group ID is `olake-consumer-group-{timestamp}`. This group ID is then persisted in state for future syncs. All the topics and their partitions are assigned to this consumer group only.
+    - Optional. Use provided ID; otherwise OLake generates `olake-consumer-group-{timestamp}` and persists it for future syncs.
 - **MaxThreads**
-    - This parameter defines the maximum level of parallelism for both data consumption and writing. It sets the upper limit on the number of concurrent “reader tasks” — and therefore the number of active Kafka consumer group members — that OLake can create for assigned topics or streams. Correspondingly, it also determines the maximum number of writer instances used for writing data to Apache Iceberg. This is also an optional parameter, when not provided then default value 3 will be considered.
-    - **Trade-off**: A higher value increases throughput by reading more partitions simultaneously but also consumes more resources on the machine running OLake (CPU, memory, and network connections).
+    - Default 3. Caps concurrent readers/writers. Higher = more throughput, more resources.
+    - When `threads_equal_total_partitions` is false, partitions are round-robin across up to `max_threads` readers.
 - **RetryCount**
-    - This controls the connector's resilience to transient errors. It defines how many times OLake should retry a failed operation before giving up and terminating the sync. 
-    - Operations like fetching messages from a broker or committing offsets can sometimes fail due to temporary network issues or broker unavailability. When such an error occurs, OLake will wait for a short period (using an exponential backoff strategy to increase the delay between retries) and then attempt the operation again, up to RetryCount times. This is an optional field, when not provided then default value 3 will be considered, each retry happening every minute.
+    - Default 3. Retries transient failures with exponential backoff (~1 minute between attempts).
 - **ThreadsEqualTotalPartitions**
-    - This boolean acts as a powerful override for the `MaxThreads` setting, designed for maximum throughput scenarios. When set `True`, will instruct OLake to create **exactly one reader task for every single partition** in the selected topics for sync. This dedicates a full thread to each partition, ensuring the fastest possible consumption rate.
+    - If `True`: one reader per partition. If `False`: readers capped by `max_threads`.
 
 
-## Architectural Design: From Streams to Readers
-
-![Architecture diagram](/img/blog/2025/11/kafka-arch.png)
+![Kafka to Apache Iceberg Data Ingestion via OLake Driver](/img/blog/2025/11/kafka-to-iceberg-olake-driver.webp)
 
 OLake’s abstraction methods wrap the Kafka-specific resources, handling Kafka-based fields and JSON-message schema discovery and batch-inclined syncing mechanism. 
 
 ### Core Design Principles
 
 1. **Decoupling: Separating High-Level Orchestration from Low-Level Kafka Mechanics**
-
-    A strict separation is maintained between the high-level orchestration logic `Kafka Driver` and the low-level Kafka protocol mechanics including setup, various authentications, close functionality. The question is **"Why this separation":** To be honest, it is fundamental. It allows the high-level driver to remain clean and focused on its orchestration role. Meanwhile, the low-level toolkit can be independently tested and refined, encapsulating the complexities of the Kafka protocol. This layered approach means we can evolve our Kafka capabilities without disrupting the core stability of the OLake engine.
-
-    Without this separation, any protocol-level change, such as tweaking fetch strategies or handling retries, could inadvertently break the orchestration layer. Maintenance becomes riskier and more error-prone, potentially causing downtime or data inconsistencies. Debugging would also be harder because orchestration and protocol logic would be tightly entangled.
+    
+    - Orchestration lives in `abstract/`; Kafka protocol/auth/setup/close lives in driver-specific code in `kafka/` folder.
+    - Why: clean orchestration, independently testable protocol layer, safer evolution, stable core engine.
+    - Current beta: reuses CDC-style method names (`pre_cdc`, `RunChangeStream`, `post_cdc`) to structure the run; may be refactored.
+    - Note: CDC naming only—Kafka isn’t CDC; it’s used just for method structure.
 
 2. **Commit Action: Ensuring Destination Sync Before Kafka Offset Commit**
 
-    Commit to Kafka consumer group will only take place when all partitions for selected topics/streams assigned to a respective `reader` reach till the point of last recorded offset. Here sync includes reader's messages reading, writing to provided destination i.e. `Apache Iceberg` or `S3 Parquet` and commit from destination side first, then in Kafka’s side. 
+    - When: commit only after all partitions assigned to a reader reach the start-of-sync high watermark/partition-offset.
+        - We note down all partition latest-offsets assigned to individual reader at the start.
+    - Order: destination commit first (e.g., Apache Iceberg/S3 Parquet), then Kafka offsets.
+    - Why: guarantees exactly-once and atomicity; safe retries on write failure; prevents loss/duplication.
 
-    This guarantees **exactly-once delivery semantics**, avoiding data loss or duplication. It also allows for atomic consistency between Kafka and the destination: if a write fails, OLake does not advance the Kafka offset, ensuring the data can be retried safely.
+3. **Configurable Parallelism: Granular Control Over Consumers**
 
-    Without this, if offsets were committed **before** successful writes, you risk losing messages if the destination write fails. Downstream consumers may see incomplete datasets, leading to inconsistent analytics or broken downstream pipelines. Essentially, the system could silently drop messages or produce duplicate processing, which is catastrophic for data flows something we at OLake strive to avoid in production environments.
-
-3. **Configurable Parallelism: Granular Control Over Readers and Writers**
-
-    The architecture provides granular control over concurrency, allowing users to balance throughput against resource consumption. OLake intelligently **scales the number of active consumers** to match the workload and user-defined limits, deciding the number of writer instances as well. This ensures no CPU cores, memory, or network connections are oversubscribed.
-
-    Without configurable parallelism, the system either underutilizes resources (low throughput) or overutilizes them (leading to CPU spikes, memory exhaustion, or even crashes). It could also cause uneven partition consumption or delays in downstream writes, reducing overall reliability and efficiency.
+    - One OLake thread = one consumer/reader.
+    - Users set `max_threads`; OLake caps active readers and writers accordingly.
+    - Balances throughput versus resource use; prevents CPU/memory/network oversubscription.
+    - Without this, you risk under/over-utilization, uneven partition progress, and delayed writes.
 
 4. **Data Access: Normalizing Topic Messages To Columnar Tables**
 
-    Kafka messages are fundamentally key–value payloads, often encoded as JSON or other semi-structured formats. However, analytical destinations like Apache Iceberg and S3 Parquet operate on columnar, schema-driven tables, not raw message blobs. To bridge this structural gap, OLake performs level-0 JSON normalization—a minimal, controlled flattening of message fields—converting streamed records into well-defined columns suitable for tabular storage.
-
-    This enables efficient querying, predicate pushdown, schema evolution handling, and metadata management on the destination side, leading tomore precise and reliable analytics. 
+    - Kafka JSON messages are level-0 normalized into columns for Iceberg/Parquet.
+    - Benefits: efficient queries, predicate pushdown, schema evolution, and metadata management.
+    - Today: JSON-only; append-only writes; normalization can be disabled per stream/table if not required.
 
 5. **Operational Efficiency: Pre-Consumption Analysis and Partition Filtering**
 
-    The design prioritises minimising unnecessary work. This is evident in the pre-consumption analysis phase, which filters out empty or fully-read and committed partitions, optimising only required bounds.
-
-    Otherwise, if OLake blindly tried to consume all partitions, it would waste CPU cycles, network bandwidth, and memory on empty or already-synced partitions. Without this, partitions could be repeatedly processed, potentially causing endless sync loops. Thread starvation will also be a huge problem, especially when syncing topics with hundreds of partitions — where most might be idle.
+    - Pre-consumption analysis filters empty or fully-read partitions; we only read where data exists.
+    - Prevents wasted CPU/network, endless loops, and thread starvation on large multi-partition topics.
 
 6. **Global State Persistence: Managing Consumer Group State Across Topics**
 
-    Since all the topics and partitions will be managed by consumer group, so global state will be persisted where consumer group will be present to which all the topics are subscribed. Without global state, OLake would lose track of committed offsets on restart, forcing it to either re-read messages (risking duplicates) or skip them (risking data loss). This will be sign of unreliability, resulting in potential sync failures in production-grade streaming workloads.
+    - Persist consumer group state (committed offsets) across runs.
+    - Avoids duplicate or missed reads and improves reliability in production.
 
 ## The Concurrency Conundrum: Scaling with Intelligent Readers
 
-The first question any serious Kafka consumer must answer is: **how do you scale consumption?** The obvious answer is `parallelism`, but the implementation is what matters. A naive approach can easily overwhelm your system or, conversely, fail to utilize its full potential.
-
-OLake's solution is a managed pool of **reader tasks**, where each task is a concurrent worker responsible for a subset of partitions. This pool is governed by two simple but powerful configuration settings: `max_threads` and `threads_equal_total_partitions`.
-
-However, simply limiting the number of threads isn't enough. This is where we encountered a limitation in standard Kafka clients and made a pivotal design decision.
+- We scale via a pool of reader tasks; each handles a subset of partitions.
+- Concurrency is governed by `max_threads` and `threads_equal_total_partitions`. If false, readers are capped at `max_threads` and partitions are distributed across them.
+- Standard balancers can be uneven, so we built a custom Round Robin Group Balancer.
 
 ### The "Why" Behind Round Robin Group Balancer
 
-Standard Kafka consumer group balancers can distribute partitions unevenly among members in a group. Even in go to libraries for Kafka (in Golang) like SegmentIO’s kafka-go which is very easy to read, understand and code, we faced this problem of not getting the right balancing algorithms which coordinated well with our concurrency methods. We realized the need for more scalable algorithm that stay true to the fundamental design principles, and respected OLake’s in-built concurrency.
-
-This resulted in **OLake’s Round Robin Group Balancer**.
+Standard balancers (e.g., in segmentio/kafka-go) can assign partitions unevenly for our workload. To align with OLake’s concurrency model, we introduced **OLake’s Round Robin Group Balancer** for even, exclusive assignment.
 
 ### How the Process Flows
 
-- First, OLake determines the optimal number of reader tasks to create based on the configured concurrency settings (`max_threads` or `threads_equal_total_partitions`) and the number of partitions containing new data across the selected topics or streams.
+- Determine reader count from concurrency settings and the number of partitions with new data.
 
     New data is identified using two criteria:
         - The partition is not empty, and
         - The partition contains new messages pending commit for the assigned consumer group.
 
-    For each stream selected for sync, OLake performs a pre-flight validation on every partition. During this step, it retrieves three key metadata points (`Partition Metadata`) — **the first available offset, the last available offset, and the last committed offset** for the respective consumer group.
+    For each selected stream, OLake performs a pre-flight check per partition and fetches three metadata points (`Partition Metadata`): first available offset, last available offset (high watermark), and last committed offset.
 
-- Then OLake creates precisely that many consumer group-based reader instances, each with a unique identifier.
+- Create that many consumer group-based reader instances (unique IDs).
 
-- Our balancer, aware of this target number, uses a round-robin strategy to distribute the partitions evenly and exclusively among this limited set of active readers.
+- The balancer assigns partitions evenly and exclusively via round-robin.
 
-- Once a partition is identified as having new data, the next question is where to begin reading. If a previously committed offset exists, OLake will always start from there to guarantee exactly-once processing. If no offset has ever been committed for this group, it will start from the first offset of the partition, representing full load for the selected stream/topic to be synced.
+- Start position: last committed offset if present; otherwise the first offset (full load).
 
-- Once deployed, a reader task begins its work of fetching, processing, and passing data to the destination. The termination of reading is governed by a dedicated mapping — `[Topic:Partition] → Partition Metadata` — which tracks the read progress of each partition and determines how many partitions are actively being processed versus those that have completed where completion indicates that the reader has consumed data up to the final offset.
+- Readers fetch, process, and write; progress is tracked via `[Topic:Partition] → Partition Metadata`. A reader stops when all assigned partitions reach their recorded high watermarks.
 
-- Corresponding writer instances are instantiated based on the same concurrency settings, responsible for writing the data read by the readers. 
+- If a thread is assigned partitions from X different topics, it will create X writers to parallelize writes.
 
-- After the data writing process completes, commits are performed on both the writer and reader sides. Finally, the system state is persisted, capturing the consumer group ID used during sync.
+- After writing: commit per writer at the destination, then commit Kafka offsets per partition assigned to that reader; close consumers; persist the consumer group ID in state.
 
-**This approach gave us fine-grained control over resource consumption, ensuring we achieve maximum parallelism up to the `max_threads` limit without ever creating unnecessary, idle consumers or writers.**
+**Result:** fine-grained resource control and maximum useful parallelism up to `max_threads`, without idle consumers or writers.
 
 ### Let’s Do A Dry Run, Shall We?
 
-**Case:** Two Kafka topics are selected for sync to Apache Iceberg, each containing 3 partitions — resulting in a total of 6 partitions. The following dry run demonstrates how varying the `max_threads` concurrency setting affects reader assignment.
-
-| Max Threads | Reader IDs per Stream (Stream A , Stream B) | Reused IDs | Stream A (Partitions) | Stream B (Partitions) | Concurrency Level | Behaviour Summary |
-|-------------|---------------------------------------------|------------|------------------------|------------------------|------------------|------------------|
-| 6 | 3 , 3 | None | A1 → Reader-1<br/> A2 → Reader-2 <br/> A3 → Reader-3 | B1 → Reader-4 <br/> B2 → Reader-5 <br/> B3 → Reader-6 | 🟢 Full | Each partition has a unique reader; no reuse; optimal parallelism. |
-| 5 | 3 , 2 | 1 ID reused | A1 → Reader-1 <br/> A2 → Reader-2 <br/> A3 → Reader-3 | B1 → Reader-3 (reused) <br/> B2 → Reader-4 <br/> B3 → Reader-5 | 🟢 High | Slight reuse between streams; near-optimal balancing with minor overlap. |
-| 4 | 2 , 2 | 2 IDs reused | A1 → Reader-1 <br/> A2 → Reader-2 <br/> A3 → Reader-1 (reused) | B1 → Reader-2 (reused) <br/> B2 → Reader-3 <br/> B3 → Reader-4 | 🟡 Moderate | Balanced reuse; reduced concurrency due to limited threads. |
-| 3 | 2 , 1 | 3 IDs reused | A1 → Reader-1 <br/> A2 → Reader-2 <br/> A3 → Reader-1 (reused) | B1 → Reader-2 (reused) <br/> B2 → Reader-3 (reused) <br/> B3 → Reader-3 (reused) | 🟠 Low | High reuse; only 3 threads available; partial overlap across streams. |
-| 2 | 1 , 1 | 4 IDs reused | A1, A2, A3 → Reader-1 (reused) | B1, B2, B3 → Reader-2 (reused) | 🔴 Very Low | Heavy reuse; both streams share limited readers. |
-| 1 | 1 | 5 IDs reused | A1, A2, A3 → Reader-1 | B1, B2, B3 → Reader-1 (same) | 🔴 Single-thread | All partitions share one reader; minimal concurrency; full reuse. |
+Case: two topics × 3 partitions = 6 partitions. Effect of `max_threads`:
+- 6: one reader per partition; optimal parallelism.
+- 5: minor reuse across streams; near‑optimal.
+- 4: balanced reuse; moderate concurrency.
+- 3: high reuse; low concurrency.
+- 2: heavy reuse; very low concurrency.
+- 1: single thread; minimal concurrency.
 
 ### Fetch Sizes and Beyond — Prioritizing Low Latency
 
-During the initialization of reader instances, two key fetch parameters are configured to balance **latency** and **memory efficiency**:
+During reader initialization, we set:
+    - **MinBytes: 1 byte** — immediate broker responses; low latency.
+    - **MaxBytes: 10 MB** — memory cap; mitigates OOM on high throughput.
+    - **Trade-off** — prioritize latency; `MaxBytes` acts as a safety guard.
 
-    - **MinBytes: 1 byte** — Setting the minimum fetch size to one byte ensures that the broker responds immediately whenever data is available. This configuration minimizes latency, making OLake highly suitable for **Fast-response environment and streaming workloads** where data freshness is critical.
+## Future scope / roadmap
 
-    - **MaxBytes: 10 MB** — The maximum fetch size is capped at 10 MB to prevent excessive memory usage and mitigate the risk of **out-of-memory (OOM)** scenarios when processing high-throughput topics.
-
-By deliberately configuring lesser `MinBytes`, OLake prioritizes **low-latency data delivery over throughput**, while the `MaxBytes` limit provides a **controlled safeguard** against resource exhaustion—ensuring stable and responsive performance even under heavy load.
+- Support other message formats
+- Schema registry integration
+- Finer control over JSON normalization
+- Continuous sync mode (between streaming and batching)
+- Graceful generation-end handling and rebalancing
+- Offset-lag-based rebalance and custom assignment policies
 
 ## Wrapping Up: Kafka in OLake, Production-Ready
 
-We've built OLake's Kafka source to tame the stream: from secure auth to partition-savvy readers, concurrency that scales with Iceberg, and a incremental loop that knows when to quit. Design decisions—like custom balancing or offset filtering—stem from real pain points: uneven loads, stalled syncs, and resource waste.
-
-Next steps? Use docker or deploy via Helm, tweak `max_thread` for your cluster, and monitor offsets with Kafka tools.
+We've built OLake's Kafka source to tame the complexity of Kafka sync: secure auth, partition-savvy readers, and concurrency that scales as needed—plus an incremental loop that knows when to stop. Decisions like custom balancing and offset filtering come from real pain points: uneven loads, stalled syncs, and wasted resources.
+Next steps? Use Docker or deploy via Helm, tweak `max_threads` for your cluster, and monitor offsets with Kafka tools.
 <BlogCTA/>
