@@ -30,22 +30,22 @@ Under the hood, we use the segmentio/kafka-go library for its Go-native performa
 Before diving into architecture, let's talk configurations. OLake's Kafka source is declarative, exposing configs which go through strict early validations. Here is the schema:
 
 - **Bootstrap Servers**
-    - Comma-separated broker addresses (e.g., `broker-1:9092,broker-2:9092`). Provide 2+ for HA; the rest are auto-discovered.
+    - Comma-separated broker addresses (e.g., `broker-1:9092,broker-2:9092`). Provide 2+ for high availability; the rest are auto-discovered.
 - **Protocol**
     - Security settings for auth/encryption:
         - **Security Protocol**: `PLAINTEXT` | `SASL_PLAINTEXT` | `SASL_SSL`.
         - **SASL Mechanism** (when `SASL_*`): `PLAIN` | `SCRAM-SHA-512`.
         - **SASL JAAS Config** (when `SASL_*`): JAAS credential string, e.g., `org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="pass";`
 - **Consumer Group ID**
-    - Optional. Use provided ID; otherwise OLake generates `olake-consumer-group-{timestamp}` and persists it for future syncs.
+    - Optional. Uses user-provided ID; otherwise OLake generates `olake-consumer-group-{timestamp}` and persists it for future syncs.
 - **MaxThreads**
-    - Default 3. Caps concurrent readers/writers. Higher = more throughput, more resources.
-    - When `threads_equal_total_partitions` is false, partitions are round-robin across up to `max_threads` readers.
+    - Defaults to 3. Enforces a cap concurrent readers/writers. Higher = more throughput, more resources will be utilized.
 - **RetryCount**
-    - Default 3. Retries transient failures with exponential backoff (~1 minute between attempts).
+    - Defaults to 3. Retries transient failures with exponential backoff (~1 minute between attempts).
 - **ThreadsEqualTotalPartitions**
     - If `True`: one reader per partition. If `False`: readers capped by `max_threads`.
 
+## Architectural Design: From Topics to Tables
 
 ![Kafka to Apache Iceberg Data Ingestion via OLake Driver](/img/blog/2025/11/kafka-to-iceberg-olake-driver.webp)
 
@@ -62,7 +62,7 @@ OLake’s abstraction methods wrap the Kafka-specific resources, handling Kafka-
 
 2. **Commit Action: Ensuring Destination Sync Before Kafka Offset Commit**
 
-    - When: commit only after all partitions assigned to a reader reach the start-of-sync high watermark/partition-offset.
+    - When: commit occurs only after all partitions assigned to a reader reach the latest offsets.
         - We note down all partition latest-offsets assigned to individual reader at the start.
     - Order: destination commit first (e.g., Apache Iceberg/S3 Parquet), then Kafka offsets.
     - Why: guarantees exactly-once and atomicity; safe retries on write failure; prevents loss/duplication.
@@ -108,7 +108,7 @@ Standard balancers (e.g., in segmentio/kafka-go) can assign partitions unevenly 
         - The partition is not empty, and
         - The partition contains new messages pending commit for the assigned consumer group.
 
-    For each selected stream, OLake performs a pre-flight check per partition and fetches three metadata points (`Partition Metadata`): first available offset, last available offset (high watermark), and last committed offset.
+    For each selected stream, OLake performs a pre-flight check per partition and fetches three metadata points (`Partition Metadata`): first available offset, last available offset, and last committed offset.
 
 - Create that many consumer group-based reader instances (unique IDs).
 
@@ -116,9 +116,9 @@ Standard balancers (e.g., in segmentio/kafka-go) can assign partitions unevenly 
 
 - Start position: last committed offset if present; otherwise the first offset (full load).
 
-- Readers fetch, process, and write; progress is tracked via `[Topic:Partition] → Partition Metadata`. A reader stops when all assigned partitions reach their recorded high watermarks.
+- Readers fetch, process, and write; progress is tracked via `[Topic:Partition] → Partition Metadata`. A reader stops when all assigned partitions reach their recorded latest offset.
 
-- If a thread is assigned partitions from X different topics, it will create X writers to parallelize writes.
+- If a thread/reader is assigned partitions from X different topics, it will create X writers to parallelize writes.
 
 - After writing: commit per writer at the destination, then commit Kafka offsets per partition assigned to that reader; close consumers; persist the consumer group ID in state.
 
