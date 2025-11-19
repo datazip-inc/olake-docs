@@ -11,7 +11,7 @@ export default function BlogPostPageWrapper(props) {
   // Extract author name and reading time
   const authorName = metadata.authors?.[0]?.name || 'OLake Team';
   const readingTime = metadata.readingTime || '5 minutes';
-  
+
   // Strip trailing slashes from permalink for canonical URL
   const cleanPermalink = metadata.permalink?.replace(/\/$/, '') || metadata.permalink;
   const canonicalUrl = cleanPermalink ? `${siteConfig.url}${cleanPermalink}` : null;
@@ -48,7 +48,7 @@ export default function BlogPostPageWrapper(props) {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'USA'
+      addressCountry: 'US'
     }
   };
 
