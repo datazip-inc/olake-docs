@@ -56,8 +56,9 @@ const CommunityPage = () => {
     ],
     sameAs: [
       'https://github.com/datazip-inc/olake',
-      'https://olake.io/slack/',
-      'https://www.linkedin.com/company/datazip'
+      'https://x.com/_olake',
+      'https://www.linkedin.com/company/datazipio/',
+      'https://www.youtube.com/@olakeio'
     ],
     address: {
       '@type': 'PostalAddress',

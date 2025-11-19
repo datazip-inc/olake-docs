@@ -38,8 +38,9 @@ const ContributorsPage = () => {
     logo: 'https://olake.io/img/logo/olake-blue.svg',
     sameAs: [
       'https://github.com/datazip-inc/olake',
-      'https://olake.io/slack/',
-      'https://olake.io/webinar/'
+      'https://x.com/_olake',
+      'https://www.linkedin.com/company/datazipio/',
+      'https://www.youtube.com/@olakeio'
     ],
     address: {
       '@type': 'PostalAddress',
