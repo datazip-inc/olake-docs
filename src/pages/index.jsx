@@ -50,7 +50,7 @@ export default function New3Page() {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'US'
+      addressCountry: 'USA'
     }
   }
 

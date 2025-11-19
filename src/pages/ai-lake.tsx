@@ -36,7 +36,7 @@ const GlaceLake: React.FC = () => {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'US'
+      addressCountry: 'USA'
     }
   }
 

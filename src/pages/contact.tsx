@@ -46,7 +46,7 @@ const ContactPage = () => {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'US'
+      addressCountry: 'USA'
     },
     hasPOS: {
       '@type': 'Place',
