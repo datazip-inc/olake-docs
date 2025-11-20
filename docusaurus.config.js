@@ -973,6 +973,10 @@ const config = {
             to: '/docs/install/docker-cli/',
             from: '/docs/getting-started/olake-cli',
           },
+          {
+            to: '/docs/connectors/overview/',
+            from: '/docs/connectors',
+          },
 
           // END
           // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
