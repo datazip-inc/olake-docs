@@ -1,6 +1,6 @@
 ---
 slug: how-olake-becomes-7x-faster
-title: "7× Faster Iceberg Writes: How We Rebuilt Olake's Destination Pipeline"
+title: "7× Faster Iceberg Writes: How We Rebuilt OLake's Destination Pipeline"
 description: "Technical deep dive into our destination refactor: exactly-once visible state, atomic commits, and a 7× throughput boost."
 date: "2025-10-10"
 authors: [ankit]
@@ -10,7 +10,7 @@ image: /img/blog/cover/how-olake-becomes-7x-faster-cover.webp
 
 ## Overview
 
-Data ingestion performance is critical when you are writing in Iceberg format to data lake. When your pipeline becomes a bottleneck, it affects everything downstream—from real-time analytics to machine learning workflows. We started with OneStack in Datazip to solve the problem of Data Analytics, but then we were bound to see the problem on Data Ingestion itself. To solve this problem for iceberg native writes we built Olake. At first we created basic Iceberg writer, but then we saw the issues with it (I will be writing about the issues in a new section). Today we have resolved all those bottlenecks.
+Data ingestion performance is critical when you are writing in Iceberg format to data lake. When your pipeline becomes a bottleneck, it affects everything downstream—from real-time analytics to machine learning workflows. We started with OneStack in Datazip to solve the problem of Data Analytics, but then we were bound to see the problem on Data Ingestion itself. To solve this problem for iceberg native writes we built OLake. At first we created basic Iceberg writer, but then we saw the issues with it (I will be writing about the issues in a new section). Today we have resolved all those bottlenecks.
 
 The result? A **7× performance improvement** in Apache Iceberg, without the complexity of background deduplication jobs or eventual consistency mechanisms.
 
@@ -25,7 +25,7 @@ If you've worked with JVM-based data processing systems, you're probably familia
 
 Let me share the specific issues we encountered that were creating bottlenecks and preventing us from extending our codebase with new features. You might recognize some of these in your own systems:
 
-1. **RPC Server Format**: In previous implementation we were using Debezium Formats to communicate between Olake and Java Iceberg server, which had large metadata that was mostly unused.
+1. **RPC Server Format**: In previous implementation we were using Debezium Formats to communicate between OLake and Java Iceberg server, which had large metadata that was mostly unused.
 
 2. **Serialization And Deserialization using JsonSchema**: At multiple places serialization and deserialization were happening, resulting in less throughput, high memory and CPU consumption.
 
@@ -40,15 +40,17 @@ Let me share the specific issues we encountered that were creating bottlenecks a
 
 ## Fundamentals of Iceberg Distributed Writers
 
-After identifying these issues, the first step to solving them was understanding Iceberg's distributed writing model. You might be thinking, "Iceberg sounds complex, is this going to be hard to understand?" Don't worry. While Iceberg might seem complex at first glance, the core concepts are straightforward once you understand the fundamentals.
+After identifying these issues, the first step was understanding Iceberg's distributed writing model. You might be thinking, "Iceberg sounds complex, is this going to be hard to understand?" Don't worry—while it might seem complex at first, the core concepts are straightforward once you understand the fundamentals.
 
-Remember learning about ACID properties in databases? Those guarantees weren't present in legacy data lakes, which made things like concurrent writes and schema changes tricky. But Iceberg table format brings ACID properties to data lakes, making your machine learning and analytics use cases much easier. The key thing to understand here is that we need atomicity while writing to Iceberg—either all your data commits successfully, or none of it does.
+Here's what you need to know:
 
-You might have heard the Iceberg community suggest retrying failed commits. But here's the thing: this advice has limitations. If your data is fundamentally incompatible with the schema (for example, trying to insert a string value into an integer column), retrying won't help—the operation will fail regardless of how many times you retry. Think about it: if you're trying to put a square peg in a round hole, trying harder won't make it fit.
+- **ACID properties matter**: Remember learning about ACID in databases? Legacy data lakes lacked these guarantees, making concurrent writes and schema changes tricky. Iceberg brings ACID to data lakes, and atomicity is key—either all your data commits successfully, or none of it does.
 
-Also, let me set the right expectations: **Iceberg is not designed for real-time streaming use cases (until the small file problem is solved)**. Even popular streaming tools like Tableflow batch data based on time periods before writing to Iceberg. So if you're looking for sub-second latency, you'll need to look elsewhere—at least for now.
+- **Retrying has limits**: You might have heard the Iceberg community suggest retrying failed commits, but this advice has limitations. If your data is fundamentally incompatible with the schema (like inserting a string into an integer column), retrying won't help—think of it as trying to put a square peg in a round hole.
 
-If you have worked with parquet, if there is schema change you have to close the previous parquet and use the new one. The same applies with writers in iceberg. Each writer acomodate its own schema and you can push only the same schema data to that particular writer.
+- **Not for real-time streaming**: **Iceberg is not designed for real-time streaming use cases (until the small file problem is solved)**. Even tools like Tableflow batch data before writing to Iceberg. If you need sub-second latency, you'll need to look elsewhere—at least for now.
+
+- **Schema changes require new writers**: If you've worked with Parquet, you know that schema changes require closing the previous file and using a new one. The same applies to Iceberg writers—each writer accommodates its own schema, and you can only push data matching that schema to that particular writer.
 
 
 <img
@@ -56,7 +58,7 @@ If you have worked with parquet, if there is schema change you have to close the
   alt="OLake Destination Refactor Architecture"
   loading="lazy"
   decoding="async"
-  style={{ width: '100%', height: 'auto' }}
+  style={{ width: '100%', maxHeight: '500px', height: 'auto' }}
 />
 
 
@@ -69,12 +71,12 @@ So, here we have four things:
 
 Besides this, we must know something about type promotions that are possible in Iceberg. We can evolve from int to bigint and float to double. For others, you can refer to this doc: https://iceberg.apache.org/docs/latest/schemas/. 
 
-## Olake New Iceberg Writer: What We Changed To Make It Fast 
+## OLake New Iceberg Writer: What We Changed To Make It Fast 
 
-So, how did we achieve this 7× improvement? The refactor fundamentally changes how we handle data processing by splitting responsibilities between Go and Java components based on their respective strengths. Think of it like a restaurant: you have chefs (Go) who prepare the ingredients quickly, and specialized equipment (Java) that handles the final cooking. This separation of concerns allows each component to focus on what it does best while maintaining clean interfaces between them.
+So, how did we achieve this 7× improvement? The refactor fundamentally changes how we handle data processing by splitting responsibilities between Go and Java components based on their respective strengths. Think of it like a restaurant: you have chefs (Go) who prepare the ingredients quickly—handling all the prep work, ingredient selection, and coordination—and waiters (Java) who serve the food. This separation of concerns allows each component to focus on what it does best while maintaining clean interfaces between them.
 
 <img
-  src="/img/blog/2025/10/how-olake-becomes-7x-faster-1.webp"
+  src="/img/blog/2025/10/how-olake-becomes-7x-faster-1.png"
   alt="OLake Destination Refactor Architecture"
   loading="lazy"
   decoding="async"
@@ -102,7 +104,7 @@ Normalization is the process of extracting columns from incoming records and tra
 
 Here are the optimizations that we have done:
 
-### Removal of Large Data Buffers
+### 1. Removal of Large Data Buffers
 
 Remember those two buffers I mentioned earlier? In the previous implementation, we had one buffer for each local thread that would push to a global table buffer after reaching a certain memory limit, which then pushed data to the Java Iceberg server to write to files. This double buffering approach added unnecessary overhead.
 
@@ -128,7 +130,7 @@ In the image below you can see how the current batching works.
 
 ---
 
-### Atomic Commits And Schema Evolution
+### 2. Atomic Commits And Schema Evolution
 
 As we discussed in the fundamentals, we require atomic data updates in Iceberg table, so here is how we are doing it in the new Iceberg writer:
 
@@ -141,6 +143,9 @@ While registering them, we take a table level lock on the Go side and commit all
 You might be wondering: "Why not take a lock while writing files? Won't that cause conflicts?" Great question! Here's the key insight: each writer maintains its own data file, and we create writers equal to the number of threads we've opened. So there's no write happening in the same file with two different writers, each thread has its own file, eliminating the need for file level locking during writes.
 
 Below is the commit logic which is on the Java side:
+<details>
+<summary>IcebergTableOperator.java</summary>
+
 ```java title="IcebergTableOperator.java"
 // destination/iceberg/olake-iceberg-java-writer/src/main/java/io/debezium/server/iceberg/tableoperator/IcebergTableOperator.java
 public void commitThread(String threadId, Table table) {
@@ -191,6 +196,8 @@ public void commitThread(String threadId, Table table) {
 }
 ```
 
+</details>
+
 **Key insight**: The commit is atomic. Either the entire batch becomes visible in the Iceberg table, or nothing does, there's no partial state. This atomicity is crucial because it means readers will never see inconsistent intermediate states, even during concurrent operations. For example, if you're committing 1000 records and the commit fails halfway through, none of those records will be visible in the table.
 
 The commit process handles two scenarios:
@@ -199,7 +206,7 @@ The commit process handles two scenarios:
 
 #### 2. Atomic Schema Evolution
 
-Now we know how files are being committed atomically, but you might be asking: "What about schema changes? How does Olake handle type promotions and schema evolution in Iceberg tables?" 
+Now we know how files are being committed atomically, but you might be asking: "What about schema changes? How does OLake handle type promotions and schema evolution in Iceberg tables?" 
 
 For schema evolution, we reuse the same global table atomic lock, which ensures that for any particular table, only one thread evolves the schema at a time. This prevents race conditions and ensures consistency.
 
@@ -214,7 +221,7 @@ For schema evolution, we reuse the same global table atomic lock, which ensures 
 
 But here's an interesting challenge: how do other threads know if the schema has changed? This is where our schema coordination comes in. We maintain a schema for each thread as well as a global schema on the Golang side. When any thread updates the schema, we update both the global schema and that thread's Go-side schema. Each thread periodically checks the global schema; if there's any difference, it updates both its Java-side writer and Go-side writer. This way, all Go-side threads stay aware of what schema is actually being written and what should be committed.
 
-We implemented one optimization: if there are type promotions (for example, from `int` to `long`), we don't close or refresh the writer until a record with a different incompatible type arrives in that chunk. This saves the overhead of refreshing and closing files unnecessarily.
+We implemented one optimization: if there are type promotions (for example, from `int` to `long`), we don't close or refresh the writer until a record with a greater type (e.g. long) arrives in that batch. This saves the overhead of refreshing and closing files unnecessarily.
 Here's how atomic schema evolution happens:
 
 <img
@@ -229,6 +236,9 @@ Here's how atomic schema evolution happens:
 2. **Lock acquisition**: Only threads detecting schema changes acquire the table level lock
 3. **Schema evolution**: The first thread to acquire the lock performs the actual schema evolution
 4. **Writer refresh**: All threads refresh their writers to use the new schema
+
+<details>
+<summary>iceberg.go</summary>
 
 ```go title="iceberg.go"
 // compares with global schema and update schema in destination accordingly
@@ -316,7 +326,9 @@ func (i *Iceberg) EvolveSchema(ctx context.Context, globalSchema, recordsRawSche
 }
 ```
 
-### Removal of JSON Overhead And Type Detection
+</details>
+
+### 3. Removal of JSON Overhead And Type Detection
 
 In previous implementation, Java JSON library used to load data, detect its type and then its conversion. But in new implementation we have removed the whole JSON overhead—now we are using RPC internal type definitions to pass data to Iceberg server. This makes it easier, with no conversion overhead and less RPC call metadata size.
 
@@ -329,6 +341,9 @@ In previous implementation, Java JSON library used to load data, detect its type
 />
 
 Below is the code where we have done it:
+<details>
+<summary>iceberg.go</summary>
+
 ```go title="iceberg.go"
 for _, field := range protoSchema {
   val, exist := record.Data[field.Key]
@@ -379,7 +394,12 @@ for _, field := range protoSchema {
 }
 ```
 
+</details>
+
 Here's the gRPC contract definition:
+
+<details>
+<summary>record_ingest.proto</summary>
 
 ```protobuf title="record_ingest.proto"
 // destination/iceberg/olake-iceberg-java-writer/src/main/resources/record_ingest.proto
@@ -443,6 +463,8 @@ message RecordIngestResponse {
 }
 ```
 
+</details>
+
 **Benefits of this protocol change:**
 
 - **Typed `oneof` fields**: Use significantly less memory than generic `google.protobuf.Value` maps, reducing both serialization overhead and memory allocations
@@ -454,7 +476,7 @@ message RecordIngestResponse {
 
 ---
 
-### Moving Compute to Go Side
+### 4. Moving Compute to Go Side
 
 In the previous architecture, all processing, type detection, and type promotion happened on the Java side. In the new writer, the Golang side is responsible for type detection, schema updates, and data writing.
 
@@ -480,15 +502,17 @@ This parallel approach is crucial for maintaining high throughput while ensuring
 
 So to reduce RPC calls and overhead of Java server, the identical writer schema copy is being maintained on the Go side, which is responsible to check if any schema evolution is required or not. In that way, we avoid unnecessary locks for the schema checks. Also Go side verifies if schema is compatible with Iceberg format or not. 
 
-### Partition Fanout Writer
+### 5. Partition Fanout Writer
 
-Highly partitioned tables were another pain point we encountered. In the previous implementation, when a record with a different partition arrived, it would close the current writer and open a new one. This meant we have to sort data in each batch and then write, which eventually create small files. This approach had several problems: frequent writer creation and destruction overhead, many small files being created, and poor I/O efficiency.
+Highly partitioned tables were another pain point we encountered. Here's what was wrong and how we fixed it:
 
-The issue becomes more pronounced when you have tables with many partitions. Imagine processing a table with 50-100 partitions—you're constantly creating and destroying writers, which is expensive. Plus, all those small files hurt query performance because query engines need to read metadata from many files.
+- **Previous approach problems**: When a record with a different partition arrived, the old implementation would close the current writer and open a new one. This meant sorting data in each batch before writing, which created small files. The result? Frequent writer creation/destruction overhead, many small files, and poor I/O efficiency.
 
-In our new implementation, we maintain multiple partition writers concurrently. When memory allows, we can have several partition writers active at the same time, each handling different partitions. Each partition buffers its data to target larger, more consistent file sizes.
+- **The scale problem**: Imagine processing a table with 50-100 partitions—you're constantly creating and destroying writers, which is expensive. Plus, all those small files hurt query performance because query engines need to read metadata from many files.
 
-The benefits are clear: improved throughput especially on highly partitioned tables, consistent file sizes that lead to better query performance, and better resource utilization. This optimization is particularly important for tables with many partitions, where the traditional approach would create hundreds or thousands of small files, leading to poor query performance and storage inefficiency.
+- **Our solution**: We now maintain multiple partition writers concurrently. When memory allows, several partition writers can be active simultaneously, each handling different partitions and buffering data to target larger, more consistent file sizes.
+
+- **The benefits**: Improved throughput on highly partitioned tables, consistent file sizes for better query performance, and better resource utilization. This is crucial for tables with many partitions, where the traditional approach would create hundreds or thousands of small files, leading to poor query performance and storage inefficiency.
 
 ---
 
@@ -550,4 +574,4 @@ The result is a system that is not only faster but also more reliable, maintaina
 
 ---
 
-*Olake is an open-source CDC and data ingestion platform for Apache Iceberg. Built for correctness, designed for speed, optimized for operations.*
+*OLake is an open-source CDC and data ingestion platform for Apache Iceberg. Built for correctness, designed for speed, optimized for operations.*
