@@ -39,10 +39,10 @@ const Footer: React.FC = () => {
     ];
 
     const socialLinks: SocialLinkItem[] = [
-        { icon: 'linkedin', href: 'https://www.linkedin.com/company/datazipio/', ariaLabel: 'LinkedIn' },
-        { icon: 'youtube', href: 'https://www.youtube.com/@olakeio', ariaLabel: 'YouTube' },
-        { icon: 'slack', href: 'https://olake.io/slack', ariaLabel: 'Slack' },
-        { icon: 'instagram', href: 'https://instagram.com/olake_io', ariaLabel: 'Instagram' },
+        { icon: 'linkedin', href: 'https://www.linkedin.com/company/datazipio/', ariaLabel: 'Linkedin logo' },
+        { icon: 'youtube', href: 'https://www.youtube.com/@olakeio', ariaLabel: 'Youtube logo' },
+        { icon: 'slack', href: 'https://olake.io/slack', ariaLabel: 'Slack logo' },
+        { icon: 'instagram', href: 'https://instagram.com/olake_io', ariaLabel: 'Instagram logo' },
         { icon: 'twitter', href: 'https://x.com/_olake', ariaLabel: 'Twitter' },
     ];
 

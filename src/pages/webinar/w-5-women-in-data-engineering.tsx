@@ -85,7 +85,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-5-women-in-data-engineering-cover.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-5-women-in-data-engineering-cover.webp" alt="Panel of women in data engineering, event on April 30, 2025" />
           </div>
 
 

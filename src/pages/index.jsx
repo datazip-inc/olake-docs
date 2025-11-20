@@ -1,6 +1,8 @@
 import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
 import React from 'react'
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
+import { useLocation } from '@docusaurus/router'
 
 import Faq from '@site/src/components/site/Faq'
 import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
@@ -8,12 +10,43 @@ import WorkflowSection from '../components/site/WorkflowSection'
 import Footer from '@theme/DocItem/Footer'
 import LazyComponent from '../components/LazyComponent'
 
+const stripTrailingSlash = (value) => {
+  if (!value) {
+    return ''
+  }
+
+  return value.endsWith('/') ? value.slice(0, -1) : value
+}
+
+const ensureTrailingSlash = (value) => {
+  if (!value) {
+    return '/'
+  }
+
+  return value.endsWith('/') ? value : `${value}/`
+}
+
 export default function New3Page() {
+  const { siteConfig } = useDocusaurusContext()
+  const location = useLocation()
+  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
+  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const ogTitle = 'Fastest Open Source Data Replication Tool'
+  const ogDescription = 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.'
+  const ogImage = 'https://olake.io/img/logo/olake-blue.webp'
+
   const OLakeFaqs = [
     {
       question: 'How to Get Started?',
-      answer:
-        'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
+      answer: (
+        <>
+          Check the{' '}
+          <a href="/docs/getting-started/quickstart" className="text-[#193AE6] hover:underline">
+            Quickstart Guide
+          </a>
+          . With a single Docker command you can spin up OLake and access the UI.
+        </>
+      )
     },
     {
       question: 'Is OLake Really Open Source?',
@@ -23,7 +56,7 @@ export default function New3Page() {
     {
       question: 'Is There Any Enterprise Plan?',
       answer:
-        'We\'re actively working on providing enterprise support from professional assistance and pilot programs to helping teams scale OLake in production. You can reach out at hello@olake.io to learn more.'
+        "We're actively working on providing enterprise support from professional assistance and pilot programs to helping teams scale OLake in production. You can reach out at hello@olake.io to learn more."
     },
     {
       question: 'How Can I Contribute?',
@@ -55,6 +88,17 @@ export default function New3Page() {
           name='description'
           content='Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.'
         />
+        {/* Open Graph */}
+        <meta property='og:type' content='website' />
+        <meta property='og:title' content={ogTitle} />
+        <meta property='og:description' content={ogDescription} />
+        <meta property='og:url' content={canonicalUrl} />
+        <meta property='og:site_name' content='OLake' />
+        <meta property='og:locale' content='en_US' />
+        <meta property='og:image' content={ogImage} />
+        <meta property='og:image:type' content='image/webp' />
+        <meta property='og:image:width' content='1200' />
+        <meta property='og:image:height' content='630' />
  
         <script
           type='application/ld+json'
@@ -63,9 +107,9 @@ export default function New3Page() {
               '@context': 'https://schema.org/',
               '@type': 'Organization',
               name: 'OLake',
-              url: 'https://olake.io/',
-              logo: 'https://olake.io/img/logo/olake-blue.svg',
-              description: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+              url: canonicalUrl,
+              logo: 'https://olake.io/img/logo/olake-blue.webp',
+              description: ogDescription,
               foundingDate: '2023',
               contactPoint: {
                 '@type': 'ContactPoint',

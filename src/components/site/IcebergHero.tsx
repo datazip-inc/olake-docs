@@ -7,7 +7,7 @@ interface IcebergBadgeProps {
 const IcebergBadge: React.FC<IcebergBadgeProps> = ({ text = 'Exclusively for Apache Iceberg' }) => {
   return (
     <div className='inline-flex items-center rounded-xl bg-white px-4 py-1 shadow-md'>
-      <img src='/img/site/iceberg-logo.svg' alt='Iceberg' className='mr-1.5 size-10' loading="lazy" decoding="async" />
+      <img src='/img/site/iceberg-logo.svg' alt='Iceberg catalog logo' className='mr-1.5 size-10' loading="lazy" decoding="async" />
       <span className='text-sm font-bold text-gray-800'>{text}</span>
     </div>
   )
@@ -17,18 +17,31 @@ interface FeatureCardProps {
   title: string
   description: string
   image: string
+  imageAlt: string
+  learnMoreLink?: string
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, image }) => {
+const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, image, imageAlt, learnMoreLink }) => {
   return (
     <div className='h-full overflow-hidden rounded-3xl bg-white shadow-lg dark:bg-gray-800'>
       <div className='flex h-full flex-col p-1 md:px-2'>
         <div className='mb-6 flex items-center justify-center rounded-xl'>
-          <img src={image} alt={title} className='w-full object-contain' loading="lazy" decoding="async" />
+          <img src={image} alt={imageAlt} className='w-full object-contain' loading="lazy" decoding="async" />
         </div>
         <div className='md:p-4'>
           <h3 className='mb-3 text-xl font-bold text-gray-900 dark:text-white'>{title}</h3>
           <p className='flex-grow text-sm text-gray-600 dark:text-gray-300'>{description}</p>
+          {learnMoreLink && (
+            <a
+              href={learnMoreLink}
+              className='mt-4 inline-flex items-center text-sm font-medium text-[#193AE6] hover:underline dark:text-blue-400'
+            >
+              Learn More
+              <svg className='ml-1 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5l7 7-7 7' />
+              </svg>
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -76,16 +89,22 @@ const IcebergHero: React.FC = () => {
             title='Schema evolution'
             description='Apache Iceberg enables seamless schema evolution by supporting column additions, deletions, renames, and reordering ensuring reliable analytics on evolving datasets without rewriting historical data.'
             image='/img/site/iceberg-1.svg'
+            imageAlt='Schema evolution'
+            learnMoreLink='/docs/features/?tab=schema-evolution'
           />
           <FeatureCard
             title='Schema datatype changes'
             description='Apache Iceberg enables safe and forward-compatible data type evolutions. This guarantees robust schema evolution without the need to rewrite existing data or disrupt downstream queries.'
             image='/img/site/iceberg-2.svg'
+            imageAlt='Schema type mapping migration'
+            learnMoreLink='/docs/features/?tab=overview#3-schema-evolution--data-types-changes'
           />
           <FeatureCard
             title='Partitioning and partition evolution'
             description='Apache Iceberg supports flexible partitioning without requiring data to be physically rewritten. Partition evolution allows you to safely change partition strategies over time without impacting existing data.'
             image='/img/site/iceberg-3.svg'
+            imageAlt='Database partitions data flow'
+            learnMoreLink='/docs/writers/iceberg/partitioning/'
           />
         </div>
       </div>

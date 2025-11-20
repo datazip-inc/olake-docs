@@ -43,7 +43,14 @@ const docSidebar = {
       label: 'Getting Started',      
       items: [
         'getting-started/quickstart',
-        'getting-started/creating-first-pipeline',
+        {
+          type: 'category',
+          label: 'Create Your First Job Pipeline',
+          link: { type: 'doc', id: 'getting-started/creating-first-pipeline' },
+          items: [
+            'getting-started/job-level-properties',
+          ],
+        },
         'getting-started/playground',
       ],
     },
@@ -154,7 +161,9 @@ const docSidebar = {
       label: 'Versions',
       items: [
         'release/overview',
-        'release/v0.2.5-v0.2.6',
+        'release/v0.2.10',
+        'release/v0.2.8',
+        'release/v0.2.5-v0.2.7',
         'release/v0.2.2-v0.2.4',
         'release/v0.2.0-v0.2.1',
         'release/v0.1.9-v0.1.11',

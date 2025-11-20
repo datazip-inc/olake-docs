@@ -4,12 +4,14 @@ const FeatureCard = ({
   title,
   description,
   illustration,
-  bgColor
+  bgColor,
+  href
 }: {
   title: string
   description: string
   illustration: React.ReactNode
   bgColor: string
+  href?: string
 }) => {
   // Get the appropriate blur color based on background color
   const getBlurColor = () => {
@@ -19,9 +21,11 @@ const FeatureCard = ({
     return '#bae6fd' // default
   }
 
-  return (
+  const cardContent = (
     <div
-      className={`${bgColor} relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-6 sm:p-8 md:p-10`}
+      className={`${bgColor} relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-6 sm:p-8 md:p-10 ${
+        href ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''
+      }`}
     >
       <div className='relative z-10'>
         <div className='relative mb-10 pt-4 sm:mb-12'>
@@ -46,6 +50,16 @@ const FeatureCard = ({
       </div>
     </div>
   )
+
+  if (href) {
+    return (
+      <a href={href} className='block h-full'>
+        {cardContent}
+      </a>
+    )
+  }
+
+  return cardContent
 }
 
 const FeatureShowcase: React.FC = () => {
@@ -68,13 +82,14 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
                   <img
                     src='/img/site/why-olake-1.svg'
-                    alt='Faster Parallel & Full Load'
+                    alt='schema connecting to data lake with faster resumable full load'
                     loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
               }
               bgColor='bg-[#C7ECFF] dark:bg-blue-900/20'
+              href='/docs/features/#3-stateful-resumable-syncs'
             />
 
             <FeatureCard
@@ -84,13 +99,14 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-28 w-full items-center justify-center sm:h-28 md:h-32'>
                   <img
                     src='/img/site/why-olake-2.svg'
-                    alt='Stay updated with ingestion logs'
+                    alt='Schema-aware logs and alerts for data integrity'
                     loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
               }
               bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
+              href='/blog/olake-architecture'
             />
 
             <FeatureCard
@@ -100,13 +116,14 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-44 w-full items-center pr-11 justify-end sm:h-28 md:h-44'>
                   <img
                     src='/img/site/why-olake-3.svg'
-                    alt='CDC Cursor Preservation'
+                    alt='CDC cursor preservation with MongoDB source'
                     loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
               }
               bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
+              href='/blog/olake-architecture-deep-dive/#cdc-sync'
             />
 
             <FeatureCard
@@ -116,13 +133,14 @@ const FeatureShowcase: React.FC = () => {
                 <div className='flex h-36 w-full items-center justify-center sm:h-28 md:h-44'>
                   <img
                     src='/img/site/why-olake-4.svg'
-                    alt='Fast & Stable Connectors'
+                    alt='Connector selection for real-time database sync'
                     loading="lazy" decoding="async"
                     className='h-full w-auto max-w-full scale-125 object-contain'
                   />
                 </div>
               }
               bgColor='bg-[#DDF3FF] dark:bg-blue-900/20'
+              href='/blog/what-makes-olake-fast'
             />
           </div>
         </div>

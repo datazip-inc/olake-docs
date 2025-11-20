@@ -17,6 +17,22 @@ import DocsRating from "./DocsRating";
 import DocBreadcrumbs from "@theme/DocBreadcrumbs";
 import DocsFooter from "../../../docs/shared/DocsFooter.mdx";
 
+const stripTrailingSlash = (value) => {
+  if (!value) {
+    return value;
+  }
+
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+};
+
+const ensureTrailingSlash = (value) => {
+  if (!value) {
+    return value;
+  }
+
+  return value.endsWith("/") ? value : `${value}/`;
+};
+
 export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
   const { siteConfig } = useDocusaurusContext();
   const { pluginId } = useActivePlugin({ failfast: true });
@@ -31,7 +47,7 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     toc,
   } = useDoc();
 
-  const { url: siteUrl } = siteConfig;
+  const baseUrl = stripTrailingSlash(siteConfig?.url || "https://olake.io");
   const versionMetadata = useDocsVersion();
   const { description, title, permalink, editUrl, lastUpdatedAt, lastUpdatedBy, unversionedId } =
     metadata;
@@ -44,10 +60,14 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
     absolute: true,
   });
 
+  const canonicalPath = ensureTrailingSlash(permalink);
+  const canonicalUrl = canonicalPath ? `${baseUrl}${canonicalPath}` : null;
+
   return (
     <>
       <Head>
         <title>{title}</title>
+        <meta property="og:type" content="website" />
         <meta property="og:title" content={title} />
         {description && <meta name="description" content={description} />}
         {description && <meta property="og:description" content={description} />}
@@ -55,8 +75,10 @@ export const DocContent = ({ Content, contentRef, readingTimeInWords }) => {
         {metaImage && <meta property="og:image" content={metaImageUrl} />}
         {metaImage && <meta name="twitter:image" content={metaImageUrl} />}
         {metaImage && <meta name="twitter:image:alt" content={`Image for ${title}`} />}
-        {permalink && <meta property="og:url" content={siteUrl + permalink} />}
-        {permalink && <link rel="canonical" href={siteUrl + permalink} />}
+        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+        <meta property="og:site_name" content="OLake" />
+        <meta property="og:locale" content="en_US" />
+        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
       </Head>
 
       <div className="row md:ml-8">

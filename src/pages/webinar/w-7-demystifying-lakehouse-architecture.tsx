@@ -53,7 +53,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/w-7-demystifying-lakehouse-architecture-cover.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/w-7-demystifying-lakehouse-architecture-cover.webp" alt="Webinar on lakehouse architectures with Cloudera product manager" />
           </div>
 
 

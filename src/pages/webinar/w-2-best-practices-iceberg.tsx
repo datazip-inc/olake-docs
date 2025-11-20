@@ -66,7 +66,7 @@ const WebinarPage = () => {
 
         <div className="flex flex-col items-center justify-center lg:flex-row md:items-start">
           <div className="w-full md:w-2/3 flex justify-center">
-            <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Webinar Cover Image" />
+            <WebinarCoverImage src="/img/webinars/webinar-iceberg.webp" alt="Live chat on best practices for migrating to Apache Iceberg with Yonatan Dolan and Amit Gilad, November 21, 2024" />
           </div>
 
         </div>

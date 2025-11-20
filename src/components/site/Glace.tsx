@@ -109,7 +109,7 @@ const Glace: React.FC<GlaceProps> = ({
             <div className='mb-8 flex w-full items-center justify-center'>
               <img
                 src='/img/site/glace-cards.svg'
-                alt='Glace Illustration'
+                alt='Migrate to Iceberg with AI-powered fast migration'
                 className='max-w-full lg:max-w-[90%]'
                 width="960" height="540"
                 loading="lazy" decoding="async"
