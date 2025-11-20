@@ -14,7 +14,7 @@ Data ingestion performance is critical when you are writing in Iceberg format to
 
 The result? A **7× performance improvement** in Apache Iceberg, without the complexity of background deduplication jobs or eventual consistency mechanisms.
 
-In this blog I am going to explain how we achieved this, so let us start. If you are just interested in what boosted performance, read the section <a href="#olake-new-iceberg-writer-what-we-changed-to-make-it-fast">What We Changed</a>.
+In this blog I am going to explain how we achieved this, so let us start. If you are just interested in what boosted performance, read the section <a href="#olake-new-iceberg-writer-what-we-changed-to-make-it-fast">What We Changed</a>. If you are interested in previous code base you can check https://github.com/datazip-inc/olake/tree/v0.1.11
 
 
 ---
@@ -60,7 +60,7 @@ If you have worked with parquet, if there is schema change you have to close the
 />
 
 
-So, here we have three things:
+So, here we have four things:
 
 - Write and commit data files atomically
 - Iceberg is for batch use cases
@@ -122,14 +122,10 @@ In the image below you can see how the current batching works.
 
 - **Local thread batch**: Each writer thread buffers records in-memory up to a per-thread threshold (typically 10,000 records). This local buffering allows for efficient in-memory processing and schema detection before sending data over the network.
 
-- **Java writer**: After the local batch crosses a threshold, we send a compact, typed payload to the Java Iceberg writer. This payload is optimized for Iceberg operations and eliminates unnecessary serialization overhead. The Java writer automatically closes files and pushes them to storage once the target file size is reached.
+- **Java writer**: After the local batch crosses a threshold, we send a compact, typed payload (via gRpc) to the Java Iceberg writer. This payload is optimized for Iceberg operations and eliminates unnecessary json serialization/deserialization overhead. The Java writer automatically closes files and pushes them to storage once the target file size is reached.
 
 - **Data visibility after commit**: Files are created and data is written, but it only becomes visible in the Iceberg table after an explicit commit operation. This ensures atomic visibility and maintains exactly-once semantics.
 
-**Benefits of this approach:**
-- **Reduced RPC chatter**: Fewer, larger batches mean fewer network round trips
-- **Bounded working sets**: Memory usage is predictable and controlled
-- **Efficient processing**: Local batching allows for optimizations like schema detection and data normalization before network transmission
 ---
 
 ### Atomic Commits And Schema Evolution
@@ -199,7 +195,7 @@ public void commitThread(String threadId, Table table) {
 
 The commit process handles two scenarios:
 - **Append mode**: For pure inserts (like backfill operations or initial data loads), we use `AppendFiles` which simply adds new data files to the table. This is the simplest and fastest mode.
-- **Upsert mode**: For CDC operations with updates/deletes, we use `RowDelta` which atomically adds both data files and delete files, enabling Iceberg's native upsert semantics. For example, if a record is updated, we write the new version to a data file and mark the old version for deletion in a delete file—all in a single atomic operation.
+- **Upsert mode**: For CDC operations with updates/deletes, we use `RowDelta` (Equality delete MOR Iceberg) which atomically adds both data files and delete files, enabling Iceberg's native upsert semantics. For example, if a record is updated, we write the new version to a data file and mark the old version for deletion in a delete file—all in a single atomic operation.
 
 #### 2. Atomic Schema Evolution
 
@@ -463,14 +459,13 @@ message RecordIngestResponse {
 In the previous architecture, all processing, type detection, and type promotion happened on the Java side. In the new writer, the Golang side is responsible for type detection, schema updates, and data writing.
 
 All concurrency management happens on the Go side. Iceberg Java server just acts as an API server where each API has single responsibilities. There are some optimizations that we have done: 
-- **Concurrent processing**: Managing multiple writer threads that can process different partitions or tables simultaneously
+- **Concurrent processing**: Managing multiple writer threads that can process different chunks or cdc simultaneouslnaging multiple writer threads that can process different partitions or tables simultaneously
 - **Schema coordination**: Detecting table changes and coordinating evolution across threads
-- **Normalization**: Parallel normalization of data across multiple threads 
 - **Lifecycle management**: Properly initializing and cleaning up writer resources
 
-#### Parallel Normalization and Schema Detection
+#### Parallel Normalization and Schema Change Detection
 
-Normalization and schema evolution checks run in parallel at the thread level. Each thread builds a local candidate schema from its batch, compares it against the table's global schema, and only acquires the table level schema lock if a difference is detected. This approach minimizes contention and allows for efficient parallel processing.
+Normalization and schema change detection checks run in parallel at the thread level. Each thread builds a local candidate schema from its batch, compares it against the table's global schema, and only acquires the table level schema lock if a difference is detected. This approach minimizes contention and allows for efficient parallel processing.
 
 **How parallel normalization works:**
 
@@ -483,11 +478,11 @@ This parallel approach is crucial for maintaining high throughput while ensuring
 
 #### Go Maintains Schema Copy
 
-So to reduce RPC calls and overhead of Java server, the identical writer schema copy is being maintained on the Go side, which is responsible to check if any schema evolution is required or not. In that way, we avoid unnecessary locks for the schema checks. 
+So to reduce RPC calls and overhead of Java server, the identical writer schema copy is being maintained on the Go side, which is responsible to check if any schema evolution is required or not. In that way, we avoid unnecessary locks for the schema checks. Also Go side verifies if schema is compatible with Iceberg format or not. 
 
 ### Partition Fanout Writer
 
-Highly partitioned tables were another pain point we encountered. In the previous implementation, when a record with a different partition arrived, it would close the current writer and open a new one. This meant we were processing partitions sequentially—only one partition writer could be active at a time. This approach had several problems: frequent writer creation and destruction overhead, many small files being created, and poor I/O efficiency.
+Highly partitioned tables were another pain point we encountered. In the previous implementation, when a record with a different partition arrived, it would close the current writer and open a new one. This meant we have to sort data in each batch and then write, which eventually create small files. This approach had several problems: frequent writer creation and destruction overhead, many small files being created, and poor I/O efficiency.
 
 The issue becomes more pronounced when you have tables with many partitions. Imagine processing a table with 50-100 partitions—you're constantly creating and destroying writers, which is expensive. Plus, all those small files hurt query performance because query engines need to read metadata from many files.
 
@@ -521,30 +516,6 @@ Now if you have seen our headline about 7x or 700% improvement, here is the proo
 
 ---
 
-## Lessons Learned
-
-Behind these optimizations lies a lot of experimentation and iteration. We first considered how to make the Java Iceberg server compatible with Olake. Our CTO started with a basic version that correctly supported Iceberg writes, as there was no existing tool that could write to Iceberg in a truly native way. We then decided to optimize it specifically for Olake, with our main goal being to build the best possible and most reliable solution.
-
-I started experimenting with a structure where each writer would have multiple flush threads, but encountered OOM (Out of Memory) issues. I also struggled to determine the optimal parameter for the number of flush threads per writer—too many flush threads with fewer writer threads would reduce database throughput. I eventually set the number to a constant value of 1 and moved forward. The next challenge was writer lifecycle management: when a schema change occurs, you must create a new Java writer, similar to creating a new Parquet file when the schema changes. We spent a day debugging this issue, primarily because the documentation didn't clearly state that each writer is based on a single schema. 
-
-This refactor taught us several valuable lessons about building high-performance data systems:
-
-### 1. Correctness Enables Performance
-Starting with strong consistency guarantees (exactly-once semantics) actually made performance optimization easier. When you don't have to worry about eventual consistency or background cleanup jobs, you can focus purely on throughput and efficiency.
-
-### 2. Language Specific Strengths Matter
-Using Go for concurrency and Java for I/O operations wasn't just about using the right tool for the job—it was about leveraging each language's ecosystem and optimizations. The mature Iceberg Java libraries and Go's concurrent programming model were both essential.
-
-### 3. Eliminate Complexity Before Optimizing
-Removing the Debezium envelope was one of our biggest wins. Sometimes the best optimization is eliminating unnecessary work entirely, rather than making existing work faster.
-
-### 4. Measure Everything
-Each optimization was measured and validated before moving to the next. This systematic approach prevented us from optimizing the wrong things and helped us understand which changes had the biggest impact.
-
-### 5. Design for Operations
-The explicit lifecycle management and clear commit boundaries weren't just about correctness—they made the system much easier to operate, debug, and monitor in production.
-
----
 
 ## Conclusion
 
