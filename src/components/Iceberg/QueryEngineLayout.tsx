@@ -86,9 +86,9 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
           <div className="absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
           
           <div className="relative z-10">
-            <h2 className="text-5xl font-bold mb-4 animate-fade-in">
+            <h1 className="text-5xl font-bold mb-4 animate-fade-in">
               {title}
-            </h2>
+            </h1>
             <p className="text-xl text-white/90 max-w-3xl leading-relaxed">
               {description}
             </p>

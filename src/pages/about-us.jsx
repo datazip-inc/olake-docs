@@ -34,9 +34,9 @@ const AboutTeam = () => {
         <div className='mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8'>
           {/* About Us Section */}
           <section className='mb-16'>
-            <h2 className='mb-4 text-center text-3xl font-extrabold' style={{ color: '#193AE6' }}>
-              About Us
-            </h2>
+            <h1 className='mb-4 text-center text-3xl font-extrabold' style={{ color: '#193AE6' }}>
+              About OLake - Fastest Open Source Data Replication Tool
+            </h1>
             <p className='mx-auto max-w-2xl text-center text-lg'>
               OLake is the fastest open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable—with recent benchmarks showing up to 500× faster ingest than common alternatives—so your team can stop handling connectors and start focusing on models, products, and impact.
             </p>
