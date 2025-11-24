@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Dialog, Transition, Tab } from '@headlessui/react';
 import { Fragment } from 'react';
+import Link from '@docusaurus/Link';
 import { 
   XMarkIcon, 
   CheckCircleIcon, 
@@ -50,7 +51,7 @@ export interface FeatureDetail {
 export interface FeatureCardProps {
   title: string;
   chip?: string;
-  description: string;
+  description: string | React.ReactNode;
   icon: React.ReactNode;
   details: FeatureDetail;
   color?: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'yellow';
