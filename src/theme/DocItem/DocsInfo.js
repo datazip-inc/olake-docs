@@ -67,7 +67,7 @@ function DocsInfo({ docsPluginId, ...props }) {
             className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
           >
             <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
-            <span className="text-gray-400">Open OLake issues</span>
+            <span className="text-gray-600 dark:text-gray-400">Open OLake issues</span>
           </a>
 
           {/* Open Doc Issue */}
@@ -78,7 +78,7 @@ function DocsInfo({ docsPluginId, ...props }) {
             className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
           >
             <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
-            <span className="text-gray-400">Open OLake doc issue</span>
+            <span className="text-gray-600 dark:text-gray-400">Open OLake doc issue</span>
           </a>
 
           {/* Share Button */}
