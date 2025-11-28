@@ -92,6 +92,10 @@ const config = {
     }
   ],
 
+  clientModules: [
+    require.resolve('./src/clientModules/releasesBell.tsx'),
+  ],
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
