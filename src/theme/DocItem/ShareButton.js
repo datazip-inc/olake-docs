@@ -65,6 +65,7 @@ function ShareButton(props) {
                 <img
                     className="margin-right--xs"
                     src={shareIconUrl}
+                    alt="Share"
                     style={{ height: "16px", width: "18px", verticalAlign: "-0.125em" }}
                 ></img>
             </a>
