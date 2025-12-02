@@ -49,6 +49,7 @@ const docSidebar = {
           link: { type: 'doc', id: 'getting-started/creating-first-pipeline' },
           items: [
             'getting-started/job-level-properties',
+            'getting-started/alerts-and-notifications',
           ],
         },
         'getting-started/playground',
