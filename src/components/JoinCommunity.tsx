@@ -62,9 +62,9 @@ const JoinCommunity: FC<TProps> = ({
   return (
     <div className="flex flex-col gap-6 pt-8">
       {/* Section Title */}
-      <h6 className="m-0 font-normal text-gray-800 dark:text-gray-100 text-center">
+      <p className="m-0 font-normal text-gray-800 dark:text-gray-100 text-center text-lg">
         {$t("Join our growing community")}
-      </h6>
+      </p>
 
       {/* Community Grid */}
       <div
