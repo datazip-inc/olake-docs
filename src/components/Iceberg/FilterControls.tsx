@@ -51,10 +51,15 @@ const FilterControls: React.FC<FilterControlsProps> = ({
         
         {/* Category Filter */}
         <div className="sm:w-64">
+          <label htmlFor="category-filter" className="sr-only">
+            Filter by category
+          </label>
           <select
+            id="category-filter"
             value={filters.category}
             onChange={(e) => handleCategoryChange(e.target.value as FilterOptions['category'])}
             className={STYLES.INPUT_FIELD}
+            aria-label="Filter query engines by category"
           >
             {CATEGORY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
