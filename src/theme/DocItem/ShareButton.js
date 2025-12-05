@@ -59,7 +59,7 @@ function ShareButton(props) {
         <div className="dropdown dropdown--hoverable pointer">
             <button
                 className="button button--lg button--link padding-horiz--none pointer share-button inline-flex items-center"
-                style={{ fontWeight: 400, fontFamily: "inherit", fontSize: "inherit", marginTop: "0.45rem" }}
+                style={{ fontWeight: 400, fontFamily: "inherit", fontSize: "inherit" }}
                 aria-label="Share this page"
             >
                 <img

@@ -100,7 +100,7 @@ const config = {
 
       announcementBar: {
         id: 'monthly-events-2025',
-        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200">here</a>. Check out! 🎉',
+        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200" aria-label="View upcoming webinars" title="View upcoming webinars">here<span class="sr-only">View upcoming webinars</span></a>. Check out! 🎉',
         backgroundColor: '#193ae6',
         textColor: 'white',
         isCloseable: true,
