@@ -211,10 +211,15 @@ const ContributorsPage = () => {
             </div>
             <div className="flex items-center gap-2">
               <FaFilter className="text-gray-400" />
+              <label htmlFor="sort-contributors" className="sr-only">
+                Sort contributors
+              </label>
               <select
+                id="sort-contributors"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'points' | 'contributions' | 'name')}
-                className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#193ae6] dark:focus:ring-blue-400"
+                className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#193ae6] dark:focus:ring-blue-400 min-w-[180px]"
+                aria-label="Sort contributors by points, contributions, or name"
               >
                 <option value="points">Sort by Points</option>
                 <option value="contributions">Sort by PRs</option>
