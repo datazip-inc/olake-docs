@@ -48,7 +48,7 @@ const ContributorsPage = () => {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'USA'
+      addressCountry: 'US'
     }
   }
 

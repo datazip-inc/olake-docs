@@ -46,19 +46,7 @@ const ContactPage = () => {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'USA'
-    },
-    hasPOS: {
-      '@type': 'Place',
-      name: 'OLake - Working Office (Bengaluru)',
-      address: {
-        '@type': 'PostalAddress',
-        streetAddress: '2nd floor, Monte carlo building, 27th Main Rd, Parangi Palaya, Sector 2, HSR Layout',
-        addressLocality: 'Bengaluru',
-        addressRegion: 'Karnataka',
-        postalCode: '560102',
-        addressCountry: 'IN'
-      }
+      addressCountry: 'US'
     }
   }
 
