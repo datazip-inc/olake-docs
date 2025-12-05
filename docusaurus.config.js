@@ -952,6 +952,32 @@ const config = {
             from: '/docs/writers/s3/',
           },
 
+          // 404 redirects from Ahrefs audit (trailingSlash: true handles / automatically)
+          {
+            to: '/docs/writers/iceberg/catalog/glue/',
+            from: '/docs/connectors/glue-catalog',
+          },
+          {
+            to: '/docs/writers/iceberg/partitioning/',
+            from: '/docs/understanding/iceberg-partitioning',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/overview/',
+            from: '/docs/connectors/iceberg',
+          },
+          {
+            to: '/docs/install/docker-cli/',
+            from: '/docs/getting-started/docker-cli',
+          },
+          {
+            to: '/docs/install/docker-cli/',
+            from: '/docs/getting-started/olake-cli',
+          },
+          {
+            to: '/docs/connectors/overview/',
+            from: '/docs/connectors',
+          },
+
           // END
           // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
           // via canonical tags in the theme files, not through redirects
