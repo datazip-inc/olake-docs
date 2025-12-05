@@ -119,7 +119,7 @@ const config = {
         title: '',
         logo: {
           alt: 'OLake Logo',
-          src: 'img/logo/olake-blue-with-text.webp',
+          src: 'img/logo/olake-blue-with-text.svg',
         },
         items: [
           { to: '/docs', label: 'Docs', position: 'right' },
@@ -201,9 +201,9 @@ const config = {
             tagName: 'link',
             attributes: {
               rel: 'preload',
-              href: '/img/logo/olake-blue-with-text.webp',
+              href: '/img/logo/olake-blue-with-text.svg',
               as: 'image',
-              type: 'image/webp',
+              type: 'image/svg+xml',
               fetchpriority: 'high'
             },
           },
