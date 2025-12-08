@@ -48,7 +48,7 @@ export default function BlogPostPageWrapper(props) {
       addressLocality: 'LEWES',
       addressRegion: 'DE',
       postalCode: '19958',
-      addressCountry: 'USA'
+      addressCountry: 'US'
     }
   };
 
