@@ -239,6 +239,10 @@ nfsServer:
 For development and quick starts, a simple NFS server is included and enabled by default. This provides an out-of-the-box shared storage solution without any external dependencies. However, because this server runs as a single pod, it represents a single point of failure and is not recommended for production use.
 :::
 
+:::warning
+**Bottlerocket OS on AWS EKS:** The built-in NFS server is incompatible with Bottlerocket OS worker nodes. For such AWS EKS configurations, AWS EFS must be used as an alternative, which requires setting `nfsServer.enabled: false` and configuring the EFS CSI driver as shown above.
+:::
+
 ### External PostgreSQL Configuration
 
 External PostgreSQL databases can be used instead of the built-in postgresql deployment. It is the primary database for storing job data, configurations, and sync state.
@@ -275,6 +279,18 @@ postgresql:
       username:          "username"
       password:          "password"
       ssl_mode:          "ssl_mode"
+```
+
+### Global Environment Variables
+
+Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, and Activity Pods:
+
+```yaml
+global:
+  env:
+    OLAKE_SECRET_KEY: "your-secret-encryption-key"
+    RUN_MODE: "production"
+    # Add any custom environment variables here
 ```
 
 ## Upgrading Chart Version
@@ -324,6 +340,46 @@ kubectl logs -l app.kubernetes.io/name=temporal-server -f
   - Check if `ssl_mode` is correctly set in the kubernetes secret for external database
 - Check database connectivity from other pods
 - Review database credentials in secrets
+
+## Migrating to v0.0.7
+
+Version 0.0.7 introduces a significant change to how ServiceAccount, RBAC, and Secret resources are managed. By default, `useStandardResources` is now set to `true`, which converts these from Helm Hooks to standard resources. This improves compatibility with ArgoCD and prevents race conditions during updates.
+
+**For New Installations:**
+No action needed. The new default (`true`) is the recommended configuration.
+
+**For Existing Installations:**
+Upgrading directly may cause `resource already exists` errors because Helm tries to adopt resources that were previously created by hooks.
+
+**Option 1: Maintain Legacy Behavior (Easiest)**
+Set the flag to `false` in custom `values.yaml` to keep the old hook-based behavior:
+```yaml
+useStandardResources: false
+```
+
+**Option 2: Migrate to Standard Resources (Recommended)**
+To adopt the new behavior, manually remove the hook annotations and label the resources for Helm adoption before upgrading:
+
+```bash
+# 1. ServiceAccount
+kubectl annotate serviceaccount olake-workers meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label serviceaccount olake-workers app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 2. Role
+kubectl annotate role olake-workers meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label role olake-workers app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 3. RoleBinding
+kubectl annotate rolebinding olake-workers meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label rolebinding olake-workers app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 4. Secret
+kubectl annotate secret olake-workers-secret meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label secret olake-workers-secret app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 5. Perform the upgrade
+helm upgrade olake olake/olake
+```
 
 ## Uninstallation
 

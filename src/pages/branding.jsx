@@ -9,7 +9,7 @@ const logos = [
     description: 'The primary horizontal logo for OLake, available in high resolution.',
     image: '/img/logo/olake-white.svg',
     downloadLinkSVG: '/img/logo/olake-white.svg',
-    downloadLinkPNG: '/img/logo/olake-white.png'
+    downloadLinkWebp: '/img/logo/olake-white.webp'
   },
   {
     id: 2,
@@ -17,7 +17,7 @@ const logos = [
     description: 'A stacked version for tight vertical spaces.',
     image: '/img/logo/olake-blue.svg',
     downloadLinkSVG: '/img/logo/olake-blue.svg',
-    downloadLinkPNG: '/img/logo/olake-blue.png'
+    downloadLinkWebp: '/img/logo/olake-blue.webp'
   },
   {
     id: 3,
@@ -25,7 +25,7 @@ const logos = [
     description: 'A stacked version for tight vertical spaces.',
     image: '/img/logo/olake-black.svg',
     downloadLinkSVG: '/img/logo/olake-black.svg',
-    downloadLinkPNG: '/img/logo/olake-black.png'
+    downloadLinkWebp: '/img/logo/olake-black.webp'
   },
   {
     id: 4,
@@ -33,7 +33,7 @@ const logos = [
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-white-with-text.svg',
     downloadLinkSVG: '/img/logo/olake-white-with-text.svg',
-    downloadLinkPNG: '/img/logo/olake-white-with-text.png'
+    downloadLinkWebp: '/img/logo/olake-white-with-text.webp'
   },
   {
     id: 5,
@@ -41,7 +41,7 @@ const logos = [
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-blue-with-text.svg',
     downloadLinkSVG: '/img/logo/olake-blue-with-text.svg',
-    downloadLinkPNG: '/img/logo/olake-blue-with-text.png'
+    downloadLinkWebp: '/img/logo/olake-blue-with-text.webp'
   },
   {
     id: 6,
@@ -49,7 +49,31 @@ const logos = [
     description: 'The simplified icon-only logo, ideal for favicons and mobile apps.',
     image: '/img/logo/olake-black-with-text.svg',
     downloadLinkSVG: '/img/logo/olake-black-with-text.svg',
-    downloadLinkPNG: '/img/logo/olake-black-with-text.png'
+    downloadLinkWebp: '/img/logo/olake-black-with-text.webp'
+  },
+  {
+    id: 7,
+    name: 'Logo Above with Text (Blue)',
+    description: 'Primary logo with stacked text for vertical layouts.',
+    image: '/img/logo/olake-above-blue-with-text.svg',
+    downloadLinkSVG: '/img/logo/olake-above-blue-with-text.svg',
+    downloadLinkWebp: '/img/logo/olake-above-blue-with-text.webp'
+  },
+  {
+    id: 8,
+    name: 'Logo Above with Text (White)',
+    description: 'Primary logo with stacked text for vertical layouts.',
+    image: '/img/logo/olake-above-white-with-text.svg',
+    downloadLinkSVG: '/img/logo/olake-above-white-with-text.svg',
+    downloadLinkWebp: '/img/logo/olake-above-white-with-text.webp'
+  },
+  {
+    id: 9,
+    name: 'Logo Above with Text (Black)',
+    description: 'Primary logo with stacked text for vertical layouts.',
+    image: '/img/logo/olake-above-black-with-text.svg',
+    downloadLinkSVG: '/img/logo/olake-above-black-with-text.svg',
+    downloadLinkWebp: '/img/logo/olake-above-black-with-text.webp'
   }
 ]
 
@@ -82,14 +106,14 @@ const LogoCard = ({ logo }) => {
           </a>
 
           <a
-            href={logo.downloadLinkPNG}
+            href={logo.downloadLinkWebp}
             download
             className='inline-flex items-center rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:text-black'
           >
             <FaDownload className='mr-2' />
             Download
             <span className='ml-2 rounded-full border border-slate-300 px-2 py-1 text-xs text-gray-800 dark:text-gray-200'>
-              PNG
+              WEBP
             </span>
           </a>
 

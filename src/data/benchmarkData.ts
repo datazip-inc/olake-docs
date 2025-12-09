@@ -7,14 +7,14 @@ export const CDC_SYNC = {
         isUniform: true // All tools have the same value
     },
     elapsedTimeCDC: {
-        olake: '22.5 minutes',
+        olake: '20.1 minutes',
         airbyte: '23 hours',
         fivetran: '31 minutes',
         debezium: '60 minutes',
         estuary: '4.5 hours'
     },
     speedCDC: {
-        olake: '36,982 RPS',
+        olake: '41,390 RPS',
         airbyte: '585 RPS',
         fivetran: '26,910 RPS',
         debezium: '13,808 RPS',
@@ -22,13 +22,13 @@ export const CDC_SYNC = {
     },
     comparisonCDC: {
         olake: '-',
-        airbyte: '63 X slower',
-        fivetran: '1.4 X slower',
-        debezium: '2.7 X slower',
-        estuary: '12 X slower'
+        airbyte: '70.7 X slower',
+        fivetran: '1.5 X slower',
+        debezium: '2.9 X slower',
+        estuary: '13.4 X slower'
     },
     costCDC: {
-        olake: '$2.02',
+        olake: '$1',
         airbyte: '$ 148.95',
         fivetran: '$ 2,257',
         debezium: '$ 2.02',
@@ -47,14 +47,14 @@ export const FULL_LOAD = {
         estuary: '0.34 Billion'
     },
     elapsedTimeFull: {
-        olake: '4.7 hours',
+        olake: '3.5 hours',
         airbyte: '7.5 hours (failed sync)',
         fivetran: '24 hours',
         debezium: '24 hours',
         estuary: '24 hours'
     },
     speedFull: {
-        olake: '2,35,411 RPS',
+        olake: '3,19,562 RPS',
         airbyte: '457 RPS',
         fivetran: '46,395 RPS',
         debezium: '14,839 RPS',
@@ -62,13 +62,13 @@ export const FULL_LOAD = {
     },
     comparisonFull: {
         olake: '-',
-        airbyte: '515.1 × slower',
-        fivetran: '5.1× slower',
-        debezium: '15.9 × slower',
-        estuary: '59.1 × slower'
+        airbyte: '699.2 × slower',
+        fivetran: '6.8× slower',
+        debezium: '21.5 × slower',
+        estuary: '80.2 × slower'
     },
     costFull: {
-        olake: '$ 15',
+        olake: '$ 10',
         airbyte: '$ 5,560',
         fivetran: '$ 0 (Free full load)',
         debezium: '$ 75',

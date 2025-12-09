@@ -16,7 +16,7 @@ Pagination.displayName = 'Pagination'
 
 const PaginationContent = React.forwardRef<HTMLUListElement, React.ComponentProps<'ul'>>(
   ({ className, ...props }, ref) => (
-    <ul ref={ref} className={cn('flex flex-row items-center gap-1', className)} {...props} />
+    <ul ref={ref} className={cn('flex flex-row items-center gap-2', className)} {...props} />
   )
 )
 PaginationContent.displayName = 'PaginationContent'
@@ -78,7 +78,7 @@ PaginationNext.displayName = 'PaginationNext'
 const PaginationEllipsis = ({ className, ...props }: React.ComponentProps<'span'>) => (
   <span
     aria-hidden
-    className={cn('flex h-9 w-9 items-center justify-center', className)}
+    className={cn('flex h-9 w-9 items-center justify-center text-muted-foreground', className)}
     {...props}
   >
     <MoreHorizontal className='h-4 w-4' />

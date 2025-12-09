@@ -4,12 +4,14 @@ const FeatureCard = ({
   title,
   description,
   illustration,
-  bgColor
+  bgColor,
+  href
 }: {
   title: string
   description: string
   illustration: React.ReactNode
   bgColor: string
+  href?: string
 }) => {
   // Get the appropriate blur color based on background color
   const getBlurColor = () => {
@@ -19,9 +21,11 @@ const FeatureCard = ({
     return '#bae6fd' // default
   }
 
-  return (
+  const cardContent = (
     <div
-      className={`${bgColor} relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-6 sm:p-8 md:p-10`}
+      className={`${bgColor} relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-6 sm:p-8 md:p-10 ${
+        href ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''
+      }`}
     >
       <div className='relative z-10'>
         <div className='relative mb-10 pt-4 sm:mb-12'>
@@ -46,6 +50,16 @@ const FeatureCard = ({
       </div>
     </div>
   )
+
+  if (href) {
+    return (
+      <a href={href} className='block h-full'>
+        {cardContent}
+      </a>
+    )
+  }
+
+  return cardContent
 }
 
 const FeatureShowcase: React.FC = () => {
@@ -75,6 +89,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#C7ECFF] dark:bg-blue-900/20'
+              href='/docs/features/#3-stateful-resumable-syncs'
             />
 
             <FeatureCard
@@ -91,6 +106,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
+              href='/blog/olake-architecture'
             />
 
             <FeatureCard
@@ -107,6 +123,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
+              href='/blog/olake-architecture-deep-dive/#cdc-sync'
             />
 
             <FeatureCard
@@ -123,6 +140,7 @@ const FeatureShowcase: React.FC = () => {
                 </div>
               }
               bgColor='bg-[#DDF3FF] dark:bg-blue-900/20'
+              href='/blog/what-makes-olake-fast'
             />
           </div>
         </div>

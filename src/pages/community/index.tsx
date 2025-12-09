@@ -141,6 +141,19 @@ const CommunityPage = () => {
 
   const communityMeets = [
     {
+      title: 'OLake 9th Community Meetup',
+      subtitle:
+        "Introducing Kafka-Powered CDC Pipelines and Smarter Ingestion Controls Across the Open Lakehouse. Join us to explore Kafka support, smarter sync management, simplified Iceberg destination handling, and secure connectivity options.",
+      route: '/community/9th-community-meetup',
+      img: `/img/community/9th-olake-community-call.webp`,
+      alt: 'OLake 9th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '12 November 2025',
+      icon: FaVideo
+    },
+    {
       title: 'OLake 8th Community Meetup',
       subtitle:
         "Join us for an end-to-end demo of OLake's latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.",

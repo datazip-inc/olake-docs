@@ -177,8 +177,15 @@ export default function New3Page() {
   const OLakeFaqs = [
     {
       question: 'How to Get Started?',
-      answer:
-        'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
+      answer: (
+        <>
+          Check the{' '}
+          <a href="/docs/getting-started/quickstart" className="text-[#193AE6] hover:underline">
+            Quickstart Guide
+          </a>
+          . With a single Docker command you can spin up OLake and access the UI.
+        </>
+      )
     },
     {
       question: 'Is OLake Really Open Source?',

@@ -57,21 +57,19 @@ function ShareButton(props) {
 
     return (
         <div className="dropdown dropdown--hoverable pointer">
-            <a
-                target="_blank"
-                rel="noreferrer noopener"
-                style={{ marginTop: "0.45rem" }}
+            <button
+                className="button button--lg button--link padding-horiz--none pointer share-button inline-flex items-center"
+                style={{ fontWeight: 400, fontFamily: "inherit", fontSize: "inherit" }}
+                aria-label="Share this page"
             >
                 <img
                     className="margin-right--xs"
                     src={shareIconUrl}
-                    style={{ height: "16px", width: "18px", verticalAlign: "-0.125em" }}
-                ></img>
-            </a>
-            <button
-                className="button button--lg button--link padding-horiz--none pointer share-button"
-                style={{ fontWeight: 400, fontFamily: "inherit", fontSize: "inherit" }}
-            >
+                    alt=""
+                    width="18"
+                    height="16"
+                    style={{ verticalAlign: "-0.125em" }}
+                />
                 Share
             </button>
 
@@ -82,15 +80,22 @@ function ShareButton(props) {
                             className="flex dropdown__link icons display-flex"
                             href={labels.link}
                             target="_blank"
+                            rel="noreferrer noopener"
                         >
                             <img
-                                className="block dark:hidden w-5 h-5 mr-2" alt="Share Icon"
+                                className="block dark:hidden w-5 h-5 mr-2"
+                                alt={`Share on ${labels.name}`}
                                 src={labels.lightIcon}
-                            ></img>
+                                width="20"
+                                height="20"
+                            />
                             <img
-                                className="hidden dark:block w-5 h-5 mr-2" alt="Share Icon"
+                                className="hidden dark:block w-5 h-5 mr-2"
+                                alt={`Share on ${labels.name}`}
                                 src={labels.darkIcon}
-                            ></img>
+                                width="20"
+                                height="20"
+                            />
                             {labels.name}
                         </a>
                     </li>
