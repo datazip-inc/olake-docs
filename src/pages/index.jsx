@@ -10,30 +10,169 @@ import WorkflowSection from '../components/site/WorkflowSection'
 import Footer from '@theme/DocItem/Footer'
 import LazyComponent from '../components/LazyComponent'
 
-const stripTrailingSlash = (value) => {
-  if (!value) {
-    return ''
-  }
-
-  return value.endsWith('/') ? value.slice(0, -1) : value
-}
-
-const ensureTrailingSlash = (value) => {
-  if (!value) {
-    return '/'
-  }
-
-  return value.endsWith('/') ? value : `${value}/`
-}
-
 export default function New3Page() {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
-  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname || '/'}`
   const ogTitle = 'Fastest Open Source Data Replication Tool'
   const ogDescription = 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.'
   const ogImage = 'https://olake.io/img/logo/olake-blue.webp'
+  const primaryUrl = 'https://olake.io/'
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'OLake',
+    url: primaryUrl,
+    logo: {
+      '@type': 'ImageObject',
+      url: 'https://olake.io/img/logo/olake-blue.svg',
+      width: 32,
+      height: 32
+    },
+    contactPoint: [
+      {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        email: 'hello@olake.io'
+      }
+    ],
+    sameAs: [
+      'https://github.com/datazip-inc/olake',
+      'https://x.com/_olake',
+      'https://www.linkedin.com/company/datazipio/',
+      'https://www.youtube.com/@olakeio'
+    ],
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '16192 COASTAL HWY',
+      addressLocality: 'LEWES',
+      addressRegion: 'DE',
+      postalCode: '19958',
+      addressCountry: 'US'
+    }
+  }
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    url: primaryUrl,
+    name: 'Fastest Open Source Data Replication Tool',
+    description:
+      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake'
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://olake.io/search?q={search_term_string}',
+      'query-input': 'required name=search_term_string'
+    }
+  }
+
+  const webPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: primaryUrl,
+    name: 'OLake - Fastest Open Source Data Replication Tool',
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'OLake'
+    },
+    description: ogDescription,
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://olake.io/img/site/hero-section.svg'
+      }
+    },
+    primaryImageOfPage: {
+      '@type': 'ImageObject',
+      url: 'https://olake.io/img/site/hero-section.svg',
+      width: 516,
+      height: 605
+    }
+  }
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: primaryUrl
+      }
+    ]
+  }
+
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'How to Get Started?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'Is OLake Really Open Source?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes. OLake is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1k+ developers) and use it freely without hidden costs.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'Is There Any Enterprise Plan?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "We're actively working on providing enterprise support from professional assistance and pilot programs to helping teams scale OLake in production. You can reach out at hello@olake.io to learn more."
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'How Can I Contribute?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Join our slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'Why Should I Use OLake?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'OLake makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'What data platforms and tools does OLake integrate with?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'As of now, we are integrating with Apache Iceberg as a destination. You can query this from most of the big data platform like Snowflake, Databricks, Redshift and BigQuery'
+        }
+      }
+    ]
+  }
+
+  const jsonLdSchemas = [
+    { id: 'organization', data: organizationSchema },
+    { id: 'website', data: websiteSchema },
+    { id: 'webpage', data: webPageSchema },
+    { id: 'breadcrumb', data: breadcrumbSchema },
+    { id: 'faq', data: faqSchema }
+  ]
 
   const OLakeFaqs = [
     {
@@ -100,29 +239,15 @@ export default function New3Page() {
         <meta property='og:image:width' content='1200' />
         <meta property='og:image:height' content='630' />
  
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org/',
-              '@type': 'Organization',
-              name: 'OLake',
-              url: canonicalUrl,
-              logo: 'https://olake.io/img/logo/olake-blue.webp',
-              description: ogDescription,
-              foundingDate: '2023',
-              contactPoint: {
-                '@type': 'ContactPoint',
-                'contactType': 'customer service',
-                'email': 'hello@olake.io'
-              },
-              sameAs: [
-                'https://github.com/datazip-inc/olake',
-                'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw'
-              ]
-            })
-          }}
-        />
+        {jsonLdSchemas.map((schema) => (
+          <script
+            key={schema.id}
+            type='application/ld+json'
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(schema.data)
+            }}
+          />
+        ))}
         <link rel='preconnect' href='https://fonts.googleapis.com' />
         <link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='' />
         <link

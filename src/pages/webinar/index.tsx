@@ -8,22 +8,6 @@ import LazyComponent from '../../components/LazyComponent'
 import WebinarGrid from '../../components/webinars/WebinarGrid';
 import { FaFileVideo, FaVideo, FaPlay, FaUsers, FaCalendarAlt, FaBroadcastTower } from 'react-icons/fa';
 
-const stripTrailingSlash = (value?: string) => {
-  if (!value) {
-    return '';
-  }
-
-  return value.endsWith('/') ? value.slice(0, -1) : value;
-};
-
-const ensureTrailingSlash = (value: string) => {
-  if (!value) {
-    return '/';
-  }
-
-  return value.endsWith('/') ? value : `${value}/`;
-};
-
 // Custom hook for dynamic iframe height
 const useDynamicIframeHeight = (src) => {
   const [height, setHeight] = useState(200);
@@ -97,10 +81,108 @@ const useDynamicIframeHeight = (src) => {
 const WebinarsPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
-  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
   // Use the dynamic iframe height hook
   const { height: iframeHeight, iframeRef } = useDynamicIframeHeight('https://app.livestorm.co/datazip-inc/upcoming?limit=2');
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'OLake',
+    alternateName: 'Datazip, Inc. (OLake project)',
+    url: 'https://olake.io/',
+    logo: 'https://olake.io/img/logo/olake-blue.svg',
+    sameAs: [
+      'https://github.com/datazip-inc/olake',
+      'https://x.com/_olake',
+      'https://www.linkedin.com/company/datazipio/',
+      'https://www.youtube.com/@olakeio'
+    ],
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '16192 COASTAL HWY',
+      addressLocality: 'LEWES',
+      addressRegion: 'DE',
+      postalCode: '19958',
+      addressCountry: 'US'
+    }
+  }
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    url: 'https://olake.io/',
+    name: 'Fastest Open Source Data Replication Tool',
+    description:
+      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake'
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://olake.io/search?q={search_term_string}',
+      'query-input': 'required name=search_term_string'
+    }
+  }
+
+  const webinarPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: canonicalUrl,
+    name: 'Events & Webinars',
+    description:
+      'Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices.',
+    isPartOf: {
+      '@type': 'WebSite',
+      url: 'https://olake.io/',
+      name: 'OLake'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake',
+      url: 'https://olake.io/',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://olake.io/img/logo/olake-blue.svg',
+        width: 32,
+        height: 32
+      }
+    }
+  }
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://olake.io/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Community',
+        item: 'https://olake.io/community/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: 'Webinars',
+        item: canonicalUrl
+      }
+    ]
+  }
+
+  const jsonLdSchemas = [
+    { id: 'organization', data: organizationSchema },
+    { id: 'website', data: websiteSchema },
+    { id: 'webPage', data: webinarPageSchema },
+    { id: 'breadcrumb', data: breadcrumbSchema }
+  ]
   
   // Define webinars data directly
   const webinars = [
@@ -321,12 +403,24 @@ const WebinarsPage = () => {
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content='OLake Events & Webinars' />
-        <meta property='og:description' content='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices' />
+        <meta
+          property='og:description'
+          content='Join our upcoming events and webinars to learn about the latest in ETL, Apache Iceberg, and modern data engineering practices'
+        />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
         <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
         <meta name='twitter:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        {jsonLdSchemas.map((schema) => (
+          <script
+            key={schema.id}
+            type='application/ld+json'
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(schema.data)
+            }}
+          />
+        ))}
       </Head>
       {/* Hero Section */}
       <section className='relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-16 dark:from-gray-900 dark:via-gray-800 dark:to-blue-950/20 lg:py-24'>
