@@ -1,0 +1,375 @@
+---
+slug: olake-amoro-iceberg-lakehouse
+title: "Mastering Compaction in Apache Iceberg: From Small Files Problem to Self-Optimizing Lakehouses with Amoro"
+description: A practical guide to fixing small-file bloat in Apache Iceberg, showing when and how to run compaction, the performance gains you can expect, and how Amoro automates it to turn Iceberg tables into self-optimizing lakehouses.
+tags: [iceberg, olake, amoro, s3]
+authors: [nayan]
+image: /img/blog/2025/10/compaction_cover.png
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![compaction diagram](/img/blog/2025/10/compaction_cover.png)
+## 1. Introduction
+
+The modern lakehouse promises the flexibility of data lakes with the performance of data warehouses. But there's a hidden operational challenge that can silently degrade your entire analytics platform: file fragmentation. This section explores why building a lakehouse is easy, but keeping it fast requires active maintenance.
+
+### 1.1. Data Lakes Are Easy to Write, Hard to Read
+
+One of the nicest things about building data lakes on object storage—whether it’s S3, GCS, or Azure Blob—is how easy it is for data producers. You just write your Parquet files, add them to your Iceberg table, and you’re done.
+
+Because of this write-first, low-friction design, data lakes are incredibly appealing. Teams can stream data from Kafka, run CDC pipelines that capture every tiny change, or use Spark jobs that naturally output tons of files per partition. From the writer’s point of view, everything feels smooth and straightforward.
+
+But over time, a quiet problem starts to show up: reading the data gets slower and slower. Queries that used to be almost instant start taking seconds, then minutes. Query planning—something that should be fast—begins taking longer than the query itself. Dashboards time out, users complain, and your “cheap and fast” lakehouse suddenly doesn’t feel either of those things.
+
+And the underlying reason is simple: while writing lots of small files is super convenient, reading them is painfully inefficient. Each file—no matter how tiny—requires opening a connection, reading metadata, coordinating workers, and closing it again. That overhead adds up fast.
+
+### 1.2. The Silent Killer: Fragmented Files
+
+File fragmentation doesn't announce itself with error messages or alarms. Instead, it degrades performance gradually, making it easy to overlook until the problem becomes severe.
+
+Here's what happens in a typical lakehouse over time:
+
+**Week 1:** Your new Iceberg table has 500 optimally-sized files (256MB each). Queries are fast, planning is instant, and your team is thrilled with performance.
+
+**Month 1:** Real-time ingestion runs 24/7, creating 1,000 new files daily. Now you have 30,000+ files. Queries are noticeably slower, but still acceptable.
+
+**Month 3:** File count exceeds 100,000. Query planning takes 30-60 seconds. Some queries time out. Users start bypassing the lakehouse, going back to querying production databases directly—defeating the entire purpose of your data platform.
+
+**Month 6:** After adding more streams, ingestion ramps to ~3,000 files/day. You now have 500,000+ files and the table is practically unusable. Metadata operations fail, time-travel queries crash, and you're spending more on S3 API calls than on compute. The lakehouse feels fundamentally broken.
+
+This progression is inevitable without intervention. File fragmentation is the silent killer of lakehouse performance.
+
+### 1.3. Why Compaction Has Become a Mandatory Dataset Operation
+
+In traditional databases, maintenance happens automatically in the background. PostgreSQL runs VACUUM, MySQL optimizes tables, Oracle manages segments. Users rarely think about physical storage organization because the database handles it.
+
+Data lakes operating on open table formats like Apache Iceberg don't have this luxury—at least not by default. You're responsible for table maintenance. Without it, your lakehouse degrades into an expensive, slow data graveyard.
+
+Compaction has gone from “nice to have” to absolutely essential, and there are a few clear reasons why:<br/>
+**1. Real-time pipelines are the norm now -** CDC, Kafka streams, and continuous ETL all generate lots of small files—there’s no way around it.
+
+**2. Cloud costs make inefficiency obvious -** Every API call, byte scanned, and second of compute shows up on the bill. Small files = bigger bills.
+
+**3. Scale makes the problem unavoidable -** What works fine at 100 GB breaks at 10 TB, and completely collapses at 1 PB.
+
+### 1.4. Iceberg & Amoro as Solutions for Modern Lakehouses
+
+Iceberg tracks every file, maintains detailed statistics, and supports atomic rewrites that don't disrupt concurrent readers or writers. The challenge? Iceberg gives you the tools, but you must orchestrate them. You need to:
+- Monitor table health continuously
+- Decide when compaction is needed
+- Choose appropriate strategies
+
+This operational complexity leads many organizations to build custom automation—or worse, neglect maintenance altogether.
+
+**Enter Apache Amoro (incubating):** a lakehouse management system built specifically to solve this problem. Amoro provides self-optimizing capabilities that continuously monitor your Iceberg tables, automatically trigger compaction when needed, and maintain optimal table health without manual intervention.
+
+## 2. What Causes the Small Files Problem?
+
+Understanding the root causes of file fragmentation is essential for preventing and addressing it. This section examines the common workload patterns that inevitably produce small files and why they're so pervasive in modern data architectures.
+
+### 2.1. Real Time Ingestion:
+
+Real-time data ingestion is the primary culprit behind small file proliferation. Let's examine the most common patterns:
+
+**1. Change Data Capture (CDC):** When you capture database changes from PostgreSQL, MySQL, or MongoDB, each transaction or batch of changes becomes a separate write to your Iceberg table. A busy production database processing thousands of transactions per second can generate millions of tiny files daily. For example, high-volume CDC streams producing thousands of changes per minute result in hundreds of new snapshots created every minute, each potentially writing small files.
+
+**2. Kafka Streaming:** Flink or Spark Streaming jobs reading from Kafka typically commit data at regular intervals (every minute, every 5 minutes, or after N records). Each checkpoint creates new files. With default configurations, a single streaming job can produce 10,000-50,000 files per day.
+
+**3. Micro-Batch Processing:** Even "batch" jobs behave like streaming when run frequently. Organizations running hourly ETL jobs across hundreds of tables create constant file churn. Each run adds new files without consolidating old ones.
+
+This isn't hypothetical. Organizations running CDC or streaming workloads on Iceberg face this exact problem: file counts grow exponentially, query performance degrades, and costs spiral out of control.
+
+### 2.2. Distributed Writers Splitting Data Into Too Many Files:
+
+Distributed processing frameworks like Spark and Flink parallelize work across many tasks. Each task writes independently, creating separate files. Without proper configuration, this parallelism creates excessive fragmentation.
+
+**Spark's Behavior:** It uses 200 shuffle partitions by default `(spark.sql.shuffle.partitions=200)`. When writing to an Iceberg table partitioned by date (eg. today's date), Spark creates up to 200 files for that single partition in a single job run.
+
+**Compounding with Table Partitions:** If your table is partitioned by high-cardinality columns (user_id, device_id, region), the problem multiplies:
+- 200 Spark tasks
+- 1,000 table partitions with data
+- Worst case: 200,000 files per job
+
+**Flink's Parallelism:** Flink's parallelism setting determines task count. With parallelism of 50 and hourly checkpoints, that's 50 new files per hour per partition with data.
+
+**Why Writers Don't Consolidate:** Distributed writers focus on throughput and fault tolerance, not optimal file sizes. Consolidating files during write time would create bottlenecks and reduce parallelism. The expectation is that compaction happens as a separate maintenance operation.
+
+### 2.3. Frequent Updates & Deletes → Too Many Delete Files
+
+Apache Iceberg V2 introduced delete files to enable efficient updates and deletes without rewriting entire data files. This is a powerful feature but creates a new dimension of the small files problem.
+
+**How Delete Files Work:**
+- **Position Deletes:** Mark specific rows as deleted by file path and row number
+- **Equality Deletes:** Mark rows as deleted by column values 
+
+**The Problem with Delete Files:**
+Each UPDATE or DELETE operation can create new delete files. In CDC scenarios where you're continuously updating a table to mirror a production database, delete files accumulate rapidly:
+- Every update = 1 equality delete + 1 insert (new data file)
+- 1,000 updates/second = 86.4 million delete files per day
+
+**Read Amplification:** At query time, engines must:
+1. Read data files
+2. Read position delete files
+3. Read equality delete files
+4. Perform joins to filter deleted rows
+5. Return final results
+
+With thousands of delete files, this "merge-on-read" operation becomes expensive. Research shows query performance can degrade by 50% or more when delete files constitute 20% of total files. Major query engines like Snowflake's external Iceberg support only handle position deletes, while Databricks doesn't support reading delete files at all.
+
+### 2.4. Unoptimized Partitioning
+
+Poor partitioning strategies exacerbate the small files problem:
+
+**Over-Partitioning:** Partitioning by high-cardinality columns (customer_id with millions of customers) creates an explosion of partitions. Even if each partition has few files, the total file count becomes unmanageable.
+
+**Under-Partitioning:** Not partitioning or using only low-cardinality partitioning (year) puts all files in few partitions, making compaction expensive and reducing query pruning benefits.
+
+**Partitioning Mismatched to Queries:** Partitioning by one dimension (date) when queries filter on another (region) forces full table scans, wasting resources regardless of file count.
+
+**Hidden Partitioning Complexity:** Iceberg supports hidden partitioning (partition transformations like days(timestamp)), but improper use can create unexpected partition counts.
+
+## 3. Why Small Files Are Bad
+
+Understanding why small files hurt performance is crucial for justifying the investment in compaction infrastructure.
+
+### 3.1. Query Engines Become Extremely Slow
+
+Before a query engine can read data, it must plan the query. Planning involves:
+- Reading the Iceberg metadata.json file
+- Loading the manifest list (index of manifest files)
+- Reading each manifest file (lists of actual data files)
+- Building a query execution plan
+
+With many files, this hierarchy explodes for instance:
+- **10,000 files**: ~50 manifest files, ~5MB total metadata, planning takes 1-2 seconds
+- **100,000 files:** ~500 manifest files, ~50MB total metadata, planning takes 10-30 seconds
+- **1,000,000 files:** ~5,000 manifest files, ~500MB total metadata, planning takes 2-10 minutes
+
+**Why This Matters:** Query planning is synchronous and single-threaded in many engines. While planning, the cluster does nothing productive. Users wait. Dashboards timeout. Interactive analytics becomes impossible.
+
+### 3.2. Poor Data Skipping & Predicate Pushdown
+
+Modern query engines use statistics to skip reading irrelevant data. Iceberg stores these statistics in manifests:
+- Min/max values for each column
+- Null counts
+- Row counts
+
+**Data Skipping with Large Files:**
+
+```sql
+SELECT * FROM events WHERE event_date = '2024-12-01' AND user_id = 12345;
+```
+
+- Engine reads manifests
+- Finds files where `event_date` range includes 2024-12-01 AND `user_id` range includes 12345
+- Reads only matching files (maybe 5 out of 1,000) and skips 99% of data.
+
+**Data Skipping with Small Files:**
+
+- Each file has wider min/max ranges
+- More files match the query predicate hence engine ends up reading a lot more data than necessary.
+- Leads to taking more time to plan the query and read the data.
+
+### 3.3. Higher Compute Costs 
+
+Too many small files make engines spend more time managing work than actually processing data.
+
+**Spark example:**
+- Spark distributes files across executors as tasks
+- With 10,000 small files and 100 executors, each executor processes 100 tasks
+- If your cluster costs **$100/hour**, and a job takes **2 hours instead of 1**, you pay double. Run that job daily and you waste **$3,000–$4,000 per month** on just one pipeline.
+
+### 3.4. The Impact on Object Storage and Catalog
+
+Small files create cascading impacts across every component of the lakehouse architecture:
+
+**Object Storage (S3/GCS/Azure):**
+- Cloud providers charge per API request. Queries reading 100,000 files make 100,000+ GET requests, costing real money
+- Storage overhead: Each file has metadata (filename, permissions, timestamps) consuming space beyond the actual data
+
+**Catalog Systems (Hive Metastore / Glue / Nessie):**
+- Catalogs store table metadata and snapshot information
+- More files = larger metadata = slower catalog operations
+
+The small files problem isn't just technical—it's operational and financial.
+
+### 3.5. More Manifests & Snapshots
+
+Every write to an Iceberg table creates a new snapshot. Each snapshot references manifest files listing all data files.
+
+**Snapshot Accumulation:**
+- Streaming job commits every minute = 1,440 snapshots/day = 43,200 snapshots/month
+- Each snapshot has a manifest list + manifests
+- Without expiration, metadata grows unbounded
+
+**Expensive Operations:**
+- **Time Travel:** Queries at old snapshots must traverse old manifests. With thousands of snapshots, finding the right one and loading its metadata is expensive.
+- **Snapshot Expiration:** Removing old snapshots requires listing all files in expired snapshots, comparing against current files, and deleting orphans. With massive metadata, this takes hours.
+
+
+## 4. How Iceberg Solves This: Compaction
+
+Apache Iceberg provides powerful primitives for compaction and table maintenance. This section explains Iceberg's approach to fixing fragmentation and when to apply each technique.
+
+### 4.1. What Is Compaction in Iceberg?
+
+Compaction is the process of rewriting small, fragmented files into larger, optimized files without changing the logical data. It's conceptually simple: read multiple small files, combine their data, write fewer large files, and update metadata to reference the new files.
+
+**Key Properties of Iceberg Compaction:**
+- **Non-Blocking:** Queries and writes continue during compaction. Iceberg's snapshot isolation ensures readers see consistent data.
+- **Atomic:** Compaction commits succeed or fail atomically. No partial states.
+- **Transparent:** After compaction commits, queries automatically use new files. No application changes needed.
+- **Concurrent:** Multiple compaction jobs can run simultaneously on different partitions.
+
+**What Compaction Doesn't Do:**
+- Doesn't change logical data (same rows, same values)
+- Doesn't require table locks or downtime
+- Doesn't immediately delete old files (that's a separate cleanup operation)
+
+### 4.2. How Compaction Brings an Iceberg Table Back to Life
+
+A healthy Iceberg table is one where files are the right size, delete files are kept under control, manifests are tidy, snapshots are cleaned up, and there are no leftover orphan files. When these things are in place, the table responds quickly, queries run efficiently, and engines like Trino or Spark don’t waste time planning work. Here’s how the recovery journey typically looks.
+
+**1. When the Table Is in Bad Shape**
+
+Imagine a table that has been running for months without maintenance. Every batch or stream of data has been dropping tiny files into storage, delete files have piled up, and snapshots have never been cleaned. The result looks something like this:
+- ~500k tiny data files (around 2MB each)
+- ~150k delete files
+- Thousands of manifest files
+- Tens of thousands of old snapshots
+
+Engines choke on this. Query planning alone takes unusual time, and the actual query execution adds even more latency. The table technically works, but it’s slow and painful to use.
+
+**2. Data Compaction**
+
+The first thing to fix is the explosion of tiny files. Data compaction rewrites them into large, efficient chunks (ideal range is 256MB to 512MB). After this step:
+- Tiny data files collapse into ~4,000 nicely sized files
+- Delete files and manifests remain untouched
+
+Query execution time drops dramatically and planning gets better too, but it’s still not great because delete and manifest bloat remain.
+
+**3. Delete File Compactio**
+
+Next, we merge delete files back into data files so the engine doesn’t need to apply them during every query. After this stage:
+- Delete files drop from 150k → 0
+- Engines stop having to rewrite rows at query time
+
+Query planning speeds up and execution improves too. At this point the table feels much faster, but metadata is still heavy.
+
+**4. Manifest Compaction**
+Manifest files describe where the data lives. Too many of them makes planning expensive. Compaction rewrites thousands of small manifests into a manageable set. After manifest cleanup:
+- Manifests shrink from ~5,000 → ~80
+- Planning time drops to 10 seconds
+
+After this operation most of the metadata overhead is gone. 
+
+**5. Snapshot Expiration**
+
+The final step is pruning old snapshots and cleaning up orphaned files. This trims the table’s history so engines no longer sift through months of irrelevant metadata. After expiration:
+- Snapshots reduce from ~50k → ~100 recent ones
+
+**The final result:** The table has gone from bloated and sluggish to streamlined and responsive. What used to take several minutes to plan now takes just a few seconds. Execution time also drops significally.
+
+## 5. Enter Amoro: Automated Optimization for Iceberg
+
+This section introduces Apache Amoro as the solution to operational complexity. While Iceberg provides the building blocks, Amoro provides the automation and intelligence to maintain table health continuously.
+
+### 5.1. Architecture of Amoro
+
+Amoro transforms Iceberg maintenance from a manual, engineer-driven process into a self-managing system.
+
+![Amoro architecture diagram](/img/blog/2025/10/amoro_arch.png)
+
+The main components of Amoro are:
+
+**Amoro Management Service (AMS)**
+
+AMS is the brain of the system. It constantly watches over all registered Iceberg tables and evaluates their health—looking for things like too many small files, growing delete files, or bloated metadata. Based on what it finds, AMS automatically decides what needs to be optimized and when. It also manages the pool of optimizers, tracks their capacity, and exposes everything through a clean UI and a set of APIs so teams can monitor and control optimization activities without manual intervention.
+
+**Optimizers**
+
+Optimizers are the workers that actually perform the heavy lifting. They run the compaction jobs, merge delete files, rewrite manifests, and clean up snapshots. These workers are organized into resource groups so you can isolate workloads (e.g., separate streaming table optimization from large batch compaction). They scale independently from query engines, which means optimization does not affect query performance. AMS simply assigns tasks, and the optimizers execute them in a distributed, fault-tolerant manner.
+
+### 5.2. How Amoro Performs Continuous Small-File Optimization
+
+Amoro keeps Iceberg tables healthy by running a continuous feedback loop. Every few seconds, AMS checks the state of your tables, decides what needs attention, and dispatches optimizers to fix problems without interrupting incoming writes.
+
+**1. Monitoring**<br/>
+Every 30–60 seconds, AMS scans the metadata of each registered table. It looks at file counts, average file size, delete-file buildup, and other health indicators. If a table starts accumulating too many small files, AMS immediately flags it.
+
+**2. Prioritization**<br/>
+Not all tables need help equally. AMS ranks tables based on their health score—tables with rapidly growing small files or high delete ratios automatically rise to the top. It also respects resource limits, so a heavily loaded cluster doesn’t get overwhelmed.
+
+**3. Scheduling**<br/>
+When a table needs work, AMS schedules an optimization task and assigns it to an available optimizer. It checks whether the table is actively receiving writes to avoid conflicts, and spreads tasks across optimizer groups to maintain balance and fairness.
+
+**4. Execution**<br/>
+Optimizers then perform the actual compaction. They read the small files, merge them into larger, efficient ones, write new data files, and commit a fresh snapshot back to the table. Once finished, they report results back to AMS.
+
+**5. Validation**<br/>
+AMS validates the commit, updates the table’s health score, and decides whether more passes are needed. If the table is healthy again, it returns to normal monitoring mode; if not, AMS continues scheduling tasks until the table reaches a stable state.
+
+### 5.3. Minor vs. Major Optimization Jobs
+
+Amoro uses a two-tier optimization strategy that works similarly to how the JVM performs garbage collection. The idea is to keep tables healthy with frequent light operations, while occasionally running deeper optimizations when necessary.
+
+**Minor Optimization**<br/>
+Minor optimization runs very frequently typically every 5 to 15 minutes and focuses only on small “fragment” files that are under 16MB. It uses a fast bin-packing strategy to merge these tiny files, making it a lightweight process that finishes quickly and keeps write amplification low. The goal is simply to prevent heavy fragmentation before it grows. While it’s efficient and uses very few resources, minor optimization doesn’t completely reorganize the table, so the resulting layout is not perfectly optimal, and larger files remain untouched.
+
+**Major Optimization**<br/>
+Major optimization happens every few hours and targets a broader range of files, including medium-sized segment files in the 16MB–128MB range. Unlike the quick minor pass, major optimization performs a full compaction and can optionally apply sorting to improve clustering and query pruning. This job is more compute-intensive but creates a much cleaner and more efficient file layout. The trade-off is that it consumes more resources and therefore runs less frequently.
+
+**Full Optimization**<br/>
+Full optimization is the most intensive operation and runs only occasionally (usually daily or weekly depending on the workload). It rewrites entire partitions or even the full table, applying global sorting or Z-ordering to produce the highest possible query performance. Because it rewrites everything, it yields the most optimized structure but also has the highest cost, making it an infrequent but very impactful process.
+
+### 5.4. Automatic Delete File Merging
+
+Amoro handles delete files intelligently:
+
+**Detection**
+- Monitors delete file ratio (delete files / total files) to measure how much deletes affect the table.
+- Tracks delete file sizes to catch when many small delete files start slowing down reads.
+- Identifies partitions or tables with excessive delete files, marking them as candidates for cleanup before they impact performance.
+
+**Strategy Selection**
+- **If delete_ratio < 10%:**<br/>
+Amoro performs simple consolidation, merging small delete files into fewer, larger ones so engines don’t waste time opening thousands of tiny delete files.
+- **If delete_ratio < 30%:**<br/>
+Amoro performs partial application, rewriting only the data files that have accumulated the most deletes and hence reducing read-time overhead without rewriting everything.
+- **Else (> 30%):**<br/>
+Amoro performs full delete application, rewriting all affected data files so that all delete files are applied and removed completely.
+
+**Result:** Delete files never accumulate to problematic levels. Read performance stays optimal.
+
+### 5.5. Automatic Metadata Organization
+
+Beyond data files, Amoro also continuously maintains Iceberg’s metadata to keep planning fast and storage clean.
+
+**Manifest Optimization**
+- Automatically triggers manifest rewriting when the number of manifest files crosses configured thresholds, preventing metadata from exploding as tables grow.
+- Consolidates fragmented manifests during major optimization cycles, grouping related metadata so engines can plan queries with fewer lookups.
+- Ensures query planning stays fast by keeping the manifest layer compact, organized, and easy for engines to scan.
+
+**Snapshot Expiration**
+- Uses configurable retention policies (e.g., keep snapshots for 7 days or a fixed number of versions) to limit how much historical metadata accumulates.
+- Automatically deletes expired snapshots to reduce metadata size and storage overhead.
+- Coordinates with active optimization tasks to ensure no data or metadata files are removed while they are still needed for compaction or running queries.
+- Performs orphan file cleanup, safely removing leftover files that are no longer referenced by any snapshot.
+
+**The benefit is** metadata stays clean, compact, and well-organized without manual maintenance. Even as tables scale to billions of rows and thousands of partitions, query planning stays consistently fast.
+
+### 5.6.When to use Amoro vs Iceberg Native Tools
+
+Use Amoro when you have multiple Iceberg tables, especially streaming or high-velocity ones, and you want continuous, automated optimization without managing compaction jobs yourself. It’s ideal if you need centralized monitoring, stable performance, and lower operational effort.
+
+On the other hand, Iceberg’s native tools are sufficient when you only manage a few tables, workloads are mostly batch and predictable, or you already have orchestration systems like Airflow or CronJobs to run compaction manually.
+
+## 6. Conclusion
+
+Small files are inevitable in modern lakehouses. Real-time ingestion, CDC, and distributed processing will flood your Iceberg tables with fragments—turning what starts as 500 optimal files into 500,000+ that slow queries and inflate costs.
+
+Compaction isn't optional; it's mandatory maintenance. Apache Iceberg provides the tools, but you're responsible for orchestrating them. That operational burden is exactly what Apache Amoro solves—transforming manual maintenance into automated, continuous optimization. The result is a lakehouse that maintains warehouse-like performance without constant human intervention.
+
