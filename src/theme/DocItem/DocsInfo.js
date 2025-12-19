@@ -44,7 +44,7 @@ function DocsInfo({ docsPluginId, ...props }) {
                 href={props.editUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-blue-500 hover:underline"
+                className="text-blue-700 dark:text-blue-400 hover:underline"
               >
                 Edit this page
               </a>
@@ -64,10 +64,10 @@ function DocsInfo({ docsPluginId, ...props }) {
             href={openOLakeIssueURL}
             target="_blank"
             rel="noreferrer noopener"
-            className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
+            className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-400"
           >
-            <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
-            <span className="text-gray-400">Open OLake issues</span>
+            <img src={bugIconUrl} alt="Bug icon" width="16" height="16" className="w-4 h-4" />
+            <span className="text-gray-600 dark:text-gray-400">Open OLake issues</span>
           </a>
 
           {/* Open Doc Issue */}
@@ -75,10 +75,10 @@ function DocsInfo({ docsPluginId, ...props }) {
             href={openDocIssueURL}
             target="_blank"
             rel="noreferrer noopener"
-            className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500"
+            className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-400"
           >
-            <img src={bugIconUrl} alt="Bug icon" className="w-4 h-4" />
-            <span className="text-gray-400">Open OLake doc issue</span>
+            <img src={bugIconUrl} alt="Bug icon" width="16" height="16" className="w-4 h-4" />
+            <span className="text-gray-600 dark:text-gray-400">Open OLake doc issue</span>
           </a>
 
           {/* Share Button */}

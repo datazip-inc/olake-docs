@@ -49,6 +49,7 @@ const docSidebar = {
           link: { type: 'doc', id: 'getting-started/creating-first-pipeline' },
           items: [
             'getting-started/job-level-properties',
+            'getting-started/alerts-and-notifications',
           ],
         },
         'getting-started/playground',
@@ -66,7 +67,8 @@ const docSidebar = {
           label: 'Docker Compose (UI)',
           link: { type: 'doc', id: 'install/olake-ui/index' },
           items: [
-            'install/olake-ui/offline-environments',
+            'install/olake-ui/offline-environments-aws',
+            'install/olake-ui/offline-environments-generic',
           ],
         },
         'install/kubernetes',
