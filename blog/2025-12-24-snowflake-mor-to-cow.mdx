@@ -1,0 +1,294 @@
+---
+slug: olake-mor-cow-snowflake
+title: "Bridging the Gap: Making OLake's MOR Iceberg Tables Compatible with Snowflake"
+description: Learn how to make OLake's Merge-on-Read (MOR) Iceberg tables compatible with Snowflake using an automated compaction script that transforms MOR tables into Copy-on-Write (COW) format for accurate analytics queries.
+tags: [iceberg, olake, snowflake]
+authors: [nayan]
+image: /img/blog/2025/12/snowflake_cow.webp
+--- 
+
+If you're using OLake to replicate database changes to Apache Iceberg and Snowflake for analytics, you've probably hit a frustrating roadblock: Snowflake doesn't support equality delete files. OLake writes data efficiently using Merge-on-Read (MOR) with equality deletes for CDC operations, but when you try to query those tables in Snowflake, the deletions and updates simply aren't honored. Your query results become incorrect, missing critical data changes.
+
+This isn't just a Snowflake limitation—several major query engines including Databricks (for external tables) and Amazon Redshift face the same challenge. While these platforms are incredibly powerful for analytics, their Iceberg implementations only support Copy-on-Write (COW) tables or position deletes at best.
+
+In this blog, I'll walk you through the problem and show you how we've solved it with a simple yet powerful compaction script that transforms OLake's MOR tables into COW-compatible tables that Snowflake and other query engines can read correctly.
+
+## The Problem: MOR vs COW in the Real World
+
+Let's understand what's happening under the hood. When you use OLake for Change Data Capture (CDC), it writes data to Iceberg using a strategy called Merge-on-Read (MOR) with equality delete files. This approach is optimized for high-throughput writes:
+
+### How OLake Writes Data (MOR with Equality Deletes):
+
+**1. Initial Full Refresh:** OLake performs a complete historical load of your table (e.g., an employees table) to Iceberg.
+
+**2. CDC Updates:** As changes happen in your source database, OLake captures them:
+- New records → Written to new data files
+- Updated records → Old version marked in an equality delete file, new version written to data file
+- Deleted records → Marked in an equality delete file
+
+**3. The Result:** After multiple CDC sync cycles, you have:
+- Multiple data files with your records
+- Multiple equality delete files tracking which records should be ignored
+
+This is incredibly efficient for writes—OLake can stream thousands of changes per second without rewriting entire data files. However, here's the catch:
+
+**Leaving blank cause need to put good content**
+
+According to Snowflake's documentation, externally-managed Iceberg tables only support position deletes, not equality deletes. This means any CDC pipeline using equality deletes (the standard approach for streaming CDC) will produce incorrect results in Snowflake.
+
+## The Solution: Automated MOR to COW Compaction
+
+The solution is to periodically compact your MOR tables into COW format—essentially creating a clean copy where all deletes and updates are fully applied by rewriting the data files. Think of it as "resolving" all the pending changes into a single, clean table state.
+
+I've built a PySpark script that automates this entire process. Here's how it works:
+
+### Workflow  Overview
+
+![MOR to COW compaction workflow](/img/blog/2025/12/snowflake_cow.webp)
+
+The workflow begins with data from multiple source databases (PostgreSQL, MySQL, Oracle, MongoDB, and Kafka) being ingested through OLake. OLake writes this data to Iceberg tables using the Merge-on-Read (MOR) strategy with equality delete files, which is optimized for high-throughput CDC operations. The Spark Compaction process then transforms these MOR tables into Copy-on-Write (COW) format by resolving all equality deletes and applying updates. The resulting COW tables are stored in S3 and can be queried directly by Snowflake as external Iceberg tables, ensuring accurate results with all deletes and updates properly applied.
+
+### Compaction Script
+
+<details>
+<summary>View the PySpark compaction script</summary>
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.utils import AnalysisException
+
+# ------------------------------------------------------------------------------
+# Spark Session
+# ------------------------------------------------------------------------------
+spark = (
+    SparkSession.builder
+    .appName("OLake MOR to COW Compaction")
+    # Avoid booting a local Hive metastore (Derby). We use Iceberg REST catalog via spark-submit.
+    .config("spark.sql.catalogImplementation", "in-memory")
+    .getOrCreate()
+)
+
+# ------------------------------------------------------------------------------
+# User Inputs (must be provided)
+# ------------------------------------------------------------------------------
+CATALOG = "<YOUR_CATALOG_NAME>"
+DB = "<YOUR_DATABASE_NAME>"
+
+MOR_TABLE = f"{CATALOG}.{DB}.<YOUR_MOR_TABLE_NAME>"
+COW_TABLE = f"{MOR_TABLE}_cow"
+STATE_TABLE = f"{COW_TABLE}_state"
+
+COW_LOCATION = "s3://<YOUR_BUCKET_NAME>/<YOUR_PATH>/<YOUR_COW_TABLE_NAME>"
+STATE_LOCATION = f"{COW_LOCATION}_state"
+
+PRIMARY_KEY = "<YOUR_PRIMARY_KEY_COLUMN_NAME>"
+
+# ------------------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------------------
+def table_exists(table_name: str) -> bool:
+    try:
+        spark.read.format("iceberg").load(table_name).limit(1).collect()
+        return True
+    except AnalysisException:
+        return False
+
+
+def get_latest_parent_snapshot_id(table):
+    df = spark.sql(f"""
+        SELECT parent_id
+        FROM {table}.snapshots
+        ORDER BY committed_at DESC
+        LIMIT 1
+    """)
+    return df.collect()[0]["parent_id"]
+
+
+def align_cow_schema(mor_df, cow_df):
+    mor_schema = {f.name: f.dataType for f in mor_df.schema.fields}
+    cow_schema = {f.name: f.dataType for f in cow_df.schema.fields}
+
+    # Add missing columns from MOR to COW
+    for col, dtype in mor_schema.items():
+        if col not in cow_schema:
+            print(f"Adding new column '{col}' with type '{dtype.simpleString()}' to COW table")
+            spark.sql(f"""
+                ALTER TABLE {COW_TABLE}
+                ADD COLUMN {col} {dtype.simpleString()}
+            """)
+
+    # Update column types if they differ
+    for col, mor_type in mor_schema.items():
+        if col in cow_schema:
+            cow_type = cow_schema[col]
+            if mor_type != cow_type:
+                print(f"Updating column '{col}' type from '{cow_type.simpleString()}' to '{mor_type.simpleString()}' in COW table")
+                spark.sql(f"""
+                    ALTER TABLE {COW_TABLE}
+                    ALTER COLUMN {col} TYPE {mor_type.simpleString()}
+                """)
+
+
+def save_state(snapshot_id):
+    """Save the current snapshot ID to the state table"""
+    if not table_exists(STATE_TABLE):
+        print(f"Creating state table: {STATE_TABLE}")
+        spark.sql(f"""
+            CREATE TABLE {STATE_TABLE} (
+                current_state_id BIGINT
+            )
+            USING iceberg
+            LOCATION '{STATE_LOCATION}'
+        """)
+    
+    # Delete old state and insert new one
+    spark.sql(f"DELETE FROM {STATE_TABLE}")
+    spark.sql(f"INSERT INTO {STATE_TABLE} VALUES ({snapshot_id})")
+    
+    print(f"Saved snapshot ID {snapshot_id} to state table")
+
+
+# ------------------------------------------------------------------------------
+# Bootstrap Logic (FULL COPY)
+# ------------------------------------------------------------------------------
+def bootstrap_cow_table_if_needed():
+    print("COW table does not exist. Creating and copying full data...")
+
+    spark.sql(f"""
+        CREATE TABLE {COW_TABLE}
+        USING iceberg
+        LOCATION '{COW_LOCATION}'
+        AS
+        SELECT *
+        FROM {MOR_TABLE}
+    """)
+
+    print("Bootstrap completed: Full MOR → COW copy done.")
+
+# ------------------------------------------------------------------------------
+# Main Recurring Flow
+# ------------------------------------------------------------------------------
+def run_compaction_cycle():
+    # Step 1: Truncate MOR
+    spark.sql(f"TRUNCATE TABLE {MOR_TABLE}")
+    
+    # Step 2: Snapshot before truncate
+    snapshot_id = get_latest_parent_snapshot_id(MOR_TABLE)
+    print(f"Using MOR snapshot: {snapshot_id}")
+
+    # Step 3: Save state
+    save_state(snapshot_id)
+    
+    # Step 4: Load schemas from the parent snapshot
+    mor_df = spark.read.format("iceberg") \
+        .option("snapshot-id", snapshot_id) \
+        .load(MOR_TABLE)
+    
+    cow_df = spark.read.format("iceberg").load(COW_TABLE)
+
+    # Step 5: Schema alignment
+    align_cow_schema(mor_df, cow_df)
+
+    # Step 6: Merge snapshot into COW
+    spark.sql(f"""
+        MERGE INTO {COW_TABLE} AS target
+        USING (
+            SELECT *
+            FROM {MOR_TABLE}
+            VERSION AS OF {snapshot_id}
+        ) AS source
+        ON target.{PRIMARY_KEY} = source.{PRIMARY_KEY}
+
+        WHEN MATCHED THEN
+          UPDATE SET *
+
+        WHEN NOT MATCHED THEN
+          INSERT *
+    """)
+
+
+    print("Compaction cycle completed successfully.")
+
+# ------------------------------------------------------------------------------
+# Entry Point
+# ------------------------------------------------------------------------------
+if __name__ == "__main__":
+    if table_exists(COW_TABLE):
+        run_compaction_cycle()
+    else:
+        bootstrap_cow_table_if_needed()
+```
+
+</details>
+
+**Before running the script, make sure to update the following variables in the "User Inputs" section:**
+
+- **`CATALOG`**: Replace `<YOUR_CATALOG_NAME>` with your Iceberg catalog name
+- **`DB`**: Replace `<YOUR_DATABASE_NAME>` with your database name
+- **`MOR_TABLE`**: Replace `<YOUR_MOR_TABLE_NAME>` with your Merge-on-Read table name
+- **`COW_LOCATION`**: Replace `<YOUR_BUCKET_NAME>`, `<YOUR_PATH>`, and `<YOUR_COW_TABLE_NAME>` with your S3 bucket, path, and COW table name
+- **`PRIMARY_KEY`**: Replace `<YOUR_PRIMARY_KEY_COLUMN_NAME>` with the actual primary key column name in your table (e.g., `_olake_id`, `id`, `employee_id`, etc.)
+
+Note: The `COW_TABLE` and `STATE_TABLE` variables are automatically derived from `MOR_TABLE`, so you don't need to modify them.
+
+### How the Compaction Script Works
+
+The compaction process is designed to be safe, repeatable, and compatible with continuous CDC ingestion. Rather than interfering with OLake’s ongoing syncs, it works alongside them by leveraging Iceberg’s snapshot isolation guarantees.
+
+The workflow starts by checking whether a Copy-on-Write (COW) version of the table already exists in the target S3 bucket. If this is the first time the script is run, the COW table does not exist yet. In that case, the script performs a one-time bootstrap: it creates the COW table and writes the entire resolved dataset from the MOR table into it. This establishes a clean baseline that Snowflake and other query engines can immediately query correctly.
+
+On subsequent runs, the script switches to incremental mode. Instead of recreating the table, it updates the existing COW table with only the latest changes.
+
+Once the Copy-on-Write (COW) table has been created, every subsequent run follows a predictable and safe update workflow:
+
+**1. Prepare the MOR table for the next cycle:** The process begins by truncating the MOR table. This might seem scary at first—after all, you're deleting data—but it's completely safe. We're not actually losing anything because Iceberg saves all the states of table in sanpshots. The truncation simply clears out previously processed CDC data and ensures that only fresh changes are collected for the next compaction run. 
+
+**2. Identify the last snapshot before truncation:** Here's where Iceberg's snapshot isolation becomes critical. When you truncate a table, Iceberg creates a brand new snapshot. But that new snapshot is empty—it contains no data. What we actually care about is the parent snapshot, which represents the exact moment in time when valid CDC data was still present in the MOR table, just before the truncate happened. The script queries Iceberg's metadata to find this parent snapshot ID, which becomes our pointer to the data we need to compact.
+
+**3. Save this snapshot as the processing state:** The parent snapshot ID is saved to a dedicated state table. This simple act is what makes the entire process safe and repeatable. By saving this state, the system guarantees that:
+- We always know exactly which snapshot we're processing, even if OLake writes new data later.
+- If the compaction job fails midway, we can restart it from the same consistent point.
+The state table is just a single-row table that stores the current snapshot ID. It's like leaving yourself a note saying "I processed everything up to this point."
+
+**4. Read schema information from the saved snapshot:** Before we can merge data, we need to make sure our tables have the same structure. The script loads the schema from the saved snapshot to ensure that the compaction process uses the same table structure that existed when the data was written. This prevents issues where a schema change mid-compaction could cause failures or data corruption.
+
+**5. Align the COW table schema if needed:** If the source schema has changed—for example, if a new column was added to the source database—the COW table is updated to match it. The script automatically detects missing columns or type changes and applies the necessary `ALTER TABLE` commands. This keeps both tables structurally consistent without manual intervention, which is crucial in a live CDC environment where schemas evolve over time.
+
+**6. Merge the saved MOR snapshot into the COW table:** Finally, we use Iceberg's MERGE INTO statement to apply all the changes from the saved snapshot. This operation handles three scenarios in one pass:
+- **New records** get inserted into the COW table.
+- **Updated records** have their old versions replaced with new values
+- **Deleted records** (marked in equality delete files) are included in the merge with `_op_type` as `d` indicating the record was deleted
+
+Because we're merging from a specific snapshot, all these changes are applied at once, resulting in a clean COW table with no equality deletes remaining. Snowflake can now read this table perfectly.
+
+## Running the Compaction Script
+
+The compaction script is designed to run periodically, automatically keeping your COW table up-to-date with the latest changes from your MOR table. You can schedule this script as a cron job or through workflow orchestration tools like Airflow, ensuring that your Snowflake queries always reflect the most recent data according to your requirements.
+
+### Execution Platforms
+
+The script can be run on any Spark cluster that has access to your Iceberg catalog and S3 storage. Common execution platforms include:
+
+- **AWS EMR**: Run the script as a Spark job on EMR clusters
+- **Databricks**: Execute as a scheduled job in your Databricks workspace
+- **Local Spark**: For testing or small-scale deployments
+
+Simply submit the script using `spark-submit` with the appropriate Iceberg catalog configuration for your environment.
+
+### Scheduling the Compaction Job
+
+The job execution frequency can be set based on your data freshness requirements and business needs. The script is idempotent, so you can run it as frequently as needed without worrying about duplicate processing. Here are some common scheduling patterns:
+
+- **Hourly**: For real-time dashboards and analytics that require near-live data
+- **Every 6 hours**: A balanced approach for most use cases, providing good data freshness without excessive compute costs
+- **Daily**: Perfect for overnight batch reporting and scenarios where daily updates are sufficient
+- **On-demand**: For low-volume tables or manual refresh workflows where you trigger compaction only when needed
+
+You can configure the schedule using cron syntax, Airflow DAG schedules, or your preferred orchestration tool. Each run will process any new changes since the last compaction, keeping your COW table synchronized with your MOR table.
+
+For Snowflake users, once the COW table is created and being updated periodically, you simply create an external Iceberg table pointing to your COW table location, and you're ready to query with correct results—all deletes and updates properly applied.
+
+## Conclusion
+
+By implementing this automated compaction solution, you can now enjoy the best of both worlds: OLake's high-performance Merge-on-Read (MOR) writes for efficient CDC ingestion, combined with Snowflake-compatible Copy-on-Write (COW) tables for accurate analytics queries. 
+
