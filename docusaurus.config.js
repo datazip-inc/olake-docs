@@ -100,7 +100,7 @@ const config = {
 
       announcementBar: {
         id: 'monthly-events-2025',
-        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200">here</a>. Check out! 🎉',
+        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200" aria-label="View upcoming webinars" title="View upcoming webinars">here<span class="sr-only">View upcoming webinars</span></a>. Check out! 🎉',
         backgroundColor: '#193ae6',
         textColor: 'white',
         isCloseable: true,
@@ -119,7 +119,7 @@ const config = {
         title: '',
         logo: {
           alt: 'OLake Logo',
-          src: 'img/logo/olake-blue-with-text.webp',
+          src: 'img/logo/olake-blue-with-text.svg',
         },
         items: [
           { to: '/docs', label: 'Docs', position: 'right' },
@@ -201,9 +201,9 @@ const config = {
             tagName: 'link',
             attributes: {
               rel: 'preload',
-              href: '/img/logo/olake-blue-with-text.webp',
+              href: '/img/logo/olake-blue-with-text.svg',
               as: 'image',
-              type: 'image/webp',
+              type: 'image/svg+xml',
               fetchpriority: 'high'
             },
           },
@@ -950,6 +950,32 @@ const config = {
           {
             to: '/docs/writers/parquet/s3',
             from: '/docs/writers/s3/',
+          },
+
+          // 404 redirects from Ahrefs audit (trailingSlash: true handles / automatically)
+          {
+            to: '/docs/writers/iceberg/catalog/glue/',
+            from: '/docs/connectors/glue-catalog',
+          },
+          {
+            to: '/docs/writers/iceberg/partitioning/',
+            from: '/docs/understanding/iceberg-partitioning',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/overview/',
+            from: '/docs/connectors/iceberg',
+          },
+          {
+            to: '/docs/install/docker-cli/',
+            from: '/docs/getting-started/docker-cli',
+          },
+          {
+            to: '/docs/install/docker-cli/',
+            from: '/docs/getting-started/olake-cli',
+          },
+          {
+            to: '/docs/connectors/overview/',
+            from: '/docs/connectors',
           },
 
           // END

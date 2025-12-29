@@ -27,69 +27,106 @@ export const BlogPagination = ({ metadata }) => {
 
   const handleParams = () => {
     const path = history.location.pathname
-    const parts = path.split('/')
-    const pageNumber = parts[parts.length - 1]
-    return isNaN(pageNumber) ? 1 : parseInt(pageNumber)
+    const parts = path.split('/').filter(p => p !== '')
+    
+    // Check if the path contains 'page' keyword
+    const pageIndex = parts.indexOf('page')
+    if (pageIndex !== -1 && pageIndex < parts.length - 1) {
+      const pageNumber = parseInt(parts[pageIndex + 1], 10)
+      return !isNaN(pageNumber) && pageNumber > 0 ? pageNumber : 1
+    }
+    
+    // Default to page 1 if no page number found
+    return 1
   }
 
   const page = handleParams()
   const basePath = getBasePath()
 
+  const getPagePath = (pageNum) => {
+    return pageNum === 1 ? basePath : `${basePath}/page/${pageNum}`
+  }
 
-  const handlePageChange = (value) => {
+  const handlePageChange = (e, value) => {
+    e.preventDefault()
     if (value === page) {
       return
     }
-    // const newPagePath = value === 1 ? '/blog' : `/blog/page/${value}`
-    const newPagePath = value === 1 ? basePath : `${basePath}/page/${value}`
-
+    const newPagePath = getPagePath(value)
     history.push(newPagePath)
   }
 
-  // Generate array of page numbers
+  // Generate array of page numbers - show current, prev, next, and last page
   const generatePagination = (currentPage, totalPages) => {
-    let pages = []
-
-    // Always show first page
-    pages.push(1)
-
-    if (currentPage > 3) {
-      pages.push('ellipsis')
+    const pages = []
+    
+    // Ensure we have valid numbers
+    const current = parseInt(currentPage, 10)
+    const total = parseInt(totalPages, 10)
+    
+    if (isNaN(current) || isNaN(total) || current < 1 || total < 1) {
+      return [1] // Return safe default
     }
 
-    // Show pages around current page
-    for (
-      let i = Math.max(2, currentPage - 1);
-      i <= Math.min(totalPages - 1, currentPage + 1);
-      i++
-    ) {
-      pages.push(i)
+    if (total <= 4) {
+      // If 4 or fewer pages, show all pages
+      for (let i = 1; i <= total; i++) {
+        pages.push(i)
+      }
+      return pages
     }
 
-    if (currentPage < totalPages - 2) {
-      pages.push('ellipsis')
+    // For page 1: show [1, 2, ..., last]
+    if (current === 1) {
+      pages.push(1, 2, 'ellipsis', total)
+      return pages
     }
 
-    // Always show last page
-    if (totalPages > 1) {
-      pages.push(totalPages)
+    // For page 2: show [1, 2, 3, ..., last]
+    if (current === 2) {
+      pages.push(1, 2, 3, 'ellipsis', total)
+      return pages
     }
+
+    // For last page: show [1, ..., prev, last]
+    if (current === total) {
+      pages.push(1, 'ellipsis', total - 1, total)
+      return pages
+    }
+
+    // For second to last page: show [1, ..., prev, second-last, last]
+    if (current === total - 1) {
+      pages.push(1, 'ellipsis', total - 2, total - 1, total)
+      return pages
+    }
+
+    // For middle pages: show [1, ..., prev, current, next, ..., last]
+    pages.push(1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total)
     return pages
   }
 
-  if (metadata.totalPages <= 1) {
+  if (!metadata || !metadata.totalPages || metadata.totalPages <= 1) {
     return null
   }
 
   const pages = generatePagination(page, metadata.totalPages)
+  
+  console.log('Pagination Debug:', { 
+    currentPage: page, 
+    totalPages: metadata.totalPages, 
+    generatedPages: pages 
+  })
+  const hasPrevious = page > 1
+  const hasNext = page < metadata.totalPages
 
   return (
-    <Pagination className='mt-8'>
+    <Pagination className='mt-8 mb-8'>
       <PaginationContent>
         <PaginationItem>
           <PaginationPrevious
-            onClick={() => page > 1 && handlePageChange(page - 1)}
-            className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+            href={hasPrevious ? getPagePath(page - 1) : undefined}
+            onClick={(e) => hasPrevious && handlePageChange(e, page - 1)}
+            className={!hasPrevious ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
           />
         </PaginationItem>
 
@@ -99,7 +136,8 @@ export const BlogPagination = ({ metadata }) => {
               <PaginationEllipsis />
             ) : (
               <PaginationLink
-                onClick={() => handlePageChange(pageNum)}
+                href={getPagePath(pageNum)}
+                onClick={(e) => handlePageChange(e, pageNum)}
                 isActive={page === pageNum}
                 className='cursor-pointer'
               >
@@ -111,10 +149,9 @@ export const BlogPagination = ({ metadata }) => {
 
         <PaginationItem>
           <PaginationNext
-            onClick={() => page < metadata.totalPages && handlePageChange(page + 1)}
-            className={
-              page >= metadata.totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'
-            }
+            href={hasNext ? getPagePath(page + 1) : undefined}
+            onClick={(e) => hasNext && handlePageChange(e, page + 1)}
+            className={!hasNext ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
           />
         </PaginationItem>
       </PaginationContent>

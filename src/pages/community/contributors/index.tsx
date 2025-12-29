@@ -24,27 +24,136 @@ import PageHeader from '../../../components/community/improved/PageHeader'
 import SectionHeader from '../../../components/community/improved/SectionHeader'
 
 import clsx from 'clsx'
-
-const stripTrailingSlash = (value?: string) => {
-  if (!value) {
-    return ''
-  }
-
-  return value.endsWith('/') ? value.slice(0, -1) : value
-}
-
-const ensureTrailingSlash = (value: string) => {
-  if (!value) {
-    return '/'
-  }
-
-  return value.endsWith('/') ? value : `${value}/`
-}
 const ContributorsPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
-  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname}`
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'OLake',
+    alternateName: 'Datazip, Inc. (OLake project)',
+    url: 'https://olake.io/',
+    logo: 'https://olake.io/img/logo/olake-blue.svg',
+    sameAs: [
+      'https://github.com/datazip-inc/olake',
+      'https://x.com/_olake',
+      'https://www.linkedin.com/company/datazipio/',
+      'https://www.youtube.com/@olakeio'
+    ],
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '16192 COASTAL HWY',
+      addressLocality: 'LEWES',
+      addressRegion: 'DE',
+      postalCode: '19958',
+      addressCountry: 'US'
+    }
+  }
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    url: 'https://olake.io/',
+    name: 'Fastest Open Source Data Replication Tool',
+    description:
+      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake'
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://olake.io/search?q={search_term_string}',
+      'query-input': 'required name=search_term_string'
+    }
+  }
+
+  const contributorsPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: canonicalUrl,
+    name: 'Hall of Fame - Our Amazing Contributors',
+    description:
+      'Meet the amazing contributors who make OLake possible. Join them in building the future of data lakehouse technology.',
+    isPartOf: {
+      '@type': 'WebSite',
+      url: 'https://olake.io/',
+      name: 'OLake'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake',
+      url: 'https://olake.io/',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://olake.io/img/logo/olake-blue.svg',
+        width: 32,
+        height: 32
+      }
+    }
+  }
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://olake.io/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Community',
+        item: 'https://olake.io/community/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: 'Contributors',
+        item: canonicalUrl
+      }
+    ]
+  }
+
+  const callsToActionList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Join our Amazing Contributors',
+    url: canonicalUrl,
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Become a Contributor',
+        item: 'https://olake.io/community/contributor-program/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'View on GitHub',
+        item: 'https://github.com/datazip-inc/olake'
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: 'Find Good First Issues',
+        item: 'https://github.com/datazip-inc/olake/issues'
+      }
+    ]
+  }
+
+  const jsonLdSchemas = [
+    { id: 'organization', data: organizationSchema },
+    { id: 'website', data: websiteSchema },
+    { id: 'webPage', data: contributorsPageSchema },
+    { id: 'breadcrumb', data: breadcrumbSchema },
+    { id: 'itemList', data: callsToActionList }
+  ]
   const [contributors, setContributors] = useState<ContributorProps[]>([])
 
 
@@ -135,6 +244,15 @@ const ContributorsPage = () => {
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
         <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        {jsonLdSchemas.map((schema) => (
+          <script
+            key={schema.id}
+            type='application/ld+json'
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(schema.data)
+            }}
+          />
+        ))}
       </Head>
       {/* Hero Section */}
       <PageHeader
@@ -211,10 +329,15 @@ const ContributorsPage = () => {
             </div>
             <div className="flex items-center gap-2">
               <FaFilter className="text-gray-400" />
+              <label htmlFor="sort-contributors" className="sr-only">
+                Sort contributors
+              </label>
               <select
+                id="sort-contributors"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'points' | 'contributions' | 'name')}
-                className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#193ae6] dark:focus:ring-blue-400"
+                className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#193ae6] dark:focus:ring-blue-400 min-w-[180px]"
+                aria-label="Sort contributors by points, contributions, or name"
               >
                 <option value="points">Sort by Points</option>
                 <option value="contributions">Sort by PRs</option>
