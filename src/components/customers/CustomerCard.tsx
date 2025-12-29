@@ -10,7 +10,7 @@ interface CustomerCardProps {
   img: string;
   alt: string;
   companyName: string;
-  category: 'B2B' | 'Customers' | 'Fintech';
+  category: 'B2B' | 'Customer Internet' | 'Fintech';
   categoryColor?: string;
 }
 
@@ -33,7 +33,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
   // Category pill colors
   const categoryColors = {
     'B2B': 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-    'Customers': 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+    'Customer Internet': 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
     'Fintech': 'bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
   };
 

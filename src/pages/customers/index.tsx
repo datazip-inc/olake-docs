@@ -26,7 +26,7 @@ const CustomersPage = () => {
   const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
   const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
   
-  const [activeFilter, setActiveFilter] = useState<'All Stories' | 'B2B' | 'Customers' | 'Fintech'>('All Stories');
+  const [activeFilter, setActiveFilter] = useState<'All Stories' | 'B2B' | 'Customer Internet' | 'Fintech'>('All Stories');
 
   // Customer stories data
   const customerStories: CustomerStory[] = [
@@ -46,11 +46,11 @@ const CustomersPage = () => {
       img: '/img/customers/cover-image-astro.svg',
       alt: 'Astro Talk customer story',
       companyName: 'Astro Talk',
-      category: 'Customers'
+      category: 'Customer Internet'
     }
   ];
 
-  const filters: Array<'All Stories' | 'B2B' | 'Customers' | 'Fintech'> = ['All Stories', 'B2B', 'Customers'];
+  const filters: Array<'All Stories' | 'B2B' | 'Customer Internet' | 'Fintech'> = ['All Stories', 'B2B', 'Customer Internet'];
 
   return (
     <Layout

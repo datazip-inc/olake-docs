@@ -8,12 +8,12 @@ export interface CustomerStory {
   img: string;
   alt: string;
   companyName: string;
-  category: 'B2B' | 'Customers' | 'Fintech';
+  category: 'B2B' | 'Customer Internet' | 'Fintech';
 }
 
 interface CustomerGridProps {
   customers: CustomerStory[];
-  activeFilter: 'All Stories' | 'B2B' | 'Customers' | 'Fintech';
+  activeFilter: 'All Stories' | 'B2B' | 'Customer Internet' | 'Fintech';
 }
 
 const CustomerGrid: React.FC<CustomerGridProps> = ({ customers, activeFilter }) => {
