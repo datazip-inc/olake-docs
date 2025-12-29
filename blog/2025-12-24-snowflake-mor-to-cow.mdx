@@ -1,15 +1,18 @@
 ---
 slug: olake-mor-cow-snowflake
-title: "Bridging the Gap: Making OLake's MOR Iceberg Tables Compatible with Snowflake"
+title: "Bridging the Gap: Making OLake's MOR Iceberg Tables Compatible with Snowflake's Query Engine"
 description: Learn how to make OLake's Merge-on-Read (MOR) Iceberg tables compatible with Snowflake using an automated compaction script that transforms MOR tables into Copy-on-Write (COW) format for accurate analytics queries.
 tags: [iceberg, olake, snowflake]
 authors: [nayan]
 image: /img/blog/2025/12/snowflake_cow.webp
---- 
+---
+ 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-If you're using OLake to replicate database changes to Apache Iceberg and Snowflake for analytics, you've probably hit a frustrating roadblock: Snowflake doesn't support equality delete files. OLake writes data efficiently using Merge-on-Read (MOR) with equality deletes for CDC operations, but when you try to query those tables in Snowflake, the deletions and updates simply aren't honored. Your query results become incorrect, missing critical data changes.
+If you're using OLake to replicate database changes to Apache Iceberg and Snowflake for analytics, you've probably hit a frustrating roadblock: Snowflake doesn't support equality delete files. OLake writes data efficiently using Merge-on-Read (MOR) with equality deletes for CDC operations, but when you try to query those tables in Snowflake, the deletions, updates and inserts simply aren't honored. Your query results become incorrect, missing critical data changes.
 
-This isn't just a Snowflake limitation—several major query engines including Databricks (for external tables) and Amazon Redshift face the same challenge. While these platforms are incredibly powerful for analytics, their Iceberg implementations only support Copy-on-Write (COW) tables or position deletes at best.
+This isn't just a Snowflake limitation—several major query engines including Databricks (for external tables) face the same challenge. While these platforms are incredibly powerful for analytics, their Iceberg implementations only support Copy-on-Write (COW) tables or position deletes at best.
 
 In this blog, I'll walk you through the problem and show you how we've solved it with a simple yet powerful compaction script that transforms OLake's MOR tables into COW-compatible tables that Snowflake and other query engines can read correctly.
 
@@ -32,7 +35,7 @@ Let's understand what's happening under the hood. When you use OLake for Change 
 
 This is incredibly efficient for writes—OLake can stream thousands of changes per second without rewriting entire data files. However, here's the catch:
 
-According to Snowflake's documentation, externally-managed Iceberg tables only support position deletes, not equality deletes. Also Snowflake does support querying Copy-on-Write (COW) tables, but any CDC pipeline using equality deletes (the standard approach for streaming CDC) will produce incorrect results in Snowflake. This is why converting MOR tables with equality deletes to COW format is essential for accurate querying.
+According to Snowflake's documentation, externally-managed Iceberg tables only support position deletes, not equality deletes. Also Snowflake does support querying Copy-on-Write (COW) tables, but any CDC pipeline using equality deletes (the standard approach for streaming CDC) will make the table unqueryable in Snowflake—no results will appear when querying such a table. This is why converting MOR tables with equality deletes to COW format is essential for making the data queryable in Snowflake.
 
 ## The Solution: Automated MOR to COW Compaction
 
@@ -42,9 +45,9 @@ We've built a PySpark script that automates this entire process. Here's how it w
 
 ### Workflow  Overview
 
-![MOR to COW compaction workflow](/img/blog/2025/12/snowflake_cow.webp)
+![MOR to COW compaction workflow](/img/blog/2025/12/snowflake_mor_cow.webp)
 
-The workflow begins with data from multiple source databases (PostgreSQL, MySQL, Oracle, MongoDB, and Kafka) being ingested through OLake. OLake writes this data to Iceberg tables using the Merge-on-Read (MOR) strategy with equality delete files, which is optimized for high-throughput CDC operations. The Spark Compaction process then transforms these MOR tables into Copy-on-Write (COW) format by resolving all equality deletes and applying updates. The resulting COW tables are stored in S3 and can be queried directly by Snowflake as external Iceberg tables, ensuring accurate results with all deletes and updates properly applied.
+The workflow begins with data from multiple source databases (PostgreSQL, MySQL, Oracle, MongoDB, and Kafka) being ingested through OLake. OLake writes this data to Iceberg tables using the Merge-on-Read (MOR) strategy with equality delete files, which is optimized for high-throughput CDC operations. The Spark Compaction process then transforms these MOR tables into Copy-on-Write (COW) format by rewriting the data files after applying the equality delete files into the data files, effectively resolving all equality deletes and applying updates. The resulting COW tables are stored in object storage (such as S3, Azure Blob Storage, or GCS) and can be queried directly by Snowflake as external Iceberg tables, ensuring accurate results with all deletes and updates properly applied.
 
 ### Prerequisites
 
@@ -55,9 +58,8 @@ Before running the compaction script, ensure you have the following installed:
 - **Spark 3.5.2**: Apache Spark with Iceberg support
 
 Additionally, make sure you have:
-- Access to your Iceberg catalog (configured in Spark)
-- Access to the S3 bucket where your Iceberg tables are stored
-- Appropriate AWS credentials or IAM roles configured
+- Access to the object storage (S3, Azure Blob Storage, GCS, etc.) where your Iceberg tables are stored
+- Appropriate cloud provider credentials or IAM roles configured
 
 ### Compaction Script
 
@@ -92,7 +94,7 @@ STATE_TABLE = f"{COW_TABLE}_state"
 COW_LOCATION = "s3://<YOUR_BUCKET_NAME>/<YOUR_PATH>/<YOUR_COW_TABLE_NAME>"
 STATE_LOCATION = f"{COW_LOCATION}_state"
 
-PRIMARY_KEY = "<YOUR_PRIMARY_KEY_COLUMN_NAME>"
+PRIMARY_KEY = "_olake_id"
 
 # ------------------------------------------------------------------------------
 # Helpers
@@ -237,7 +239,7 @@ if __name__ == "__main__":
 - **`CATALOG`**: Replace `<YOUR_CATALOG_NAME>` with your Iceberg catalog name
 - **`DB`**: Replace `<YOUR_DATABASE_NAME>` with your database name
 - **`MOR_TABLE`**: Replace `<YOUR_MOR_TABLE_NAME>` with your Merge-on-Read table name
-- **`COW_LOCATION`**: Replace `<YOUR_BUCKET_NAME>`, `<YOUR_PATH>`, and `<YOUR_COW_TABLE_NAME>` with your S3 bucket, path, and COW table name
+- **`COW_LOCATION`**: Replace `<YOUR_BUCKET_NAME>`, `<YOUR_PATH>`, and `<YOUR_COW_TABLE_NAME>` with your object storage bucket, path, and COW table name 
 - **`PRIMARY_KEY`**: Replace `<YOUR_PRIMARY_KEY_COLUMN_NAME>` with the actual primary key column name in your table (e.g., `_olake_id`, `id`, `employee_id`, etc.)
 
 Note: The `COW_TABLE` and `STATE_TABLE` variables are automatically derived from `MOR_TABLE`, so you don't need to modify them.
@@ -246,7 +248,7 @@ Note: The `COW_TABLE` and `STATE_TABLE` variables are automatically derived from
 
 The compaction process is designed to be safe, repeatable, and compatible with continuous CDC ingestion. Rather than interfering with OLake’s ongoing syncs, it works alongside them by leveraging Iceberg’s snapshot isolation guarantees.
 
-The workflow starts by checking whether a Copy-on-Write (COW) version of the table already exists in the target S3 bucket. If this is the first time the script is run, the COW table does not exist yet. In that case, the script performs a one-time bootstrap: it creates the COW table and writes the entire resolved dataset from the MOR table into it. This establishes a clean baseline that Snowflake and other query engines can immediately query correctly.
+The workflow starts by checking whether a Copy-on-Write (COW) version of the table already exists in the target object storage location. If this is the first time the script is run, the COW table does not exist yet. In that case, the script performs a one-time bootstrap: it creates the COW table and writes the entire resolved dataset from the MOR table into it. This establishes a clean baseline that Snowflake and other query engines can immediately query correctly.
 
 On subsequent runs, the script switches to incremental mode. Instead of recreating the table, it updates the existing COW table with only the latest changes.
 
@@ -272,13 +274,151 @@ The state table is just a single-row table that stores the current snapshot ID. 
 
 Because we're merging from a specific snapshot, all these changes are applied at once, resulting in a clean COW table with no equality deletes remaining. Snowflake can now read this table perfectly.
 
+## Testing the Compaction Script Locally
+
+To understand how the compaction script works and see it in action, you can test it locally on your system before running it on production data. Follow these steps to run the script locally:
+
+1. Use the following command to quickly spin up the source Postgres and destination (Iceberg/Parquet Writer) services using Docker Compose. This will download the required docker-compose files and start the containers in the background.
+   ```bash
+   sh -c 'curl -fsSL https://raw.githubusercontent.com/datazip-inc/olake-docs/master/docs/community/docker-compose.yml -o docker-compose.source.yml && \
+   curl -fsSL https://raw.githubusercontent.com/datazip-inc/olake/master/destination/iceberg/local-test/docker-compose.yml -o docker-compose.destination.yml && \
+   docker compose -f docker-compose.source.yml --profile postgres -f docker-compose.destination.yml up -d'
+   ```
+
+2. Clone the OLake repository and navigate to the project directory:
+   ```bash
+   git clone git@github.com:datazip-inc/olake.git && cd olake
+   ```
+
+3. Set up the configuration files:
+
+    <Tabs>
+    <TabItem value="source" label="source.json">
+
+    ```json
+    {
+    "host": "localhost",
+    "port": 5431,
+    "database": "main",
+    "username": "main",
+    "password": "password",
+    "jdbc_url_params": {},
+    "ssl": {
+        "mode": "disable"
+    },
+    "update_method": {
+        "replication_slot": "postgres_slot",
+        "publication": "olake_publication",
+        "initial_wait_time": 120
+    },
+    "reader_batch_size": 1000,
+    "max_threads": 10
+    }
+    ```
+
+    </TabItem>
+    <TabItem value="destination" label="destination.json">
+
+    ```json
+    {
+    "type": "ICEBERG",
+    "writer": {
+        "catalog_type": "jdbc",
+        "jdbc_url": "jdbc:postgresql://localhost:5432/iceberg",
+        "jdbc_username": "iceberg",
+        "jdbc_password": "password",
+        "iceberg_s3_path": "s3a://warehouse",
+        "s3_endpoint": "http://localhost:9000",
+        "s3_use_ssl": false,
+        "s3_path_style": true,
+        "aws_access_key": "admin",
+        "aws_secret_key": "password",
+        "iceberg_db": "olake_iceberg",
+        "aws_region": "us-east-1"
+    }
+    }
+    ```
+
+    </TabItem>
+    </Tabs>
+
+4. Sync the data to Iceberg:
+
+   The below command generates the `streams.json` file which contains one sample table that we will use for this demonstration:
+
+   ```bash
+   ./build.sh driver-postgres discover --config $(pwd)/source.json
+   ```
+
+   Once the `streams.json` file is generated, you can sync the sample table to Iceberg:
+
+   ```bash
+   ./build.sh driver-postgres sync --config $(pwd)/source.json --catalog $(pwd)/streams.json --destination $(pwd)/destination.json
+   ```
+
+5. The data can be queried from Iceberg using the Spark Iceberg service available at [`localhost:8888`](http://localhost:8888).
+
+   To view the table run the following SQL command:
+   ```sql
+   %%sql
+   SELECT * FROM olake_iceberg.postgres_main_public.sample_data;
+   ```
+
+   We can modify the source database by adding and modifying few records and then running the sync again with state enabled to see the changes in the Iceberg table.
+
+   Below command inserts two records into the source database:
+
+   ```bash
+   docker exec -it primary_postgres psql -U main -d main -c "INSERT INTO public.sample_data (id, num_col, str_col) VALUES (10, 100, 'First record'), (20, 200, 'Second record');"
+   ```
+
+   Let us also update a record in the source database:
+
+   ```bash
+   docker exec -it primary_postgres psql -U main -d main -c "UPDATE public.sample_data SET num_col = 150, str_col = 'First record updated' WHERE id = 1;"
+   ```
+
+   Now run the sync:
+   
+   ```bash
+   ./build.sh driver-postgres sync --config $(pwd)/source.json --catalog $(pwd)/streams.json --destination $(pwd)/destination.json --state $(pwd)/state.json
+   ```
+
+   To view the updated table run the following SQL command:
+   
+   ```sql
+   %%sql
+   SELECT * FROM olake_iceberg.postgres_main_public.sample_data;
+   ```
+
+6. Run the compaction script to convert MOR tables to COW format:
+
+   After completing the historical load and CDC sync, your Iceberg table now contains both data files and equality delete files in object storage, representing a Merge-on-Read (MOR) table. To convert this MOR table into a Copy-on-Write (COW) table, run the compaction script with the following configuration:
+
+   Update the variables in the [compaction script](#compaction-script):
+
+   ```python
+   CATALOG = "olake_iceberg"
+   DB = "postgres_main_public"
+   COW_LOCATION = "s3a://warehouse/postgres_main_public_cow/sample_data_cow"
+   ```
+
+7. Verify the COW table creation:
+
+   Once the compaction script runs successfully, we can verify the results in MinIO (the local object storage used in this demo). It can be noticed that:
+
+   - The original MOR table with data files and equality delete files remains in `warehouse/postgres_main_public/sample_data`
+   - A new COW table has been created in `warehouse/postgres_main_public_cow/sample_data_cow`, containing the resolved data with all equality deletes applied
+
+   The COW table is now ready to be queried by Snowflake as an external Iceberg table, with all updates and deletes properly reflected in the data files.
+
 ## Running the Compaction Script
 
-The compaction script is designed to run periodically, automatically keeping your COW table up-to-date with the latest changes from your MOR table. You can schedule this script as a cron job or through workflow orchestration tools like Airflow, ensuring that your Snowflake queries always reflect the most recent data according to your requirements.
+The compaction script is designed to run periodically, automatically keeping your COW table up-to-date with the latest changes from your MOR table. You can schedule this script as a cron job or through workflow orchestration tools, ensuring that your Snowflake queries always reflect the most recent data according to your requirements.
 
 ### Execution Platforms
 
-The script can be run on any Spark cluster that has access to your Iceberg catalog and S3 storage. Common execution platforms include:
+The script can be run on any Spark cluster that has access to your Iceberg catalog and object storage (S3, Azure Blob Storage, GCS, etc.). Common execution platforms include:
 
 - **AWS EMR**: Run the script as a Spark job on EMR clusters
 - **Databricks**: Execute as a scheduled job in your Databricks workspace
