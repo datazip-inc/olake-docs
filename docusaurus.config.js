@@ -168,6 +168,8 @@ const config = {
             ],
           },
 
+          { to: '/customers', label: 'Customer Stories', position: 'right' },
+
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
             position: 'right',
