@@ -982,7 +982,6 @@ const config = {
           // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
           // via canonical tags in the theme files, not through redirects
 
-          // /slack redirect is now handled by src/pages/slack.tsx with proper SEO meta tags
           {
             to: 'https://github.com/datazip-inc/olake',
             from: '/github',
