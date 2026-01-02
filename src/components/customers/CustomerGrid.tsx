@@ -1,19 +1,10 @@
 import React from 'react';
 import CustomerCard from './CustomerCard';
-
-export interface CustomerStory {
-  title: string;
-  description: string;
-  route: string;
-  img: string;
-  alt: string;
-  companyName: string;
-  category: 'B2B' | 'Customer Internet' | 'Fintech';
-}
+import { CustomerStory, CustomerCategory } from '../../types/customer';
 
 interface CustomerGridProps {
   customers: CustomerStory[];
-  activeFilter: 'All Stories' | 'B2B' | 'Customer Internet' | 'Fintech';
+  activeFilter: 'All Stories' | CustomerCategory;
 }
 
 const CustomerGrid: React.FC<CustomerGridProps> = ({ customers, activeFilter }) => {

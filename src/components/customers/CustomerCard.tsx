@@ -2,6 +2,8 @@ import React from 'react';
 import { useHistory } from "react-router-dom";
 import Image from '@theme/IdealImage';
 import { FaArrowRight } from 'react-icons/fa';
+import clsx from 'clsx';
+import { CustomerCategory } from '../../types/customer';
 
 interface CustomerCardProps {
   title: string;
@@ -10,8 +12,7 @@ interface CustomerCardProps {
   img: string;
   alt: string;
   companyName: string;
-  category: 'B2B' | 'Customer Internet' | 'Fintech';
-  categoryColor?: string;
+  category: CustomerCategory;
 }
 
 const CustomerCard: React.FC<CustomerCardProps> = ({
@@ -21,8 +22,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
   img,
   alt,
   companyName,
-  category,
-  categoryColor
+  category
 }) => {
   const router = useHistory();
 
@@ -32,19 +32,19 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
 
   // Category pill colors
   const categoryColors = {
-    'B2B': 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-    'Customer Internet': 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
-    'Fintech': 'bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+    [CustomerCategory.B2B]: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    [CustomerCategory.CustomerInternet]: 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+    [CustomerCategory.Fintech]: 'bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
   };
 
-  const pillColor = categoryColor || categoryColors[category];
+  const pillColor = categoryColors[category];
 
   return (
     <article
       className="group flex flex-col h-full bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl border-0 transition-all duration-500 ease-out transform hover:-translate-y-2 hover:scale-[1.02] cursor-pointer relative"
       onClick={handleNavigation}
     >
-      {/* Image Section with Dark Blue Overlay */}
+      {/* Image Section */}
       <div className="relative overflow-hidden">
         <div className="aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700">
           <Image
@@ -52,8 +52,6 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             alt={alt}
             className="w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110"
           />
-          {/* Dark Blue Overlay - matches Ollama brand */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#193ae6]/60 via-[#193ae6]/40 to-[#193ae6]/70 mix-blend-multiply" />
           {/* Company Logo/Name Overlay */}
           <div className="absolute bottom-4 left-4 z-10">
             <span className="text-white font-bold text-xl drop-shadow-lg">
@@ -67,7 +65,10 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
       <div className="flex flex-col flex-grow p-6 space-y-4">
         {/* Category Pill */}
         <div className="flex items-start">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${pillColor}`}>
+          <span className={clsx(
+            'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium',
+            pillColor
+          )}>
             {category}
           </span>
         </div>

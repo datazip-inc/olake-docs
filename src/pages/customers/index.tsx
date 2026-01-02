@@ -4,29 +4,17 @@ import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
-import CustomerGrid, { CustomerStory } from '../../components/customers/CustomerGrid';
-
-const stripTrailingSlash = (value?: string) => {
-  if (!value) {
-    return '';
-  }
-  return value.endsWith('/') ? value.slice(0, -1) : value;
-};
-
-const ensureTrailingSlash = (value: string) => {
-  if (!value) {
-    return '/';
-  }
-  return value.endsWith('/') ? value : `${value}/`;
-};
+import clsx from 'clsx';
+import CustomerGrid from '../../components/customers/CustomerGrid';
+import { CustomerStory, CustomerCategory } from '../../types/customer';
 
 const CustomersPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
-  const siteUrl = stripTrailingSlash(siteConfig?.url || 'https://olake.io')
-  const canonicalUrl = ensureTrailingSlash(`${siteUrl}${location.pathname || '/'}`)
+  const siteUrl = siteConfig?.url || 'https://olake.io'
+  const canonicalUrl = `${siteUrl}${location.pathname || '/'}`
   
-  const [activeFilter, setActiveFilter] = useState<'All Stories' | 'B2B' | 'Customer Internet' | 'Fintech'>('All Stories');
+  const [activeFilter, setActiveFilter] = useState<'All Stories' | CustomerCategory>('All Stories');
 
   // Customer stories data
   const customerStories: CustomerStory[] = [
@@ -34,23 +22,23 @@ const CustomersPage = () => {
       title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
       description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
       route: '/blog/customer-stories/cordial-real-time-data-sync',
-      img: '/img/customers/cover-image-cordial.svg',
+      img: '/img/customers/cordial/cover-image-cordial.svg',
       alt: 'Cordial customer story',
       companyName: 'Cordial',
-      category: 'B2B'
+      category: CustomerCategory.B2B
     },
     {
       title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
       description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
       route: '/blog/customer-stories/astro-talk-lakehouse-transformation',
-      img: '/img/customers/cover-image-astro.svg',
+      img: '/img/customers/astrotalk/cover-image-astro.svg',
       alt: 'Astro Talk customer story',
       companyName: 'Astro Talk',
-      category: 'Customer Internet'
+      category: CustomerCategory.CustomerInternet
     }
   ];
 
-  const filters: Array<'All Stories' | 'B2B' | 'Customer Internet' | 'Fintech'> = ['All Stories', 'B2B', 'Customer Internet'];
+  const filters: Array<'All Stories' | CustomerCategory> = ['All Stories', CustomerCategory.B2B, CustomerCategory.CustomerInternet];
 
   return (
     <Layout
@@ -93,13 +81,14 @@ const CustomersPage = () => {
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                className={clsx(
+                  'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-200',
                   activeFilter === filter
                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                     : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
-                }`}
+                )}
               >
-                {filter}
+                {filter === 'All Stories' ? 'All Stories' : CustomerCategory[filter as keyof typeof CustomerCategory]}
               </button>
             ))}
           </div>
