@@ -1,0 +1,497 @@
+---
+title: "OLake S3 Source Connector | Multi-Format Data Sync"
+description: Configure OLake S3 Connector for CSV, JSON, and Parquet files. Supports AWS S3, MinIO, LocalStack with incremental sync and folder-based streams.
+sidebar_label: S3
+---
+
+import DateTimeHandling from '@site/src/components/DateTimeHandling';
+
+# Overview {#overview}
+
+The OLake S3 Source connector ingests data from Amazon S3 or S3-compatible storage (MinIO, LocalStack). It supports multiple file formats with intelligent folder-based stream grouping, incremental sync, and parallel processing. This connector can be used within the OLake UI or run locally via Docker for open-source workflows.
+
+## Key Features
+
+- **Multi-Format Support**: CSV, JSON (JSONL/Array), and Parquet files
+- **Automatic Compression Handling**: Transparent gzip decompression (`.gz` files)
+- **Folder-Based Streams**: Groups files by top-level folder into logical streams
+- **Incremental Sync**: Tracks changes using S3 LastModified timestamps
+- **Parallel Processing**: Configurable concurrent file processing
+- **S3-Compatible Services**: AWS S3, MinIO, LocalStack, and other S3 APIs
+
+## Sync Modes Supported
+
+- **Full Refresh**: Syncs all files in the bucket/prefix every run
+- **Incremental**: Syncs only new or modified files using LastModified cursor
+
+## File Format Support
+
+### CSV Files
+- Plain and gzip compressed (`.csv`, `.csv.gz`)
+- Configurable delimiter, header detection, quote character
+- Automatic schema inference from header and data sampling
+
+### JSON Files
+- JSONL (line-delimited), JSON Array, and Single Object formats
+- Plain and gzip compressed (`.json`, `.jsonl`, `.json.gz`)
+- Automatic format detection and schema inference
+
+### Parquet Files
+- Native columnar format with full type support
+- Schema read directly from file metadata
+- Efficient streaming with S3 range requests
+
+## How Stream Grouping Works
+
+Files are automatically grouped into streams based on folder structure:
+
+**Example Bucket Structure**:
+```
+s3://my-bucket/data/
+├── users/
+│   ├── 2024-01-01/users.parquet
+│   └── 2024-01-02/users.parquet
+├── orders/
+│   ├── 2024-01-01/orders.parquet
+│   └── 2024-01-02/orders.parquet
+└── products/
+    └── products.csv.gz
+```
+
+**Result**: 3 streams created - `users`, `orders`, `products`
+
+:::info Folder Grouping
+Stream grouping occurs at level 1 (first folder after path_prefix). All files within the same top-level folder are grouped into one stream, regardless of subfolder structure.
+:::
+
+## Prerequisites
+
+### Version Prerequisites
+
+- AWS S3 (any version) or S3-compatible service (MinIO 2020+, LocalStack 0.12+)
+- File formats: CSV, JSON (JSONL/Array/Object), or Parquet
+
+### Connection Prerequisites
+
+- Read access to S3 bucket (`s3:ListBucket`, `s3:GetObject`)
+- **AWS Authentication** (choose one):
+  - IAM roles, environment variables, or instance profiles (recommended)
+  - Static access key and secret key credentials
+- Network connectivity to S3 endpoint
+
+**For MinIO/LocalStack**: Custom endpoint URL required (e.g., `http://localhost:9000`)
+
+**For AWS S3**: Credentials are optional. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles, etc.)
+
+**After prerequisites are fulfilled, configurations can be set up.**
+
+---
+
+## Configuration {#configuration}
+
+<Tabs>
+
+<TabItem value="olake-ui" label="Use Olake UI for S3" default>
+
+### 1. Navigate to the Source Configuration Page
+
+1. Complete the [OLake UI Setup Guide](/docs/install/olake-ui)
+2. After logging in to the OlakeUI, select the `Sources` tab from the left sidebar
+3. Click **`Create Source`** on the top right corner
+4. Select **S3** from the connector dropdown
+5. Provide a name for this source
+
+### 2. Provide Configuration Details
+
+<Tabs groupId="s3-platform">
+
+<TabItem value="aws-s3" label="AWS S3" default>
+
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| Bucket Name `required` | S3 bucket name (without `s3://` prefix) | `my-data-warehouse` |
+| Region `required` | AWS region where bucket is hosted | `us-east-1` |
+| Path Prefix | Optional path prefix to filter files | `data/` |
+| Access Key ID | AWS access key for authentication (optional - see note) | `<YOUR_KEY>` |
+| Secret Access Key | AWS secret key for authentication (optional - see note) | `<YOUR_SECRET>` |
+| File Format `required` | Format of files to sync | `parquet` (CSV/JSON/Parquet) |
+| Max Threads | Number of concurrent file processors | `10` |
+| Retry Count | Number of retry attempts for failures | `3` |
+
+:::info AWS Authentication
+**Access Key ID** and **Secret Access Key** are optional for AWS S3. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles). This is the **recommended approach** for production deployments. If you provide one credential, you must provide both.
+:::
+
+</TabItem>
+
+<TabItem value="minio" label="MinIO">
+
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| Bucket Name `required` | MinIO bucket name | `source-data` |
+| Region `required` | Region (can be any value for MinIO) | `us-east-1` |
+| Endpoint `required` | MinIO server endpoint URL | `http://minio:9000` |
+| Access Key ID `required` | MinIO access key | `minioadmin` |
+| Secret Access Key `required` | MinIO secret key | `minioadmin` |
+| Path Prefix | Optional path prefix | `csv/` |
+| File Format `required` | Format of files to sync | `csv` |
+| Max Threads | Concurrent file processors | `5` |
+
+:::tip MinIO Endpoint Format
+Use the format `http://hostname:9000` or `https://hostname:9000`. Do not include bucket name in endpoint.
+:::
+
+</TabItem>
+
+<TabItem value="localstack" label="LocalStack">
+
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| Bucket Name `required` | LocalStack bucket name | `test-bucket` |
+| Region `required` | AWS region (LocalStack default) | `us-east-1` |
+| Endpoint `required` | LocalStack S3 endpoint | `http://localhost:4566` |
+| Access Key ID `required` | LocalStack access key | `test` |
+| Secret Access Key `required` | LocalStack secret key | `test` |
+| File Format `required` | Format of files to sync | `json` |
+
+:::info LocalStack Port
+LocalStack S3 service runs on port 4566 by default. Adjust if using custom configuration.
+:::
+
+</TabItem>
+
+</Tabs>
+
+### 3. Format-Specific Configuration
+
+<Tabs groupId="file-format">
+
+<TabItem value="csv-format" label="CSV Configuration">
+
+Additional fields for CSV files:
+
+| Field | Description | Default | Example |
+|-------|-------------|---------|---------|
+| Delimiter | Field separator character | `,` | `;` or `\t` |
+| Has Header | Whether first row contains column names | `true` | `true` |
+| Skip Rows | Number of rows to skip at beginning | `0` | `2` |
+| Quote Character | Character for quoting fields | `"` | `'` |
+
+**Compression**: Automatically detected from file extension (`.csv.gz` = gzipped)
+
+</TabItem>
+
+<TabItem value="json-format" label="JSON Configuration">
+
+Additional fields for JSON files:
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| Line Delimited | Whether JSON is JSONL format | `true` |
+
+**Supported Formats**:
+- JSONL (newline-delimited): `{"id": 1}\n{"id": 2}`
+- JSON Array: `[{"id": 1}, {"id": 2}]`
+- Single Object: `{"data": [...]}`
+
+**Compression**: Automatically detected (`.json.gz`, `.jsonl.gz`)
+
+</TabItem>
+
+<TabItem value="parquet-format" label="Parquet Configuration">
+
+No additional configuration required for Parquet files.
+
+**Features**:
+- Schema read from Parquet metadata
+- Efficient columnar reading
+- Streaming support for large files
+- Native type preservation
+
+</TabItem>
+
+</Tabs>
+
+### 4. Test Connection
+
+- Once the connection is validated, the S3 source is created. Jobs can then be configured using this source
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting)
+
+</TabItem>
+
+<TabItem value="olake-cli" label="Use OLake CLI for S3">
+
+### 1. Create Configuration File
+
+Once the Olake CLI is setup, create a folder to store configuration files such as `source.json` and `destination.json`.
+
+### 2. Provide Configuration Details
+
+<Tabs groupId="s3-platform-cli">
+
+<TabItem value="aws-s3-iam" label="AWS S3 (IAM Role)" default>
+
+<S3SourceConfigIAM />
+
+</TabItem>
+
+<TabItem value="aws-s3-cli" label="AWS S3 (Static Keys)">
+
+<S3SourceConfig />
+
+</TabItem>
+
+<TabItem value="minio-cli" label="MinIO">
+
+<S3SourceConfigMinIO />
+
+</TabItem>
+
+<TabItem value="localstack-cli" label="LocalStack">
+
+<S3SourceConfigLocalStack />
+
+</TabItem>
+
+</Tabs>
+
+<S3SourceConfigDetails />
+
+### 3. Format-Specific Configuration Examples
+
+<Tabs groupId="file-format-cli">
+
+<TabItem value="csv-cli" label="CSV Format">
+
+<S3SourceConfigCSV />
+
+</TabItem>
+
+<TabItem value="json-cli" label="JSON Format">
+
+<S3SourceConfigJSON />
+
+</TabItem>
+
+<TabItem value="parquet-cli" label="Parquet Format">
+
+<S3SourceConfigParquet />
+
+</TabItem>
+
+</Tabs>
+
+### 4. Check Source Connection
+
+<DockerDiscoverS3 />
+
+- If OLake successfully connects: `{"connectionStatus":{"status":"SUCCEEDED"},"type":"CONNECTION_STATUS"}`
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting)
+
+</TabItem>
+
+</Tabs>
+
+---
+
+## Data Type Mapping {#data-type-mapping}
+
+<S3ToIcebergDatatypes />
+
+---
+
+## Date and Time Handling
+
+<DateTimeHandling />
+
+---
+
+## Incremental Sync Details
+
+The S3 connector uses S3's `LastModified` timestamp as a cursor for incremental syncs:
+
+**How it works**:
+1. Discovery phase adds `_last_modified_time` field to each stream
+2. During sync, each record is injected with the file's LastModified timestamp
+3. State file tracks the latest `_last_modified_time` per stream
+4. Subsequent syncs only process files with `LastModified > last_synced_timestamp`
+
+**State Example**:
+```json
+{
+  "users": {
+    "_last_modified_time": "2024-01-15T10:30:00Z"
+  },
+  "orders": {
+    "_last_modified_time": "2024-01-15T11:45:00Z"
+  }
+}
+```
+
+**Benefits**:
+- Dramatically reduces sync time for large buckets
+- Only transfers changed data
+- Per-stream cursor tracking for granular control
+
+:::warning File Modifications
+If a file's content changes and is re-uploaded to S3, it will be re-synced in incremental mode because S3 updates the LastModified timestamp.
+:::
+
+---
+
+## Troubleshooting {#troubleshooting}
+
+### 1. Connection Failed - Access Denied
+
+```logs
+ERROR failed to list objects: AccessDenied: Access Denied
+```
+
+**Cause**: Insufficient IAM permissions or incorrect credentials
+
+**Solution**:
+- **If using static credentials**: Verify access key and secret key are correct
+- **If using IAM roles**: Ensure the IAM role has proper S3 permissions attached
+- Check IAM policy includes:
+  ```json
+  {
+    "Effect": "Allow",
+    "Action": ["s3:ListBucket", "s3:GetObject"],
+    "Resource": [
+      "arn:aws:s3:::bucket-name",
+      "arn:aws:s3:::bucket-name/*"
+    ]
+  }
+  ```
+- **AWS Credential Chain Order**:
+  1. Static credentials in config (access_key_id, secret_access_key)
+  2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  3. IAM role attached to EC2 instance/ECS task
+  4. AWS credentials file (~/.aws/credentials)
+- For MinIO/LocalStack: Ensure credentials match server configuration
+
+### 2. No Streams Discovered
+
+**Cause**: Files not organized in folders or incorrect path_prefix
+
+**Solution**:
+- S3 connector requires folder structure: `bucket/prefix/stream_name/files`
+- Check path_prefix matches your structure
+- Verify file extensions match format (`.csv`, `.json`, `.parquet`)
+- Example command to verify:
+  ```bash
+  aws s3 ls s3://bucket-name/prefix/ --recursive
+  ```
+
+### 3. Schema Inference Failed - CSV
+
+```logs
+ERROR failed to infer schema: invalid delimiter or header configuration
+```
+
+**Cause**: Incorrect CSV configuration
+
+**Solution**:
+- Verify `has_header` matches file (check first row)
+- Check `delimiter` is correct (`,` vs `;` vs `\t`)
+- Ensure all rows have same column count
+- Test with a small sample file first
+
+### 4. JSON Format Not Detected
+
+**Cause**: Mixed JSON formats in same folder or invalid JSON
+
+**Solution**:
+- Keep JSONL and JSON Array formats in separate folders/streams
+- Validate JSON syntax: `jq . < file.json`
+- Ensure consistent field names across records
+- Check for trailing commas or syntax errors
+
+### 5. Parquet File Cannot Be Read
+
+```logs
+ERROR failed to read parquet schema: not a parquet file
+```
+
+**Cause**: Corrupted file or invalid Parquet format
+
+**Solution**:
+- Verify file with parquet-tools: `parquet-tools schema file.parquet`
+- Check file wasn't corrupted during upload
+- Ensure file extension is `.parquet` (not `.pq` or other)
+- Re-upload file from source
+
+### 6. Incremental Sync Not Working
+
+**Cause**: State file not persisted or incorrect sync_mode
+
+**Solution**:
+- Verify `state.json` file location is writable
+- Check catalog has `sync_mode: "incremental"`
+- Ensure `cursor_field: "_last_modified_time"` is set
+- Confirm state file is being passed to sync command:
+  ```bash
+  --state /path/to/state.json
+  ```
+
+### 7. MinIO Connection Timeout
+
+```logs
+ERROR dial tcp: i/o timeout
+```
+
+**Cause**: Network connectivity or incorrect endpoint
+
+**Solution**:
+- Check MinIO is running: `docker ps | grep minio`
+- Test endpoint: `curl http://localhost:9000/minio/health/live`
+- Verify endpoint format: `http://hostname:9000` (include protocol)
+- For Docker: Use container name instead of localhost
+
+### 8. Files Not Syncing Despite Being Present
+
+**Cause**: File extension mismatch or compression not detected
+
+**Solution**:
+- Ensure file extensions match format:
+  - CSV: `.csv` or `.csv.gz`
+  - JSON: `.json`, `.jsonl`, `.json.gz`, `.jsonl.gz`
+  - Parquet: `.parquet`
+- Check file size is non-zero: `aws s3 ls s3://bucket/prefix/ --recursive --human-readable`
+- Verify files are in correct folder structure
+
+### 9. Out of Memory Errors
+
+```logs
+FATAL runtime: out of memory
+```
+
+**Cause**: Too many large files processed concurrently
+
+**Solution**:
+- Reduce `max_threads` in configuration (try 3-5)
+- Process fewer streams at once
+- Split very large files (>5GB) before upload
+- Increase container memory limits
+
+### 10. Permission Denied - LocalStack
+
+**Cause**: LocalStack IAM policy simulator
+
+**Solution**:
+- LocalStack accepts any credentials by default (`test`/`test`)
+- Ensure endpoint is correct: `http://localhost:4566`
+- Check LocalStack is running: `docker ps | grep localstack`
+- Verify bucket exists: `awslocal s3 ls`
+
+**If the issue is not listed here, post the query on Slack to get it resolved within a few hours.**
+
+---
+
+## Changelog
+
+| Date of Release | Version | Description |
+| --------------- | ------- | ----------- |
+| TBD | v0.4.0 | Initial S3 source connector release |
+
+---
