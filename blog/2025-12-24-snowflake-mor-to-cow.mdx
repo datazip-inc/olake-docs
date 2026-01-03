@@ -1,8 +1,8 @@
 ---
-slug: olake-mor-cow-snowflake
-title: "Bridging the Gap: Making OLake's MOR Iceberg Tables Compatible with Snowflake's Query Engine"
-description: Learn how to make OLake's Merge-on-Read (MOR) Iceberg tables compatible with Snowflake using an automated compaction script that transforms MOR tables into Copy-on-Write (COW) format for accurate analytics queries.
-tags: [iceberg, olake, snowflake]
+slug: olake-mor-cow-databricks
+title: "Bridging the Gap: Making OLake's MOR Iceberg Tables Compatible with Databrick's Query Engine"
+description: Learn how to make OLake's Merge-on-Read (MOR) Iceberg tables compatible with Databricks using an automated MOR to COW write script that transforms MOR tables into Copy-on-Write (COW) format for accurate analytics queries.
+tags: [iceberg, olake, databricks]
 authors: [nayan]
 image: /img/blog/2025/12/snowflake_cow.webp
 --- 
@@ -14,7 +14,7 @@ If you're using OLake to replicate database changes to Apache Iceberg and Databr
 
 This isn't just a Databricks limitation—several major query engines including Snowflake face the same challenge. While these platforms are incredibly powerful for analytics, their Iceberg implementations only support Copy-on-Write (COW) tables or position deletes at best.
 
-In this blog, I'll walk you through the problem and show you how we've solved it with a simple yet powerful compaction script that transforms OLake's MOR tables into COW-compatible tables that Databricks and other query engines can read correctly.
+In this blog, I'll walk you through the problem and show you how we've solved it with a simple yet powerful MOR to COW write script that transforms OLake's MOR tables into COW-compatible tables that Databricks and other query engines can read correctly.
 
 ## The Problem: MOR vs COW in the Real World
 
@@ -24,26 +24,23 @@ Let's understand what's happening under the hood. When you use OLake for Change 
 
 ### How OLake Writes Data (MOR with Equality Deletes):
 
-**1. Initial Full Refresh:** OLake performs a complete historical load of your table to Iceberg.
+**1. Initial Full Refresh:** OLake performs a complete historical load of your table to Iceberg. This creates append only data files (No MOR).
 
 **2. CDC Updates:** As changes happen in your source database, OLake captures them:
 - New records → Written to new data files
 - Updated records → Old version marked in an equality delete file, new version written to data file
-- Deleted records → Marked in an equality delete file
+- Deleted records → Marked in an equality delete file and soft-delete in the data-file
 
 **3. The Result:** After multiple CDC sync cycles, you have:
 - Multiple data files with your records
 - Multiple equality delete files tracking which records should be ignored
 
-This is incredibly efficient for writes—OLake can stream thousands of changes per second without rewriting entire data files. However, here's the catch:
-MOR tables. That means, any CDC pipeline using equality deletes (the standard approach for streaming CDC) will make the table unqueryable in Databricks—no results will appear when querying such a table. This is why converting MOR tables with equality deletes to COW format is essential for making the data queryable in Databricks.
-
-## The Solution: Automated MOR to COW Compaction
+## The Solution: Automated MOR to COW Write
 
 The solution is to periodically compact your MOR tables into COW format—essentially creating a clean copy where all deletes and updates are fully applied by rewriting the data files. Think of it as "resolving" all the pending changes into a single, clean table state.
 
 :::tip Storage Optimization
-Once the COW table is created and verified, you can delete the MOR table data. To manage storage efficiently, run Iceberg's snapshot expiry job to expire snapshots older than 5-7 days, given that the compaction job runs daily. This eliminates data duplication and reduces storage costs.
+Once the COW table is created and verified, you can expire the MOR table data. To manage storage efficiently, run Iceberg's snapshot expiry job to expire snapshots older than 5-7 days, given that the compaction job runs daily. This eliminates data duplication and reduces storage costs.
 ::: 
 
 We've built a PySpark script that automates this entire process. Here's how it works:
@@ -55,26 +52,104 @@ We've built a PySpark script that automates this entire process. Here's how it w
 The workflow consists of the following steps:
 
 - **Data Ingestion**: Multiple source databases (PostgreSQL, MySQL, Oracle, MongoDB, Kafka) are ingested through OLake
-- **MOR Table Creation**: OLake writes data to Iceberg tables using Merge-on-Read (MOR) strategy with equality delete files, optimized for high-throughput CDC operations
-- **Compaction**: Spark Compaction transforms MOR tables into Copy-on-Write (COW) format by rewriting data files with equality deletes applied
+- **MOR Table Creation**: OLake creates MOR-Equality-delete-tables
+- **COW Write**: Spark script to transforms MOR tables into Copy-on-Write (COW) format by rewriting data files with equality deletes applied
 - **Storage**: COW tables are stored in object storage (S3, Azure Blob Storage, GCS, etc.)
-- **Querying**: Snowflake queries COW tables as external Iceberg tables with all deletes and updates properly applied
+- **Querying**: Databricks queries COW tables as external Iceberg tables with all deletes and updates properly applied
+
+
+### How the MOR to COW Write Script Works
+
+The MOR to COW write process is designed to be safe, repeatable, and compatible with continuous CDC ingestion. Key features:
+
+- **Non-intrusive**: Works alongside OLake's ongoing syncs using Iceberg's snapshot isolation
+- **Bootstrap mode**: On first run, creates COW table with full resolved dataset from MOR table
+- **Incremental mode**: On subsequent runs, updates existing COW table with only latest changes
+
+Once the Copy-on-Write (COW) table has been created, every subsequent run follows a predictable and safe update workflow:
+
+**1. Prepare the MOR table for the next cycle:** The process begins by truncating the MOR table. This might seem scary at first—after all, you're deleting data—but it's completely safe. We're not actually losing anything because Iceberg saves all the states of table in sanpshots. The truncation clears out previously processed CDC data that has already been written to the COW table, ensuring that only fresh changes are collected for the next write run. This helps avoid maintaining two copies of data—once the data is successfully written to COW format, the MOR data can be deleted, keeping only one copy of your data. 
+
+**2. Identify the last snapshot before truncation:** Here's where Iceberg's snapshot isolation becomes critical. When you truncate a table, Iceberg creates a brand new snapshot (the truncate snapshot). But that new snapshot is empty—it contains no data. What we actually care about is the predecessor snapshot, which represents the exact moment in time when valid CDC data was still present in the MOR table, just before the truncate happened. The script queries Iceberg's metadata to find this predecessor snapshot ID, which becomes our pointer to the data we need to write to COW.
+
+**3. Read and align schema information:** Before merging data, the script loads the schema from the predecessor snapshot to ensure the write process uses the same table structure that existed when the data was written. If the source schema has changed—for example, if a new column was added to the source database—the script automatically detects missing columns or type changes and applies the necessary `ALTER TABLE` commands to align the COW table schema. This keeps both tables structurally consistent without manual intervention, preventing failures or data corruption from schema changes during the write process, which is crucial in a live CDC environment where schemas evolve over time.
+
+**4. Merge the MOR snapshot into the COW table:** We use Iceberg's MERGE INTO statement to apply all the changes from the predecessor snapshot. This operation handles three scenarios in one pass:
+- **New records** get inserted into the COW table.
+- **Updated records** have their old versions replaced with new values
+- **Deleted records** (marked in equality delete files) are included in the merge with `_op_type` as `d` indicating the record was deleted
+
+Because we're merging from a specific snapshot, all these changes are applied at once, resulting in a clean COW table with no equality deletes remaining. Databricks can now read this table perfectly.
+
+**5. Save the truncate snapshot as the processing state:** Only after the merge to COW succeeds, the truncate snapshot ID is saved to a dedicated state table. This makes the entire process safe and repeatable. By saving this state, the system guarantees that:
+- We always know exactly which truncate boundary we've processed, even if OLake writes new data later.
+- If the write job fails midway, we can restart it from the same consistent point.
+The state table stores the truncate snapshot ID, which serves as a checkpoint indicating that all data up to that truncate has been successfully written to COW.
+
+### Failure Recovery and State Management
+
+<details>
+<summary>View failure recovery and state management details</summary>
+
+The MOR to COW write flow is designed to be **safe to re-run** by using a per-table state row and checkpointing only after a successful merge.
+
+Consider this snapshot/commit sequence in the MOR table:
+
+`eq1 → eq2 → eq3 → eq4 → trunc1 → eq5 → eq6 → eq7 → trunc2`
+
+#### What the state table stores
+
+For each MOR table, the state table stores:
+
+- **`last_compacted_snapshot_id`**: the last predecessor snapshot (snapshot before truncate) that was merged into COW (e.g., `eq4`, `eq7`)
+- **`last_boundary_snapshot_id`**: the last truncate snapshot that completed successfully (e.g., `trunc1`, `trunc2`)
+
+On reruns, the script uses `last_boundary_snapshot_id` as the effective checkpoint.
+
+#### How recovery works
+
+1. **Cycle around `trunc1`:**
+   - The script truncates the MOR table (creating `trunc1`)
+   - It finds the predecessor snapshot (the snapshot before truncate): `eq4`
+   - It merges `eq4` into the COW table
+   - Only after the merge succeeds, it updates state:
+     - `last_compacted_snapshot_id = eq4`
+     - `last_boundary_snapshot_id = trunc1`
+
+2. **Cycle around `trunc2`:**
+
+   Suppose the script truncates again and tries to merge `eq7`, but the run fails.
+
+   Two important cases:
+
+   - **Failure before the merge commits**
+     - COW is **not** updated with `eq7`
+     - State is still at `trunc1`
+     - On rerun, the script creates a new boundary (another truncate snapshot) and merges the predecessor snapshot (snapshot before the new truncate) again
+
+   - **Merge commits, but the state update didn't happen**
+     - COW **already contains** `eq7`
+     - State still says `trunc1`
+     - On rerun, the script may re-merge `eq7`—this is safe because it's a key-based `MERGE` (idempotent for `_olake_id`)
+
+</details>
 
 ### Prerequisites
 
-Before running the compaction script, ensure you have the following installed:
+Before running the MOR to COW write script, ensure you have the following installed:
 
 - **Java 21**: Required for Spark runtime
 - **Python 3.13.7**: Required for PySpark
 - **Spark 3.5.2**: Apache Spark with Iceberg support
 
 Additionally, make sure you have:
+- Permission to access the Iceberg catalog
 - Access to the object storage (S3, Azure Blob Storage, GCS, etc.) where your Iceberg tables are stored
 - Appropriate cloud provider credentials or IAM roles configured
 
 ### Generate Destination Details
 
-Before running the compaction script, you need to generate a `destination_details.json` file that contains your catalog configuration and credentials. This file is required as input for the compaction script.
+Before running the MOR to COW write script, you need to generate a `destination_details.json` file that contains your catalog configuration and credentials. This file is required as input for the write script.
 
 <details>
 <summary>View the destination details generation script</summary>
@@ -85,20 +160,35 @@ Before running the compaction script, you need to generate a `destination_detail
 # ============================================================================
 # CONFIGURATION: Edit this section to customize the script
 # ============================================================================
+
 # API endpoint base URL
 # Example: BASE_URL="http://localhost:8000"
 #          BASE_URL="http://api.example.com"
 BASE_URL="http://localhost:8000"
 
-# Job IDs to query (must specify at least one)
-# Example: JOB_IDS=(146)
-
-JOB_IDS=(10)
+# Job ID to query (can also be provided as command line argument)
+# Example: JOB_ID=157
+# Usage: ./get_destination_destination.sh [job_id]
+#        If job_id is provided as argument, it overrides this value
+JOB_ID=9
 
 # ============================================================================
+
 # Check if jq is available
 if ! command -v jq &> /dev/null; then
     echo "Error: jq is required but not installed. Please install jq to use this script."
+    exit 1
+fi
+
+# Get job ID from command line argument if provided, otherwise use script variable
+if [ -n "$1" ]; then
+    JOB_ID="$1"
+fi
+
+# Check if job ID is specified
+if [ -z "$JOB_ID" ] || [ "$JOB_ID" == "" ]; then
+    echo "Error: Please specify a job ID either in the script (JOB_ID variable) or as a command line argument."
+    echo "Usage: $0 [job_id]"
     exit 1
 fi
 
@@ -113,68 +203,23 @@ curl --location "$BASE_URL/login" \
   -c cookies.txt \
   -s > /dev/null
 
-# Check if job IDs are specified
-if [ ${#JOB_IDS[@]} -eq 0 ]; then
-    echo "Error: Please specify at least one job ID in the JOB_IDS array."
-    exit 1
-fi
-
 # Get jobs data and save to temporary file
-echo "Fetching jobs data for job IDs: ${JOB_IDS[*]}..."
+echo "Fetching jobs data for job ID: $JOB_ID..."
 RESPONSE_FILE=$(mktemp)
 curl --location "$BASE_URL/api/v1/project/123/jobs" \
   --header 'Content-Type: application/json' \
   -b cookies.txt \
   -s > "$RESPONSE_FILE"
 
-# Build jq filter expression for the specified job IDs
-# Using a direct comparison approach that works more reliably
-FILTER_PARTS=""
-for job_id in "${JOB_IDS[@]}"; do
-    if [ -z "$FILTER_PARTS" ]; then
-        FILTER_PARTS=".id == $job_id"
-    else
-        FILTER_PARTS="$FILTER_PARTS or .id == $job_id"
-    fi
-done
-
-# Debug: Show streams_config structure for the selected job
-echo "Debug - streams_config for job ${JOB_IDS[*]}:"
-jq -r ".data[]? | select($FILTER_PARTS) | .streams_config" "$RESPONSE_FILE" 2>/dev/null | head -c 1000
-echo ""
-echo ""
-echo "Debug - Parsed streams structure:"
-jq -r ".data[]? | select($FILTER_PARTS) | (.streams_config // \"\" | fromjson | .streams[0] // {})" "$RESPONSE_FILE" 2>/dev/null
-echo ""
-
-# Extract and save destinations with job IDs and destination_database from streams_config
-OUTPUT_FILE="destination_details.json"
-jq -r ".data[]? | select($FILTER_PARTS) | {
-  job_id: .id,
-  job_name: .name,
-  destination: .destination,
-  destination_database: (
-    try (
-      (.streams_config // \"\") as \$sc |
-      if (\$sc | type == \"string\" and length > 0) then
-        (\$sc | fromjson) as \$parsed |
-        (\$parsed.streams // []) |
-        if length > 0 then
-          (.[0].stream.destination_database // .[0].stream.destination_table // \"\") |
-          if type == \"string\" and length > 0 then
-            gsub(\":\"; \"_\")
-          else
-            \"\"
-          end
-        else
-          \"\"
-        end
-      else
-        \"\"
-      end
-    ) catch \"\"
-  )
-}" "$RESPONSE_FILE" 2>/dev/null | jq -s . > "$OUTPUT_FILE"
+# Extract and save destination.config as parsed JSON (single object, not array)
+OUTPUT_FILE="destination.json"
+jq -r ".data[]? | select(.id == $JOB_ID) | 
+  .destination.config // \"\" |
+  if type == \"string\" and length > 0 then
+    fromjson
+  else
+    {}
+  end" "$RESPONSE_FILE" 2>/dev/null > "$OUTPUT_FILE"
 
 echo "Results saved to: $OUTPUT_FILE"
 
@@ -187,14 +232,14 @@ rm -f "$RESPONSE_FILE" cookies.txt
 **Before running the script, update the following configuration:**
 
 - **`BASE_URL`**: Replace with your OLake API endpoint URL (e.g., `http://localhost:8000` or your production API URL)
-- **`JOB_ID`**: Replace with your actual job ID.
+- **`JOB_ID`**: Replace with your actual job ID. The job ID can be obtained from the OLake UI job section. This job ID is required to retrieve the catalog configuration, URIs, and credentials from `destination_details.json` for all tables synced by that job.
 
-The script will generate a `destination_details.json` file that contains the catalog configuration, credentials, and object storage settings needed by the compaction script. This file is automatically used by the compaction script to configure the Spark session with the correct Iceberg catalog and storage credentials.
+The script will generate a `destination_details.json` file that contains the catalog configuration, credentials, and object storage settings needed by the MOR to COW write script. This file is automatically used by the write script to configure the Spark session with the correct Iceberg catalog and storage credentials.
 
-### Compaction Script
+### MOR to COW Write Script
 
 <details>
-<summary>View the PySpark compaction script</summary>
+<summary>View the PySpark MOR to COW write script</summary>
 ```python
 import argparse
 import json
@@ -213,18 +258,10 @@ spark = None  # type: ignore[assignment]
 # ------------------------------------------------------------------------------
 CATALOG = "olake_iceberg"
 # Source namespace/database for MOR tables.
-# This is set at runtime from destination_details.json field 'destination_database'
-# (or overridden via --source-db).
-DB = ""
+# User must hardcode this before running the script.
+DB = "<NAME_OF_YOUR_SOURCE_DATABASE>"
 # Destination namespace/database for generated COW tables (same catalog, different db)
 COW_DB = "<NAME_OF_YOUR_COW_DATABASE>"
-
-# If True, the script enumerates all tables in CATALOG.DB and compacts them one-by-one.
-# If False, set MOR_TABLE explicitly below to compact a single table.
-COMPACT_ALL_TABLES_IN_DB = True
-
-# Used only when COMPACT_ALL_TABLES_IN_DB = False
-MOR_TABLE = f"{CATALOG}.{DB}.<YOUR_MOR_TABLE_NAME>"
 
 # Base S3 location where per-table COW tables (and the shared state table) will be stored.
 # Example: "s3://my-bucket/warehouse/cow"
@@ -239,23 +276,25 @@ PRIMARY_KEY = "_olake_id"
 
 
 def _recompute_derived_names():
-    global MOR_TABLE, STATE_TABLE, STATE_LOCATION
-    MOR_TABLE = f"{CATALOG}.{DB}.<YOUR_MOR_TABLE_NAME>"
+    global STATE_TABLE, STATE_LOCATION
     STATE_TABLE = f"{CATALOG}.{COW_DB}.{STATE_TABLE_NAME}"
     STATE_LOCATION = f"{COW_BASE_LOCATION}/{STATE_TABLE_NAME}"
 
 
 def load_destination_writer_config(destination_details_path: str, job_id: Optional[int] = None) -> dict:
-    """
-    destination_details.json schema (from your curl/jq script) is a list of records like:
-      { job_id, job_name, destination: { ..., config: "<json string>" } }
-    We parse the outer JSON, then parse destination.config (string) to get writer dict.
-    """
+    
     with open(destination_details_path, "r", encoding="utf-8") as f:
         outer = json.load(f)
 
+    # New simplified format: top-level dict with writer
+    if isinstance(outer, dict) and isinstance(outer.get("writer"), dict):
+        writer = outer.get("writer")
+        assert isinstance(writer, dict)
+        return writer
+
+    # Old format: array of records
     if not isinstance(outer, list) or not outer:
-        raise ValueError("destination_details.json must be a non-empty JSON array")
+        raise ValueError("Destination config file must be either a JSON object with 'writer' or a non-empty JSON array")
 
     record = None
     if job_id is None:
@@ -278,35 +317,6 @@ def load_destination_writer_config(destination_details_path: str, job_id: Option
     if not isinstance(writer, dict):
         raise ValueError("destination.config JSON does not contain a 'writer' object")
     return writer
-
-
-def load_destination_database(destination_details_path: str, job_id: Optional[int] = None) -> Optional[str]:
-    """
-    Some destination_details.json records include a top-level field:
-      "destination_database": "<namespace>"
-    We use this as the default MOR/source namespace (DB) unless overridden by --source-db.
-    """
-    with open(destination_details_path, "r", encoding="utf-8") as f:
-        outer = json.load(f)
-
-    if not isinstance(outer, list) or not outer:
-        raise ValueError("destination_details.json must be a non-empty JSON array")
-
-    record = None
-    if job_id is None:
-        record = outer[0]
-    else:
-        for r in outer:
-            if r.get("job_id") == job_id:
-                record = r
-                break
-        if record is None:
-            raise ValueError(f"job_id {job_id} not found in destination_details.json")
-
-    db = record.get("destination_database")
-    if isinstance(db, str) and db.strip():
-        return db.strip()
-    return None
 
 
 def _normalize_warehouse(catalog_type: str, warehouse_val: str) -> str:
@@ -370,6 +380,12 @@ def build_spark_session_from_writer(writer: dict) -> SparkSession:
     aws_region = writer.get("aws_region")
     aws_access_key = writer.get("aws_access_key")
     aws_secret_key = writer.get("aws_secret_key")
+    aws_session_token = (
+        writer.get("aws_session_token")
+        or writer.get("aws_sessionToken")
+        or writer.get("session_token")
+        or writer.get("sessionToken")
+    )
     s3_path_style = writer.get("s3_path_style")  # may not exist; we'll infer if missing
     s3_use_ssl = writer.get("s3_use_ssl")
 
@@ -400,6 +416,27 @@ def build_spark_session_from_writer(writer: dict) -> SparkSession:
     )
     builder = builder.config("spark.sql.catalogImplementation", "in-memory")
     builder = builder.config("spark.sql.defaultCatalog", catalog_name)
+
+    # Ensure AWS SDK-based clients (e.g., GlueCatalog, Iceberg S3FileIO) can see credentials.
+    # This avoids requiring users to export env vars in the container.
+    if aws_region:
+        os.environ["AWS_REGION"] = str(aws_region)
+        os.environ["AWS_DEFAULT_REGION"] = str(aws_region)
+        builder = builder.config("spark.driverEnv.AWS_REGION", str(aws_region))
+        builder = builder.config("spark.driverEnv.AWS_DEFAULT_REGION", str(aws_region))
+        builder = builder.config("spark.executorEnv.AWS_REGION", str(aws_region))
+        builder = builder.config("spark.executorEnv.AWS_DEFAULT_REGION", str(aws_region))
+    if aws_access_key and aws_secret_key:
+        os.environ["AWS_ACCESS_KEY_ID"] = str(aws_access_key)
+        os.environ["AWS_SECRET_ACCESS_KEY"] = str(aws_secret_key)
+        builder = builder.config("spark.driverEnv.AWS_ACCESS_KEY_ID", str(aws_access_key))
+        builder = builder.config("spark.driverEnv.AWS_SECRET_ACCESS_KEY", str(aws_secret_key))
+        builder = builder.config("spark.executorEnv.AWS_ACCESS_KEY_ID", str(aws_access_key))
+        builder = builder.config("spark.executorEnv.AWS_SECRET_ACCESS_KEY", str(aws_secret_key))
+    if aws_session_token:
+        os.environ["AWS_SESSION_TOKEN"] = str(aws_session_token)
+        builder = builder.config("spark.driverEnv.AWS_SESSION_TOKEN", str(aws_session_token))
+        builder = builder.config("spark.executorEnv.AWS_SESSION_TOKEN", str(aws_session_token))
 
     # SparkCatalog wrapper
     builder = builder.config(f"spark.sql.catalog.{catalog_name}", "org.apache.iceberg.spark.SparkCatalog")
@@ -777,46 +814,9 @@ def merge_snapshot_into_cow(mor_table_fqn: str, cow_table_fqn: str, snapshot_id:
     """)
 
 
-# ------------------------------------------------------------------------------
-# Bootstrap + per-table compaction
-# ------------------------------------------------------------------------------
-def bootstrap_cow_table_if_needed(mor_table_fqn: str, cow_table_fqn: str, cow_location: str):
-    print(f"[{mor_table_fqn}] COW table does not exist. Creating and copying full data...")
-
-    bootstrap_snapshot_id, _ = get_latest_snapshot_and_parent_id(mor_table_fqn)
-    if bootstrap_snapshot_id is None:
-        spark.sql(f"""
-            CREATE TABLE {cow_table_fqn}
-            USING iceberg
-            LOCATION '{cow_location}'
-            AS
-            SELECT *
-            FROM {mor_table_fqn}
-        """)
-        upsert_state_success(mor_table_fqn, None, None)
-        print(f"[{mor_table_fqn}] Bootstrap completed: MOR had no snapshots; created empty COW table.")
-        return
-
-    spark.sql(f"""
-        CREATE TABLE {cow_table_fqn}
-        USING iceberg
-        LOCATION '{cow_location}'
-        AS
-        SELECT *
-        FROM {mor_table_fqn}
-        VERSION AS OF {bootstrap_snapshot_id}
-    """)
-
-    # After bootstrap, COW contains MOR as-of this snapshot.
-    upsert_state_success(mor_table_fqn, bootstrap_snapshot_id, bootstrap_snapshot_id)
-    print(f"[{mor_table_fqn}] Bootstrap completed: Full MOR → COW copy done.")
-
-
 def run_compaction_cycle_for_table(mor_table_fqn: str):
     cow_table_fqn, cow_location = cow_table_and_location_for(mor_table_fqn)
-
-    if not table_exists(cow_table_fqn):
-        bootstrap_cow_table_if_needed(mor_table_fqn, cow_table_fqn, cow_location)
+    cow_exists = table_exists(cow_table_fqn)
 
     state_row = get_state_row(mor_table_fqn)
     start_state = effective_state_id(state_row)
@@ -825,7 +825,7 @@ def run_compaction_cycle_for_table(mor_table_fqn: str):
     else:
         print(f"[{mor_table_fqn}] Effective start snapshot: {start_state}")
 
-    # Boundary: truncate MOR so new writes won't mix with the batch we're compacting.
+    # Boundary: always truncate MOR first (same flow for first-time and subsequent runs).
     spark.sql(f"TRUNCATE TABLE {mor_table_fqn}")
 
     truncate_snapshot_id, high_water_snapshot_id = get_latest_snapshot_and_parent_id(mor_table_fqn)
@@ -834,9 +834,21 @@ def run_compaction_cycle_for_table(mor_table_fqn: str):
 
     # Nothing to compact (no parent snapshot)
     if high_water_snapshot_id is None:
+        # First time and nothing existed before truncation -> create empty COW table from current (empty) view.
+        if not cow_exists:
+            print(f"[{mor_table_fqn}] COW table does not exist and no high-water snapshot. Creating empty COW table...")
+            spark.sql(f"""
+                CREATE TABLE {cow_table_fqn}
+                USING iceberg
+                LOCATION '{cow_location}'
+                AS
+                SELECT *
+                FROM {mor_table_fqn}
+            """)
+            cow_exists = True
         prev_compacted = None if state_row is None else state_row["last_compacted_snapshot_id"]
         upsert_state_success(mor_table_fqn, prev_compacted, truncate_snapshot_id)
-        print(f"[{mor_table_fqn}] Compaction cycle completed (nothing to compact).")
+        print(f"[{mor_table_fqn}] Compaction cycle completed (nothing to compact). Advanced boundary.")
         return
 
     # Optimization: For "latest state per key" semantics, it's sufficient to merge ONLY the
@@ -845,6 +857,22 @@ def run_compaction_cycle_for_table(mor_table_fqn: str):
         prev_compacted = None if state_row is None else state_row["last_compacted_snapshot_id"]
         upsert_state_success(mor_table_fqn, prev_compacted, truncate_snapshot_id)
         print(f"[{mor_table_fqn}] No new snapshots to compact; advanced boundary.")
+        return
+
+    # First time: create COW baseline from the high-water snapshot (CTAS).
+    if not cow_exists:
+        print(f"[{mor_table_fqn}] COW table does not exist. Creating baseline from high-water snapshot {high_water_snapshot_id} ...")
+        spark.sql(f"""
+            CREATE TABLE {cow_table_fqn}
+            USING iceberg
+            LOCATION '{cow_location}'
+            AS
+            SELECT *
+            FROM {mor_table_fqn}
+            VERSION AS OF {high_water_snapshot_id}
+        """)
+        upsert_state_success(mor_table_fqn, high_water_snapshot_id, truncate_snapshot_id)
+        print(f"[{mor_table_fqn}] First-time compaction completed successfully (CTAS baseline).")
         return
 
     print(f"[{mor_table_fqn}] Compacting high-water snapshot {high_water_snapshot_id} ...")
@@ -881,28 +909,13 @@ if __name__ == "__main__":
         help="Path to destination_details.json generated by get_destination_details.sh",
     )
     parser.add_argument("--job-id", type=int, default=None, help="Optional job_id to select from destination_details.json")
-    parser.add_argument(
-        "--source-db",
-        default=None,
-        help="Optional override for source namespace/database containing MOR tables. "
-        "If omitted, the script uses destination_details.json field 'destination_database' (when present).",
-    )
     parser.add_argument("--cow-db", default=COW_DB, help="Destination namespace/database for COW tables/state")
     parser.add_argument("--catalog-name", default=None, help="Override catalog name (otherwise taken from destination config)")
     args = parser.parse_args()
 
-    # Determine source DB from destination_details.json, unless user overrides.
-    destination_db = load_destination_database(args.destination_details, job_id=args.job_id)
-    if args.source_db:
-        DB = args.source_db
-    else:
-        # destination_database is expected to always be present per requirements.
-        if not destination_db:
-            raise ValueError(
-                "destination_details.json is missing required field 'destination_database' "
-                "(or it is empty). Provide --source-db only if you intend to override."
-            )
-        DB = destination_db
+    # Source DB is expected to be hardcoded in this file.
+    if not DB or DB.strip() == "" or DB.strip() == "<YOUR_SOURCE_DB>":
+        raise ValueError("Please set DB = '<YOUR_SOURCE_DB>' at the top of fail_test.py before running.")
 
     # Update globals from args
     COW_DB = args.cow_db
@@ -923,15 +936,13 @@ if __name__ == "__main__":
 
     ensure_state_table()
 
-    if COMPACT_ALL_TABLES_IN_DB:
-        all_tables = list_tables_in_db(CATALOG, DB)
-        mor_tables = [
-            f"{CATALOG}.{DB}.{t}"
-            for t in all_tables
-            if t != STATE_TABLE_NAME and not t.endswith("_cow")
-        ]
-    else:
-        mor_tables = [MOR_TABLE]
+    # Always compact all MOR tables in the source namespace/database.
+    all_tables = list_tables_in_db(CATALOG, DB)
+    mor_tables = [
+        f"{CATALOG}.{DB}.{t}"
+        for t in all_tables
+        if t != STATE_TABLE_NAME and not t.endswith("_cow")
+    ]
 
     successes = []
     failures = []
@@ -957,11 +968,15 @@ if __name__ == "__main__":
 </details>
 
 **Before running the script, make sure to update the following variables in the "User Inputs" section:**
-- **`COW_DB`**: Replace `<NAME_OF_YOUR_COW_DATABASE>` with the namespace/database where COW tables + the state table should live
-- **`COW_BASE_LOCATION`**: Replace `<YOUR_COW_BASE_LOCATION>` with the base object-storage path where COW tables will be written (one folder per table)
-- **`COMPACT_ALL_TABLES_IN_DB`**: Set to `True` to compact every table in the source namespace (`CATALOG.DB`), or `False` to compact a single table via `MOR_TABLE`
+- **`COW_DB`**: Replace `<NAME_OF_YOUR_COW_DATABASE>` with the namespace/database where COW tables + the state table should live (e.g., `postgres_main_public_cow`)
+- **`COW_BASE_LOCATION`**: Replace `<YOUR_COW_BASE_LOCATION>` with the base object-storage path where COW tables will be written (e.g., `s3://my-bucket/warehouse/cow`)
+- **`DB`**: Replace `<NAME_OF_YOUR_SOURCE_DATABASE>` with the namespace/database containing the MOR tables to be converted to COW format.
 
-**To execute the compaction script, use the following spark-submit command:**
+:::note Lakekeeper Limitation
+For Lakekeeper catalogs, `COW_BASE_LOCATION` must be within the warehouse location. You can use a subfolder (e.g., if warehouse is `s3://bucket/warehouse`, use `s3://bucket/warehouse/cow`).
+:::
+
+**To execute the MOR to COW write script, use the following spark-submit command:**
 
 ```bash
 spark-submit \
@@ -970,82 +985,15 @@ spark-submit \
   --destination-details destination_details.json
 ```
 
-Replace `compaction_script.py` with the actual name of your compaction script file. The script will automatically read the catalog configuration, credentials, and object storage settings from the `destination_details.json` file generated by the previous step.
+Replace `compaction_script.py` with the actual name of your MOR to COW write script file. The script will automatically read the catalog configuration, credentials, and object storage settings from the `destination_details.json` file generated by the previous step.
 
-### How the Compaction Script Works
 
-The compaction process is designed to be safe, repeatable, and compatible with continuous CDC ingestion. Key features:
+## Testing the MOR to COW Write Script Locally
 
-- **Non-intrusive**: Works alongside OLake's ongoing syncs using Iceberg's snapshot isolation
-- **Bootstrap mode**: On first run, creates COW table with full resolved dataset from MOR table
-- **Incremental mode**: On subsequent runs, updates existing COW table with only latest changes
+<details>
+<summary>View local testing steps</summary>
 
-Once the Copy-on-Write (COW) table has been created, every subsequent run follows a predictable and safe update workflow:
-
-**1. Prepare the MOR table for the next cycle:** The process begins by truncating the MOR table. This might seem scary at first—after all, you're deleting data—but it's completely safe. We're not actually losing anything because Iceberg saves all the states of table in sanpshots. The truncation simply clears out previously processed CDC data and ensures that only fresh changes are collected for the next compaction run. 
-
-**2. Identify the last snapshot before truncation:** Here's where Iceberg's snapshot isolation becomes critical. When you truncate a table, Iceberg creates a brand new snapshot. But that new snapshot is empty—it contains no data. What we actually care about is the predecessor snapshot, which represents the exact moment in time when valid CDC data was still present in the MOR table, just before the truncate happened. The script queries Iceberg's metadata to find this predecessor snapshot ID, which becomes our pointer to the data we need to compact.
-
-**3. Save this snapshot as the processing state:** The parent snapshot ID is saved to a dedicated state table. This simple act is what makes the entire process safe and repeatable. By saving this state, the system guarantees that:
-- We always know exactly which snapshot we're processing, even if OLake writes new data later.
-- If the compaction job fails midway, we can restart it from the same consistent point.
-The state table is just a single-row table that stores the current snapshot ID. It's like leaving yourself a note saying "I processed everything up to this point."
-
-**4. Read and align schema information:** Before merging data, the script loads the schema from the saved snapshot to ensure the compaction process uses the same table structure that existed when the data was written. If the source schema has changed—for example, if a new column was added to the source database—the script automatically detects missing columns or type changes and applies the necessary `ALTER TABLE` commands to align the COW table schema. This keeps both tables structurally consistent without manual intervention, preventing failures or data corruption from schema changes mid-compaction, which is crucial in a live CDC environment where schemas evolve over time.
-
-**5. Merge the saved MOR snapshot into the COW table:** Finally, we use Iceberg's MERGE INTO statement to apply all the changes from the saved snapshot. This operation handles three scenarios in one pass:
-- **New records** get inserted into the COW table.
-- **Updated records** have their old versions replaced with new values
-- **Deleted records** (marked in equality delete files) are included in the merge with `_op_type` as `d` indicating the record was deleted
-
-Because we're merging from a specific snapshot, all these changes are applied at once, resulting in a clean COW table with no equality deletes remaining. Snowflake can now read this table perfectly.
-
-### Failure Recovery and State Management
-
-The compaction flow is designed to be **safe to re-run** by using a per-table state row and checkpointing only after a successful merge.
-
-Consider this snapshot/commit sequence in the MOR table:
-
-`eq1 → eq2 → eq3 → eq4 → trunc1 → eq5 → eq6 → eq7 → trunc2`
-
-#### What the state table stores
-
-For each MOR table, the state table stores:
-
-- **`last_compacted_snapshot_id`**: the last “high‑water” snapshot that was merged into COW (e.g., `eq4`, `eq7`)
-- **`last_boundary_snapshot_id`**: the last truncate snapshot that completed successfully (e.g., `trunc1`, `trunc2`)
-
-On reruns, the script uses `last_boundary_snapshot_id` as the effective checkpoint.
-
-#### How recovery works
-
-1. **Cycle around `trunc1`:**
-   - The script truncates the MOR table (creating `trunc1`)
-   - It finds the “high‑water” snapshot right before the truncate: `eq4`
-   - It merges `eq4` into the COW table
-   - Only after the merge succeeds, it updates state:
-     - `last_compacted_snapshot_id = eq4`
-     - `last_boundary_snapshot_id = trunc1`
-
-2. **Cycle around `trunc2`:**
-
-   Suppose the script truncates again and tries to merge `eq7`, but the run fails.
-
-   Two important cases:
-
-   - **Failure before the merge commits**
-     - COW is **not** updated with `eq7`
-     - State is still at `trunc1`
-     - On rerun, the script creates a new boundary (another truncate snapshot) and merges the latest high‑water snapshot again
-
-   - **Merge commits, but the state update didn’t happen**
-     - COW **already contains** `eq7`
-     - State still says `trunc1`
-     - On rerun, the script may re-merge `eq7`—this is safe because it’s a key-based `MERGE` (idempotent for `_olake_id`)
-
-## Testing the Compaction Script Locally
-
-To understand how the compaction script works and see it in action, you can test it locally on your system before running it on production data. Follow these steps to run the script locally:
+To understand how the MOR to COW write script works and see it in action, you can test it locally on your system before running it on production data. Follow these steps to run the script locally:
 
 1. Use the following command to quickly spin up the source Postgres and destination (Iceberg/Parquet Writer) services using Docker Compose. This will download the required docker-compose files and start the containers in the background.
    ```bash
@@ -1114,11 +1062,11 @@ To understand how the compaction script works and see it in action, you can test
    SELECT * FROM olake_iceberg.postgres_main_public.sample_data;
    ```
 
-5. Run the compaction script to convert MOR tables to COW format:
+5. Run the MOR to COW write script to write COW tables:
 
-   After completing the historical load and CDC sync, your Iceberg table now contains both data files and equality delete files in object storage, representing a Merge-on-Read (MOR) table. To convert this MOR table into a Copy-on-Write (COW) table, run the compaction script with the following configuration:
+   After completing the historical load and CDC sync, your Iceberg table now contains both data files and equality delete files in object storage, representing a Merge-on-Read (MOR) table. To write this data as a Copy-on-Write (COW) table, run the MOR to COW write script with the following configuration:
 
-   Update the variables in the [compaction script](#compaction-script):
+   Update the variables in the [MOR to COW write script](#mor-to-cow-write-script):
 
    ```python
    COW_DB = "postgres_main_public_cow"
@@ -1128,11 +1076,11 @@ To understand how the compaction script works and see it in action, you can test
    Since we're running the script in the Spark Docker container, copy the required files to the container:
 
    ```bash
-   docker cp <PATH_TO_YOUR_COMPACTION_SCRIPT>/compaction_script.py spark-iceberg:/home/iceberg/compaction_script.py
+   docker cp <PATH_TO_YOUR_WRITE_SCRIPT>/compaction_script.py spark-iceberg:/home/iceberg/compaction_script.py
    docker cp <PATH_TO_YOUR_DESTINATION_DETAILS>/destination_details.json spark-iceberg:/home/iceberg/destination_details.json
    ```
 
-   Replace `<PATH_TO_YOUR_COMPACTION_SCRIPT>` and `<PATH_TO_YOUR_DESTINATION_DETAILS>` with the actual paths to your files on your local machine.
+   Replace `<PATH_TO_YOUR_WRITE_SCRIPT>` and `<PATH_TO_YOUR_DESTINATION_DETAILS>` with the actual paths to your files on your local machine.
 
    Enter the Spark container:
 
@@ -1140,7 +1088,7 @@ To understand how the compaction script works and see it in action, you can test
    docker exec -it spark-iceberg bash
    ```
 
-   Once inside the container, run the compaction script using spark-submit:
+   Once inside the container, run the MOR to COW write script using spark-submit:
 
    ```bash
    spark-submit \
@@ -1153,16 +1101,18 @@ To understand how the compaction script works and see it in action, you can test
 
 6. Verify the COW table creation:
 
-   Once the compaction script runs successfully, we can verify the results in MinIO (the local object storage used in this demo). It can be noticed that:
+   Once the MOR to COW write script runs successfully, we can verify the results in MinIO (the local object storage used in this demo). It can be noticed that:
 
    - The original MOR table with data files and equality delete files remains in `warehouse/postgres_main_public/sample_data`
    - A new COW table has been created in `warehouse/postgres_main_public_cow/sample_data_cow`, containing the resolved data with all equality deletes applied
 
-   The COW table is now ready to be queried by Snowflake as an external Iceberg table, with all updates and deletes properly reflected in the data files.
+   The COW table is now ready to be queried by Databricks as an external Iceberg table, with all updates and deletes properly reflected in the data files.
 
-## Running the Compaction Script
+</details>
 
-The compaction script is designed to run periodically, automatically keeping your COW table up-to-date with the latest changes from your MOR table. You can schedule this script as a cron job or through workflow orchestration tools, ensuring that your Snowflake queries always reflect the most recent data according to your requirements.
+## Running the MOR to COW Write Script
+
+The MOR to COW write script is designed to run periodically, automatically keeping your COW table up-to-date with the latest changes from your MOR table. You can schedule this script as a cron job or through workflow orchestration tools, ensuring that your Databricks queries always reflect the most recent data according to your requirements.
 
 ### Execution Platforms
 
@@ -1174,20 +1124,20 @@ The script can be run on any Spark cluster that has access to your Iceberg catal
 
 Simply submit the script using `spark-submit` with the appropriate Iceberg catalog configuration for your environment.
 
-### Scheduling the Compaction Job
+### Scheduling the MOR to COW Write Job
 
 The job execution frequency can be set based on your data freshness requirements and business needs. The script is idempotent, so you can run it as frequently as needed without worrying about duplicate processing. Here are some common scheduling patterns:
 
 - **Hourly**: For real-time dashboards and analytics that require near-live data
 - **Every 6 hours**: A balanced approach for most use cases, providing good data freshness without excessive compute costs
 - **Daily**: Perfect for overnight batch reporting and scenarios where daily updates are sufficient
-- **On-demand**: For low-volume tables or manual refresh workflows where you trigger compaction only when needed
+- **On-demand**: For low-volume tables or manual refresh workflows where you trigger the write job only when needed
 
-You can configure the schedule using cron syntax, Airflow DAG schedules, or your preferred orchestration tool. Each run will process any new changes since the last compaction, keeping your COW table synchronized with your MOR table.
+You can configure the schedule using cron syntax, Airflow DAG schedules, or your preferred orchestration tool. Each run will process any new changes since the last write, keeping your COW table synchronized with your MOR table.
 
-For Snowflake users, once the COW table is created and being updated periodically, you simply create an external Iceberg table pointing to your COW table location, and you're ready to query with correct results—all deletes and updates properly applied.
+For Databricks users, once the COW table is created and being updated periodically, you simply create an external Iceberg table pointing to your COW table location, and you're ready to query with correct results—all deletes and updates properly applied.
 
 ## Conclusion
 
-By implementing this automated compaction solution, you can now enjoy the best of both worlds: OLake's high-performance Merge-on-Read (MOR) writes for efficient CDC ingestion, combined with Snowflake-compatible Copy-on-Write (COW) tables for accurate analytics queries. 
+By implementing this automated MOR to COW write solution, you can now enjoy the best of both worlds: OLake's high-performance Merge-on-Read (MOR) writes for efficient CDC ingestion, combined with Databricks-compatible Copy-on-Write (COW) tables for accurate analytics queries. 
 
