@@ -7,6 +7,7 @@ import { useLocation } from '@docusaurus/router'
 import clsx from 'clsx';
 import CustomerGrid from '../../components/customers/CustomerGrid';
 import { CustomerStory, CustomerCategory } from '../../types/customer';
+import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 
 const CustomersPage = () => {
   const { siteConfig } = useDocusaurusContext()
@@ -22,7 +23,7 @@ const CustomersPage = () => {
       title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
       description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
       route: '/blog/customer-stories/cordial-real-time-data-sync',
-      img: '/img/customers/cordial/cover-image-cordial.svg',
+      img: '/img/customers/cordial/cover-image-cordial.webp',
       alt: 'Cordial customer story',
       companyName: 'Cordial',
       category: CustomerCategory.B2B
@@ -31,7 +32,7 @@ const CustomersPage = () => {
       title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
       description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
       route: '/blog/customer-stories/astro-talk-lakehouse-transformation',
-      img: '/img/customers/astrotalk/cover-image-astro.svg',
+      img: '/img/customers/astrotalk/cover-image-astro.webp',
       alt: 'Astro Talk customer story',
       companyName: 'Astro Talk',
       category: CustomerCategory.CustomerInternet
@@ -56,10 +57,15 @@ const CustomersPage = () => {
         <meta name='twitter:image' content='https://olake.io/img/logo/olake-blue.webp' />
       </Head>
 
+      {/* Breadcrumbs */}
+      <div className='container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8'>
+        <CentralizedBreadcrumbs type="customers" title="Customer Stories" />
+      </div>
+
       {/* Hero Section */}
-      <section className='relative bg-white py-16 dark:bg-gray-900 lg:py-24'>
+      <section className='relative bg-white py-12 dark:bg-gray-900 lg:py-16'>
         <div className='container relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
-          <div className='space-y-8 text-center'>
+          <div className='space-y-6 text-center'>
             {/* Main heading */}
             <div className='space-y-4'>
               <h1 className='text-4xl font-bold leading-tight text-gray-900 dark:text-gray-50 sm:text-5xl lg:text-6xl'>
@@ -74,9 +80,9 @@ const CustomersPage = () => {
       </section>
 
       {/* Filter Tabs */}
-      <section className='bg-white dark:bg-gray-900 py-8'>
+      <section className='bg-white dark:bg-gray-900 py-6'>
         <div className='container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
-          <div className='flex flex-wrap justify-center gap-3'>
+          <div className='flex flex-wrap justify-center gap-3 py-2'>
             {filters.map((filter) => (
               <button
                 key={filter}
@@ -88,7 +94,7 @@ const CustomersPage = () => {
                     : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                 )}
               >
-                {filter === 'All Stories' ? 'All Stories' : CustomerCategory[filter as keyof typeof CustomerCategory]}
+                {filter === 'All Stories' ? 'All Stories' : filter}
               </button>
             ))}
           </div>
