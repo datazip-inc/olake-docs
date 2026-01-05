@@ -272,13 +272,17 @@ export default function BlogBreadcrumbs() {
     return null;
   }
 
+  // Check if this is a customer story
+  const isCustomerStory = location.pathname.includes('/customer-stories/') || 
+                          blogPostMetadata?.slug?.includes('customer-stories');
+
   // Get the blog post title if available
   const blogTitle = blogPostMetadata?.title || 'Blog Post';
   const truncatedTitle = truncateTitle(blogTitle, 70);
 
   const breadcrumbItems = [
     { label: 'Home', href: baseUrl },
-    { label: 'Blog', href: '/blog' },
+    { label: isCustomerStory ? 'Customer Stories' : 'Blog', href: isCustomerStory ? '/customers' : '/blog' },
     { label: truncatedTitle, fullLabel: blogTitle, href: location.pathname, current: true },
   ];
 
