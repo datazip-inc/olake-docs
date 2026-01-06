@@ -643,6 +643,14 @@ const config = {
             from: '/blog/top-mongodb-etl-tools-a-comprehensive-guide-to-syncing-your-nosql-data',
           },
           {
+            to: '/blog/customer-stories/cordial-real-time-data-sync',
+            from: '/customers/cordial-real-time-data-sync',
+          },
+          {
+            to: '/blog/customer-stories/astro-talk-lakehouse-transformation',
+            from: '/customers/astro-talk-lakehouse-transformation',
+          },
+          {
             to: '/docs/getting-started/quickstart',
             from: '/docs/getting-started/',
           },

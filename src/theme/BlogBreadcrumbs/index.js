@@ -273,8 +273,8 @@ export default function BlogBreadcrumbs() {
   }
 
   // Check if this is a customer story
-  const isCustomerStory = location.pathname.startsWith('/customers/') && 
-                          location.pathname !== '/customers';
+  const isCustomerStory = location.pathname.includes('/customer-stories/') || 
+                          blogPostMetadata?.slug?.includes('customer-stories');
 
   // Get the blog post title if available
   const blogTitle = blogPostMetadata?.title || 'Blog Post';
