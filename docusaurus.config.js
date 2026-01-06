@@ -540,7 +540,9 @@ const config = {
           '**/_*.{js,jsx,ts,tsx,md,mdx}',
           '**/_*/**',
           '**/*.test.{js,jsx,ts,tsx}',
-          '**/__tests__/**'
+          '**/__tests__/**',
+          '**/2025-12-15-cordial-real-time-data-sync.mdx',
+          '**/2025-12-15-astro-talk-lakehouse-transformation.mdx'
         ],
         postsPerPage: 6,
         truncateMarker: /<!--\s*(truncate)\s*-->/,
@@ -566,6 +568,7 @@ const config = {
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'Customer Stories',
         routeBasePath: 'customers',
+        blogListPageComponent: false,
         include: ['**/2025-12-15-cordial-real-time-data-sync.mdx', '**/2025-12-15-astro-talk-lakehouse-transformation.mdx'],
         exclude: [
           '**/_*.{js,jsx,ts,tsx,md,mdx}',
