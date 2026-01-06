@@ -550,6 +550,7 @@ We used AWS Glue as Iceberg catalog and AWS S3 as the storage layer on the desti
 
 <br/>
 
+
 _(OLake vs. Popular Data-Movement Tools)_
 
 #### 1. Speed Comparison – **Batch-Load Performance**
@@ -559,15 +560,16 @@ _(OLake vs. Popular Data-Movement Tools)_
 | **OLake** <br/><span className='text-xs text-slate-500'>(as of 5th Dec 2025)</span>         | **1.0 B**  | **1,54,320 MPS**        | –                  |
 | Flink <br/><span className='text-xs text-slate-500'>(as of 5th Dec 2025)</span>           | 1.0 B      | 85,470 MPS              | **1.8 × slower**   |
 
-**Memory usage (OLake)** - `Standard D64ls v6 (64 vcpus, 128 GiB Memory)`
+**Memory usage (OLake vs Flink)** - `Standard D64ls v6 (64 vcpus, 128 GiB Memory)`
 
-| Memory Stats | Usage (GB) |
-|--------|----|
-| Min    | 43.14 |
-| Max    | 65.91 |
-| Mean   | 63.15 |
+| Memory Stats | OLake Usage (GB) | Flink Usage (GB) |	
+|--------|----|----|
+| Min    | 43.14 | 16.34 |
+| Max    | 65.91 | 40.92 |
+| Mean   | 63.15 | 39.89 |
 
-> OLake maintains high throughput while keeping memory usage efficient.
+
+
 
 #### 2. Cost Comparison (Vendor List Prices)
 
@@ -581,6 +583,9 @@ _(OLake vs. Popular Data-Movement Tools)_
 :::info 
 Both **OLake** and **Flink** are open-source and can be deployed on your own Kubernetes cluster or cloud VMs; you pay only for the compute and storage you provision.
 :::
+
+
+
 ### Dataset and Table Schemas
 Please refer to [this GitHub repository](https://github.com/datazip-inc/nyc-taxi-data-benchmark/tree/remote-postgres) for the dataset we used to conduct these benchmarks. 
 
@@ -625,6 +630,329 @@ CREATE TABLE trips (
 We used AWS Glue as Iceberg catalog and AWS S3 as the storage layer on the destination side for this benchmarks. 
 :::::
 
+<details>
+<summary><strong>Flink setup for this benchmark</strong></summary>
+
+This section covers the complete Flink setup process used for the Kafka → Iceberg benchmark, from installation to configuration.
+
+#### Prerequisites
+
+- **Java 11+** must be installed on your system. Verify your Java version:
+  ```bash
+  java -version
+  ```
+
+#### Installation
+
+1. Download the Flink tar release from the [Apache Flink downloads page](https://flink.apache.org/downloads.html).
+
+2. Extract the archive:
+   ```bash
+   $ tar -xzf flink-*.tgz
+   ```
+
+3. Navigate to the extracted Flink directory:
+   ```bash
+   $ cd flink-*
+   ```
+
+#### Flink Cluster Configuration
+
+This is the exact Flink cluster configuration we used for the Kafka → Iceberg benchmark, including JVM module opens, JobManager/TaskManager sizing, and S3 endpoint settings.
+
+
+```yaml
+env:
+  java:
+    opts:
+      all: >
+        --add-exports=java.base/sun.net.util=ALL-UNNAMED
+        --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED
+        --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+        --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+        --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+        --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+        --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED
+        --add-opens=java.base/java.lang=ALL-UNNAMED
+        --add-opens=java.base/java.net=ALL-UNNAMED
+        --add-opens=java.base/java.io=ALL-UNNAMED
+        --add-opens=java.base/java.nio=ALL-UNNAMED
+        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+        --add-opens=java.base/java.text=ALL-UNNAMED
+        --add-opens=java.base/java.time=ALL-UNNAMED
+        --add-opens=java.base/java.util=ALL-UNNAMED
+        --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
+        --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+        --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED
+
+jobmanager:
+  bind-host: localhost
+  rpc:
+    address: localhost
+    port: 6123
+  memory:
+    process:
+      size: 8192m
+  execution:
+    failover-strategy: region
+
+taskmanager:
+  bind-host: localhost
+  host: localhost
+  numberOfTaskSlots: 5
+  memory:
+    process:
+      size: 81920m
+
+parallelism:
+  default: 5
+
+execution:
+  checkpointing:
+    interval: 60000
+    mode: EXACTLY_ONCE
+    timeout: 600000
+    max-concurrent-checkpoints: 1
+
+state:
+  backend:
+    type: rocksdb
+  checkpoints:
+    dir: s3://<checkpoint-bucket>/<path>/
+  savepoints:
+    dir: s3://<savepoint-bucket>/<path>/
+
+s3:
+  endpoint: s3.ap-south-1.amazonaws.com
+  path:
+    style:
+      access: false
+
+rest:
+  address: 0.0.0.0
+  port: 8081
+```
+
+#### Running a Flink Job
+
+Before running a Flink job, make sure you have all of these jar files in the `lib` directory. These jar files are required as dependencies for transferring data from Kafka to Iceberg using Glue as catalog:
+
+- aws-java-sdk-bundle-1.12.262.jar
+- bundle-2.20.160.jar
+- commons-configuration2-2.8.0.jar
+- flink-cep-2.0.1.jar
+- flink-connector-files-2.0.1.jar
+- flink-csv-2.0.1.jar
+- flink-dist-2.0.1.jar
+- flink-json-2.0.1.jar
+- flink-scala_2.12-2.0.1.jar
+- flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+- flink-shaded-hadoop-3-uber-3.3.6-20.0.jar
+- flink-sql-connector-kafka-4.0.0-2.0.jar
+- flink-table-api-java-uber-2.0.1.jar
+- flink-table-planner-loader-2.0.1.jar
+- flink-table-runtime-2.0.1.jar
+- guava-27.0.1-jre.jar
+- hadoop-aws-3.3.6.jar
+- iceberg-aws-bundle-1.10.0.jar
+- iceberg-flink-runtime-2.0-1.10.0.jar
+- log4j-1.2-api-2.24.3.jar
+- log4j-api-2.24.3.jar
+- log4j-core-2.24.3.jar
+- log4j-slf4j-impl-2.24.3.jar
+- schema-registry-flink-serde-1.1.18.jar
+- stax2-api-4.2.1.jar
+- woodstox-core-5.3.0.jar
+
+
+Below is the complete commands for the transfer process:
+
+#### Starting the Flink Cluster
+
+Start the Flink cluster:
+```bash
+$ ./bin/start-cluster.sh
+```
+
+Verify that Flink is running properly by accessing the Flink Web UI at `http://localhost:8081` in your browser.
+
+#### Setting up Flink SQL Client
+
+1. Start the Flink SQL client:
+   ```bash
+   ./bin/sql-client.sh
+   ```
+
+2. Check available catalogs:
+   ```sql
+   Flink SQL> show catalogs;
+   ```
+
+3. Use the default catalog:
+   ```sql
+   Flink SQL> USE CATALOG default_catalog;
+   ```
+
+#### Configuring Kafka Connection and initiating the transfer
+
+1. Drop any existing table to avoid conflicts:
+   ```sql
+   Flink SQL> DROP TABLE IF EXISTS nyc_trips_flink;
+   ```
+
+2. Set the execution runtime mode to batch:
+   ```sql
+   Flink SQL> SET 'execution.runtime-mode' = 'batch';
+   ```
+
+3. Create the Kafka table with the following schema:
+   ```sql
+   Flink SQL> CREATE TABLE nyc_trips_flink (
+     id INT,
+     cab_type_id INT,
+     vendor_id INT,
+     pickup_datetime STRING,
+     dropoff_datetime STRING,
+     store_and_fwd_flag BOOLEAN,
+     rate_code_id INT,
+     pickup_longitude DOUBLE,
+     pickup_latitude DOUBLE,
+     dropoff_longitude DOUBLE,
+     dropoff_latitude DOUBLE,
+     passenger_count INT,
+     trip_distance DOUBLE,
+     fare_amount DOUBLE,
+     extra DOUBLE,
+     mta_tax DOUBLE,
+     tip_amount DOUBLE,
+     tolls_amount DOUBLE,
+     ehail_fee DOUBLE,
+     improvement_surcharge DOUBLE,
+     congestion_surcharge DOUBLE,
+     airport_fee DOUBLE,
+     total_amount DOUBLE,
+     payment_type INT,
+     trip_type INT,
+     pickup_nyct2010_gid INT,
+     dropoff_nyct2010_gid INT,
+     pickup_location_id INT,
+     dropoff_location_id INT
+   ) WITH (
+     'connector' = 'kafka',
+     'topic' = '<YOUR_TOPIC_NAME>',
+     'properties.bootstrap.servers' = '<LIST_OF_BOOTSTRAP_SERVERS>',
+     'properties.security.protocol' = '<SECURITY_PROTOCOL_OF_YOUR_KAFKA_CLUSTER>',
+     'properties.group.id' = '<UNIQUE_GROUP_ID>',
+     'scan.startup.mode' = 'earliest-offset',
+     'scan.bounded.mode' = 'latest-offset',
+     'format' = 'json',
+     'json.ignore-parse-errors' = 'true'
+   );
+   ```
+
+4. Creating AWS Glue Catalog
+
+	```sql
+	Flink SQL> CREATE CATALOG glue_catalog WITH (
+	'type' = 'iceberg',
+	'catalog-impl' = 'org.apache.iceberg.aws.glue.GlueCatalog',
+	'warehouse' = 's3://<BUCKET_NAME>/',
+	'io-impl' = 'org.apache.iceberg.aws.s3.S3FileIO',
+	'client.region' = '<REGION_NAME>'
+	);
+	```
+
+5. Use the AWS Glue catalog
+
+	```sql
+	USE CATALOG glue_catalog;
+	```
+
+6. Use the database from Glue Catalog where you want the Iceberg table to be created
+
+	```sql
+	USE <DATABASE_NAME>;
+	```
+
+7. Create the table in Iceberg with the same schema as the Kafka topic:
+
+	```sql
+	Flink SQL> CREATE TABLE IF NOT EXISTS nyc_trips_mtasks (
+	id INT,
+	cab_type_id INT,
+	vendor_id INT,
+	pickup_datetime STRING,
+	dropoff_datetime STRING,
+	store_and_fwd_flag BOOLEAN,
+	rate_code_id INT,
+	pickup_longitude DOUBLE,
+	pickup_latitude DOUBLE,
+	dropoff_longitude DOUBLE,
+	dropoff_latitude DOUBLE,
+	passenger_count INT,
+	trip_distance DOUBLE,
+	fare_amount DOUBLE,
+	extra DOUBLE,
+	mta_tax DOUBLE,
+	tip_amount DOUBLE,
+	tolls_amount DOUBLE,
+	ehail_fee DOUBLE,
+	improvement_surcharge DOUBLE,
+	congestion_surcharge DOUBLE,
+	airport_fee DOUBLE,
+	total_amount DOUBLE,
+	payment_type INT,
+	trip_type INT,
+	pickup_nyct2010_gid INT,
+	dropoff_nyct2010_gid INT,
+	pickup_location_id INT,
+	dropoff_location_id INT
+	);
+	```
+
+8. Insert the data from the Kafka topic into the Iceberg table:
+
+	```sql
+	Flink SQL> INSERT INTO nyc_trips_mtasks
+	SELECT 
+	id,
+	cab_type_id,
+	vendor_id,
+	pickup_datetime,
+	dropoff_datetime,
+	store_and_fwd_flag,
+	rate_code_id,
+	pickup_longitude,
+	pickup_latitude,
+	dropoff_longitude,
+	dropoff_latitude,
+	passenger_count,
+	trip_distance,
+	fare_amount,
+	extra,
+	mta_tax,
+	tip_amount,
+	tolls_amount,
+	ehail_fee,
+	improvement_surcharge,
+	congestion_surcharge,
+	airport_fee,
+	total_amount,
+	payment_type,
+	trip_type,
+	pickup_nyct2010_gid,
+	dropoff_nyct2010_gid,
+	pickup_location_id,
+	dropoff_location_id
+	FROM default_catalog.default_database.nyc_trips_flink;
+	```
+
+	Check in the Flink Web UI at `http://localhost:8081` to verify that the job has been created and is running.
+
+
+</details>
 
 </TabItem>
 
