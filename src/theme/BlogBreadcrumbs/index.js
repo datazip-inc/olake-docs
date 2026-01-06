@@ -61,6 +61,13 @@ export default function BlogBreadcrumbs() {
     !location.pathname.includes('/tags/') &&
     !location.pathname.includes('/authors/');
 
+  const isCustomerStoryPost =
+    location.pathname.startsWith('/customer-stories/') &&
+    location.pathname !== '/customer-stories' &&
+    !location.pathname.includes('/page/') &&
+    !location.pathname.includes('/tags/') &&
+    !location.pathname.includes('/authors/');
+
   // Helper renderer for breadcrumb items
   const renderBreadcrumbItem = (item, index) => (
     <li
@@ -268,13 +275,34 @@ export default function BlogBreadcrumbs() {
     );
   }
 
+  if (isCustomerStoryPost) {
+    // Get the blog post title if available
+    const blogTitle = blogPostMetadata?.title || 'Customer Story';
+    const truncatedTitle = truncateTitle(blogTitle, 70);
+
+    const customerStoryBreadcrumbItems = [
+      { label: 'Home', href: baseUrl },
+      { label: 'Customer Stories', href: '/customers' },
+      { label: truncatedTitle, fullLabel: blogTitle, href: location.pathname, current: true },
+    ];
+
+    return (
+      <nav
+        className="mb-4"
+        aria-label="Breadcrumb"
+        itemScope
+        itemType="https://schema.org/BreadcrumbList"
+      >
+        <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+          {customerStoryBreadcrumbItems.map(renderBreadcrumbItem)}
+        </ol>
+      </nav>
+    );
+  }
+
   if (!isBlogPost) {
     return null;
   }
-
-  // Check if this is a customer story
-  const isCustomerStory = location.pathname.includes('/customer-stories/') || 
-                          blogPostMetadata?.slug?.includes('customer-stories');
 
   // Get the blog post title if available
   const blogTitle = blogPostMetadata?.title || 'Blog Post';
@@ -282,7 +310,7 @@ export default function BlogBreadcrumbs() {
 
   const breadcrumbItems = [
     { label: 'Home', href: baseUrl },
-    { label: isCustomerStory ? 'Customer Stories' : 'Blog', href: isCustomerStory ? '/customers' : '/blog' },
+    { label: 'Blog', href: '/blog' },
     { label: truncatedTitle, fullLabel: blogTitle, href: location.pathname, current: true },
   ];
 

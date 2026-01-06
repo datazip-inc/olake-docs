@@ -540,7 +540,8 @@ const config = {
           '**/_*.{js,jsx,ts,tsx,md,mdx}',
           '**/_*/**',
           '**/*.test.{js,jsx,ts,tsx}',
-          '**/__tests__/**'
+          '**/__tests__/**',
+          '**/customer-stories/**'
         ],
         postsPerPage: 6,
         truncateMarker: /<!--\s*(truncate)\s*-->/,
@@ -583,6 +584,34 @@ const config = {
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
         rehypePlugins: [imageFetchPriorityRehypePlugin],
 
+      }
+    ],
+    [
+      './src/plugins/blog-plugin',
+      {
+        path: 'customer-stories',
+        id: 'customer-stories-blog',
+        editLocalizedFiles: false,
+        blogTitle: 'Customer Stories',
+        blogDescription: 'Customer success stories and case studies',
+        blogSidebarCount: 'ALL',
+        blogSidebarTitle: 'Customer Stories',
+        routeBasePath: 'customer-stories',
+        include: ['**/*.md', '**/*.mdx'],
+        exclude: [
+          '**/_*.{js,jsx,ts,tsx,md,mdx}',
+          '**/_*/**',
+          '**/*.test.{js,jsx,ts,tsx}',
+          '**/__tests__/**'
+        ],
+        postsPerPage: 6,
+        truncateMarker: /<!--\s*(truncate)\s*-->/,
+        showReadingTime: true,
+        onUntruncatedBlogPosts: 'ignore',
+        editUrl:
+          'https://github.com/datazip-inc/olake-docs/tree/master/',
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
       }
     ],
     [
@@ -641,6 +670,14 @@ const config = {
           {
             to: '/blog',
             from: '/blog/top-mongodb-etl-tools-a-comprehensive-guide-to-syncing-your-nosql-data',
+          },
+          {
+            to: '/customer-stories/cordial-real-time-data-sync',
+            from: '/blog/customer-stories/cordial-real-time-data-sync',
+          },
+          {
+            to: '/customer-stories/astro-talk-lakehouse-transformation',
+            from: '/blog/customer-stories/astro-talk-lakehouse-transformation',
           },
           {
             to: '/docs/getting-started/quickstart',
