@@ -6,7 +6,7 @@ const defaultBlogPlugin = blogPluginExports.default
 
 async function blogPluginExtended(...pluginArgs) {
   const blogPluginInstance = await defaultBlogPlugin(...pluginArgs)
-  // const pluginOptions = pluginArgs[1]
+  const pluginOptions = pluginArgs[1]
 
   return {
     // Add all properties of the default blog plugin so existing functionality is preserved
@@ -41,9 +41,33 @@ async function blogPluginExtended(...pluginArgs) {
         }
       }
 
-
       // Call the default overridden `contentLoaded` implementation
       return blogPluginInstance.contentLoaded(params)
+    },
+    /**
+     * Add custom routes for customer stories at /customers/... 
+     */
+    onRoutes: async function (routes) {
+      if (pluginOptions.id === 'olake-blog') {
+        const customerStorySlugs = [
+          'customer-stories/cordial-real-time-data-sync',
+          'customer-stories/astro-talk-lakehouse-transformation'
+        ]
+
+        // Find routes for customer stories and duplicate them at /customers/...
+        routes.forEach((route) => {
+          if (route.path && route.path.startsWith('/blog/customer-stories/')) {
+            const storyName = route.path.split('/').pop()
+            const customerRoute = `/customers/${storyName}`
+            
+            // Add duplicate route at /customers/...
+            routes.push({
+              ...route,
+              path: customerRoute,
+            })
+          }
+        })
+      }
     }
   }
 }

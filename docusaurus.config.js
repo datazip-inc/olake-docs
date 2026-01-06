@@ -124,7 +124,12 @@ const config = {
         items: [
           { to: '/docs', label: 'Docs', position: 'right' },
           { to: '/ai-lake', label: 'AILake', position: 'right' },
-          { to: '/blog', label: 'Blogs', position: 'right' },
+          { 
+            to: '/blog', 
+            label: 'Blogs', 
+            position: 'right',
+            activeBaseRegex: '^/blog(?!.*customer-stories)',
+          },
 
           {
             // Dropdown menu in the navbar for "Iceberg" section
@@ -168,7 +173,12 @@ const config = {
             ],
           },
 
-          { to: '/customers', label: 'Customer Stories', position: 'right' },
+          { 
+            to: '/customers', 
+            label: 'Customer Stories', 
+            position: 'right',
+            activeBaseRegex: '^/(blog/customer-stories|customers)',
+          },
 
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
@@ -991,6 +1001,14 @@ const config = {
           {
             to: 'https://github.com/datazip-inc/olake',
             from: '/github',
+          },
+          {
+            to: '/blog/customer-stories/cordial-real-time-data-sync',
+            from: '/customers/cordial-real-time-data-sync',
+          },
+          {
+            to: '/blog/customer-stories/astro-talk-lakehouse-transformation',
+            from: '/customers/astro-talk-lakehouse-transformation',
           },
         ],
       },
