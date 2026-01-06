@@ -1,6 +1,6 @@
 export enum CustomerCategory {
   B2B = 'B2B',
-  CustomerInternet = 'Customer Internet',
+  CustomerInternet = 'Consumer Internet',
   Fintech = 'Fintech',
 }
 

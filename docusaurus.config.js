@@ -124,7 +124,7 @@ const config = {
         items: [
           { to: '/docs', label: 'Docs', position: 'right' },
           { to: '/ai-lake', label: 'AILake', position: 'right' },
-          { to: '/blog', label: 'Blogs', position: 'right' },
+          { to: '/blog', label: 'Blogs', position: 'right', activeBaseRegex: '^/blog(?!.*customers)' },
 
           {
             // Dropdown menu in the navbar for "Iceberg" section
@@ -168,7 +168,7 @@ const config = {
             ],
           },
 
-          { to: '/customers', label: 'Customer Stories', position: 'right' },
+          { to: '/customers', label: 'Customer Stories', position: 'right', activeBasePath: '/customers' },
 
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
@@ -547,6 +547,36 @@ const config = {
         showReadingTime: true,
         onUntruncatedBlogPosts: 'ignore',
         // Remove this to remove the "edit this page" links.
+        editUrl:
+          'https://github.com/datazip-inc/olake-docs/tree/master/',
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
+
+      }
+    ],
+
+    [
+      './src/plugins/blog-plugin',
+      {
+        path: 'blog',
+        id: 'customer-stories-blog',
+        editLocalizedFiles: false,
+        blogTitle: 'Customer Stories',
+        blogDescription: '',
+        blogSidebarCount: 'ALL',
+        blogSidebarTitle: 'Customer Stories',
+        routeBasePath: 'customers',
+        include: ['**/2025-12-15-cordial-real-time-data-sync.mdx', '**/2025-12-15-astro-talk-lakehouse-transformation.mdx'],
+        exclude: [
+          '**/_*.{js,jsx,ts,tsx,md,mdx}',
+          '**/_*/**',
+          '**/*.test.{js,jsx,ts,tsx}',
+          '**/__tests__/**'
+        ],
+        postsPerPage: 6,
+        truncateMarker: /<!--\s*(truncate)\s*-->/,
+        showReadingTime: true,
+        onUntruncatedBlogPosts: 'ignore',
         editUrl:
           'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
