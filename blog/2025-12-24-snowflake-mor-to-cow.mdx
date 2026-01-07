@@ -211,7 +211,7 @@ spark = None  # type: ignore[assignment]
 # ------------------------------------------------------------------------------
 # User Inputs (must be provided)
 # ------------------------------------------------------------------------------
-CATALOG = "olake_iceberg"
+CATALOG = "<YOUR_CATALOG_NAME>"
 # Source namespace/database for MOR tables.
 # User must hardcode this before running the script.
 DB = "<NAME_OF_YOUR_SOURCE_DATABASE>"
@@ -222,13 +222,8 @@ COW_DB = "<NAME_OF_YOUR_COW_DATABASE>"
 # Example: "s3://my-bucket/warehouse/cow"
 COW_BASE_LOCATION = "<YOUR_COW_BASE_LOCATION>"
 
-# Shared state table (single Iceberg table with one row per MOR table).
-#
-# We no longer use a shared state table. Instead, we store per-table checkpoint state
-# in the COW table's Iceberg table properties (custom metadata).
-#
-# Property key used to store the last successfully processed truncate boundary snapshot id.
-COW_CHECKPOINT_PROPERTY_KEY = "cow.last_success_truncate_snapshot_id"
+# We use WAP (Write-Audit-Publish) pattern to store checkpoint state.
+# The truncate snapshot_id is stored as the WAP ID, which is published after each successful write.
 
 PRIMARY_KEY = "_olake_id"
 
@@ -513,36 +508,76 @@ def ensure_namespace_exists(catalog: str, namespace: str):
     spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {catalog}.{namespace}")
 
 
-def get_cow_checkpoint_truncate_snapshot_id(cow_table_fqn: str) -> Optional[int]:
+def enable_wap_for_table(cow_table_fqn: str):
+    """Enable WAP (Write-Audit-Publish) for the COW table if not already enabled."""
+    try:
+        spark.sql(f"ALTER TABLE {cow_table_fqn} SET TBLPROPERTIES ('write.wap.enabled'='true')")
+    except Exception:
+        # WAP might already be enabled, ignore error
+        pass
+
+
+def get_wap_id_from_table(cow_table_fqn: str, catalog_name: str) -> Optional[str]:
     """
-    Read checkpoint from the COW table's properties.
-    Returns the last successfully processed truncate boundary snapshot id (int) or None.
+    Get the latest published WAP ID from the COW table.
+    Returns the WAP ID (string) or None if no WAP ID exists.
+    
+    Queries the COW table's snapshot metadata to find WAP IDs stored in snapshot summaries.
     """
     if not table_exists(cow_table_fqn):
         return None
+
+    # Check snapshot metadata for WAP ID
     try:
-        rows = spark.sql(f"SHOW TBLPROPERTIES {cow_table_fqn}").collect()
+        rows = spark.sql(f"""
+            SELECT summary
+            FROM {cow_table_fqn}.snapshots
+            WHERE summary IS NOT NULL
+            ORDER BY committed_at DESC
+            LIMIT 10
+        """).collect()
+        for r in rows:
+            d = r.asDict(recursive=True)
+            summary = d.get("summary") or {}
+            if isinstance(summary, dict):
+                # Look for wap_id in snapshot summary (check multiple key variations)
+                wap_id = summary.get("wap.id") or summary.get("wap_id") or summary.get("wap-id")
+                if wap_id:
+                    return str(wap_id)
     except Exception:
-        return None
-    for r in rows:
-        d = r.asDict(recursive=True)
-        k = d.get("key") or d.get("property") or d.get("k")
-        v = d.get("value") or d.get("v")
-        if k == COW_CHECKPOINT_PROPERTY_KEY and v is not None:
-            try:
-                return int(str(v))
-            except Exception:
-                return None
+        pass
+    
     return None
 
 
-def set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn: str, truncate_snapshot_id: int):
+def publish_wap_changes(cow_table_fqn: str, catalog_name: str, wap_id: str):
     """
-    Persist checkpoint into COW table properties after successful compaction of boundary.
+    Publish WAP changes. Idempotent - can be called multiple times safely.
+    Catches duplicate WAP commit errors and cherry-pick validation errors (occurs when re-publishing already published WAP IDs).
     """
-    spark.sql(
-        f"ALTER TABLE {cow_table_fqn} SET TBLPROPERTIES ('{COW_CHECKPOINT_PROPERTY_KEY}' = '{truncate_snapshot_id}')"
-    )
+    try:
+        spark.sql(f"CALL {catalog_name}.system.publish_changes('{cow_table_fqn}', '{wap_id}')")
+    except Exception as e:
+        error_msg = str(e).lower()
+        # DuplicateWAPCommitException: "Duplicate request to cherry pick wap id that was published already"
+        # Cherry-pick validation errors: "cannot cherry-pick" or "not append, dynamic overwrite, or fast-forward"
+        # Both indicate the WAP ID is already published, which is idempotent
+        if ("duplicate" in error_msg and "wap" in error_msg and "published already" in error_msg) or \
+           "cannot cherry-pick" in error_msg or \
+           "not append, dynamic overwrite, or fast-forward" in error_msg:
+            # Idempotent - already published, that's fine
+            print(f"[{cow_table_fqn}] WAP ID {wap_id} already published (idempotent operation).")
+        else:
+            # Re-raise if it's a different error
+            raise
+
+
+def extract_truncate_id_from_wap_id(wap_id: str) -> Optional[int]:
+    """Extract truncate snapshot_id from WAP ID. WAP ID should be the truncate snapshot_id itself."""
+    try:
+        return int(wap_id)
+    except Exception:
+        return None
 
 
 # ------------------------------------------------------------------------------
@@ -731,12 +766,31 @@ def merge_snapshot_into_cow(mor_table_fqn: str, cow_table_fqn: str, snapshot_id:
 def run_compaction_cycle_for_table(mor_table_fqn: str):
     cow_table_fqn, cow_location = cow_table_and_location_for(mor_table_fqn)
     cow_exists = table_exists(cow_table_fqn)
-    # Step 1/2: Read last successful truncate checkpoint from COW table properties.
-    last_success_t = get_cow_checkpoint_truncate_snapshot_id(cow_table_fqn)
-    if last_success_t is None:
-        print(f"[{mor_table_fqn}] No COW checkpoint found; starting from earliest MOR history.")
+    
+    # Get catalog name from table FQN
+    catalog_name, _, _ = split_fqn(mor_table_fqn)
+    
+    # Step 1: Enable WAP for COW table if it exists (idempotent)
+    if cow_exists:
+        enable_wap_for_table(cow_table_fqn)
+    
+    # Step 2: Check for existing WAP ID (checkpoint)
+    wap_id = get_wap_id_from_table(cow_table_fqn, catalog_name)
+    last_success_t = None
+    
+    if wap_id is None:
+        print(f"[{mor_table_fqn}] No WAP ID found; starting from earliest MOR history.")
     else:
-        print(f"[{mor_table_fqn}] Last successful truncate checkpoint from COW metadata: {last_success_t}")
+        # Re-publish the existing WAP ID (idempotent operation)
+        print(f"[{mor_table_fqn}] Found existing WAP ID: {wap_id}. Re-publishing (idempotent)...")
+        publish_wap_changes(cow_table_fqn, catalog_name, wap_id)
+        
+        # Extract truncate snapshot_id from WAP ID
+        last_success_t = extract_truncate_id_from_wap_id(wap_id)
+        if last_success_t is None:
+            print(f"[{mor_table_fqn}] Warning: Could not extract truncate ID from WAP ID {wap_id}. Starting from beginning.")
+        else:
+            print(f"[{mor_table_fqn}] Last successful truncate checkpoint from WAP ID: {last_success_t}")
 
     # Step 3: Truncate MOR to create the current boundary for this run.
     spark.sql(f"TRUNCATE TABLE {mor_table_fqn}")
@@ -773,47 +827,58 @@ def run_compaction_cycle_for_table(mor_table_fqn: str):
             print(f"[{mor_table_fqn}] Nothing to compact (no high-water snapshot).")
             if not cow_exists:
                 print(f"[{mor_table_fqn}] Creating empty COW table...")
+                enable_wap_for_table(cow_table_fqn)
                 spark.sql(f"""
-                    CREATE TABLE {cow_table_fqn}
-                    USING iceberg
-                    LOCATION '{cow_location}'
-                    AS
-                    SELECT *
-                    FROM {mor_table_fqn}
-                """)
+            CREATE TABLE {cow_table_fqn}
+            USING iceberg
+            LOCATION '{cow_location}'
+            AS
+            SELECT *
+            FROM {mor_table_fqn}
+        """)
                 cow_exists = True
             if truncate_snapshot_id is not None:
-                set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn, int(truncate_snapshot_id))
+                # Set WAP ID, publish changes
+                spark.sql(f"SET spark.wap.id={truncate_snapshot_id}")
+                publish_wap_changes(cow_table_fqn, catalog_name, str(truncate_snapshot_id))
+                spark.sql("SET spark.wap.id=")
             return
 
         # First-time: create COW baseline from the high-water snapshot (CTAS).
         if not cow_exists:
             print(f"[{mor_table_fqn}] Creating COW baseline from snapshot {high_water_snapshot_id} ...")
+            enable_wap_for_table(cow_table_fqn)
+            # Set WAP ID using SQL SET (required for Spark SQL operations)
+            spark.sql(f"SET spark.wap.id={truncate_snapshot_id}")
             spark.sql(f"""
-                CREATE TABLE {cow_table_fqn}
-                USING iceberg
-                LOCATION '{cow_location}'
-                AS
-                SELECT *
-                FROM {mor_table_fqn}
+        CREATE TABLE {cow_table_fqn}
+        USING iceberg
+        LOCATION '{cow_location}'
+        TBLPROPERTIES ('write.wap.enabled'='true')
+        AS
+        SELECT *
+        FROM {mor_table_fqn}
                 VERSION AS OF {high_water_snapshot_id}
             """)
+            publish_wap_changes(cow_table_fqn, catalog_name, str(truncate_snapshot_id))
+            spark.sql("SET spark.wap.id=")
             cow_exists = True
         else:
             print(f"[{mor_table_fqn}] Compacting snapshot {high_water_snapshot_id} into existing COW ...")
+            # Set WAP ID using SQL SET (required for Spark SQL operations)
+            spark.sql(f"SET spark.wap.id={truncate_snapshot_id}")
             merge_snapshot_into_cow(mor_table_fqn, cow_table_fqn, int(high_water_snapshot_id))
-
-        set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn, int(truncate_snapshot_id))
-        print(f"[{mor_table_fqn}] Updated COW checkpoint to truncate {truncate_snapshot_id}.")
+            publish_wap_changes(cow_table_fqn, catalog_name, str(truncate_snapshot_id))
+            spark.sql("SET spark.wap.id=")
+        
+        print(f"[{mor_table_fqn}] Published WAP changes with truncate {truncate_snapshot_id}.")
         return
 
     if not to_process:
         print(f"[{mor_table_fqn}] No truncate boundaries to process in this run.")
-        if truncate_snapshot_id is not None:
-            set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn, int(truncate_snapshot_id))
         return
 
-    # Step 5: For each boundary, compact its parent snapshot, then update COW checkpoint property.
+    # Step 5: For each boundary, compact its parent snapshot, then publish WAP changes.
     boundary_ids = {b.get("snapshot_id") for b in boundaries}
     for b in to_process:
         t_id = b.get("snapshot_id")
@@ -821,50 +886,67 @@ def run_compaction_cycle_for_table(mor_table_fqn: str):
         print(f"[{mor_table_fqn}] Processing boundary {t_id}; parent(high-water)={h_id}")
 
         if h_id is None:
-            # Nothing existed before this boundary; ensure COW exists (empty) and checkpoint boundary.
+            # Nothing existed before this boundary; ensure COW exists (empty) and publish WAP.
             if not cow_exists:
                 print(f"[{mor_table_fqn}] Creating empty COW table (no parent snapshot exists)...")
+                enable_wap_for_table(cow_table_fqn)
+                spark.sql(f"SET spark.wap.id={t_id}")
                 spark.sql(f"""
                     CREATE TABLE {cow_table_fqn}
                     USING iceberg
                     LOCATION '{cow_location}'
+                    TBLPROPERTIES ('write.wap.enabled'='true')
                     AS
                     SELECT *
                     FROM {mor_table_fqn}
                     VERSION AS OF {t_id}
                 """)
+                publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+                spark.sql("SET spark.wap.id=")
                 cow_exists = True
-            if t_id is not None:
-                set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn, int(t_id))
-                print(f"[{mor_table_fqn}] Updated COW checkpoint to truncate {t_id}.")
+            elif t_id is not None:
+                # Table exists but no parent, just publish WAP for this boundary
+                spark.sql(f"SET spark.wap.id={t_id}")
+                publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+                spark.sql("SET spark.wap.id=")
+            print(f"[{mor_table_fqn}] Published WAP changes with truncate {t_id}.")
             continue
 
         # Skip if the parent is itself a truncate boundary (avoid compacting empty boundary artifacts).
         if h_id in boundary_ids:
             print(f"[{mor_table_fqn}] Skipping parent snapshot {h_id} because it is also a truncate boundary.")
             if t_id is not None:
-                set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn, int(t_id))
+                # Still publish WAP for this boundary even though we skip the data write
+                spark.sql(f"SET spark.wap.id={t_id}")
+                publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+                spark.sql("SET spark.wap.id=")
             continue
 
         if not cow_exists:
             print(f"[{mor_table_fqn}] COW table missing; creating baseline from snapshot {h_id} ...")
+            enable_wap_for_table(cow_table_fqn)
+            spark.sql(f"SET spark.wap.id={t_id}")
             spark.sql(f"""
                 CREATE TABLE {cow_table_fqn}
                 USING iceberg
                 LOCATION '{cow_location}'
+                TBLPROPERTIES ('write.wap.enabled'='true')
                 AS
                 SELECT *
                 FROM {mor_table_fqn}
                 VERSION AS OF {h_id}
             """)
+            publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+            spark.sql("SET spark.wap.id=")
             cow_exists = True
         else:
             print(f"[{mor_table_fqn}] Compacting snapshot {h_id} into existing COW ...")
+            spark.sql(f"SET spark.wap.id={t_id}")
             merge_snapshot_into_cow(mor_table_fqn, cow_table_fqn, int(h_id))
+            publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+            spark.sql("SET spark.wap.id=")
 
-        if t_id is not None:
-            set_cow_checkpoint_truncate_snapshot_id(cow_table_fqn, int(t_id))
-            print(f"[{mor_table_fqn}] Updated COW checkpoint to truncate {t_id}.")
+        print(f"[{mor_table_fqn}] Published WAP changes with truncate {t_id}.")
 
 
 def list_tables_in_db(catalog: str, db: str):
@@ -942,17 +1024,14 @@ if __name__ == "__main__":
     print(f"Failed tables: {len(failures)}")
     for t, err in failures:
         print(f"  - {t}: {err}")
-
-
-
 ```
-
 </details>
 
 **Before running the script, make sure to update the following variables in the "User Inputs" section:**
+- **`CATALOG`**: Replace `<YOUR_CATALOG_NAME>` with the name of the catalog where the MOR tables live (e.g., `olake_iceberg`)
 - **`COW_DB`**: Replace `<NAME_OF_YOUR_COW_DATABASE>` with the namespace/database where COW tables + the state table should live (e.g., `postgres_main_public_cow`)
 - **`COW_BASE_LOCATION`**: Replace `<YOUR_COW_BASE_LOCATION>` with the base object-storage path where COW tables will be written (e.g., `s3://my-bucket/warehouse/cow`)
-- **`DB`**: Replace `<NAME_OF_YOUR_SOURCE_DATABASE>` with the namespace/database containing the MOR tables to be converted to COW format.
+- **`DB`**: Replace `<NAME_OF_YOUR_SOURCE_DATABASE>` with the namespace/database containing the MOR tables to be converted to COW format
 
 :::note Lakekeeper Limitation
 For Lakekeeper catalogs, `COW_BASE_LOCATION` must be within the warehouse location. You can use a subfolder (e.g., if warehouse is `s3://bucket/warehouse`, use `s3://bucket/warehouse/cow`).
@@ -978,46 +1057,52 @@ The MOR to COW write process is designed to be safe, repeatable, and compatible 
 - **Unified incremental mode**: Uses a single function that handles both first-time and subsequent runs. On the first run, it checks if the COW table exists—if not, it creates the COW table with a full resolved dataset from the MOR table. On subsequent runs, it updates the existing COW table with only the latest changes.
 
 **1. Read the last successful truncate ID from the COW table:** The process starts by checking the COW table metadata to determine whether a previous MOR → COW run has completed successfully.
-- The metadata is scanned to find the last snapshot ID that was explicitly marked as a successful truncate.
-- If no COW table exists, or if the table exists but no truncate snapshot is recorded, the system treats this as a first-time run.
+- The COW table's snapshot history is scanned to find the most recent WAP ID stored in the snapshot summary (under the key wap.id).
+- The WAP ID contains the truncate snapshot ID from the MOR table that was successfully processed and published.
+- If no COW table exists, or if the table exists but no WAP ID is found in any snapshot, the system treats this as a first-time run.
+- This step defines from where the next processing should begin.
 
-This step defines from where the next processing should begin.
+**2. Re-publish the last WAP ID:** If a WAP ID was found in **Step 1**, the script re-publishes it using Iceberg's `publish_changes` procedure.
+- This operation is idempotent—if the WAP ID is already published, Iceberg recognizes it and continues without error.
+- This ensures that in any case if WAP ID was not published in the previous run even after data been written to COW table, it will be published in the current run.
+- After re-publishing, the truncate snapshot ID is extracted from the WAP ID to determine the starting point for the current run.
 
-**2. Decide the starting snapshot in the MOR table:** Based on the outcome of **Step 1**:
-- If it is a First Run (no COW table exists/no truncate snapshot is recorded), the script starts from the earliest snapshot in the MOR table.
-- If it is a Subsequent Run (COW table exists/truncate snapshot is recorded), the script starts from the next snapshot after the last successful truncate.
+**3. Decide the starting snapshot in the MOR table:** Based on the outcome of **Steps 1** and **Step 2**:
+- First Run (no COW table exists / no WAP ID found), the script starts from the earliest snapshot in the MOR table.
+- Subsequent Run (COW table exists / WAP ID found), the script starts from the snapshot after the last successfully published truncate id.
 
 This ensures the process never reprocesses already-handled data.
 
-**3. Truncate the MOR table to mark the current boundary:** Before any data is merged, the MOR table is explicitly truncated.
+**4. Truncate the MOR table to mark the current boundary:** Before any data is merged, the MOR table is explicitly truncated.
 - This truncate operation creates a new snapshot, which serves as the upper boundary for the current processing cycle.
-- This truncate snapshot marks the end point up to which MOR data should be processed in this run.
+- At this point, the workflow has a starting point (from **Step 3**) and an ending point (this newly created truncate).
 
-At this point, the workflow has a **starting point** obtained from **Step 2** and an **ending point** obtained from this newly created truncate.
-
-**4. Iterate through MOR snapshots and detect truncate boundaries:** The workflow now walks through MOR snapshots sequentially, starting from the snapshot chosen in **Step 2** and stopping at the truncate snapshot created in **Step 3**. During this iteration:
+**5. Iterate through MOR snapshots and detect truncate boundaries:** The workflow now walks through MOR snapshots sequentially, starting from the snapshot chosen in **Step 3** and stopping at the truncate snapshot created in **Step 4**. During this iteration:
 - Each snapshot is examined to determine whether it represents a truncate operation.
 - Truncate snapshots are detected using metadata signals such as:
-    - `operation` = `overwrite`
+    - `operation` = `delete`
     - `added-data-files` = 0
     - `added-delete-files` = 0
     - `total-data-files` = 0
     - `removed-data-files` = `previous_snapshot.total-data-files`
+This allows the workflow to correctly identify all truncate boundaries, including those created in previous failed runs.
 
-This allows the workflow to correctly identify all truncate points, including those created in previous failed runs.
-
-**5. Prepare COW database, table, and schema:** Before any data transfer happens, the workflow prepares the COW side completely.
-- If this is the first run, the COW database is created if it does not exist. The COW table is created with the required structure as of the MOR table.
-- If the COW table already exists, the MOR schema is compared with the COW schema. If there are any schema changes or new tables are added, the COW table is altered to match the MOR table schema.
+**6. Prepare COW database, table, and schema:** Before any data transfer happens, the workflow prepares the COW side completely.
+- If this is the first run, the COW database is created if it does not exist.
+- If the COW table already exists, the MOR schema is compared with the COW schema. If there are any schema changes, the COW table is altered to match the MOR table schema (new columns are added, column types are updated as needed).
 
 This step guarantees that the COW table is fully ready and schema-compatible before any transfer begins.
 
-**6. Merge MOR data into the COW table:** Once the COW table and schema are prepared, the workflow transfers data for the current snapshot range.
-- If it is a **First Time Transfer**, a **CTAS (Create Table As Select)** is used to write the initial resolved dataset from MOR into COW.
-- If it is a **Subsequent Transfer**, a **MERGE INTO** statement is used to transfer the data from MOR to COW.
-- Before transferring we check that if a truncate snapshot's parent snapshot is also a truncate? If yes, it is skipped to avoid redundant processing.
-- After the transfer is completed successfully, the corresponding truncate snapshot ID is written to the COW table metadata as a checkpoint.
-- This process is repeated for every truncate snapshot in the list until the final truncate snapshot is processed.
+**7. Merge MOR data into the COW table with atomic checkpointing:** Once the COW table and schema are prepared, the workflow transfers data for each detected truncate boundary using Iceberg's WAP pattern for atomic checkpointing.
+
+For each truncate boundary in the processing range:
+- **Check for redundant boundaries:** If a truncate snapshot's parent snapshot is also a truncate, it is skipped to avoid redundant processing.
+- **Set the WAP ID:** Before writing data, the script sets `spark.wap.id` to the current truncate snapshot ID. This ensures the upcoming write operation will be staged under this WAP ID.
+- **Transfer data:**
+    - **First Time Transfer:** Creates a new COW table and writes the initial data from the MOR table. The WAP ID (truncate snapshot ID) is appended to the metadata in a single commit to the COW table.
+    - **Subsequent Transfer:** Merges records from the MOR table into the existing COW table and updates the WAP ID with the current truncate snapshot ID for which the MOR to COW conversion is being performed.
+- **Publish the WAP changes:** After the data write completes, the script calls Iceberg's `publish_changes` procedure with the truncate snapshot ID as the WAP ID. 
+- **Unset the WAP ID:** The script clears `spark.wap.id` to prepare for the next boundary.
 
 ### Failure Recovery and State Management
 
@@ -1027,9 +1112,9 @@ This step guarantees that the COW table is fully ready and schema-compatible bef
 
 The MOR to COW write flow is designed to be safe to re-run by checkpointing progress only after a truncate cycle is fully and successfully transferred.
 
-The workflow records successful truncate snapshot IDs directly in the COW table metadata and replays any missing truncate cycles when a failure occurs.
+The workflow records successful truncate snapshot IDs in the data writes to COW table and stores them as WAP ID.
 
-`eq1 → eq2 → eq3 → eq4 → trunc1 → eq5 → eq6 → eq7 → trunc2`
+`trunc0 → eq1 → eq2 → eq3 → eq4 → trunc1 → eq5 → eq6 → eq7 → trunc2`
 
 Here:
 - `eq*` snapshots contain cdc changes
@@ -1044,21 +1129,13 @@ On reruns, the script uses `last_successful_truncate_snapshot_id` as the effecti
 
 #### How recovery works
 
-1. **Cycle around `trunc1`:**
-   - The script checks the present COW table for last successful truncate snapshot ID. Since its not present it starts from the earliest snapshot in the MOR table.
-   - The script truncates the MOR table (creating `trunc1`)
-   - It finds the predecessor snapshot (the snapshot before truncate): `eq4`
-   - It merges `eq4` into the COW table
-   - Only after the merge succeeds, it updates COW table metadata:
-     - `last_successful_truncate_snapshot_id = trunc1`
-
-2. **Cycle around `trunc2`:**
-
-   Suppose the script truncates again and tries to merge `eq7`, but the run fails. In this case the script will not update the COW table metadata and will continue to use the `last_successful_truncate_snapshot_id` for the next re run.
-
-   It will then find out all the truncate snapshot ID's between the `last_successful_truncate_snapshot_id` and the current truncate snapshot ID and merge their predecessor snapshots into the COW table.
-
-   In the present scenario it will check that `last_successful_truncate_snapshot_id`  is `trunc1` and the current truncate snapshot ID is `trunc2`. Hence, it will only merge `eq7` into the COW table.
+Let us assume that `trunc0` was the most recent successful truncate operation and while running `trunc1` the script failed. By the time we re run the script, OLake might have ingested some more CDC changes. This is how the workflow will behave:
+- The script checks the COW table's snapshot history and finds the latest WAP ID containing `trunc0_snapshot_id`.
+- It re-publishes this WAP ID to ensure the data written to COW will be visible to the query engine.
+- Then it fetches the `trunc0` stored in WAP ID and uses it as the starting point for the current run. The script truncates the MOR table again, creating `trunc2` as the boundary for the run.
+- It starts scanning the snapshots from `trunc0` to `trunc2` finding for any truncate operations in this boundary.
+- While scanning it encounters `trunc1`, it transfers the data from snapshot of `eq4` to the COW table and also updates the WAP ID with the snapshot id of `trunc1`. After this operation it publishes the changes to the COW table.
+- Then it continues its process to find next truncate operation and encounters `trunc2`, it transfers the data from snapshot of `eq7` to the COW table and also updates the WAP ID with the snapshot id of `trunc2`. Similarly it publishes the changes to the COW table.
 
 </details>
 
