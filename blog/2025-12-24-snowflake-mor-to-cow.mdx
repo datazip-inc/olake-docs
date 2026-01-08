@@ -38,7 +38,7 @@ The solution is to periodically compact your MOR tables into COW format—essent
 
 :::tip Storage Optimization
 Once the COW table is created and verified, you can expire the MOR table data. To manage storage efficiently, run Iceberg's snapshot expiry job to expire snapshots older than 5-7 days, given that the compaction job runs daily. This eliminates data duplication and reduces storage costs.
-::: 
+:::
 
 We've built a PySpark script that automates this entire process. Here's how it works:
 
@@ -201,7 +201,7 @@ The script will generate a `destination.json` file that contains the catalog con
 import argparse
 import json
 import os
-from typing import Optional, Tuple, Union, List
+from typing import Optional
 
 from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
@@ -221,6 +221,7 @@ COW_DB = "<NAME_OF_YOUR_COW_DATABASE>"
 
 # Base S3 location where per-table COW tables (and the shared state table) will be stored.
 # Example: "s3://my-bucket/warehouse/cow"
+
 COW_BASE_LOCATION = "<YOUR_COW_BASE_LOCATION>"
 
 # We use WAP (Write-Audit-Publish) pattern to store checkpoint state.
@@ -234,17 +235,41 @@ def _recompute_derived_names():
     return
 
 
-def load_destination_writer_config(destination_details_path: str) -> dict:
+def load_destination_writer_config(destination_details_path: str, job_id: Optional[int] = None) -> dict:
+
     with open(destination_details_path, "r", encoding="utf-8") as f:
         outer = json.load(f)
 
-    if not isinstance(outer, dict):
-        raise ValueError("Destination config file must be a JSON object with a 'writer' object")
+    # New simplified format: top-level dict with writer
+    if isinstance(outer, dict) and isinstance(outer.get("writer"), dict):
+        writer = outer.get("writer")
+        assert isinstance(writer, dict)
+        return writer
 
-    writer = outer.get("writer")
+    # Old format: array of records
+    if not isinstance(outer, list) or not outer:
+        raise ValueError("Destination config file must be either a JSON object with 'writer' or a non-empty JSON array")
+
+    record = None
+    if job_id is None:
+        record = outer[0]
+    else:
+        for r in outer:
+            if r.get("job_id") == job_id:
+                record = r
+                break
+        if record is None:
+            raise ValueError(f"job_id {job_id} not found in destination_details.json")
+
+    dest = record.get("destination") or {}
+    config_str = dest.get("config")
+    if not config_str:
+        raise ValueError("destination.config missing in destination_details.json")
+
+    inner = json.loads(config_str)
+    writer = inner.get("writer")
     if not isinstance(writer, dict):
-        raise ValueError("Destination config JSON does not contain a 'writer' object")
-
+        raise ValueError("destination.config JSON does not contain a 'writer' object")
     return writer
 
 
@@ -345,6 +370,18 @@ def build_spark_session_from_writer(writer: dict) -> SparkSession:
     )
     builder = builder.config("spark.sql.catalogImplementation", "in-memory")
     builder = builder.config("spark.sql.defaultCatalog", catalog_name)
+
+    # EMR/YARN resource management configs to prevent resource starvation
+    builder = builder.config("spark.dynamicAllocation.enabled", "true")
+    builder = builder.config("spark.dynamicAllocation.minExecutors", "1")
+    builder = builder.config("spark.dynamicAllocation.maxExecutors", "10")
+
+    # Incase you are running it on AWS EMR make sure of these settings: 
+    builder = builder.config("spark.dynamicAllocation.initialExecutors", "1") 
+    builder = builder.config("spark.executor.cores", "2")
+    builder = builder.config("spark.executor.memory", "2g")
+    builder = builder.config("spark.scheduler.maxRegisteredResourcesWaitingTime", "10s")
+    builder = builder.config("spark.scheduler.minRegisteredResourcesRatio", "0.0")
 
     # Ensure AWS SDK-based clients (e.g., GlueCatalog, Iceberg S3FileIO) can see credentials.
     # This avoids requiring users to export env vars in the container.
@@ -498,7 +535,7 @@ def get_wap_id_from_table(cow_table_fqn: str, catalog_name: str) -> Optional[str
     """
     Get the latest published WAP ID from the COW table.
     Returns the WAP ID (string) or None if no WAP ID exists.
-    
+
     Queries the COW table's snapshot metadata to find WAP IDs stored in snapshot summaries.
     """
     if not table_exists(cow_table_fqn):
@@ -523,7 +560,7 @@ def get_wap_id_from_table(cow_table_fqn: str, catalog_name: str) -> Optional[str
                     return str(wap_id)
     except Exception:
         pass
-    
+
     return None
 
 
@@ -561,46 +598,15 @@ def extract_truncate_id_from_wap_id(wap_id: str) -> Optional[int]:
 # Iceberg snapshot helpers
 # ------------------------------------------------------------------------------
 def get_latest_snapshot_and_parent_id(table_fqn: str):
-    """
-    Return the most recent TRUNCATE-like snapshot (snapshot_id, parent_id).
-    To be robust against a small race where new OLake writes are committed
-    immediately after our TRUNCATE, we look at the latest few snapshots and
-    pick the first one that matches the truncate boundary signature.
-    """
     rows = spark.sql(f"""
-        SELECT snapshot_id, parent_id, committed_at, operation, summary
+        SELECT snapshot_id, parent_id
         FROM {table_fqn}.snapshots
         ORDER BY committed_at DESC
-        LIMIT 10
+        LIMIT 1
     """).collect()
     if not rows:
         return None, None
-
-    snaps = []
-    by_id = {}
-    for r in rows:
-        d = r.asDict(recursive=True)
-        snap = {
-            "snapshot_id": d.get("snapshot_id"),
-            "parent_id": d.get("parent_id"),
-            "committed_at": d.get("committed_at"),
-            "operation": d.get("operation"),
-            "summary": d.get("summary"),
-        }
-        snaps.append(snap)
-        sid = snap.get("snapshot_id")
-        if sid is not None:
-            by_id[sid] = snap
-
-    # Among these most recent snapshots, find the newest one that looks like a truncate.
-    for snap in snaps:
-        parent = by_id.get(snap.get("parent_id"))
-        if _is_truncate_boundary_snapshot(snap, parent):
-            return snap.get("snapshot_id"), snap.get("parent_id")
-
-    # Fallback: if none looks like a truncate, just return the latest snapshot.
-    head = snaps[0]
-    return head.get("snapshot_id"), head.get("parent_id")
+    return rows[0]["snapshot_id"], rows[0]["parent_id"]
 
 
 def _summary_int(summary: Optional[dict], key: str) -> Optional[int]:
@@ -610,16 +616,6 @@ def _summary_int(summary: Optional[dict], key: str) -> Optional[int]:
         return int(summary.get(key))  # type: ignore[arg-type]
     except Exception:
         return None
-
-
-def _summary_first_int(summary: Optional[dict], keys: Tuple[str, ...]) -> Optional[int]:
-    if not summary:
-        return None
-    for k in keys:
-        v = _summary_int(summary, k)
-        if v is not None:
-            return v
-    return None
 
 
 def _added_delete_files(summary: Optional[dict]) -> int:
@@ -649,36 +645,17 @@ def _removed_data_files(summary: Optional[dict]) -> Optional[int]:
     return None
 
 
-def _removed_delete_files(summary: Optional[dict]) -> Optional[int]:
-    # Best-effort; key names vary by engine/version.
-    return _summary_first_int(
-        summary,
-        (
-            "deleted-delete-files",
-            "removed-delete-files",
-            "deleted_delete_files",
-            "removed_delete_files",
-        ),
-    )
-
-
-def _total_delete_files(summary: Optional[dict]) -> Optional[int]:
-    return _summary_first_int(summary, ("total-delete-files", "total_delete_files"))
-
-
 def _is_truncate_boundary_snapshot(snap: dict, parent: Optional[dict]) -> bool:
     """
     Identify compaction boundary snapshots created by TRUNCATE TABLE.
 
-    - operation in {'delete','overwrite'} (varies by engine/version)
+    - operation == 'delete'
     - added-data-files == 0
     - added delete files == 0
     - total-data-files == 0 (table empty after boundary)
-    - removed/deleted data files == parent.total-data-files (when both are available)
-    - removed/deleted delete files == parent.total-delete-files (when both are available)
+    - removed/deleted data files == parent.total-data-files
     """
-    op = (snap.get("operation") or "").lower()
-    if op not in ("delete", "overwrite"):
+    if (snap.get("operation") or "").lower() != "delete":
         return False
 
     summary = snap.get("summary") or {}
@@ -695,28 +672,54 @@ def _is_truncate_boundary_snapshot(snap: dict, parent: Optional[dict]) -> bool:
     if total_data_files is not None and total_data_files != 0:
         return False
 
-    total_delete_files = _total_delete_files(summary)
-    if total_delete_files is not None and total_delete_files != 0:
-        return False
-
     removed = _removed_data_files(summary)
     parent_total = _summary_int(parent_summary, "total-data-files")
     if removed is not None and parent_total is not None:
-        if removed != parent_total:
-            return False
-
-    removed_del = _removed_delete_files(summary)
-    parent_total_del = _total_delete_files(parent_summary)
-    if removed_del is not None and parent_total_del is not None:
-        if removed_del != parent_total_del:
-            return False
+        return removed == parent_total
 
     # Fallback if one side isn't available: delete-to-empty should remove something.
     if removed is not None:
         return removed > 0
-    # If the engine doesn't report removed data files, we can't reliably detect.
     return False
 
+
+def _load_snapshots_with_summary(table_fqn: str):
+    """
+    Returns a list of dicts with keys: snapshot_id, parent_id, committed_at, operation, summary.
+    Sorted by committed_at ascending (oldest -> newest).
+    """
+    rows = spark.sql(f"""
+        SELECT snapshot_id, parent_id, committed_at, operation, summary
+        FROM {table_fqn}.snapshots
+        ORDER BY committed_at ASC
+    """).collect()
+    out = []
+    for r in rows:
+        d = r.asDict(recursive=True)
+        out.append(
+            {
+                "snapshot_id": d.get("snapshot_id"),
+                "parent_id": d.get("parent_id"),
+                "committed_at": d.get("committed_at"),
+                "operation": d.get("operation"),
+                "summary": d.get("summary"),
+            }
+        )
+    return out
+
+
+def _find_truncate_boundaries(table_fqn: str):
+    """
+    Return truncate boundary snapshots (oldest -> newest) detected via operation+summary signature.
+    """
+    snaps = _load_snapshots_with_summary(table_fqn)
+    by_id = {s["snapshot_id"]: s for s in snaps}
+    boundaries = []
+    for s in snaps:
+        parent = by_id.get(s.get("parent_id"))
+        if _is_truncate_boundary_snapshot(s, parent):
+            boundaries.append(s)
+    return boundaries, by_id
 
 # ------------------------------------------------------------------------------
 # Merge + schema alignment
@@ -773,59 +776,95 @@ def merge_snapshot_into_cow(mor_table_fqn: str, cow_table_fqn: str, snapshot_id:
             INSERT *
     """)
 
-def _cow_has_any_snapshots(cow_table_fqn: str) -> bool:
-    if not table_exists(cow_table_fqn):
-        return False
-    try:
-        cnt = spark.sql(f"SELECT COUNT(*) AS c FROM {cow_table_fqn}.snapshots").collect()[0]["c"]
-        return int(cnt) > 0
-    except Exception:
-        # If metadata table isn't accessible for some reason, assume it has snapshots.
-        return True
 
+def run_compaction_cycle_for_table(mor_table_fqn: str):
+    cow_table_fqn, cow_location = cow_table_and_location_for(mor_table_fqn)
+    cow_exists = table_exists(cow_table_fqn)
 
-def _fetch_snapshot_with_summary(table_fqn: str, snapshot_id: int) -> Optional[dict]:
-    """
-    Fetch a single snapshot (and its summary) by snapshot_id.
-    """
-    rows = spark.sql(f"""
-        SELECT snapshot_id, parent_id, committed_at, operation, summary
-        FROM {table_fqn}.snapshots
-        WHERE snapshot_id = {snapshot_id}
-    """).collect()
-    if not rows:
-        return None
-    d = rows[0].asDict(recursive=True)
-    return {
-        "snapshot_id": d.get("snapshot_id"),
-        "parent_id": d.get("parent_id"),
-        "committed_at": d.get("committed_at"),
-        "operation": d.get("operation"),
-        "summary": d.get("summary"),
-    }
+    # Get catalog name from table FQN
+    catalog_name, _, _ = split_fqn(mor_table_fqn)
 
-
-def _set_wap_id(wap_id: Optional[Union[int, str]]):
-    if wap_id is None:
-        spark.sql("SET spark.wap.id=")
-    else:
-        spark.sql(f"SET spark.wap.id={wap_id}")
-
-
-def _ensure_cow_table_from_snapshot(
-    mor_table_fqn: str,
-    cow_table_fqn: str,
-    cow_location: str,
-    snapshot_id_for_schema: int,
-):
-    """
-    Create the COW table if missing by CTAS from a MOR snapshot.
-    This also anchors the initial schema for later schema alignment.
-    """
-    if table_exists(cow_table_fqn):
+    # Step 1: Enable WAP for COW table if it exists (idempotent)
+    if cow_exists:
         enable_wap_for_table(cow_table_fqn)
-        return
-    spark.sql(f"""
+
+    # Step 2: Check for existing WAP ID (checkpoint)
+    wap_id = get_wap_id_from_table(cow_table_fqn, catalog_name)
+    last_success_t = None
+
+    if wap_id is None:
+        print(f"[{mor_table_fqn}] No WAP ID found; starting from earliest MOR history.")
+    else:
+        # Re-publish the existing WAP ID (idempotent operation)
+        print(f"[{mor_table_fqn}] Found existing WAP ID: {wap_id}. Re-publishing (idempotent)...")
+        publish_wap_changes(cow_table_fqn, catalog_name, wap_id)
+
+        # Extract truncate snapshot_id from WAP ID
+        last_success_t = extract_truncate_id_from_wap_id(wap_id)
+        if last_success_t is None:
+            print(f"[{mor_table_fqn}] Warning: Could not extract truncate ID from WAP ID {wap_id}. Starting from beginning.")
+        else:
+            print(f"[{mor_table_fqn}] Last successful truncate checkpoint from WAP ID: {last_success_t}")
+
+    # Step 3: Truncate MOR to create the current boundary for this run.
+    spark.sql(f"TRUNCATE TABLE {mor_table_fqn}")
+
+    truncate_snapshot_id, high_water_snapshot_id = get_latest_snapshot_and_parent_id(mor_table_fqn)
+    print(f"[{mor_table_fqn}] Boundary truncate snapshot: {truncate_snapshot_id}")
+    print(f"[{mor_table_fqn}] High-water (pre-truncate) snapshot: {high_water_snapshot_id}")
+
+    # Step 4: Find truncate boundaries in MOR history up to the current truncate.
+    boundaries, by_id = _find_truncate_boundaries(mor_table_fqn)
+    current_t_snap = by_id.get(truncate_snapshot_id)
+    current_t_ts = current_t_snap.get("committed_at") if current_t_snap else None
+
+    if last_success_t is None:
+        last_ts = None
+    else:
+        last_snap = by_id.get(last_success_t)
+        last_ts = last_snap.get("committed_at") if last_snap else None
+
+    to_process = []
+    for b in boundaries:
+        bt = b.get("committed_at")
+        if current_t_ts is not None and bt is not None and bt > current_t_ts:
+            continue
+        if last_ts is not None and bt is not None and bt <= last_ts:
+            continue
+        to_process.append(b)
+
+    # Ensure the current truncate is included as the end boundary for this run (if detected).
+    if truncate_snapshot_id is not None and all(x.get("snapshot_id") != truncate_snapshot_id for x in to_process):
+        # If current truncate isn't detected by signature, we still process the latest high-water once.
+        # (Per requirements, we ignore the concurrency race for now.)
+        if high_water_snapshot_id is None:
+            print(f"[{mor_table_fqn}] Nothing to compact (no high-water snapshot).")
+            if not cow_exists:
+                print(f"[{mor_table_fqn}] Creating empty COW table...")
+                enable_wap_for_table(cow_table_fqn)
+                spark.sql(f"""
+            CREATE TABLE {cow_table_fqn}
+            USING iceberg
+            LOCATION '{cow_location}'
+            AS
+            SELECT *
+            FROM {mor_table_fqn}
+        """)
+                cow_exists = True
+            if truncate_snapshot_id is not None:
+                # Set WAP ID, publish changes
+                spark.sql(f"SET spark.wap.id={truncate_snapshot_id}")
+                publish_wap_changes(cow_table_fqn, catalog_name, str(truncate_snapshot_id))
+                spark.sql("SET spark.wap.id=")
+            return
+
+        # First-time: create COW baseline from the high-water snapshot (CTAS).
+        if not cow_exists:
+            print(f"[{mor_table_fqn}] Creating COW baseline from snapshot {high_water_snapshot_id} ...")
+            enable_wap_for_table(cow_table_fqn)
+            # Set WAP ID using SQL SET (required for Spark SQL operations)
+            spark.sql(f"SET spark.wap.id={truncate_snapshot_id}")
+            spark.sql(f"""
         CREATE TABLE {cow_table_fqn}
         USING iceberg
         LOCATION '{cow_location}'
@@ -833,150 +872,95 @@ def _ensure_cow_table_from_snapshot(
         AS
         SELECT *
         FROM {mor_table_fqn}
-        VERSION AS OF {snapshot_id_for_schema}
-    """)
-    enable_wap_for_table(cow_table_fqn)
-
-
-def _apply_truncate_boundary(
-    mor_table_fqn: str,
-    cow_table_fqn: str,
-    cow_location: str,
-    catalog_name: str,
-    boundary_snap: dict,
-):
-    """
-    For a truncate boundary snapshot t:
-    - Compact/merge its parent snapshot h into the COW table (unless h is also a boundary).
-    - Commit using WAP ID = t.snapshot_id, then publish (idempotent).
-    """
-    t_id = boundary_snap.get("snapshot_id")
-    h_id = boundary_snap.get("parent_id")
-    print(f"[{mor_table_fqn}] Processing boundary {t_id}; parent(high-water)={h_id}")
-
-    if t_id is None:
-        return
-
-
-
-    if not table_exists(cow_table_fqn) or not _cow_has_any_snapshots(cow_table_fqn):
-        print(f"[{mor_table_fqn}] COW table missing/empty; creating baseline from snapshot {h_id} ...")
-        _set_wap_id(t_id)
-        _ensure_cow_table_from_snapshot(mor_table_fqn, cow_table_fqn, cow_location, int(h_id))
-        publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
-        _set_wap_id(None)
-        print(f"[{mor_table_fqn}] Published WAP changes with truncate {t_id}.")
-        return
-
-    print(f"[{mor_table_fqn}] Compacting snapshot {h_id} into existing COW ...")
-    _set_wap_id(t_id)
-    merge_snapshot_into_cow(mor_table_fqn, cow_table_fqn, int(h_id))
-    publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
-    _set_wap_id(None)
-    print(f"[{mor_table_fqn}] Published WAP changes with truncate {t_id}.")
-
-
-def run_compaction_cycle_for_table(mor_table_fqn: str):
-    cow_table_fqn, cow_location = cow_table_and_location_for(mor_table_fqn)
-    catalog_name, _, _ = split_fqn(mor_table_fqn)
-
-    # Step 1: Resume checkpoint from COW's last WAP id; re-publish it (idempotent) to finalize any half-done runs.
-    if table_exists(cow_table_fqn):
-        enable_wap_for_table(cow_table_fqn)
-
-    wap_id = get_wap_id_from_table(cow_table_fqn, catalog_name)
-    last_success_t = None
-
-    if wap_id:
-        print(f"[{mor_table_fqn}] Found existing WAP ID: {wap_id}. Re-publishing (idempotent)...")
-        publish_wap_changes(cow_table_fqn, catalog_name, wap_id)
-        last_success_t = extract_truncate_id_from_wap_id(wap_id)
-        if last_success_t is not None:
-            print(f"[{mor_table_fqn}] Last successful truncate checkpoint: {last_success_t}")
+                VERSION AS OF {high_water_snapshot_id}
+            """)
+            publish_wap_changes(cow_table_fqn, catalog_name, str(truncate_snapshot_id))
+            spark.sql("SET spark.wap.id=")
+            cow_exists = True
         else:
-            print(f"[{mor_table_fqn}] Warning: Could not parse WAP ID {wap_id} as truncate snapshot id. Starting from beginning.")
-    else:
-        print(f"[{mor_table_fqn}] No WAP ID found; starting from earliest MOR history.")
+            print(f"[{mor_table_fqn}] Compacting snapshot {high_water_snapshot_id} into existing COW ...")
+            # Set WAP ID using SQL SET (required for Spark SQL operations)
+            spark.sql(f"SET spark.wap.id={truncate_snapshot_id}")
+            merge_snapshot_into_cow(mor_table_fqn, cow_table_fqn, int(high_water_snapshot_id))
+            publish_wap_changes(cow_table_fqn, catalog_name, str(truncate_snapshot_id))
+            spark.sql("SET spark.wap.id=")
 
-    # Step 2/3: Truncate MOR to create the boundary for this run.
-    spark.sql(f"TRUNCATE TABLE {mor_table_fqn}")
-
-    head_snapshot_id, _ = get_latest_snapshot_and_parent_id(mor_table_fqn)
-    if head_snapshot_id is None:
-        print(f"[{mor_table_fqn}] No snapshots found; nothing to do.")
+        print(f"[{mor_table_fqn}] Published WAP changes with truncate {truncate_snapshot_id}.")
         return
 
-    # Build lineage from the new truncate snapshot back to (but not including) last_success_t.
-    by_id: dict = {}
-    lineage: List[dict] = []
-
-    # Optionally fetch the checkpoint snapshot so we know its summary when detecting truncates.
-    if last_success_t is not None:
-        chk = _fetch_snapshot_with_summary(mor_table_fqn, int(last_success_t))
-        if chk is not None:
-            by_id[chk["snapshot_id"]] = chk
-
-    cur_id = head_snapshot_id
-    seen = set()
-    while cur_id is not None and cur_id not in seen:
-        seen.add(cur_id)
-        snap = _fetch_snapshot_with_summary(mor_table_fqn, int(cur_id))
-        if snap is None:
-            break
-        by_id[snap["snapshot_id"]] = snap
-        lineage.append(snap)
-
-        parent_id = snap.get("parent_id")
-        # Stop once we've reached the snapshot whose parent is the checkpoint; this ensures we only
-        # reprocess snapshots strictly after last_success_t.
-        if last_success_t is not None and parent_id == last_success_t:
-            break
-        cur_id = parent_id
-
-    if not lineage:
-        print(f"[{mor_table_fqn}] No snapshots to scan between checkpoint and current truncate; nothing to do.")
+    if not to_process:
+        print(f"[{mor_table_fqn}] No truncate boundaries to process in this run.")
         return
 
-    # Process in chronological order (oldest -> newest).
-    lineage.reverse()
+    # Step 5: For each boundary, compact its parent snapshot, then publish WAP changes.
+    boundary_ids = {b.get("snapshot_id") for b in boundaries}
+    for b in to_process:
+        t_id = b.get("snapshot_id")
+        h_id = b.get("parent_id")
+        print(f"[{mor_table_fqn}] Processing boundary {t_id}; parent(high-water)={h_id}")
 
-    any_boundary = False
-    for snap in lineage:
-        parent = by_id.get(snap.get("parent_id"))
-        is_boundary = _is_truncate_boundary_snapshot(snap, parent)
-        if not is_boundary:
+        if h_id is None:
+            # Nothing existed before this boundary; ensure COW exists (empty) and publish WAP.
+            if not cow_exists:
+                print(f"[{mor_table_fqn}] Creating empty COW table (no parent snapshot exists)...")
+                enable_wap_for_table(cow_table_fqn)
+                spark.sql(f"SET spark.wap.id={t_id}")
+                spark.sql(f"""
+                    CREATE TABLE {cow_table_fqn}
+                    USING iceberg
+                    LOCATION '{cow_location}'
+                    TBLPROPERTIES ('write.wap.enabled'='true')
+                    AS
+                    SELECT *
+                    FROM {mor_table_fqn}
+                    VERSION AS OF {t_id}
+                """)
+                publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+                spark.sql("SET spark.wap.id=")
+                cow_exists = True
+            elif t_id is not None:
+                # Table exists but no parent, just publish WAP for this boundary
+                spark.sql(f"SET spark.wap.id={t_id}")
+                publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+                spark.sql("SET spark.wap.id=")
+            print(f"[{mor_table_fqn}] Published WAP changes with truncate {t_id}.")
             continue
 
-        any_boundary = True
-        t_id = snap.get("snapshot_id")
+        # Skip if the parent is itself a truncate boundary (avoid compacting empty boundary artifacts).
+        if h_id in boundary_ids:
+            print(f"[{mor_table_fqn}] Skipping parent snapshot {h_id} because it is also a truncate boundary.")
+            if t_id is not None:
+                # Still publish WAP for this boundary even though we skip the data write
+                spark.sql(f"SET spark.wap.id={t_id}")
+                publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+                spark.sql("SET spark.wap.id=")
+            continue
 
-        _apply_truncate_boundary(
-            mor_table_fqn=mor_table_fqn,
-            cow_table_fqn=cow_table_fqn,
-            cow_location=cow_location,
-            catalog_name=catalog_name,
-            boundary_snap=snap,
-        )
+        if not cow_exists:
+            print(f"[{mor_table_fqn}] COW table missing; creating baseline from snapshot {h_id} ...")
+            enable_wap_for_table(cow_table_fqn)
+            spark.sql(f"SET spark.wap.id={t_id}")
+            spark.sql(f"""
+                CREATE TABLE {cow_table_fqn}
+                USING iceberg
+                LOCATION '{cow_location}'
+                TBLPROPERTIES ('write.wap.enabled'='true')
+                AS
+                SELECT *
+                FROM {mor_table_fqn}
+                VERSION AS OF {h_id}
+            """)
+            publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+            spark.sql("SET spark.wap.id=")
+            cow_exists = True
+        else:
+            print(f"[{mor_table_fqn}] Compacting snapshot {h_id} into existing COW ...")
+            spark.sql(f"SET spark.wap.id={t_id}")
+            merge_snapshot_into_cow(mor_table_fqn, cow_table_fqn, int(h_id))
+            publish_wap_changes(cow_table_fqn, catalog_name, str(t_id))
+            spark.sql("SET spark.wap.id=")
 
-    if not any_boundary:
-        # If we couldn't detect any truncate boundaries by signature (summary keys missing/version diff),
-        # process the head snapshot once as a synthetic boundary so we compact its parent.
-        head_snap = by_id.get(head_snapshot_id)
-        if head_snap is None:
-            print(f"[{mor_table_fqn}] Head snapshot {head_snapshot_id} not found; nothing to do.")
-            return
-
-        print(
-            f"[{mor_table_fqn}] Warning: no truncate boundaries detected by signature; "
-            f"processing head snapshot {head_snapshot_id} once as boundary."
-        )
-        _apply_truncate_boundary(
-            mor_table_fqn=mor_table_fqn,
-            cow_table_fqn=cow_table_fqn,
-            cow_location=cow_location,
-            catalog_name=catalog_name,
-            boundary_snap=head_snap,
-        )
+        print(f"[{mor_table_fqn}] Published WAP changes with truncate {t_id}.")
 
 
 def list_tables_in_db(catalog: str, db: str):
@@ -1002,6 +986,7 @@ if __name__ == "__main__":
         required=True,
         help="Path to destination_details.json generated by get_destination_details.sh",
     )
+    parser.add_argument("--job-id", type=int, default=None, help="Optional job_id to select from destination_details.json")
     parser.add_argument("--cow-db", default=COW_DB, help="Destination namespace/database for COW tables/state")
     parser.add_argument("--catalog-name", default=None, help="Override catalog name (otherwise taken from destination config)")
     args = parser.parse_args()
@@ -1013,7 +998,7 @@ if __name__ == "__main__":
     # Update globals from args
     COW_DB = args.cow_db
 
-    writer = load_destination_writer_config(args.destination_details)
+    writer = load_destination_writer_config(args.destination_details, job_id=args.job_id)
     if args.catalog_name:
         writer["catalog_name"] = args.catalog_name
 
@@ -1053,7 +1038,9 @@ if __name__ == "__main__":
     print(f"Failed tables: {len(failures)}")
     for t, err in failures:
         print(f"  - {t}: {err}")
+
 ```
+
 </details>
 
 **Before running the script, make sure to update the following variables in the "User Inputs" section:**
@@ -1078,7 +1065,24 @@ spark-submit \
 Replace `compaction_script.py` with the actual name of your MOR to COW write script file. The script will automatically read the catalog configuration, credentials, and object storage settings from the `destination.json` file generated by the previous step.
 
 :::note For AWS EMR Execution
-If you're running the script on AWS EMR, you need to copy both `destination.json` and the MOR to COW write script (e.g., `mor_to_cow_script.py`) to an S3 bucket that your EMR cluster can access. Then reference these S3 paths in your `spark-submit` command:
+If you're running the script on AWS EMR, you need to make sure:
+
+1. **Copy files to S3**: Copy both `destination.json` and the MOR to COW write script (e.g., `mor_to_cow_script.py`) to an S3 bucket that your EMR cluster can access.
+
+2. **Include EMR-specific Spark configurations**: When submitting the job, include the following Spark configurations to prevent resource starvation and ensure optimal performance:
+
+```bash
+  --conf spark.dynamicAllocation.enabled=true \
+  --conf spark.dynamicAllocation.minExecutors=1 \
+  --conf spark.dynamicAllocation.maxExecutors=10 \
+  --conf spark.dynamicAllocation.initialExecutors=1 \
+  --conf spark.executor.cores=2 \
+  --conf spark.executor.memory=2g \
+  --conf spark.scheduler.maxRegisteredResourcesWaitingTime=10s \
+  --conf spark.scheduler.minRegisteredResourcesRatio=0.0 \
+```
+
+These configurations ensure proper resource management and prevent job failures due to resource starvation on EMR clusters.
 :::
 
 ### How the MOR to COW Write Script Works
