@@ -12,7 +12,7 @@ export interface BreadcrumbItem {
 }
 
 export interface CentralizedBreadcrumbsProps {
-  type: 'iceberg' | 'iceberg-blog' | 'query-engine' | 'webinar' | 'community' | 'blog';
+  type: 'iceberg' | 'iceberg-blog' | 'query-engine' | 'webinar' | 'community' | 'blog' | 'customers';
   title: string;
   customItems?: BreadcrumbItem[];
   maxTitleLength?: number;
@@ -81,6 +81,12 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
           ...baseItems,
           { label: 'Blog', href: '/blog' },
           { label: displayTitle, fullLabel: title, current: true }
+        ];
+
+      case 'customers':
+        return [
+          ...baseItems,
+          { label: 'Customer Stories', href: '/customers', current: true }
         ];
 
       default:
