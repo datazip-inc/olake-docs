@@ -282,7 +282,7 @@ export default function BlogBreadcrumbs() {
 
     const customerStoryBreadcrumbItems = [
       { label: 'Home', href: baseUrl },
-      { label: 'Customer Stories', href: '/customers' },
+      { label: 'Customer Stories', href: '/customer-stories' },
       { label: truncatedTitle, fullLabel: blogTitle, href: location.pathname, current: true },
     ];
 

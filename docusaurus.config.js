@@ -168,7 +168,7 @@ const config = {
             ],
           },
 
-          { to: '/customers', label: 'Customer Stories', position: 'right' },
+          { to: '/customer-stories', label: 'Customer Stories', position: 'right', activeBasePath: '/customer-stories' },
 
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
@@ -670,6 +670,10 @@ const config = {
           {
             to: '/blog',
             from: '/blog/top-mongodb-etl-tools-a-comprehensive-guide-to-syncing-your-nosql-data',
+          },
+          {
+            to: '/customer-stories',
+            from: '/customers',
           },
           {
             to: '/customer-stories/cordial-real-time-data-sync',

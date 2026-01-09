@@ -86,7 +86,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
       case 'customers':
         return [
           ...baseItems,
-          { label: 'Customer Stories', href: '/customers', current: true }
+          { label: 'Customer Stories', href: '/customer-stories', current: true }
         ];
 
       default:
