@@ -8,114 +8,106 @@ import DateTimeHandling from '@site/src/components/DateTimeHandling';
 
 # Overview {#overview}
 
-The OLake S3 Source connector ingests data from Amazon S3 or S3-compatible storage (MinIO, LocalStack). It supports multiple file formats with intelligent folder-based stream grouping, incremental sync, and parallel processing. This connector can be used within the OLake UI or run locally via Docker for open-source workflows.
+The OLake S3 Source connector ingests data from Amazon S3 or S3-compatible storage (MinIO, LocalStack). It offers features like parallel chunking, checkpointing, and automatic resume for failed full loads. This connector can be used within the OLake UI or run locally via Docker for open-source workflows.
 
 ## Key Features
 
-- **Multi-Format Support**: CSV, JSON (JSONL/Array), and Parquet files
+- **Multi-Format Support**: CSV files (`.csv`, `.csv.gz`), JSON files in JSONL and Array formats (`.json`, `.jsonl`, `.json.gz`), and Parquet files
 - **Automatic Compression Handling**: Transparent gzip decompression (`.gz` files)
-- **Folder-Based Streams**: Groups files by top-level folder into logical streams
-- **Incremental Sync**: Tracks changes using S3 LastModified timestamps
-- **Parallel Processing**: Configurable concurrent file processing
+- **Folder-Based Streams**: Groups files by top-level folder into logical streams. Files are automatically grouped into streams based on folder structure. An example of bucket structure is provided below:
+
+  ```
+  s3://my-bucket/data/
+  ├── users/
+  │   ├── 2024-01-01/users.parquet
+  │   └── 2024-01-02/users.parquet
+  ├── orders/
+  │   ├── 2024-01-01/orders.parquet
+  │   └── 2024-01-02/orders.parquet
+  └── products/
+      └── products.csv.gz
+  ```
+
+  In the above example, as a result we get 3 streams created - `users`, `orders`, `products`.
+
 - **S3-Compatible Services**: AWS S3, MinIO, LocalStack, and other S3 APIs
 
 ## Sync Modes Supported
 
-- **Full Refresh**: Syncs all files in the bucket/prefix every run
-- **Incremental**: Syncs only new or modified files using LastModified cursor
+- **Full Refresh**
+- **Incremental**
 
-## File Format Support
+<details>
+  <summary>How Incremental Sync Works</summary>
 
-### CSV Files
-- Plain and gzip compressed (`.csv`, `.csv.gz`)
-- Configurable delimiter, header detection, quote character
-- Automatic schema inference from header and data sampling
+    The S3 connector uses S3's `LastModified` timestamp as a cursor for incremental syncs:
 
-### JSON Files
-- JSONL (line-delimited), JSON Array, and Single Object formats
-- Plain and gzip compressed (`.json`, `.jsonl`, `.json.gz`)
-- Automatic format detection and schema inference
+    **How it works**:
+    1. Discovery phase adds `_last_modified_time` field to each stream
+    2. During sync, each record is injected with the file's LastModified timestamp
+    3. State file tracks the latest `_last_modified_time` per stream
+    4. Subsequent syncs only process files with `LastModified > last_synced_timestamp`
 
-### Parquet Files
-- Native columnar format with full type support
-- Schema read directly from file metadata
-- Efficient streaming with S3 range requests
+    **State Example**:
+    ```json
+    {
+      "users": {
+        "_last_modified_time": "2024-01-15T10:30:00Z"
+      },
+      "orders": {
+        "_last_modified_time": "2024-01-15T11:45:00Z"
+      }
+    }
+    ```
 
-## How Stream Grouping Works
+    :::warning File Modifications
+    If a file's content changes and is re-uploaded to S3, it will be re-synced in incremental mode because S3 updates the LastModified timestamp.
+    :::
 
-Files are automatically grouped into streams based on folder structure:
-
-**Example Bucket Structure**:
-```
-s3://my-bucket/data/
-├── users/
-│   ├── 2024-01-01/users.parquet
-│   └── 2024-01-02/users.parquet
-├── orders/
-│   ├── 2024-01-01/orders.parquet
-│   └── 2024-01-02/orders.parquet
-└── products/
-    └── products.csv.gz
-```
-
-**Result**: 3 streams created - `users`, `orders`, `products`
-
-:::info Folder Grouping
-Stream grouping occurs at level 1 (first folder after path_prefix). All files within the same top-level folder are grouped into one stream, regardless of subfolder structure.
-:::
+</details>
 
 ## Prerequisites
 
 ### Version Prerequisites
 
 - AWS S3 (any version) or S3-compatible service (MinIO 2020+, LocalStack 0.12+)
-- File formats: CSV, JSON (JSONL/Array/Object), or Parquet
 
 ### Connection Prerequisites
 
 - Read access to S3 bucket (`s3:ListBucket`, `s3:GetObject`)
-- **AWS Authentication** (choose one):
-  - IAM roles, environment variables, or instance profiles (recommended)
-  - Static access key and secret key credentials
+- AWS Authentication: IAM roles, environment variables, instance profiles (recommended), or static access key and secret key credentials
 - Network connectivity to S3 endpoint
+- IAM policy for S3 source access:
 
-**For MinIO/LocalStack**: Custom endpoint URL required (e.g., `http://localhost:9000`)
+  ```json title="s3-source-iam-policy.json"
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": [
+          "s3:ListBucket"
+        ],
+        "Resource": [
+          "arn:aws:s3:::<YOUR_S3_BUCKET>"
+        ]
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject"
+        ],
+        "Resource": [
+          "arn:aws:s3:::<YOUR_S3_BUCKET>/*"
+        ]
+      }
+    ]
+  }
+  ```
+  - Replace `<YOUR_S3_BUCKET>` with your actual S3 bucket name. 
+  - This policy provides read-only access required for the OLake S3 source connector.
 
-**For AWS S3**: Credentials are optional. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles, etc.)
-
-**IAM Policy for S3 Source Access**:
-
-```json title="s3-source-iam-policy.json"
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:ListBucket"
-      ],
-      "Resource": [
-        "arn:aws:s3:::<YOUR_S3_BUCKET>"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject"
-      ],
-      "Resource": [
-        "arn:aws:s3:::<YOUR_S3_BUCKET>/*"
-      ]
-    }
-  ]
-}
-```
-
-:::tip
-Replace `<YOUR_S3_BUCKET>` with your actual S3 bucket name. This policy provides read-only access required for the OLake S3 source connector.
-:::
-
-**After prerequisites are fulfilled, configurations can be set up.**
+**After initial Prerequisites are fulfilled, the configurations for S3 can be configured.**
 
 ---
 
@@ -135,9 +127,10 @@ Replace `<YOUR_S3_BUCKET>` with your actual S3 bucket name. This policy provides
 
 ### 2. Provide Configuration Details
 
-<Tabs groupId="s3-platform">
-
-<TabItem value="aws-s3" label="AWS S3" default>
+- Enter S3 credentials.
+  <div className='flex w-full justify-center'>
+    <div className='w-3/5'>![Form for creating a S3 source in OLake, showing fields for endpoint configuration, authentication, and connection options](/img/docs/sources/s3/source_config.webp)</div>
+  </div>
 
 | Field | Description | Example Value |
 |-------|-------------|---------------|
@@ -151,27 +144,8 @@ Replace `<YOUR_S3_BUCKET>` with your actual S3 bucket name. This policy provides
 | Retry Count | Number of retry attempts for failures | `3` |
 
 :::info AWS Authentication
-**Access Key ID** and **Secret Access Key** are optional for AWS S3. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles). This is the **recommended approach** for production deployments. If you provide one credential, you must provide both.
-:::
-
-</TabItem>
-
-</Tabs>
-
-:::tip S3-Compatible Services (MinIO, LocalStack)
-For MinIO or LocalStack, use the same field structure but add the **Endpoint** field:
-
-**MinIO**:
-- Endpoint: `http://minio:9000`
-- Access Key ID: `minioadmin`
-- Secret Access Key: `minioadmin`
-
-**LocalStack**:
-- Endpoint: `http://localhost:4566`
-- Access Key ID: `test`
-- Secret Access Key: `test`
-
-The Endpoint field is required for non-AWS S3 services.
+- **Access Key ID** and **Secret Access Key** are optional for AWS S3. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles). This is the **recommended approach** for production deployments. If you provide one credential, you must provide both.
+- **Access Key ID**, **Secret Access Key** and **Endpoint** is required for non AWS S3 services.
 :::
 
 ### 3. Format-Specific Configuration
@@ -235,9 +209,13 @@ No additional configuration required for Parquet files.
 
 ### 1. Create Configuration File
 
-Once the Olake CLI is setup, create a folder to store configuration files such as `source.json` and `destination.json`.
+    - Once the Olake CLI is setup, create a folder to store configuration files such as `source.json` and `destination.json`.
+
+    The `source.json` file for postgres must contain these mandatory fields.
 
 ### 2. Provide Configuration Details
+
+An example `source.json` file will look like this:
 
 <Tabs groupId="s3-platform-cli">
 
@@ -255,21 +233,12 @@ Once the Olake CLI is setup, create a folder to store configuration files such a
 
 </Tabs>
 
-:::tip S3-Compatible Services (MinIO, LocalStack)
-For MinIO or LocalStack, use the same configuration structure but add the `endpoint` field:
-
-**MinIO Example**:
-- Add `"endpoint": "http://minio:9000"`
-- Use credentials: `"access_key_id": "minioadmin"`, `"secret_access_key": "minioadmin"`
-
-**LocalStack Example**:
-- Add `"endpoint": "http://localhost:4566"`
-- Use credentials: `"access_key_id": "test"`, `"secret_access_key": "test"`
-
-The `endpoint` field is required for non-AWS S3 services.
-:::
-
 <S3SourceConfigDetails />
+
+:::info AWS Authentication
+- **Access Key ID** and **Secret Access Key** are optional for AWS S3. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles). This is the **recommended approach** for production deployments. If you provide one credential, you must provide both.
+- **Access Key ID**, **Secret Access Key** and **Endpoint** is required for non AWS S3 services.
+:::
 
 ### 3. Format-Specific Configuration Examples
 
@@ -297,10 +266,19 @@ The `endpoint` field is required for non-AWS S3 services.
 
 ### 4. Check Source Connection
 
-<DockerDiscoverS3 />
+To verify the database connection following command needs to be run:
 
-- If OLake successfully connects: `{"connectionStatus":{"status":"SUCCEEDED"},"type":"CONNECTION_STATUS"}`
-- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting)
+```bash title="check command"
+docker run --pull=always \
+-v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+olakego/source-s3:latest \
+check \
+--config /mnt/config/source.json
+```
+
+- If OLake is able to connect with S3 `{"connectionStatus":{"status":"SUCCEEDED"},"type":"CONNECTION_STATUS"}` response is returned.
+
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting).
 
 </TabItem>
 
@@ -317,39 +295,6 @@ The `endpoint` field is required for non-AWS S3 services.
 ## Date and Time Handling
 
 <DateTimeHandling />
-
----
-
-## Incremental Sync Details
-
-The S3 connector uses S3's `LastModified` timestamp as a cursor for incremental syncs:
-
-**How it works**:
-1. Discovery phase adds `_last_modified_time` field to each stream
-2. During sync, each record is injected with the file's LastModified timestamp
-3. State file tracks the latest `_last_modified_time` per stream
-4. Subsequent syncs only process files with `LastModified > last_synced_timestamp`
-
-**State Example**:
-```json
-{
-  "users": {
-    "_last_modified_time": "2024-01-15T10:30:00Z"
-  },
-  "orders": {
-    "_last_modified_time": "2024-01-15T11:45:00Z"
-  }
-}
-```
-
-**Benefits**:
-- Dramatically reduces sync time for large buckets
-- Only transfers changed data
-- Per-stream cursor tracking for granular control
-
-:::warning File Modifications
-If a file's content changes and is re-uploaded to S3, it will be re-synced in incremental mode because S3 updates the LastModified timestamp.
-:::
 
 ---
 
