@@ -31,16 +31,9 @@ export default function BlogBreadcrumbs() {
     }
   }
 
-  // Don't show breadcrumbs on the main blog listing page or pagination pages
-  if (location.pathname === '/blog' || 
-      location.pathname === '/blog/' || 
-      location.pathname === '/' ||
-      location.pathname.startsWith('/blog/page/') ||
-      location.pathname.startsWith('/iceberg/page/') ||
-      location.pathname.startsWith('/customer-stories/page/')) {
-    return null;
-  }
-
+  // Normalize pathname by removing trailing slash and query params for comparison
+  const normalizedPath = location.pathname.replace(/\/$/, '').split('?')[0];
+  
   // Helper to capitalize first letter
   const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
@@ -51,27 +44,6 @@ export default function BlogBreadcrumbs() {
       .map(word => capitalize(word))
       .join(' ');
   };
-
-  const isBlogPost =
-    location.pathname.startsWith('/blog/') &&
-    location.pathname !== '/blog' &&
-    !location.pathname.includes('/page/') &&
-    !location.pathname.includes('/tags/') &&
-    !location.pathname.includes('/authors/');
-
-  const isIcebergPost =
-    location.pathname.startsWith('/iceberg/') &&
-    location.pathname !== '/iceberg' &&
-    !location.pathname.includes('/page/') &&
-    !location.pathname.includes('/tags/') &&
-    !location.pathname.includes('/authors/');
-
-  const isCustomerStoryPost =
-    location.pathname.startsWith('/customer-stories/') &&
-    location.pathname !== '/customer-stories' &&
-    !location.pathname.includes('/page/') &&
-    !location.pathname.includes('/tags/') &&
-    !location.pathname.includes('/authors/');
 
   // Helper renderer for breadcrumb items
   const renderBreadcrumbItem = (item, index) => (
@@ -130,6 +102,92 @@ export default function BlogBreadcrumbs() {
       <meta itemProp="position" content={String(index + 1)} />
     </li>
   );
+  
+  // Handle blog listing pages - show "Home > Blog" breadcrumbs
+  if (normalizedPath === '/blog' || normalizedPath.startsWith('/blog/page/')) {
+    const breadcrumbItems = [
+      { label: 'Home', href: baseUrl },
+      { label: 'Blog', href: '/blog', current: true },
+    ];
+    return (
+      <nav
+        className="mb-4"
+        aria-label="Breadcrumb"
+        itemScope
+        itemType="https://schema.org/BreadcrumbList"
+      >
+        <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+          {breadcrumbItems.map(renderBreadcrumbItem)}
+        </ol>
+      </nav>
+    );
+  }
+  
+  // Handle iceberg listing pages - show "Home > Iceberg" breadcrumbs
+  if (normalizedPath === '/iceberg' || normalizedPath.startsWith('/iceberg/page/')) {
+    const breadcrumbItems = [
+      { label: 'Home', href: baseUrl },
+      { label: 'Iceberg', href: '/iceberg', current: true },
+    ];
+    return (
+      <nav
+        className="mb-4"
+        aria-label="Breadcrumb"
+        itemScope
+        itemType="https://schema.org/BreadcrumbList"
+      >
+        <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+          {breadcrumbItems.map(renderBreadcrumbItem)}
+        </ol>
+      </nav>
+    );
+  }
+  
+  // Handle customer stories listing pages - show "Home > Customer Stories" breadcrumbs
+  if (normalizedPath === '/customer-stories' || normalizedPath.startsWith('/customer-stories/page/')) {
+    const breadcrumbItems = [
+      { label: 'Home', href: baseUrl },
+      { label: 'Customer Stories', href: '/customer-stories', current: true },
+    ];
+    return (
+      <nav
+        className="mb-4"
+        aria-label="Breadcrumb"
+        itemScope
+        itemType="https://schema.org/BreadcrumbList"
+      >
+        <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+          {breadcrumbItems.map(renderBreadcrumbItem)}
+        </ol>
+      </nav>
+    );
+  }
+  
+  // Don't show breadcrumbs on home page
+  if (normalizedPath === '/') {
+    return null;
+  }
+
+  const isBlogPost =
+    location.pathname.startsWith('/blog/') &&
+    location.pathname !== '/blog' &&
+    !location.pathname.includes('/page/') &&
+    !location.pathname.includes('/tags/') &&
+    !location.pathname.includes('/authors/');
+
+  const isIcebergPost =
+    location.pathname.startsWith('/iceberg/') &&
+    location.pathname !== '/iceberg' &&
+    !location.pathname.includes('/page/') &&
+    !location.pathname.includes('/tags/') &&
+    !location.pathname.includes('/authors/');
+
+  const isCustomerStoryPost =
+    location.pathname.startsWith('/customer-stories/') &&
+    location.pathname !== '/customer-stories' &&
+    !location.pathname.includes('/page/') &&
+    !location.pathname.includes('/tags/') &&
+    !location.pathname.includes('/authors/');
 
   // Handle Iceberg tags pages
   if (location.pathname.startsWith('/iceberg/tags')) {
