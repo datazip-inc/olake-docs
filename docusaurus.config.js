@@ -540,8 +540,7 @@ const config = {
           '**/_*.{js,jsx,ts,tsx,md,mdx}',
           '**/_*/**',
           '**/*.test.{js,jsx,ts,tsx}',
-          '**/__tests__/**',
-          '**/customer-stories/**'
+          '**/__tests__/**'
         ],
         postsPerPage: 6,
         truncateMarker: /<!--\s*(truncate)\s*-->/,
