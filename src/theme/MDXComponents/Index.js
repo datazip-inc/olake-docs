@@ -68,6 +68,22 @@ import OracleToIcebergDatatypes from '../../../docs/shared/config/OracleToIceber
 
 import KafkaSourceConfig from '../../../docs/shared/config/KafkaSourceConfig.mdx'
 
+import DockerDiscoverS3 from '../../../docs/shared/commands/DockerDiscoverS3.mdx'
+import DockerSyncS3 from '../../../docs/shared/commands/DockerSyncS3.mdx'
+
+import LocalDiscoverS3 from '../../../docs/shared/commands/LocalDiscoverS3.mdx'
+import LocalSyncS3 from '../../../docs/shared/commands/LocalSyncS3.mdx'
+
+import S3SourceConfig from '../../../docs/shared/config/S3SourceConfig.mdx'
+import S3SourceConfigIAM from '../../../docs/shared/config/S3SourceConfigIAM.mdx'
+import S3SourceConfigMinIO from '../../../docs/shared/config/S3SourceConfigMinIO.mdx'
+import S3SourceConfigLocalStack from '../../../docs/shared/config/S3SourceConfigLocalStack.mdx'
+import S3SourceConfigDetails from '../../../docs/shared/config/S3SourceConfigDetails.mdx'
+import S3SourceConfigCSV from '../../../docs/shared/config/S3SourceConfigCSV.mdx'
+import S3SourceConfigJSON from '../../../docs/shared/config/S3SourceConfigJSON.mdx'
+import S3SourceConfigParquet from '../../../docs/shared/config/S3SourceConfigParquet.mdx'
+import S3ToIcebergDatatypes from '../../../docs/shared/config/S3ToIcebergDatatypes.mdx'
+
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
 import DockerParquetConfig from '../../../docs/shared/config/DockerParquetConfig.mdx'
 import S3Config from '../../../docs/shared/config/S3Config.mdx'
@@ -181,6 +197,22 @@ const MDXComponents = {
   OracleToIcebergDatatypes,
 
   KafkaSourceConfig,
+
+  DockerDiscoverS3,
+  DockerSyncS3,
+
+  LocalDiscoverS3,
+  LocalSyncS3,
+
+  S3SourceConfig,
+  S3SourceConfigIAM,
+  S3SourceConfigMinIO,
+  S3SourceConfigLocalStack,
+  S3SourceConfigDetails,
+  S3SourceConfigCSV,
+  S3SourceConfigJSON,
+  S3SourceConfigParquet,
+  S3ToIcebergDatatypes,
 
   S3Config,
   S3ConfigGCS,
