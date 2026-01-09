@@ -31,8 +31,13 @@ export default function BlogBreadcrumbs() {
     }
   }
 
-  // Don't show breadcrumbs on the main blog listing page
-  if (location.pathname === '/blog' || location.pathname === '/') {
+  // Don't show breadcrumbs on the main blog listing page or pagination pages
+  if (location.pathname === '/blog' || 
+      location.pathname === '/blog/' || 
+      location.pathname === '/' ||
+      location.pathname.startsWith('/blog/page/') ||
+      location.pathname.startsWith('/iceberg/page/') ||
+      location.pathname.startsWith('/customer-stories/page/')) {
     return null;
   }
 
