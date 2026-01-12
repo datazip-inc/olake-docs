@@ -57,25 +57,29 @@ export default function DocBreadcrumbsWrapper(props) {
               )}
               
               {item.href ? (
-                <Link
-                  to={item.href}
-                  className="flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                  itemProp="item"
-                >
-                  <span itemProp="name" className="flex items-center">
+                <>
+                  <Link
+                    to={item.href}
+                    className="flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                    itemProp="item"
+                  >
+                    <span className="flex items-center">
+                      {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
+                      {index === 0 ? "Home" : item.label}
+                    </span>
+                  </Link>
+                  <meta itemProp="name" content={index === 0 ? "Home" : item.label} />
+                </>
+              ) : (
+                <>
+                  <span 
+                    className="flex items-center text-gray-900 dark:text-gray-100 font-medium"
+                  >
                     {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
                     {index === 0 ? "Home" : item.label}
                   </span>
-                  <meta itemProp="@id" content={`${siteUrl}${item.href}`} />
-                </Link>
-              ) : (
-                <span 
-                  className="flex items-center text-gray-900 dark:text-gray-100 font-medium"
-                  itemProp="name"
-                >
-                  {item.icon && <span className="mr-1 text-gray-900 dark:text-gray-100">{item.icon}</span>}
-                  {index === 0 ? "Home" : item.label}
-                </span>
+                  <meta itemProp="name" content={index === 0 ? "Home" : item.label} />
+                </>
               )}
               <meta itemProp="position" content={String(index + 1)} />
             </li>
