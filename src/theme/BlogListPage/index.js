@@ -375,27 +375,18 @@ function BlogListPageContent(props) {
   const { metadata, items, sidebar } = props
   const location = useLocation()
 
-  // Filter out customer stories from blog listing
-  const filteredItems = items.filter((item) => {
-    const tags = item.content.metadata.tags || []
-    const slug = item.content.metadata.slug || ''
-    // Exclude if it has customer-stories tag or is in customer-stories slug path
-    return !tags.some(tag => tag.label === 'Customer Stories' || tag.label === 'customer-stories') && 
-           !slug.includes('customer-stories')
-  })
-
   // Check if we're on the iceberg route
   const isIcebergRoute = location.pathname === '/iceberg' || location.pathname === '/iceberg/'
 
   return (
     <BlogLayout sidebar={sidebar}>
       {/* Preload first blog card image to improve LCP on listing */}
-      {filteredItems && filteredItems[0]?.content?.metadata?.frontMatter?.image && (
+      {items && items[0]?.content?.metadata?.frontMatter?.image && (
         <Head>
           <link
             rel='preload'
             as='image'
-            href={useBaseUrl(filteredItems[0].content.metadata.frontMatter.image)}
+            href={useBaseUrl(items[0].content.metadata.frontMatter.image)}
             imagesizes='(max-width: 1024px) 100vw, 33vw'
             fetchpriority='high'
           />
@@ -404,7 +395,7 @@ function BlogListPageContent(props) {
       <BlogHomepageBanner {...props} />
       {/* Conditionally render Query Engine Advertisement */}
       {isIcebergRoute && <QueryEngineAdvertisement />}
-      <BlogPostItems items={filteredItems} />
+      <BlogPostItems items={items} />
       <BlogPagination metadata={metadata} />
     </BlogLayout>
   )
