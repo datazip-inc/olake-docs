@@ -18,7 +18,7 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({
   return (
     <div className="bg-[#1e40af] rounded-xl p-8 my-6 text-white max-w-[800px] mx-auto">
       <p className="text-xl font-medium leading-relaxed mb-6">
-        {quote}
+        "{quote}"
       </p>
       <div className="flex items-center gap-4 mt-4">
         <img 
