@@ -20,6 +20,15 @@ const CustomersPage = () => {
   // Customer stories data
   const customerStories: CustomerStory[] = [
     {
+      title: "From 40-Minute to Sub-Minute Segmentation Queries: How Bitespeed rebuilt its customer segmentation engine using OLake and Apache Iceberg",
+      description: 'Bitespeed is a customer engagement and messaging platform built for modern commerce brands. Learn how they rebuilt their segmentation engine using OLake and Apache Iceberg without breaking their budget.',
+      route: '/customer-stories/bitespeed-segmentation-queries',
+      img: '/img/customers/bitespeed/cover-image-bitespeed.webp',
+      alt: 'Bitespeed customer story',
+      companyName: 'Bitespeed',
+      category: CustomerCategory.CustomerInternet
+    },
+    {
       title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
       description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
       route: '/customer-stories/cordial-real-time-data-sync',
