@@ -23,7 +23,7 @@ const CustomersPage = () => {
       title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
       description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
       route: '/customer-stories/cordial-real-time-data-sync',
-      img: '/img/customers/cordial/cover-image-cordial.webp',
+      img: '/img/customers/cordial/cover-image-cordial.png',
       alt: 'Cordial customer story',
       companyName: 'Cordial',
       category: CustomerCategory.B2B
@@ -32,7 +32,7 @@ const CustomersPage = () => {
       title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
       description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
       route: '/customer-stories/astro-talk-lakehouse-transformation',
-      img: '/img/customers/astrotalk/cover-image-astro.webp',
+      img: '/img/customers/astrotalk/cover-image-astro.png',
       alt: 'Astro Talk customer story',
       companyName: 'Astro Talk',
       category: CustomerCategory.CustomerInternet
