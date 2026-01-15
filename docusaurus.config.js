@@ -1020,10 +1020,95 @@ const config = {
             from: '/docs/connectors',
           },
 
-          // END
-          // Note: Query parameter URLs (e.g., /docs/features?tab=schema) are handled
-          // via canonical tags in the theme files, not through redirects
-
+          // 404 redirects from CSV audit (January 2026)
+          {
+            to: '/docs/core/configs/catalog/',
+            from: '/iceberg/docs/core/configs/catalog/',
+          },
+          {
+            to: '/docs/connectors/oracle#configuration',
+            from: '/docs/writers/connectors/oracle/config/',
+          },
+          {
+            to: '/docs/connectors/mongodb#configuration',
+            from: '/docs/core/connectors/mongodb/config/',
+          },
+          {
+            to: '/docs/connectors/oracle#configuration',
+            from: '/docs/core/connectors/oracle/config/',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/glue/',
+            from: '/iceberg/docs/writers/iceberg/catalog/glue/',
+          },
+          {
+            to: '/docs/connectors/overview/',
+            from: '/docs/writers/connectors/overview/',
+          },
+          {
+            to: '/docs/writers/parquet/partitioning/',
+            from: '/docs/writers/parquet/parquet/partitioning/',
+          },
+          {
+            to: '/docs/writers/iceberg/overview/',
+            from: '/docs/writers/parquet/iceberg/overview/',
+          },
+          {
+            to: '/docs/writers/overview/',
+            from: '/docs/connectors/writers/overview/',
+          },
+          {
+            to: '/docs/connectors/mysql#configuration',
+            from: '/docs/core/connectors/mysql/config/',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/glue/',
+            from: '/writers/iceberg/catalog/glue/',
+          },
+          {
+            to: '/docs/writers/parquet/gcs/',
+            from: '/docs/writers/parquet/gcs/config/',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/overview/',
+            from: '/docs/core/writers/iceberg/catalog/overview/',
+          },
+          {
+            to: '/docs/connectors/mysql#configuration',
+            from: '/docs/writers/connectors/mysql/config/',
+          },
+          {
+            to: '/docs/writers/parquet/s3/',
+            from: '/docs/writers/writers/parquet/s3/',
+          },
+          {
+            to: '/docs/connectors/postgres#configuration',
+            from: '/iceberg/docs/connectors/postgres/config/',
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/overview/',
+            from: '/iceberg/docs/writers/iceberg/catalog/overview/',
+          },
+          {
+            to: '/docs/connectors/mongodb#configuration',
+            from: '/docs/writers/connectors/mongodb/config/',
+          },
+          {
+            to: '/docs/connectors/postgres#configuration',
+            from: '/docs/core/connectors/postgres/config/',
+          },
+          {
+            to: '/docs/jobs/overview/',
+            from: '/docs/writers/jobs/overview/',
+          },
+          {
+            to: '/docs/connectors/postgres#configuration',
+            from: '/docs/writers/connectors/postgres/config/',
+          },
+          {
+            to: '/docs/getting-started/olake-ui/',
+            from: '/docs/connectors/getting-started/olake-ui/',
+          },
           {
             to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
             from: '/slack',
