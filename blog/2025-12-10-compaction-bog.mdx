@@ -11,7 +11,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import BlogCTA from '@site/src/components/BlogCTA';
 
-![compaction diagram](/img/blog/2025/10/compaction_cover.webp)
+![compaction diagram](/img/blog/2025/10/compaction_blog_cover_image.webp)
 
 ## 1. Introduction
 
@@ -80,6 +80,8 @@ Real-time data ingestion is the primary culprit behind small file proliferation.
 **2. Kafka Streaming:** Flink or Spark Streaming jobs reading from Kafka typically commit data at regular intervals (every minute, every 5 minutes, or after N records). Each checkpoint creates new files. With default configurations, a single streaming job can produce 10,000-50,000 files per day.
 
 **3. Micro-Batch Processing:** Even "batch" jobs behave like streaming when run frequently. Organizations running hourly ETL jobs across hundreds of tables create constant file churn. Each run adds new files without consolidating old ones.
+
+![Writer-side mitigation strategies](/img/blog/2026/17/writer_side_mitigation.webp)
 
 This isn't hypothetical. Organizations running CDC or streaming workloads on Iceberg face this exact problem: file counts grow exponentially, query performance degrades, and costs spiral out of control.
 
@@ -319,6 +321,8 @@ This is powerful, but if your ingestion is continuous, you usually don’t want 
 
 Incremental compaction accepts a simple truth: for large, continuously written tables, rewriting everything is usually unnecessary and operationally risky. Instead, incremental compaction rewrites parts of the table in smaller jobs that run frequently.
 
+![compaction diagram](/img/blog/2026/17/incremental_rolling_compaction.webp)
+
 The practical benefits are huge:
 - jobs complete in minutes rather than hours
 - each job produces smaller commits (less conflict risk)
@@ -343,7 +347,20 @@ CALL my_catalog.system.rewrite_data_files(
 ```
 </TabItem>
 <TabItem value="spark" label="Spark">
-Yet to be entered
+```sql
+import org.apache.iceberg.actions.Actions
+  Actions
+  .forTable(spark, "my_catalog.db.my_table")
+  .rewriteDataFiles()
+  // Scope compaction to cold partitions only
+  .filter("event_date < DATE '2026-01-01'")
+  // Target ~256 MB output files
+  .option("target-file-size-bytes", "268435456")
+  // Optional safety controls:
+  // .option("max-concurrent-file-group-rewrites", "4")
+  // .option("partial-progress.enabled", "true")
+  .execute()
+  ```
 </TabItem>
 </Tabs>
 
@@ -363,6 +380,8 @@ Incremental compaction isn’t just “smaller compaction.” It’s a fundament
 **3. Threshold-based compaction** triggers only when fragmentation crosses a boundary file count too high, average file size too low, delete-to-data ratio too large. This prevents unnecessary rewrites.
 
 **4. Predicate-scoped compaction** uses Iceberg’s where filtering to target only the slices that matter. This is one of Iceberg’s most powerful operational features, because it lets you maintain only what needs it without rewriting what’s already healthy.
+
+![incremental strategies flowchart](/img/blog/2026/17/incremental_stratagies-flowchart.webp)
 
 ### 4.4. Why “I compacted, but it’s still slow” often comes down to delete files
 
@@ -472,4 +491,4 @@ Under the hood, this maps to Iceberg procedures like `rewrite_manifests`, `expir
 
 ## 6. Conclusion
 
-
+Compaction in Apache Iceberg is a core maintenance operation, but the right strategy depends on several factors including ingestion patterns, table size and growth rate, query latency requirements, delete behavior, orchestration design, and cloud storage cost constraints. In practice, the most robust production setups blend multiple techniques: continuous incremental compaction to prevent small-file buildup, periodic full table rewrites for deep optimization, metadata-driven triggers for intelligent scheduling, sorting during compaction to improve query performance, and regular snapshot expiration to keep storage lean. When these strategies are combined effectively, Iceberg evolves from a simple table format into a high-performance analytic engine capable of handling real-world streaming workloads and multi-terabyte–scale data pipelines with consistency and efficiency.
