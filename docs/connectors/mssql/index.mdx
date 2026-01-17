@@ -1,0 +1,182 @@
+---
+title: "MSSQL Source Connector Guide | OLake Data Sync & CDC"
+description: Learn to configure OLake MSSQL Connector for fast full refresh, incremental sync, and CDC. Tips on chunking, setup, and troubleshooting errors included.
+sidebar_label: MSSQL
+---
+
+import DateTimeHandling from '@site/src/components/DateTimeHandling';
+
+# Overview {#overview}
+
+The OLake MSSQL Source connector supports multiple synchronization modes. It offers features like parallel chunking, checkpointing, and automatic resume for failed full loads. This connector can be used within the OLake UI or run locally via Docker for open-source workflows.
+
+## Sync Modes Supported
+
+- **Full Refresh**
+- [**Full Refresh + CDC**](/docs/features/#2-sync-modes-supported)
+- [**CDC Only**](/docs/features/#2-sync-modes-supported)
+- **Full Refresh + Incremental**
+
+## Prerequisites
+
+### Version Prerequisites
+        
+- MSSQL Version X.X or higher.
+
+### CDC Prerequisites
+
+SQL Server doesn't allow direct access to the transaction log. Instead, it provides pre-built CDC functionality that parses the transaction log and creates change tables.
+
+To use CDC with OLake, you must enable CDC on both the database and individual tables you want to capture.
+
+#### Enable CDC on Database
+
+Connect to your SQL Server database using Microsoft SQL Server Management Studio or your preferred client, then run:
+
+```sql
+USE MY_DB;
+EXEC sys.sp_cdc_enable_db;
+```
+
+:::tip Cloud Provider Commands
+For hosted cloud provider versions of SQL Server, use these commands instead:
+- **Amazon RDS**: `EXEC msdb.dbo.rds_cdc_enable_db;`
+- **Google Cloud SQL**: `EXEC msdb.dbo.gcloudsql_cdc_enable_db;`
+:::
+
+#### Enable CDC on Tables
+
+After enabling CDC on the database, enable it on each table you want to capture changes from:
+
+```sql
+EXEC sys.sp_cdc_enable_table 
+    @source_schema = 'dbo', 
+    @source_name = 'my_table', 
+    @role_name = 'my_role', 
+    @capture_instance = 'dbo_my_table';
+```
+
+- `@source_schema`: The schema name (typically `'dbo'`)
+- `@source_name`: The table name
+- `@role_name`: The database role that controls access to the change data
+- `@capture_instance`: Optional name for the CDC capture instance (defaults to schema_table if not specified)
+
+#### CDC Limitations
+
+- **Columnstore indexes**: CDC cannot be enabled on tables with a clustered columnstore index. Starting with SQL Server 2016, it can be enabled on tables with a nonclustered columnstore index.
+- **Computed columns**: CDC doesn't support values for computed columns, even if defined as persisted. Computed columns included in a capture instance will always have a value of `NULL`. This is intended behavior, not a bug.
+
+
+### Connection Prerequisites
+
+- Read access to the tables for the MSSQL user.
+
+**After initial Prerequisites are fulfilled, the configurations for MSSQL can be configured.**
+
+---
+
+## Configuration {#configuration}
+
+<Tabs>
+
+<TabItem value="olake-ui" label="Use Olake UI for MSSQL" default>
+
+### 1. Navigate to the Source Configuration Page
+
+1. Complete the [OLake UI Setup Guide](/docs/getting-started/olake-ui)
+2. After logging in to the OLake UI, select the `Sources` tab from the left sidebar.
+3. Click **`Create Source`** on the top right corner.
+4. Select **MSSQL** from the connector dropdown
+5. Provide a name for this source.
+
+### 2. Provide Configuration Details
+
+- Enter MSSQL credentials.
+  <div className='flex w-full justify-center'>
+    <div className='w-3/5'>![Form for creating a Postgres source in OLake, showing fields for endpoint configuration, authentication, and connection options](/img/docs/sources/postgres/postgres-config.webp)</div>
+  </div>
+
+| Field                               | Description                                                                                                                                                                   | Example Value                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Host `required`                     | Hostname or IP address of the MSSQL database server.                                                                                                                          | `MSSQL-host`                                                                                           |
+| Port `required`                     | TCP port on which the MSSQL listener is accepting connections.                                                                                                                | `1433`                                                                                                  |
+| Database Name `required`            | The name of the target database to connect to.                                                                                                                                | `olake-db`                                                                                               |
+| Password `required`                 | The password corresponding to the provided username for authentication.                                                                                                       | `mssqlpwd`                                                                                                 |
+| Username `required`                 | Database user used to authenticate the connection.                                                                                                                            | `mssql-user`                                                                                               |                                                                               
+| Max Threads                         | Maximum number of worker threads the connector can spin up for parallel tasks.                                                                                                | `10`                                                                                                     |
+| JDBC URL Parameters                 | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                                   | `{"connectTimeout":"20"}`                                                                                |
+| SSL Mode                            | SSL configuration for the database connection. Contains details such as the SSL mode.                                                                                         | `disable`                                                                                                |
+| Retry Count                         | Number of times the retry will take place incase of timeout before failing the sync.                                                                                          | `3`                                                                                                      | 
+
+### 3. Test Connection
+
+- Once the connection is validated, the MSSQL source is created. Jobs can then be configured using this source.
+
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting).
+
+</TabItem>
+
+<TabItem value="olake-cli" label="Use OLake CLI for Postgres" default>
+
+### 1. Create Configuration File
+
+    - Once the OLake CLI is setup, create a folder to store configuration files such as `source.json` and `destination.json`.
+
+    The `source.json` file for postgres must contain these mandatory fields.
+
+### 2. Provide Configuration Details
+
+An example `source.json` file will look like this:
+
+<MSSQLSourceConfig />
+
+| Field                               | Description                                                                                                                                                                   | Example Value                                                                                            | Type   |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------ |
+| DB2 Host `required`                 | Hostname or IP address of the MSSQL database server.                                                                                                                          | `MSSQL LUW-host`                                                                                           | String |
+| DB2 Port `required`                 | TCP port on which the MSSQL listener is accepting connections.                                                                                                                | `1433`                                                                                                  | Integer |
+| Database Name `required`            | The name of the target database to connect to.                                                                                                                                | `olake-db`                                                                                               | String |
+| Password `required`                 | The password corresponding to the provided username for authentication.                                                                                                       | `mssqlpwd`                                                                                                 | String |
+| Username `required`                 | Database user used to authenticate the connection.                                                                                                                            | `mssql-user`                                                                                               | String |                                                                              
+| Max Threads                         | Maximum number of worker threads the connector can spin up for parallel tasks.                                                                                                | `10`                                                                                                     | Integer |
+| JDBC URL Parameters                 | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                                   | `{"connectTimeout":"20"}`                                                                                | Object |
+| SSL Mode                            | SSL configuration for the database connection. Contains details such as the SSL mode.                                                                                         | `disable`                                                                                                | Object |
+| Retry Count                         | Number of times the retry will take place incase of timeout before failing the sync.                                                                                          | `3`                                                                                                      | Integer |
+
+
+Similarly, `destination.json` file can be created inside this folder. For more information, see destination documentation.
+
+### 3. Check Source Connection
+
+To verify the database connection following command needs to be run:
+
+```bash title="check command"
+docker run --pull=always \
+-v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+olakego/source-mssql:latest \
+check \
+--config /mnt/config/source.json
+```
+
+- If OLake is able to connect with MSSQL `{"connectionStatus":{"status":"SUCCEEDED"},"type":"CONNECTION_STATUS"}` response is returned.
+
+- In case of connection failure, refer to the [Troubleshooting section](#troubleshooting).
+
+</TabItem>
+
+</Tabs>
+
+---
+
+## Data Type Mapping {#data-type-mapping}
+
+<MSSQLToIcebergDatatypes />
+
+---
+
+
+## Date and Time Handling
+
+<DateTimeHandling />
+
+---
+

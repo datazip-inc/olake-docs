@@ -59,6 +59,9 @@ import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
 import PostgresToIcebergDatatypes from '../../../docs/shared/config/PostgresToIcebergDatatypes.mdx'
 
+import MSSQLSourceConfig from '../../../docs/shared/config/MSSQLSourceConfig.mdx'
+import MSSQLToIcebergDatatypes from '../../../docs/shared/config/MSSQLToIcebergDatatypes.mdx'
+
 import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.mdx'
 import OraclePermissions from '../../../docs/shared/config/OraclePermissions.mdx'
 import OracleToIcebergDatatypes from '../../../docs/shared/config/OracleToIcebergDatatypes.mdx'
@@ -185,6 +188,9 @@ const MDXComponents = {
   PostgresStateConfig,
   PostgresStateConfigDetails,
   PostgresToIcebergDatatypes,
+
+  MSSQLSourceConfig,
+  MSSQLToIcebergDatatypes,
 
   OracleSourceConfig,
   OraclePermissions,

@@ -88,6 +88,7 @@ const docSidebar = {
         'connectors/oracle/index',
         'connectors/kafka/index',
         'connectors/s3/index',
+        'connectors/mssql/index',
       ],
     },
 
