@@ -32,11 +32,9 @@ const config = {
     locales: ['en'],
   },
 
-  customFields: {
-    future: {
-      v4: true,
-      experimental_faster: true
-    }
+  future: {
+    v4: true,
+    experimental_faster: true
   },
 
   presets: [
