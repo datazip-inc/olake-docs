@@ -9,22 +9,11 @@ import Layout from '@theme/Layout';
 import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Andrew Madson",
-    role: "Head of Developer Relations, Fivetran | Data & AI Evangelist",
-    bio: "Andrew is a Data & AI Evangelist, O'Reilly author, keynote speaker, and professor who transforms the complex into the accessible. With multiple master's degrees in data analytics and business management, he bridges technical innovation and practical application. His expertise spans data analytics, machine learning, and AI, complemented by experience as an adjunct instructor at six universities and recognition as a Global Top 20 Data Science Creator.",
-    image: "/img/authors/andrew-madson.webp",
-    linkedin: "https://www.linkedin.com/in/andrew-madson/",
-  },
-  {
-    name: "Harsha Kalbalia",
-    role: "GTM & Founding Member @ Datazip",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
+  HOSTS.ANDREW_MADSON,
+  HOSTS.HARSHA_KALBALIA,
 ];
 
 const WebinarPage = () => {

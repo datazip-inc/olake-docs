@@ -9,23 +9,11 @@ import Layout from '@theme/Layout';
 import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-
-  {
-    name: "Harsha Kalbalia",
-    role: " [Moderator] GTM & Founding Member @ Datazip ",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
-  {
-    name: "Akshat Mathur",
-    role: "Senior Software Engineer @ Cloudera",
-    bio: "As a senior software engineer at Cloudera, Akshat Mathur works on developing and maintaining scalable, reliable, and secure data solutions using Apache Iceberg, Hive, Tez, Trino, and other big data technologies. He collaborates with cross-functional teams to deliver high-quality products and services that meet the needs and expectations of clients and users. He also contributes to the open source community actively as an Apache contributor, where he helps to improve the performance, functionality, and usability of the projects.",
-    image: "/img/authors/akshat.webp",
-    linkedin: "https://www.linkedin.com/in/devakshatmathur/",
-  },
+  HOSTS.HARSHA_KALBALIA,
+  HOSTS.AKSHAT_MATHUR,
 ];
 
 const WebinarPage = () => {
