@@ -32,11 +32,9 @@ const config = {
     locales: ['en'],
   },
 
-  customFields: {
-    future: {
-      v4: true,
-      experimental_faster: true
-    }
+  future: {
+    v4: true,
+    experimental_faster: true
   },
 
   presets: [
@@ -200,26 +198,26 @@ const config = {
         { name: "msvalidate.01", content: "C36AD97FE1CEDCD4041338A807D6BC4C" },
       ],
       headTags: [
-        // Critical resource preloads for mobile performance
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preload',
-            href: '/img/logo/olake-blue-with-text.svg',
-            as: 'image',
-            type: 'image/svg+xml',
-            fetchpriority: 'high'
+          // Critical resource preloads for mobile performance
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/logo/olake-blue-with-text.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
           },
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preload',
-            href: '/img/site/hero-section.svg',
-            as: 'image',
-            type: 'image/svg+xml',
-            fetchpriority: 'high'
-          },
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preload',
+              href: '/img/site/hero-section.svg',
+              as: 'image',
+              type: 'image/svg+xml',
+              fetchpriority: 'high'
+            },
         },
         // Font optimization - preconnect to Google Fonts
         {
@@ -245,7 +243,7 @@ const config = {
             href: 'https://fonts.googleapis.com'
           },
         },
-        // DNS prefetch for external resources
+         // DNS prefetch for external resources
         {
           tagName: 'link',
           attributes: {
@@ -267,7 +265,7 @@ const config = {
             href: 'https://www.googletagmanager.com'
           },
         },
-        // Preconnect to critical domains
+         // Preconnect to critical domains
         {
           tagName: 'link',
           attributes: {
@@ -1118,7 +1116,7 @@ const config = {
   ],
 
   // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags
-
+   
 };
 
 export default config;
