@@ -993,8 +993,6 @@ const config = {
             to: '/docs/writers/parquet/s3',
             from: '/docs/writers/s3/',
           },
-
-          // 404 redirects from Ahrefs audit (trailingSlash: true handles / automatically)
           {
             to: '/docs/writers/iceberg/catalog/glue/',
             from: '/docs/connectors/glue-catalog',
@@ -1019,8 +1017,6 @@ const config = {
             to: '/docs/connectors/overview/',
             from: '/docs/connectors',
           },
-
-          // 404 redirects from CSV audit (January 2026)
           {
             to: '/docs/core/configs/catalog/',
             from: '/iceberg/docs/core/configs/catalog/',
