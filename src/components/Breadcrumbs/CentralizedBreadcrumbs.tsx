@@ -18,7 +18,7 @@ export interface CentralizedBreadcrumbsProps {
   customItems?: BreadcrumbItem[];
   maxTitleLength?: number;
 }
-
+//centralized breadcrumbs component
 const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   type,
   title,
@@ -28,7 +28,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   const { siteConfig } = useDocusaurusContext();
   const location = useLocation();
   const siteUrl = siteConfig.url || 'https://olake.io';
-  
+
   const getBreadcrumbItems = (): BreadcrumbItem[] => {
     if (customItems) {
       return customItems;
@@ -99,16 +99,16 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   const items = getBreadcrumbItems();
 
   return (
-    <nav 
-      className="mb-4" 
+    <nav
+      className="mb-4"
       aria-label="Breadcrumb"
-      itemScope 
+      itemScope
       itemType="https://schema.org/BreadcrumbList"
     >
       <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
         {items.map((item, index) => (
-          <li 
-            key={index} 
+          <li
+            key={index}
             className="flex items-center"
             itemProp="itemListElement"
             itemScope
@@ -117,7 +117,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
             {index > 0 && (
               <ChevronRightIcon className="w-4 h-4 mx-2 text-gray-400" />
             )}
-            
+
             {item.href && !item.current ? (
               <>
                 <Link
@@ -142,12 +142,11 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
               </>
             ) : (
               <>
-                <span 
-                  className={`${
-                    item.current 
-                      ? 'text-gray-900 dark:text-gray-100 font-medium' 
+                <span
+                  className={`${item.current
+                      ? 'text-gray-900 dark:text-gray-100 font-medium'
                       : 'text-gray-600 dark:text-gray-400'
-                  }`}
+                    }`}
                   aria-label={item.fullLabel || item.label}
                   title={item.fullLabel || item.label}
                 >
