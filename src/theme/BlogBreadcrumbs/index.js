@@ -77,8 +77,6 @@ export default function BlogBreadcrumbs() {
             : "text-gray-600 dark:text-gray-400"
         )}
         itemProp="item"
-        itemScope
-        itemType="https://schema.org/Thing" 
         aria-label={item.fullLabel || item.label}
         title={item.fullLabel || item.label}
       >
@@ -95,10 +93,9 @@ export default function BlogBreadcrumbs() {
             item.label
           )}
         </span>
-        {/* Hidden full title for search engines in schema.org markup */}
-        <meta itemProp="name" content={item.fullLabel || item.label} />
-        <meta itemProp="@id" content={`${siteUrl}${item.href}`} /> 
       </Link>
+      {/* Schema.org markup for breadcrumb item */}
+      <meta itemProp="name" content={item.fullLabel || item.label} />
       <meta itemProp="position" content={String(index + 1)} />
     </li>
   );
