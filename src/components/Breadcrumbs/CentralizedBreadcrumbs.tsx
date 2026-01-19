@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
+import { useLocation } from '@docusaurus/router';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { truncateTitle } from '../../lib/utils';
@@ -25,6 +26,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
   maxTitleLength = 70
 }) => {
   const { siteConfig } = useDocusaurusContext();
+  const location = useLocation();
   const siteUrl = siteConfig.url || 'https://olake.io';
   
   const getBreadcrumbItems = (): BreadcrumbItem[] => {
@@ -161,6 +163,7 @@ const CentralizedBreadcrumbs: React.FC<CentralizedBreadcrumbsProps> = ({
                 </span>
                 {/* Schema.org markup for breadcrumb item */}
                 <meta itemProp="name" content={item.fullLabel || item.label} />
+                <link itemProp="item" href={`${siteUrl}${item.href || location.pathname}`} />
               </>
             )}
             <meta itemProp="position" content={String(index + 1)} />
