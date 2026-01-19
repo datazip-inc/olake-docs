@@ -10,6 +10,7 @@ import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBrea
 import React from "react";
 import Hr from '../../components/Hr';
 import { HOSTS } from '../../data/webinarHosts';
+//centralized component for hosts 
 
 const hosts = [
   HOSTS.HARSHA_KALBALIA,
