@@ -1106,10 +1106,6 @@ const config = {
             from: '/docs/connectors/getting-started/olake-ui/',
           },
           {
-            to: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
-            from: '/slack',
-          },
-          {
             to: 'https://github.com/datazip-inc/olake',
             from: '/github',
           },

@@ -96,9 +96,9 @@ const Glace: React.FC<GlaceProps> = ({
             </div>
 
             {/* Main Heading */}
-            <h4 className='mb-4 text-center text-3xl font-bold text-gray-900 dark:text-white md:text-4xl lg:text-left lg:text-5xl'>
+            <h1 className='mb-4 text-center text-3xl font-bold text-gray-900 dark:text-white md:text-4xl lg:text-left lg:text-5xl'>
               <span className='font-thin'>Migrate to Iceberg </span> In Days, Not Months
-            </h4>
+            </h1>
 
             {/* Subtitle */}
             <p className='mb-8 text-center text-lg text-[#000000] dark:text-gray-300 lg:text-left'>
