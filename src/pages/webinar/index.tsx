@@ -187,6 +187,19 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Iceberg for Agents: Building AI-Ready Data Pipelines',
+      subtitle:
+        'AI agents fail in production because they\'re overwhelmed with data but starved for context. LLM models aren\'t the problem. The bottleneck is the data stack: fragmented silos, inconsistent definitions, and logic hidden in tribal knowledge. In this session, Andrew Madsen shows how Apache Iceberg becomes the backbone of AI-ready pipelines, elevating your implementation from a storage format to a live context layer that powers structured RAG, schema-aware agents, and autonomous reasoning.',
+      route: '/webinar/w-14-iceberg-for-agents',
+      img: `/img/webinars/w-14-iceberg-for-agents.webp`,
+      alt: 'Iceberg for Agents: Building AI-Ready Data Pipelines',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '8 January 2025',
+      icon: FaVideo
+    },
+    {
       title: 'Fireside Chat: Apache Iceberg in Production',
       subtitle:
         'Join Jacopo Tagliabue (Co-founder/CTO, Bauplan) and Shubham Satish Baldava (CTO, OLake) for a candid discussion on how Apache Iceberg is reshaping data engineering—from CDC pipelines and branching strategies to deletion vectors and REST catalogs.',
