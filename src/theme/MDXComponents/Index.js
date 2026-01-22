@@ -60,6 +60,8 @@ import PostgresStateConfig from '../../../docs/shared/config/PostgresStateConfig
 import PostgresStateConfigDetails from '../../../docs/shared/config/PostgresStateConfigDetails.mdx'
 import PostgresToIcebergDatatypes from '../../../docs/shared/config/PostgresToIcebergDatatypes.mdx'
 
+import MSSQLSourceConfig from '../../../docs/shared/config/MSSQLSourceConfig.mdx'
+import MSSQLToIcebergDatatypes from '../../../docs/shared/config/MSSQLToIcebergDatatypes.mdx'
 import DB2SourceConfig from '../../../docs/shared/config/DB2SourceConfig.mdx'
 import DB2ToIcebergDatatypes from '../../../docs/shared/config/DB2ToIcebergDatatypes.mdx'
 
@@ -191,6 +193,8 @@ const MDXComponents = {
   PostgresStateConfigDetails,
   PostgresToIcebergDatatypes,
 
+  MSSQLSourceConfig,
+  MSSQLToIcebergDatatypes,
   DB2SourceConfig,
   DB2ToIcebergDatatypes,
 
