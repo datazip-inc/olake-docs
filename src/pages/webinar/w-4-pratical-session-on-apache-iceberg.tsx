@@ -10,22 +10,11 @@ import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBrea
 import React from "react";
 import Hr from '../../components/Hr';
 import { FaRegCalendarAlt } from 'react-icons/fa';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Sachin Tripathi",
-    role: "[Guest] Senior Data Engineer @ EarnIn",
-    bio: "Seasoned data software engineer with a track record spanning over 7 years in the Financial Products sector. Specialised in designing cost-effective and efficient data stacks for diverse teams",
-    image: "/img/authors/sachin.webp",
-    linkedin: "https://www.linkedin.com/in/tripathisachin/",
-  },
-  {
-    name: "Harsha Kalbalia",
-    role: " [Moderator] GTM & Founding Member @ Datazip ",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
+  HOSTS.SACHIN_TRIPATHI,
+  HOSTS.HARSHA_KALBALIA,
 ];
 
 const WebinarPage = () => {

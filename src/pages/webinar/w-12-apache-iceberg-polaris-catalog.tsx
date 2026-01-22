@@ -11,22 +11,11 @@ import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Alex Merced",
-    role: "Head of DevRel @ Dremio",
-    bio: "Alex Merced is a leading voice in the data lakehouse ecosystem and a prolific contributor to the Apache Iceberg community. He is the co-author of O'Reilly's Definitive Guide to Apache Iceberg and Polaris, and author of Manning's Architecting an Iceberg Lakehouse. As Head of Developer Relations at Dremio, Alex champions open-source data technologies and helps organizations navigate modern data architectures. He's also a LinkedIn Learning instructor and creator of DataLakehouseHub.com, where he shares insights on building scalable data platforms.",
-    image: "/img/authors/alex-merced.webp",
-    linkedin: "https://www.linkedin.com/in/alexmerced",
-  },
-  {
-    name: "Akshay Kumar Sharma",
-    role: "DevRel @ OLake",
-    bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.webp",
-    linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
-  },
+  HOSTS.ALEX_MERCED,
+  HOSTS.AKSHAY_KUMAR_SHARMA,
 ];
 
 const WebinarPage = () => {
@@ -36,7 +25,7 @@ const WebinarPage = () => {
   };
 
   return (
-    <Layout 
+    <Layout
       title={webinarData.title}
       description={webinarData.summary}
     >
@@ -45,7 +34,7 @@ const WebinarPage = () => {
           type="webinar"
           title={webinarData.title}
         />
-        
+
         <WebinarTitle
           title={`${webinarData.title} `}
           tag="Webinar"

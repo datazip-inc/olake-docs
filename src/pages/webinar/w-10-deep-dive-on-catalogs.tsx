@@ -11,22 +11,11 @@ import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Arsham Eslami",
-    role: "Co-Founder @ Greybeam",
-    bio: "Arsham Eslami is Co-Founder of Greybeam, where he builds automated workload routing systems to optimize Snowflake costs and performance. With extensive experience in data infrastructure automation, Arsham has architected scalable data platforms across multiple startups. His technical expertise spans distributed systems, real-time analytics, and cost optimization for cloud-native data architectures.",
-    image: "/img/authors/arsham.webp",
-    linkedin: "https://www.linkedin.com/in/arsham-eslami/",
-  },
-  {
-    name: "Akshay Kumar Sharma",
-    role: "DevRel @ OLake",
-    bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.webp",
-    linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
-  },
+  HOSTS.ARSHAM_ESLAMI,
+  HOSTS.AKSHAY_KUMAR_SHARMA,
 ];
 
 const WebinarPage = () => {
@@ -36,7 +25,7 @@ const WebinarPage = () => {
   };
 
   return (
-    <Layout 
+    <Layout
       title={webinarData.title}
       description={webinarData.summary}
     >
@@ -45,7 +34,7 @@ const WebinarPage = () => {
           type="webinar"
           title={webinarData.title}
         />
-        
+
         <WebinarTitle
           title={`${webinarData.title} `}
           tag="Webinar"

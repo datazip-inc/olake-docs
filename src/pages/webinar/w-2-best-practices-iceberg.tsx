@@ -8,36 +8,13 @@ import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Amit Gilad",
-    role: "[Guest] Data Engineer",
-    bio: " Amit Gilad, a Data Engineer who's been actively working with Apache Iceberg and data lakes. Currently leading data engineering in stealth, he previously worked as a data engineer at Cloudinary. He has hands-on experience with EMR, Athena, and Spark, and recently shared insights about Iceberg implementations without Spark at the Chill Data Summit.",
-    image: "/img/authors/amit.webp",
-    linkedin: "https://www.linkedin.com/in/amit-gilad-45763433/",
-  },
-  {
-    name: "Yonatan Dolan",
-    role: "[Guest] Principal Analytics Specialist @ AWS",
-    bio: " Yonatan Dolan, a Principal Analytics Specialist at AWS, focusing on Big Data & Analytics in Israel. He's an Apache Iceberg evangelist and actively drives data lake innovations. Before AWS, he led Intel's Pharma Analytics Platform, developing edge-to-cloud AI solutions for clinical trials, and spent 9 years driving advanced analytics projects at Intel.",
-    image: "/img/authors/yonatan.webp",
-    linkedin: "https://www.linkedin.com/in/ydolan/",
-  },
-  {
-    name: "Vishwas Narayan",
-    role: "[Host] Sr. Solution Engineer ",
-    bio: " at InnateMetrics.",
-    image: "/img/authors/author.webp",
-    linkedin: "https://www.linkedin.com/in/vishwas-narayana/",
-  },
-  {
-    name: "Harsha Kalbalia",
-    role: " [Moderator] GTM & Founding Member @ Datazip ",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
+  HOSTS.AMIT_GILAD,
+  HOSTS.YONATAN_DOLAN,
+  HOSTS.VISHWAS_NARAYAN,
+  HOSTS.HARSHA_KALBALIA,
 ];
 
 
@@ -58,7 +35,7 @@ const WebinarPage = () => {
           type="webinar"
           title={webinarData.title}
         />
-        
+
         <WebinarTitle
           title={webinarData.title}
           tag="Webinar"

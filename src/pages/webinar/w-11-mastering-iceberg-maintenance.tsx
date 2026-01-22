@@ -11,22 +11,11 @@ import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Amit Gilad",
-    role: "CTO @ Lakeops",
-    bio: "Apache Iceberg enthusiast and ex-data engineer at Cloudinary. Amit focus revolves around leveraging the power of data lakes and diving into Apache Iceberg. He's deeply focused on harnessing the potential of data lakes, orchestrating the organization and management of vast datasets to extract valuable insights.",
-    image: "/img/authors/amit.webp",
-    linkedin: "https://www.linkedin.com/in/amitgilad",
-  },
-  {
-    name: "Akshay Kumar Sharma",
-    role: "DevRel @ OLake",
-    bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.webp",
-    linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
-  },
+  HOSTS.AMIT_GILAD,
+  HOSTS.AKSHAY_KUMAR_SHARMA,
 ];
 
 const WebinarPage = () => {
@@ -36,7 +25,7 @@ const WebinarPage = () => {
   };
 
   return (
-    <Layout 
+    <Layout
       title={webinarData.title}
       description={webinarData.summary}
     >
@@ -45,7 +34,7 @@ const WebinarPage = () => {
           type="webinar"
           title={webinarData.title}
         />
-        
+
         <WebinarTitle
           title={`${webinarData.title} `}
           tag="Webinar"

@@ -5,6 +5,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
+import TestimonialCard from '@site/src/components/TestimonialCard'
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
@@ -61,6 +62,8 @@ import PostgresToIcebergDatatypes from '../../../docs/shared/config/PostgresToIc
 
 import MSSQLSourceConfig from '../../../docs/shared/config/MSSQLSourceConfig.mdx'
 import MSSQLToIcebergDatatypes from '../../../docs/shared/config/MSSQLToIcebergDatatypes.mdx'
+import DB2SourceConfig from '../../../docs/shared/config/DB2SourceConfig.mdx'
+import DB2ToIcebergDatatypes from '../../../docs/shared/config/DB2ToIcebergDatatypes.mdx'
 
 import OracleSourceConfig from '../../../docs/shared/config/OracleSourceConfig.mdx'
 import OraclePermissions from '../../../docs/shared/config/OraclePermissions.mdx'
@@ -139,6 +142,7 @@ const MDXComponents = {
   TabItem,
   Hr,
   BlogCTA,
+  TestimonialCard,
   DocCardList,
 
   DockerDiscoverMongoDB,
@@ -191,6 +195,8 @@ const MDXComponents = {
 
   MSSQLSourceConfig,
   MSSQLToIcebergDatatypes,
+  DB2SourceConfig,
+  DB2ToIcebergDatatypes,
 
   OracleSourceConfig,
   OraclePermissions,
