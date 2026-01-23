@@ -37,6 +37,9 @@ const config = {
     experimental_faster: true
   },
 
+  // Client modules for handling client-side functionality
+  clientModules: [require.resolve('./src/clientModules/hashScroll.ts')],
+
   presets: [
     [
       'classic',
