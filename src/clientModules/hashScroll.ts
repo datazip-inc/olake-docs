@@ -18,7 +18,6 @@ const DEFAULT_NAVBAR_HEIGHT = 60
 const EXTRA_PADDING = 16
 const SPA_NAV_DURATION = 2000
 
-let initialLoadHandled = false
 let spaTimeoutId: NodeJS.Timeout | null = null
 let rafId: number | null = null
 let isUserInteracting = false
@@ -110,7 +109,6 @@ export function onClientEntry(): void {
     } else {
       window.addEventListener('load', handleWindowLoad)
     }
-    initialLoadHandled = true
   }
 }
 
