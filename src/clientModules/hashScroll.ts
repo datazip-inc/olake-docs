@@ -1,9 +1,16 @@
 /**
- * Client module to fix anchor link scrolling in Docusaurus SPA.
+ * Client module to mitigate anchor link misalignment in a Docusaurus SPA.
  *
- * Problem: Layout shifts (images loading/hydration) move the target element after initial render.
- * Solution: Wait for window.onload (all resources loaded), then scroll.
- *           ABORT if user interacts to prevent "fighting".
+ * Problem:
+ * - Docusaurus performs early anchor scrolling during route transitions.
+ * - Subsequent layout shifts (MDX hydration, images, fonts) can move the
+ *   target element after the initial scroll, leaving the anchor misaligned.
+ *
+ * Approach (Pragmatic):
+ * - Defer the first scroll until `window.onload` to avoid the earliest shifts.
+ * - During SPA navigations, re-assert the scroll position for a short window.
+ * - Immediately abort if the user interacts (wheel/touch/keys/mouse) to avoid
+ *   fighting user intent.
  */
 
 const NAVBAR_SELECTOR = '.navbar'
