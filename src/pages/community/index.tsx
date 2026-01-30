@@ -94,7 +94,7 @@ const CommunityPage = () => {
     url: canonicalUrl,
     name: 'OLake Community',
     description:
-      'Join the fastest growing data engineering community. Connect, learn, and contribute with 350+ passionate practitioners.',
+      'Join the fastest growing data engineering community. Connect, learn, and contribute with 500+ passionate practitioners.',
     isPartOf: {
       '@type': 'WebSite',
       url: 'https://olake.io/',
@@ -281,21 +281,21 @@ const CommunityPage = () => {
   ]
 
   const stats = [
-    { label: 'Community Members', value: '350+' },
-    { label: 'Contributors', value: '25+' },
-    { label: 'Pull Requests', value: '340+' },
-    { label: 'Issues Resolved', value: '120+' }
+    { label: 'Community Members', value: '500+' },
+    { label: 'Contributors', value: '35+' },
+    { label: 'Pull Requests', value: '500+' },
+    { label: 'Issues Resolved', value: '150+' }
   ]
 
   return (
     <Layout
       title='OLake Community'
-      description='Join the fastest growing data engineering community. Connect, learn, and contribute with 350+ passionate practitioners.'
+      description='Join the fastest growing data engineering community. Connect, learn, and contribute with 500+ passionate practitioners.'
     >
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content='OLake Community' />
-        <meta property='og:description' content='Join the fastest growing data engineering community. Connect, learn, and contribute with 350+ passionate practitioners.' />
+        <meta property='og:description' content='Join the fastest growing data engineering community. Connect, learn, and contribute with 500+ passionate practitioners.' />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
@@ -320,7 +320,7 @@ const CommunityPage = () => {
           </>
         }
         subtitle='Welcome to OLake Community'
-        description='Become part of our community of 350+ builders redefining the future of data lakehouses'
+        description='Become part of our community of 500+ builders redefining the future of data lakehouses'
         cta={
           <div className='flex flex-wrap justify-center gap-4'>
             <Button href='https://olake.io/slack' size='lg' external>
