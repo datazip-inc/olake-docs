@@ -686,6 +686,10 @@ const config = {
             from: '/blog/customer-stories/astro-talk-lakehouse-transformation',
           },
           {
+            to: '/customer-stories/physicswallah-mongodb-cdc-iceberg',
+            from: '/blog/customer-stories/physicswallah-mongodb-cdc-iceberg',
+          },
+          {
             to: '/docs/getting-started/quickstart',
             from: '/docs/getting-started/',
           },
