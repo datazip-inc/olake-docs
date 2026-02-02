@@ -10,23 +10,9 @@ import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/8th-meetup.json';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
 import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';
+import { HOSTS } from '../../data/webinarHosts';
 
-const hosts = [
-  {
-    name: "Akshay Kumar Sharma",
-    role: "DevRel @ OLake",
-    bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.webp",
-    linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
-  },
-  {
-    name: "Schitiz Sharma",
-    role: "DevOps Engineer @ OLake",
-    bio: "OLake Maintainer and DevOps engineer with expertise in Kubernetes deployments, Helm charts, and infrastructure automation for data engineering platforms.",
-    image: "/img/authors/schitiz.webp",
-    linkedin: "https://www.linkedin.com/in/schitizsharma",
-  },
-];
+const hosts = [HOSTS.AKSHAY_KUMAR_SHARMA, HOSTS.SCHITIZ_SHARMA];
 
 const decks: Slide[] = [
   { title: '8th OLake Community Meetup', url: 'https://docs.google.com/presentation/d/1QvuMbxpsklrmvE2NVacowKcRDnZEZOmc-9FJGprKHgw/edit?usp=sharing' },
