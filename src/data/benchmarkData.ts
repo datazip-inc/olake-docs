@@ -47,14 +47,14 @@ export const FULL_LOAD = {
         estuary: '0.34 Billion'
     },
     elapsedTimeFull: {
-        olake: '3.5 hours',
+        olake: '1.91 hours',
         airbyte: '7.5 hours (failed sync)',
         fivetran: '24 hours',
         debezium: '24 hours',
         estuary: '24 hours'
     },
     speedFull: {
-        olake: '3,19,562 RPS',
+        olake: '5,80,113 RPS',
         airbyte: '457 RPS',
         fivetran: '46,395 RPS',
         debezium: '14,839 RPS',
@@ -62,13 +62,13 @@ export const FULL_LOAD = {
     },
     comparisonFull: {
         olake: '-',
-        airbyte: '699.2 × slower',
-        fivetran: '6.8× slower',
-        debezium: '21.5 × slower',
-        estuary: '80.2 × slower'
+        airbyte: '1270 × slower',
+        fivetran: '12.5 × slower',
+        debezium: '39.1 × slower',
+        estuary: '146 × slower'
     },
     costFull: {
-        olake: '$ 10',
+        olake: '$ 6',
         airbyte: '$ 5,560',
         fivetran: '$ 0 (Free full load)',
         debezium: '$ 75',
