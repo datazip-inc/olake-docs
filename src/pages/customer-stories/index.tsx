@@ -45,6 +45,15 @@ const CustomersPage = () => {
       alt: 'Astro Talk customer story',
       companyName: 'Astro Talk',
       category: CustomerCategory.CustomerInternet
+    },
+    {
+      title: "PhysicsWallah Evaluates MongoDB CDC Ingestion into a Lakehouse with Apache Iceberg and OLake",
+      description: 'At PhysicsWallah, the Data Engineering team operates a large-scale lakehouse platform that powers analytics, reporting, and AI-driven use cases. A significant portion of operational data originates from MongoDB, making reliable and scalable CDC ingestion a foundational requirement.',
+      route: '/customer-stories/physicswallah-mongodb-cdc-iceberg',
+      img: '/img/customers/physicswallah/cover-image-pw.webp',
+      alt: 'PhysicsWallah customer story',
+      companyName: 'PhysicsWallah',
+      category: CustomerCategory.CustomerInternet
     }
   ];
 
