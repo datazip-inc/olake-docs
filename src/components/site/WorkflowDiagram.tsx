@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { PiPath, PiLinktreeLogo } from 'react-icons/pi'
 
 // Workflow step configuration
@@ -154,7 +154,7 @@ const WorkflowDiagram: React.FC<WorkflowDiagramProps> = ({ highlightedIndex = 0,
   const mobileContainerRef = React.useRef<HTMLDivElement | null>(null)
 
   // Auto-scroll to highlighted pill on mobile only (horizontal scroll within container)
-  React.useEffect(() => {
+  useEffect(() => {
     const container = mobileContainerRef.current
     const highlightedPill = pillRefs.current[highlightedIndex]
 

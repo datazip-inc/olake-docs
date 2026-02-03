@@ -64,6 +64,7 @@ const OLakeContent: React.FC = () => {
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Center the scroll view on mount
     if (scrollRef.current) {
       scrollRef.current.scrollLeft =
         (scrollRef.current.scrollWidth - scrollRef.current.clientWidth) / 2
@@ -223,7 +224,8 @@ const CatalogItem: React.FC<{ src: string; alt: string; label: string }> = ({
 const IcebergCatalogsContent: React.FC = () => {
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
-  React.useEffect(() => {
+  useEffect(() => {
+    // Center the scroll view on mount
     if (scrollRef.current) {
       scrollRef.current.scrollLeft =
         (scrollRef.current.scrollWidth - scrollRef.current.clientWidth) / 2

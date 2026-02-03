@@ -75,7 +75,6 @@ const SetupStepsSection: React.FC = () => {
   }
 
   // Handle video completion
-  // Handle video completion
   const handleVideoEnded = () => {
     setActiveStep((prev) => (prev + 1) % STEPS.length)
   }

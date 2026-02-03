@@ -13,25 +13,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   return (
     <div className='mx-auto flex w-full flex-col-reverse items-center justify-between overflow-hidden py-8 xl:container md:px-6 md:py-16 lg:flex-row lg:px-0 lg:py-20'>
-      {/* Mobile Image - Only visible on mobile */}
-      {/* 
-      <div className='md:hidden'>
-        <StatsSection />
-      </div>
-
-      <div className='mb-8 w-full lg:hidden'>
-        <div className='flex justify-center'>
-          <img
-            src='/img/site/hero-section.svg'
-            alt='Olake Data Replication Dashboard'
-            className='h-auto max-w-[80%] dark:brightness-90 dark:filter'
-            loading='eager'
-            fetchPriority='high'
-            decoding='async'
-          />
-        </div>
-      </div> */}
-
       {/* Left Column - contains 2 rows */}
       <div className='container mt-0 flex w-full flex-col lg:mt-0'>
         {/* Row 1: "Fastest way to replicate..." section */}

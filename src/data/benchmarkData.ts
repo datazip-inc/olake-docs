@@ -134,13 +134,10 @@ export const CONNECTOR_METRIC_LABELS = {
 
 // =============================================================================
 // CONNECTOR BENCHMARK DATA (Full Load)
-// Data sourced from /docs/benchmarks - Full Load performance only
 // Edit the values below to update benchmark numbers for each connector
 // =============================================================================
 
 export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
-  // MongoDB Full Load Benchmark
-  // Source: 230 million rows (664.81GB) Twitter data
   mongodb: {
     hasData: true,
     rowsSynced: {
@@ -180,9 +177,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // Kafka Batch Load Benchmark
-  // Source: 1 billion messages (144 bytes avg)
-  // Note: Kafka benchmark compares OLake against Apache Flink
   kafka: {
     hasData: true,
     rowsSynced: {
@@ -227,8 +221,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // Oracle Full Load Benchmark
-  // Source: 4.01 billion rows NYC Taxi Data
   oracle: {
     hasData: true,
     rowsSynced: {
@@ -268,8 +260,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // MySQL Full Load Benchmark
-  // Source: 4.0 billion rows NYC Taxi Data
   mysql: {
     hasData: true,
     rowsSynced: {
@@ -309,8 +299,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // Postgres Full Load Benchmark
-  // Source: 4.01 billion rows NYC Taxi Data
   postgres: {
     hasData: true,
     rowsSynced: {
@@ -350,8 +338,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // S3 Full Load Benchmark
-  // Placeholder - Update with actual benchmark data
   s3: {
     hasData: false,
     rowsSynced: {
@@ -391,8 +377,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // MSSQL Full Load Benchmark
-  // Placeholder - Update with actual benchmark data
   mssql: {
     hasData: false,
     rowsSynced: {
@@ -432,8 +416,6 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     }
   },
 
-  // DB2 Full Load Benchmark
-  // Placeholder - Update with actual benchmark data
   db2: {
     hasData: false,
     rowsSynced: {
@@ -476,13 +458,10 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
 
 // =============================================================================
 // CONNECTOR CDC BENCHMARK DATA
-// Data sourced from /docs/benchmarks - CDC performance only
 // Edit the values below to update CDC benchmark numbers for each connector
 // =============================================================================
 
 export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
-  // MongoDB CDC Benchmark
-  // Source: 1 Million Rows (2.88GB, 999450 records) across 10 collections
   mongodb: {
     hasData: false,
     rowsSynced: {
@@ -522,7 +501,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // Kafka CDC Benchmark - Not applicable (batch-based)
   kafka: {
     hasData: false,
     rowsSynced: {
@@ -567,7 +545,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // Oracle CDC Benchmark - Coming Soon
   oracle: {
     hasData: false,
     rowsSynced: {
@@ -607,8 +584,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // MySQL CDC Benchmark
-  // Source: 50 million rows
   mysql: {
     hasData: true,
     rowsSynced: {
@@ -648,8 +623,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // Postgres CDC Benchmark
-  // Source: 50 million changes
   postgres: {
     hasData: true,
     rowsSynced: {
@@ -689,7 +662,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // S3 CDC Benchmark - Coming Soon
   s3: {
     hasData: false,
     rowsSynced: {
@@ -729,7 +701,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // MSSQL CDC Benchmark - Coming Soon
   mssql: {
     hasData: false,
     rowsSynced: {
@@ -769,7 +740,6 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     }
   },
 
-  // DB2 CDC Benchmark - Coming Soon
   db2: {
     hasData: false,
     rowsSynced: {
