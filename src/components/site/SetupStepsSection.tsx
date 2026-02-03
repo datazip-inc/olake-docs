@@ -1,199 +1,281 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import clsx from 'clsx'
+
+const STEPS = [
+  {
+    step: 'Step I',
+    title: 'Job Config',
+    video: '/videos/config.mp4'
+  },
+  {
+    step: 'Step II',
+    title: 'Source',
+    video: '/videos/source.mp4'
+  },
+  {
+    step: 'Step III',
+    title: 'Destination',
+    video: '/videos/destination.mp4'
+  },
+  {
+    step: 'Step IV',
+    title: 'Schema',
+    video: '/videos/schema.mp4'
+  }
+]
+
+// Animated connector (reusable for vertical/horizontal)
+const Connector: React.FC<{
+  index: number
+  activeStep: number
+  orientation?: 'vertical' | 'horizontal'
+}> = ({ index, activeStep, orientation = 'vertical' }) => {
+  // Logic from WorkflowDiagram:
+  // Fills when we move TO the next step.
+  // Connector i connects Step i to Step i+1.
+  // It should animate when activeStep becomes i+1.
+  const isFullyFilled = activeStep > index + 1
+  const isAnimating = activeStep === index + 1
+  const isActive = isFullyFilled || isAnimating
+
+  const isVertical = orientation === 'vertical'
+
+  return (
+    <div
+      className={clsx(
+        'relative overflow-hidden bg-neutral-200',
+        isVertical ? 'h-full w-0.5' : 'h-0.5 w-full'
+      )}
+    >
+      <div
+        className={clsx(
+          'duration-[800ms] absolute inset-0 transition-transform ease-out',
+          isVertical
+            ? 'origin-top bg-gradient-to-b from-[#203FDD] to-[#4F6AE8]'
+            : 'origin-left bg-gradient-to-r from-[#203FDD] to-[#4F6AE8]',
+          isActive
+            ? isVertical
+              ? 'scale-y-100'
+              : 'scale-x-100'
+            : isVertical
+              ? 'scale-y-0'
+              : 'scale-x-0'
+        )}
+      />
+    </div>
+  )
+}
 
 const SetupStepsSection: React.FC = () => {
-  const [selectedConnector, setSelectedConnector] = useState('postgres')
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [activeStep, setActiveStep] = useState(0)
 
-  const connectors = [
-    { id: 'mongodb', name: 'MongoDB', color: 'bg-gray-100', icon: '/img/site/mongodb.svg' },
-    { id: 'postgres', name: 'PostgreSQL', color: 'bg-gray-100', icon: '/img/site/postgres.svg' },
-    { id: 'mysql', name: 'MySQL', color: 'bg-gray-100', icon: '/img/site/mysql.svg' }
-  ]
-  const stepDescriptions = [
-    {step: 'Step I', title: 'Source'},
-    {step: 'Step II', title: 'Destination'},
-    {step: 'Step III', title: 'Schema'},
-    {step: 'Step IV', title: 'Job Config'}
-  ]
-
-  const getConnectorUrl = () => {
-    return `https://olake.io/docs/connectors/${selectedConnector}/overview`
+  // Handle manual step selection
+  const handleStepClick = (index: number) => {
+    setActiveStep(index)
   }
 
-  const toggleDropdown = () => {
-    setDropdownOpen(!dropdownOpen)
+  // Handle video completion
+  // Handle video completion
+  const handleVideoEnded = () => {
+    setActiveStep((prev) => (prev + 1) % STEPS.length)
   }
 
-  const handleConnectorSelect = (connectorId: string) => {
-    setSelectedConnector(connectorId)
-    setDropdownOpen(false)
-  }
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  const getSelectedConnector = () => {
-    return connectors.find((connector) => connector.id === selectedConnector)
-  }
+  // Auto-scroll to active step on mobile
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    const activeElement = document.getElementById(`step-indicator-${activeStep}`)
+
+    if (container && activeElement && window.innerWidth < 640) {
+      const scrollLeft =
+        activeElement.offsetLeft - container.clientWidth / 2 + activeElement.clientWidth / 2
+
+      container.scrollTo({
+        left: scrollLeft,
+        behavior: 'smooth'
+      })
+    }
+  }, [activeStep])
 
   return (
     <section className='py-16 dark:bg-gray-900 md:py-24'>
       <div className='container mx-auto px-4 md:px-6'>
-        <div className='mx-auto grid max-w-6xl items-center gap-8 md:grid-cols-2'>
-          {/* Left Side - Steps */}
-          <div>
-            <div className='mb-3 text-xl font-semibold tracking-wide text-[#203FDD]'>
+        <div className='mx-auto flex flex-col gap-12 lg:grid lg:max-w-7xl lg:grid-cols-2 lg:items-center'>
+          {/* Left Side - Steps Navigation */}
+          <div className='w-full'>
+            <div className='mb-3 text-xs font-medium tracking-wide text-[#203FDD] sm:text-2xl'>
               The OLake Experience
             </div>
-            <h2 className='mb-16 text-4xl font-bold tracking-wider text-gray-900 dark:text-white md:text-5xl'>
+            <h2 className='mb-16 text-xl font-medium leading-tight tracking-[-0.05em] text-gray-900 dark:text-white sm:text-[40px] sm:tracking-wider md:text-5xl'>
               Fast & Efficient
-              <br />
+              <span className='sm:hidden'>, </span>
+              <br className='hidden sm:block' />
               That is OLake
             </h2>
 
-            <div className='flex flex-col'>
-              { stepDescriptions.map((item,index)=>(
-                <div key={index} className='flex'>
-                <div className='mr-4 flex flex-col items-center'>
-                  {/* <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#203FDD]'> */}
-                  <div className='z-40 h-2 w-2 rounded-full bg-white outline outline-2 outline-[#e5e5e5]'></div>
-                  {/* </div> */}
-                  <div className='h-20 w-0.5 bg-[#e5e5e5]'></div>
-                </div>
-                {/* <div className='pb-10'> */}
-                <div className='flex flex-col'>
-                  <div className='mb-1 text-sm text-[#8A8A8A]'>{item.step}</div>
-                  <div className='text-2xl font-bold text-gray-900 dark:text-white'>{item.title}</div>
-                </div>
-                {/* </div> */}
-              </div>
+            <div
+              ref={scrollContainerRef}
+              className='scrollbar-hide relative -mx-4 flex flex-row overflow-x-auto px-4 sm:mx-0 sm:flex-col sm:overflow-visible sm:px-0'
+            >
+              {STEPS.map((item, index) => {
+                const isActive = activeStep === index
+                // const isPast = activeStep > index
 
-              ))
-              }
-             
+                return (
+                  <div
+                    key={index}
+                    id={`step-indicator-${index}`}
+                    className='group flex min-w-max flex-shrink-0 cursor-pointer items-center transition-opacity duration-300 sm:w-auto sm:min-w-0 sm:items-stretch'
+                    onClick={() => handleStepClick(index)}
+                    role='button'
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && handleStepClick(index)}
+                  >
+                    <div className='mr-3 flex flex-col items-center sm:mr-6'>
+                      {/* Circle Indicator */}
+                      <div
+                        className={clsx(
+                          'z-10 h-[7px] w-[7px] rounded-full border-[3px] border-solid transition-all duration-300 sm:h-4 sm:w-4',
+                          isActive
+                            ? 'border-[#193AE6] bg-[#193AE6] shadow-[0_0_0_4px_#EEF2FF]'
+                            : index < activeStep
+                              ? 'border-[#193AE6] bg-white'
+                              : 'border-neutral-200 bg-white group-hover:border-neutral-400'
+                        )}
+                      />
+                      {/* Vertical Connector Line (Desktop Only) */}
+                      {index < STEPS.length - 1 && (
+                        <div className='hidden h-20 w-0.5 sm:block'>
+                          <Connector index={index} activeStep={activeStep} orientation='vertical' />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className='flex items-center pb-0 transition-all duration-300 sm:block sm:pb-2'>
+                      {/* Mobile Text: Inline */}
+                      <div className='flex items-center whitespace-nowrap sm:hidden'>
+                        <span className='mr-1 font-helvetica text-xs font-medium text-[#8A8A8A]'>
+                          {item.step} /
+                        </span>
+                        <span
+                          className={clsx(
+                            'font-helvetica text-sm font-medium leading-none transition-colors',
+                            isActive ? 'text-[#203FDD]' : 'text-black dark:text-white'
+                          )}
+                        >
+                          {item.title}
+                        </span>
+                      </div>
+
+                      {/* Desktop Text: Stacked (Original) */}
+                      <div className='hidden sm:block'>
+                        <div className='mb-0.5 font-helvetica text-base font-medium leading-[30.37px] text-[#8A8A8A]'>
+                          {item.step}
+                        </div>
+                        <div
+                          className={clsx(
+                            'font-helvetica text-xl font-medium leading-none transition-colors',
+                            isActive ? 'text-[#203FDD]' : 'text-black dark:text-white'
+                          )}
+                        >
+                          {item.title}
+                        </div>
+                      </div>
+
+                      {/* Horizontal Connector Line (Mobile Only) */}
+                      {index < STEPS.length - 1 && (
+                        <div className='mx-4 block w-24 flex-shrink-0 sm:hidden'>
+                          <Connector
+                            index={index}
+                            activeStep={activeStep}
+                            orientation='horizontal'
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
-          {/* Right Side - Form */}
-          <div className='rounded-3xl bg-white p-6 shadow-lg dark:bg-gray-800 sm:p-8'>
-            <div className='mb-6 flex items-center sm:mb-8'>
-              <svg
-                className='mr-2 h-5 w-5'
-                viewBox='0 0 24 24'
-                fill='none'
-                xmlns='http://www.w3.org/2000/svg'
-              >
-                <rect
-                  width='18'
-                  height='18'
-                  x='3'
-                  y='3'
-                  rx='2'
-                  stroke='currentColor'
-                  strokeWidth='2'
-                />
-                <path
-                  d='M9 9h6M9 12h6M9 15h6'
-                  stroke='currentColor'
-                  strokeWidth='2'
-                  strokeLinecap='round'
-                />
-              </svg>
-              <span className='text-base font-semibold sm:text-lg'>Setup Source</span>
-            </div>
-
-            <div className='mb-5'>
-              <label className='mb-2 block text-sm font-medium'>Connector</label>
-              <div className='relative'>
-                <div
-                  className='group flex cursor-pointer items-center rounded-lg border-2 border-gray-300 p-2.5 transition-colors hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
-                  onClick={toggleDropdown}
-                  aria-haspopup='listbox'
-                  aria-expanded={dropdownOpen}
-                  role='button'
-                >
-                  <div
-                    className={`mr-3 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md text-white ${getSelectedConnector()?.color}`}
-                  >
-                    <img
-                      src={getSelectedConnector()?.icon}
-                      alt={getSelectedConnector()?.name}
-                      className='h-5 w-5'
-                      loading="lazy" decoding="async"
-                    />
-                  </div>
-                  <span className='text-sm'>{getSelectedConnector()?.name}</span>
-                  <svg
-                    className={`ml-auto h-4 w-4 text-gray-500 transition-transform duration-200 group-hover:text-gray-700 dark:group-hover:text-gray-300 ${dropdownOpen ? 'rotate-180 transform' : ''}`}
-                    viewBox='0 0 20 20'
-                    fill='currentColor'
-                  >
-                    <path
-                      fillRule='evenodd'
-                      d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
-                      clipRule='evenodd'
-                    />
-                  </svg>
-                </div>
-
-                {dropdownOpen && (
-                  <div
-                    className='absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800'
-                    role='listbox'
-                  >
-                    {connectors.map((connector) => (
-                      <div
-                        key={connector.id}
-                        className='flex cursor-pointer items-center p-2.5 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        onClick={() => handleConnectorSelect(connector.id)}
-                        role='option'
-                        aria-selected={selectedConnector === connector.id}
-                      >
-                        <div
-                          className={`mr-3 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md text-white ${connector.color}`}
-                        >
-                          <img src={connector.icon} alt={connector.name} className='h-5 w-5' loading="lazy" decoding="async" />
-                        </div>
-                        <span className='text-sm'>{connector.name}</span>
-                        {selectedConnector === connector.id && (
-                          <svg
-                            className='ml-auto h-4 w-4 text-blue-600'
-                            viewBox='0 0 20 20'
-                            fill='currentColor'
-                          >
-                            <path
-                              fillRule='evenodd'
-                              d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                              clipRule='evenodd'
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                Click to select a database connector
-              </p>
-            </div>
-
-            <div className='mb-5'>
-              <label className='mb-2 block text-sm font-medium'>Name of your source</label>
-              <input
-                type='text'
-                placeholder='Source Name'
-                className='w-full rounded-lg border border-none border-gray-300 bg-gray-100 p-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800'
+          {/* Right Side - Video Player */}
+          <div
+            className='relative mx-auto w-[90vw] overflow-hidden rounded-2xl bg-gray-100 shadow-xl dark:bg-gray-800 sm:w-full'
+            style={{ aspectRatio: '1/1' }}
+          >
+            {/* Map over steps to create persistent video elements for smooth transitions */}
+            {STEPS.map((step, index) => (
+              <VideoPlayer
+                key={step.video}
+                src={step.video}
+                isActive={activeStep === index}
+                onEnded={handleVideoEnded}
+                alt={step.title}
               />
-            </div>
-
-            <a
-              href={getConnectorUrl()}
-              className='inline-block w-full rounded-lg bg-blue-600 px-6 py-2.5 text-center text-sm font-medium text-white transition hover:bg-blue-700 hover:text-gray-100 sm:text-base'
-            >
-              Connect Source
-            </a>
+            ))}
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+// Separate component to handle video logic efficiently
+const VideoPlayer: React.FC<{
+  src: string
+  isActive: boolean
+  onEnded: () => void
+  alt: string
+}> = ({ src, isActive, onEnded, alt }) => {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [hasLoaded, setHasLoaded] = useState(false)
+
+  // Lazy loading logic: only set src when it first becomes active
+  useEffect(() => {
+    if (isActive && !hasLoaded) {
+      setHasLoaded(true)
+    }
+  }, [isActive, hasLoaded])
+
+  // Play/Pause control
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (isActive) {
+      video.currentTime = 0
+      const playPromise = video.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.log('Video play prevented:', error)
+        })
+      }
+    } else {
+      video.pause()
+    }
+  }, [isActive, hasLoaded])
+
+  return (
+    <div
+      className={clsx(
+        'absolute inset-0 h-full w-full transition-opacity duration-500',
+        isActive ? 'z-10 opacity-100' : 'z-0 opacity-0'
+      )}
+    >
+      {hasLoaded && (
+        <video
+          ref={videoRef}
+          className='h-full w-full object-cover'
+          muted
+          playsInline
+          onEnded={onEnded}
+          src={src}
+          aria-label={alt}
+        />
+      )}
+    </div>
   )
 }
 

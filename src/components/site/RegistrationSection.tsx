@@ -1,21 +1,26 @@
 import React, { useRef, useEffect } from 'react'
-import { useHistory } from 'react-router-dom'
+import { useHistory } from '@docusaurus/router'
 
-const RegistrationSection = () => {
-  const childRef = useRef()
-  const formRef = useRef(null)
-  const sectionRef = useRef(null)
-  const scriptLoadedRef = useRef(false)
-  const formInitializedRef = useRef(false)
+declare global {
+  interface Window {
+    hbspt?: {
+      forms?: {
+        create: (config: any) => void
+      }
+    }
+  }
+}
+
+const RegistrationSection: React.FC = () => {
+  const formRef = useRef<HTMLDivElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
+  const scriptLoadedRef = useRef<boolean>(false)
+  const formInitializedRef = useRef<boolean>(false)
   const history = useHistory()
   // const isMobile = useIsMobile()
 
   // Defer HubSpot script & form creation until near viewport or anchor requested
   useEffect(() => {
-    if (childRef.current && childRef.current.init) {
-      childRef.current.init()
-    }
-
     const loadHubSpot = () => {
       if (formInitializedRef.current) return
       const initialize = () => {
@@ -52,7 +57,10 @@ const RegistrationSection = () => {
       loadHubSpot()
       requestAnimationFrame(() => {
         window.scrollTo(0, targetEl.offsetTop)
-        history.replace({ pathname: window.location.pathname, search: window.location.search })
+        history.replace({
+          pathname: window.location.pathname,
+          search: window.location.search
+        })
       })
       return
     }
@@ -83,64 +91,73 @@ const RegistrationSection = () => {
     <section
       id='olake-form-product'
       ref={sectionRef}
-      className='w-5/5 relative mx-auto overflow-hidden rounded-xl p-6 2xl:w-4/5'
+      className='relative mx-auto h-auto min-h-[80vh] w-full overflow-visible p-0 pb-12 sm:h-[80vh] sm:w-[90%] sm:overflow-hidden sm:rounded-4xl sm:p-6'
     >
-      {/* Background lake image */}
-      <div className='absolute inset-0 z-0'>
+      {/* Background lake image (Desktop only) */}
+      <div className='absolute inset-0 z-0 hidden sm:block'>
         <img
           src='/img/site/registration-bg.webp'
           alt='Lake background'
           className='h-full w-full object-cover'
           role='presentation'
-          loading="lazy" decoding="async"
+          loading='lazy'
+          decoding='async'
         />
-        {/* <div className='absolute inset-0 bg-blue-900/70'></div> */}
+
+        {/* Gradient overlay */}
+        <div className='absolute inset-0 bg-gradient-to-b from-[#012348]/0 via-[#012348]/40 to-[#012348]' />
       </div>
 
-      <div className='container relative z-10 mx-auto py-8 md:py-16'>
+      <div className='relative z-10 mx-auto w-full px-0 py-0 sm:container sm:px-4 md:py-16'>
         <div className='mx-auto'>
-          <div className='grid items-center gap-8 md:grid-cols-[50%_50%] lg:grid-cols-[60%_40%] lg:gap-16'>
+          <div className='flex flex-col gap-0 md:grid md:grid-cols-[50%_50%] md:items-center md:gap-8 lg:grid-cols-[50%_40%] lg:gap-16'>
             {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}
-            <div className='order-2 rounded-xl bg-white p-4 shadow-lg dark:bg-gray-800 sm:rounded-2xl sm:p-6 sm:shadow-xl md:order-1 md:rounded-3xl md:p-8 lg:p-10'>
+            <div className='order-2 mx-auto mt-8 w-[95%] rounded-3xl bg-white p-6 shadow-[0.72px_0.72px_5.06px_0px_#0000001A] dark:bg-gray-800 sm:mt-0 sm:w-auto sm:rounded-2xl sm:p-6 md:order-1 md:ml-0 md:rounded-3xl md:p-8 lg:ml-36 lg:p-10'>
               <div className='mb-4 sm:mb-6 md:mb-8'>
-                <h3 className='mb-1 text-lg font-bold text-blue-600 dark:text-blue-400 sm:mb-2 sm:text-xl'>
+                <h3 className='mb-1 text-sm font-bold text-blue-600 dark:text-blue-400 sm:mb-2 sm:text-xl'>
                   OLake
                 </h3>
-                <h2 className='mb-2 text-xl font-bold text-gray-900 dark:text-white sm:text-2xl md:text-3xl'>
-                  Register for Pilot Program
+                <h2 className='mb-2 text-lg font-bold text-gray-900 dark:text-white sm:text-2xl md:text-3xl'>
+                  Get in touch
                 </h2>
-                <p className='text-sm text-gray-600 dark:text-gray-300 sm:text-base'>
-                  Set up your account to get started
+                <p className='text-[10px] text-[#696969] dark:text-gray-300 sm:text-base'>
+                  Send a query and our team will reach out to you
                 </p>
               </div>
 
-              {/* added the form here */}
-              <div
-                id='olake-form-product2'
-                ref={formRef}
-                className='flex w-full flex-col rounded-2xl bg-white md:flex-row'
-              >
-                <div className='m-1 min-h-[250px] flex-1 shrink-0 rounded border border-[#f5f5f5] p-2 dark:border-gray-700 sm:m-2 sm:min-h-[300px] sm:p-3 md:m-3'>
-                  <div id='olake-product-form' className='bg-white'></div>
-                </div>
+              <div className='min-h-[400px] sm:h-[40vh]'>
+                <div id='olake-product-form' ref={formRef}></div>
               </div>
 
-              <div className='mt-4 text-xs text-gray-600 dark:text-gray-400 sm:mt-6 sm:text-sm md:mt-8'>
+              {/* HubSpot form container - hidden, will be used for actual form submission */}
+
+              <div className='mt-6 text-[7px] text-gray-500 sm:text-xs'>
                 OLake makes data replication faster by parallelising full loads, leveraging change
                 streams for real-time sync, and pulling data in a lake house
               </div>
-
-
             </div>
 
             {/* Right side - Feature Text */}
-            <div className='order-1 text-white md:order-2'>
+            <div className='relative order-1 mx-auto flex h-[70vh] w-full flex-col justify-end px-4 pb-16 pt-10 text-white md:order-2 md:ml-0 md:mt-10 md:h-auto md:px-0 md:pb-16 lg:ml-24'>
+              {/* Mobile Background Image */}
+              <div className='absolute inset-0 -z-10 sm:hidden'>
+                <img
+                  src='/img/site/registration-bg.webp'
+                  alt='Lake background'
+                  className='h-full w-full object-cover'
+                  role='presentation'
+                  loading='lazy'
+                  decoding='async'
+                />
+                <div className='absolute inset-0 bg-gradient-to-b from-[#012348]/0 via-[#012348]/40 to-[#012348]' />
+              </div>
+
               <div className='mb-6 md:mb-8'>
-                <h3 className='mb-2 text-xl font-medium md:mb-3 md:text-2xl'>OLake</h3>
-                <h2 className='mb-6 text-3xl font-medium md:mb-10 md:text-3xl lg:text-5xl'>
-                  Discover more
+                <h3 className='mb-2 text-sm font-medium md:mb-6 md:text-2xl'>OLake</h3>
+                <h2 className='mb-6 text-[32px] font-medium md:mb-16 md:text-3xl lg:text-5xl'>
+                  Interested?
                   <br />
-                  Join us now
+                  Register Now.
                 </h2>
               </div>
 
@@ -150,15 +167,16 @@ const RegistrationSection = () => {
                   <div className='mb-3 flex items-start gap-4'>
                     <img
                       src='/img/site/iceberg-logo.svg'
-                      className='mt-1'
+                      className='mt-1 size-[10px] sm:size-6'
                       alt='Iceberg catalog logo'
-                      loading="lazy" decoding="async"
+                      loading='lazy'
+                      decoding='async'
                     />
                     <div className='flex max-w-[90%] flex-col gap-2'>
-                      <div className='text-lg font-semibold md:text-xl lg:text-xl'>
+                      <div className='text-[11px] font-bold md:text-xl lg:text-xl'>
                         Iceberg Native
                       </div>
-                      <div className='break-words pr-4 text-sm text-gray-100 md:text-sm'>
+                      <div className='break-words pr-4 text-[8px] text-gray-100 md:text-sm'>
                         Instead of directly transforming data from Databases during extraction, we
                         first pull it in its native format.
                       </div>
@@ -170,7 +188,7 @@ const RegistrationSection = () => {
                 <div>
                   <div className='flex items-start gap-4 md:mb-3'>
                     <svg
-                      className='mt-1 h-5 w-5 flex-shrink-0 md:h-6 md:w-6'
+                      className='mt-1 size-[11px] flex-shrink-0 sm:size-6'
                       viewBox='0 0 24 24'
                       fill='none'
                       xmlns='http://www.w3.org/2000/svg'
@@ -184,13 +202,13 @@ const RegistrationSection = () => {
                         strokeLinejoin='round'
                       />
                     </svg>
-                    <div className='flex max-w-[90%] flex-col gap-2'>
-                      <div className='text-lg font-semibold md:text-xl lg:text-xl'>
+                    <div className='flex flex-col gap-2'>
+                      <div className='text-[10px] font-bold md:text-xl lg:text-xl'>
                         Faster & More Efficient
                       </div>
-                      <div className='break-words pr-4 text-sm text-gray-100 md:text-sm'>
-                        Engineered for high-throughput EL with adaptive chunking, parallel execution
-                        for historical loads, and CDC for optimized data pipeline.
+                      <div className='break-words pr-4 text-[8px] text-gray-100 md:text-sm'>
+                        Instead of directly transforming data from Databases during extraction, we
+                        first pull it in its native format.
                       </div>
                     </div>
                   </div>

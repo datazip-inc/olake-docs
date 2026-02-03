@@ -27,7 +27,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
         </div>
       </div>
       {expanded && (
-        <div className='rounded p-3 px-2 -mt-2'>
+        <div className='-mt-2 rounded p-3 px-2'>
           <div className='text-sm font-normal leading-relaxed text-[#333333] dark:text-gray-300'>
             {answer}
           </div>
@@ -44,7 +44,7 @@ const Faq = ({ data, showHeading }) => {
         // <SectionHeader showHr={false} heading={<>Frequently Asked Questions</>} />
         <div
           id='faq-heading'
-          className='mb-4 flex flex-col gap-4 text-5xl font-medium text-[#333333] dark:text-white'
+          className='mb-4 flex flex-col gap-4 text-xl font-medium text-[#333333] dark:text-white sm:text-[64px]'
         >
           Frequently Asked Questions
         </div>

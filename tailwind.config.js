@@ -6,27 +6,24 @@ module.exports = {
     './blog/**/*.{js,jsx,ts,tsx,md,mdx}'
   ],
   corePlugins: {
-    preflight: false, // Disables Tailwind's global resets
+    preflight: false // Disables Tailwind's global resets
   },
 
   darkMode: ['class', '[data-theme="dark"]'], // Support Docusaurus dark mode
   theme: {
     extend: {
-
-
       animation: {
         'fade-in': 'fadeIn 0.6s ease-out',
         'fade-in-up': 'fadeInUp 0.6s ease-out',
         'scale-in': 'scaleIn 0.4s ease-out',
         'pulse-dot': 'pulseDot 2s infinite',
-        'gradient-shift': 'gradientShift 3s ease infinite',
+        'gradient-shift': 'gradientShift 3s ease infinite'
       },
-
 
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
+          '100%': { opacity: '1' }
         },
         fadeInUp: {
           '0%': {
@@ -36,7 +33,7 @@ module.exports = {
           '100%': {
             opacity: '1',
             transform: 'translateY(0)'
-          },
+          }
         },
         scaleIn: {
           '0%': {
@@ -46,62 +43,75 @@ module.exports = {
           '100%': {
             opacity: '1',
             transform: 'scale(1)'
-          },
+          }
         },
         pulseDot: {
           '0%, 100%': {
             transform: 'scale(0.95)',
-            boxShadow: '0 0 0 0 rgba(25, 58, 230, 0.7)',
+            boxShadow: '0 0 0 0 rgba(25, 58, 230, 0.7)'
           },
           '70%': {
             transform: 'scale(1)',
-            boxShadow: '0 0 0 10px rgba(25, 58, 230, 0)',
-          },
+            boxShadow: '0 0 0 10px rgba(25, 58, 230, 0)'
+          }
         },
         gradientShift: {
           '0%, 100%': {
-            backgroundPosition: '0% 50%',
+            backgroundPosition: '0% 50%'
           },
           '50%': {
-            backgroundPosition: '100% 50%',
-          },
-        },
+            backgroundPosition: '100% 50%'
+          }
+        }
       },
 
       backdropBlur: {
-        xs: '2px',
+        xs: '2px'
       },
 
       // Enhanced max width
       maxWidth: {
         '8xl': '88rem',
-        '9xl': '96rem',
+        '9xl': '96rem'
       },
 
       // Enhanced z-index
       zIndex: {
-        '60': '60',
-        '70': '70',
-        '80': '80',
-        '90': '90',
-        '100': '100',
+        60: '60',
+        70: '70',
+        80: '80',
+        90: '90',
+        100: '100'
       },
 
       // Enhanced line height for better typography
       lineHeight: {
-        'relaxed': '1.625',
-        'loose': '1.75',
+        relaxed: '1.625',
+        loose: '1.75'
       },
 
       // Enhanced letter spacing
       letterSpacing: {
-        'tighter': '-0.025em',
-        'tight': '-0.0125em',
+        tighter: '-0.025em',
+        tight: '-0.0125em'
       },
 
       fontFamily: {
-        sans: ['Space Grotesk', 'Segoe UI', 'Roboto', 'Ubuntu', 'Cantarell', 'Noto Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: [
+          'IBM Plex Sans',
+          'Space Grotesk',
+          'Segoe UI',
+          'Roboto',
+          'Ubuntu',
+          'Cantarell',
+          'Noto Sans',
+          'system-ui',
+          '-apple-system',
+          'sans-serif'
+        ],
         mono: ['Fira Code', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'monospace'],
+        space: ['Space Grotesk', 'sans-serif'],
+        helvetica: ['Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif']
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -120,7 +130,7 @@ module.exports = {
           600: '#193ae6', // Your main brand color
           700: '#1529b8', // Your --ifm-color-primary-darker
           800: '#0d1f7a', // Your --ifm-color-primary-darkest
-          900: '#0a1554',
+          900: '#0a1554'
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
@@ -150,20 +160,19 @@ module.exports = {
       borderRadius: {
         '2xl': '1rem',
         '3xl': '1.5rem',
-        '4xl': '2rem',
+        '4xl': '2rem'
       },
       spacing: {
-        '18': '4.5rem',
-        '88': '22rem',
-        '128': '32rem',
+        18: '4.5rem',
+        88: '22rem',
+        128: '32rem'
       },
       aspectRatio: {
         '21/9': '21 / 9',
         '21/7': '21 / 7',
         '21/5': '21 / 5',
-        '16/9': '16 / 9',
-      },
-
+        '16/9': '16 / 9'
+      }
     }
   },
   plugins: [
@@ -175,27 +184,27 @@ module.exports = {
     function ({ addUtilities }) {
       const newUtilities = {
         '.line-clamp-1': {
-          display: '-webkit-box',
+          'display': '-webkit-box',
           '-webkit-line-clamp': '1',
           '-webkit-box-orient': 'vertical',
-          overflow: 'hidden',
+          'overflow': 'hidden'
         },
         '.line-clamp-2': {
-          display: '-webkit-box',
+          'display': '-webkit-box',
           '-webkit-line-clamp': '2',
           '-webkit-box-orient': 'vertical',
-          overflow: 'hidden',
+          'overflow': 'hidden'
         },
         '.line-clamp-3': {
-          display: '-webkit-box',
+          'display': '-webkit-box',
           '-webkit-line-clamp': '3',
           '-webkit-box-orient': 'vertical',
-          overflow: 'hidden',
-        },
+          'overflow': 'hidden'
+        }
       }
 
       addUtilities(newUtilities, ['responsive'])
-    },
+    }
   ],
   safelist: [
     // Brand colors
@@ -228,6 +237,6 @@ module.exports = {
     'aspect-[16/9]',
     'aspect-[21/9]',
     'aspect-[21/7]',
-    'aspect-[21/5]',
-  ],
+    'aspect-[21/5]'
+  ]
 }

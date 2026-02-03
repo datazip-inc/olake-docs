@@ -98,13 +98,13 @@ const config = {
       // Replace with your project's social card
       image: 'img/logo/olake-blue-with-text.webp',
 
-      announcementBar: {
-        id: 'monthly-events-2025',
-        content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200" aria-label="View upcoming webinars" title="View upcoming webinars">here<span class="sr-only">View upcoming webinars</span></a>. Check out! 🎉',
-        backgroundColor: '#193ae6',
-        textColor: 'white',
-        isCloseable: true,
-      },
+      // announcementBar: {
+      //   id: 'monthly-events-2025',
+      //   content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200" aria-label="View upcoming webinars" title="View upcoming webinars">here<span class="sr-only">View upcoming webinars</span></a>. Check out! 🎉',
+      //   backgroundColor: '#193ae6',
+      //   textColor: 'white',
+      //   isCloseable: true,
+      // },
 
       docs: {
         sidebar: {
@@ -122,14 +122,14 @@ const config = {
           src: 'img/logo/olake-blue-with-text.svg',
         },
         items: [
-          { to: '/docs', label: 'Docs', position: 'right' },
-          { to: '/ai-lake', label: 'AILake', position: 'right' },
-          { to: '/blog', label: 'Blogs', position: 'right' },
+          { to: '/docs', label: 'Docs', position: 'left' },
+          { to: '/ai-lake', label: 'AILake', position: 'left' },
+          { to: '/blog', label: 'Blogs', position: 'left' },
 
           {
             // Dropdown menu in the navbar for "Iceberg" section
             type: "dropdown",
-            position: "right",
+            position: "left",
             label: "Iceberg",
             items: [
               {
@@ -146,7 +146,7 @@ const config = {
           {
             // Dropdown menu in the navbar for "Learn" section
             type: "dropdown",
-            position: "right",
+            position: "left",
             label: "Community",
             items: [
               {
@@ -168,7 +168,7 @@ const config = {
             ],
           },
 
-          { to: '/customers', label: 'Customer Stories', position: 'right' },
+          { to: '/customers', label: 'Customer Stories', position: 'left' },
 
           {
             href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
