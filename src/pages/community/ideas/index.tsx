@@ -14,10 +14,6 @@ import SectionHeader from '../../../components/community/improved/SectionHeader'
 import SectionLayout from '../../../components/community/SectionLayout'
 import CentralizedBreadcrumbs from '../../../components/Breadcrumbs/CentralizedBreadcrumbs'
 
-const code = (s: string) => (
-  <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-700">{s}</code>
-)
-
 const IDEAS = [
   {
     id: 'prometheus-metrics',
@@ -32,7 +28,7 @@ const IDEAS = [
     problem: 'Today, operators have limited standardized observability into per-job sync throughput, job success/failure counts, and request volume trends. Prometheus-style metrics are the de-facto standard for production monitoring and alerting.',
     deliverables: [
       <li key="d1"><span className="font-semibold">A /metrics endpoint: </span>configurable enable/disable, bind address/port; works with existing OLake deployment modes (local + containerized)</li>,
-      <li key="d2"><span className="font-semibold">Core metrics: </span>{code('olake_rows_synced_total{job="..."}')}, {code('olake_job_runs_total{job="...",status="success|failed"}')}, {code('olake_requests_total{job="..."}')}</li>,
+      <li key="d2"><span className="font-semibold">Core metrics: </span>olake_rows_synced_total{'{job="..."}'}, olake_job_runs_total{'{job="...",status="success|failed"}'}, olake_requests_total{'{job="..."}'}</li>,
       <li key="d3"><span className="font-semibold">Documentation: </span>how to enable metrics, example Prometheus scrape config, example PromQL queries (throughput, error rate, request rate)</li>,
       <li key="d4"><span className="font-semibold">Tests: </span>/metrics returns metrics text format; at least one test that verifies counters increment on lifecycle events</li>
     ],
@@ -64,7 +60,7 @@ const IDEAS = [
     deliverables: [
       <li key="d1"><span className="font-semibold">Correct handling of TOAST &quot;unchanged&quot; markers: </span>detect in decoding, treat as missing values requiring resolution</li>,
       <li key="d2"><span className="font-semibold">Configurable behavior modes: </span>STRICT (fail with clear error when missing values cannot be resolved), REUSE_LAST (reuse last ingested TOAST value for same primary key), DB_RECOMMENDED (detect impacted tables; recommend REPLICA IDENTITY FULL)</li>,
-      <li key="d3"><span className="font-semibold">Observability: </span>logs and counters for {code('toast_miss')}, {code('toast_filled_from_cache')}, {code('toast_filled_from_destination')}</li>,
+      <li key="d3"><span className="font-semibold">Observability: </span>logs and counters for toast_miss, toast_filled_from_cache, toast_filled_from_destination</li>,
       <li key="d4"><span className="font-semibold">Tests: </span>unit tests for decoding and marker detection; integration test with Postgres table containing TOAST-able column (INSERT full value, UPDATE different column with TOAST unchanged, verify OLake writes correct full row downstream)</li>
     ],
     stretchGoals: null,
