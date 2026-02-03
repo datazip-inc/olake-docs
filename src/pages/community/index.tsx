@@ -480,6 +480,45 @@ const CommunityPage = () => {
         </div>
       </SectionLayout>
 
+      {/* Google Summer of Code Section */}
+      <SectionLayout className='py-20'>
+        <SectionHeader
+          title={
+            <>
+              Google Summer of <span className='text-[#193ae6] dark:text-blue-400'>Code</span> at OLake
+            </>
+          }
+          subtitle='Work on a 12+ week open source project with OLake. Browse project ideas, read proposal guidelines, and submit your application.'
+        />
+        <div className='mx-auto max-w-4xl'>
+          <div className='rounded-2xl border border-gray-200 bg-gradient-to-br from-blue-50 to-purple-50 p-8 dark:border-gray-700 dark:from-gray-800 dark:to-gray-800'>
+            <div className='flex flex-wrap items-center gap-6'>
+              <div className='flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-white shadow-md dark:bg-gray-800'>
+                <img src='/img/logo/olake-blue.svg' alt='OLake' className='h-12 w-12 dark:brightness-0 dark:invert' />
+              </div>
+              <div className='min-w-0 flex-1'>
+                <h3 className='mb-2 text-2xl font-bold'>GSoC 2026</h3>
+                <p className='mb-4 text-gray-600 dark:text-gray-400'>
+                  Pick a project idea (Prometheus metrics, PostgreSQL TOAST support, or Iceberg v3 deletion vectors),
+                  discuss with mentors, and submit a strong proposal. We provide guidelines and a template to help you.
+                </p>
+                <div className='flex flex-wrap gap-4'>
+                  <Button href='/community/gsoc' size='lg'>
+                    <FaGraduationCap className='mr-2' /> GSoC at OLake
+                  </Button>
+                  <Button href='/community/ideas' variant='outline' size='lg'>
+                    <FaLightbulb className='mr-2' /> Project Ideas
+                  </Button>
+                  <Button href='/community/proposal-guidelines' variant='outline' size='lg'>
+                    Proposal Guidelines
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SectionLayout>
+
       {/* Events Section */}
       <SectionLayout className='bg-gray-50 py-20 dark:bg-gray-900/50'>
         <SectionHeader
