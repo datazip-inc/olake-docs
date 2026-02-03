@@ -12,24 +12,11 @@ import Layout from '@theme/Layout';
 import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-
-  {
-    name: "Harsha Kalbalia",
-    role: " [Moderator] GTM & Founding Member @ Datazip ",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
-  {
-    name: "Viktor Kessler",
-    role: "Co-founder @ Vakamo",
-    bio: "Viktor Kessler is the Co-Founder of Vakamo (founded December 2024), where he focuses on Apache Iceberg and Lakekeeper Catalog technologies. His technical expertise spans modern data infrastructure with a particular emphasis on open-source technologies and lakehouse architectures. Prior to founding Vakamo, Viktor built his technical expertise through roles at Dremio, MongoDB, ERGO Group. Viktor is actively involved in the data infrastructure community, particularly around Apache Iceberg implementations. His current focus appears to be on transforming data analytics from cost centers to profit centers through innovative data products and open technologies like Apache Iceberg and Lakekeeper Catalog.",
-    image: "/img/authors/viktor.webp",
-    linkedin: "https://www.linkedin.com/in/viktor-kessler/",
-  },
-  
+  HOSTS.HARSHA_KALBALIA,
+  HOSTS.VIKTOR_KESSLER,
 ];
 
 const WebinarPage = () => {

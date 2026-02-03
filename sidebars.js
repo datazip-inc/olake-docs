@@ -87,7 +87,9 @@ const docSidebar = {
         'connectors/mysql/index',
         'connectors/oracle/index',
         'connectors/kafka/index',
+        'connectors/db2/index',
         'connectors/s3/index',
+        'connectors/mssql/index',
       ],
     },
 
@@ -164,6 +166,7 @@ const docSidebar = {
       label: 'Versions',
       items: [
         'release/overview',
+        'release/v0.3.14',
         'release/v0.3.9-v0.3.11',
         'release/v0.3.5',
         'release/v0.2.10',

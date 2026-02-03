@@ -10,29 +10,12 @@ import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBrea
 import React from "react";
 import Hr from '../../components/Hr';
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Rajesh Rout",
-    role: "[Guest] Lead Data Engineer @ Kipi",
-    bio: ".",
-    image: "/img/authors/rajesh.webp",
-    linkedin: "https://www.linkedin.com/in/rajeshrout97/",
-  },
-  {
-    name: "Varun Saraogi",
-    role: "[Guest] Engineering Unit Head @ MathCo",
-    bio: ".",
-    image: "/img/authors/varun-saraogi.webp",
-    linkedin: "https://www.linkedin.com/in/varunsaraogi/",
-  },
-  {
-    name: "Harsha Kalbalia",
-    role: " [Moderator] GTM & Founding Member @ Datazip ",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
+  HOSTS.RAJESH_ROUT,
+  HOSTS.VARUN_SARAOGI,
+  HOSTS.HARSHA_KALBALIA,
 ];
 
 

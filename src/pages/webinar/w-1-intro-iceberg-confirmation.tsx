@@ -7,29 +7,12 @@ import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBrea
 import Layout from '@theme/Layout';
 import React from "react";
 import Hr from '../../components/Hr';
+import { HOSTS } from '../../data/webinarHosts';
 
 const hosts = [
-  {
-    name: "Varun Bainsla",
-    role: "[Guest] Data Engineer @ Nira Finance",
-    bio: "Varun Bainsla is a skilled data engineer specializing in cloud-native architectures and big data processing. With expertise in Python, PySpark, and AWS, he excels at developing scalable data pipelines and optimizing ETL processes. Varun's experience includes implementing lakehouse architectures and achieving significant cost reductions in OLAP systems, demonstrating his ability to deliver efficient, high-performance data solutions.",
-    image: "/img/authors/varun.webp",
-    linkedin: "https://www.linkedin.com/in/varunbainsla/",
-  },
-  {
-    name: "Rohan Khameshra",
-    role: "[Host] co-founder @ Datazip",
-    bio: " Rohan Khameshra is the co-founder and CPO of Datazip. With a strong background in data science and analytics, he brings expertise in machine learning, data modeling, and data-driven problem-solving. His experience spans role of early data team member at Khatabook and Rapido, where he worked on customer analytics, supply analytics, incentive optimization, and customer segmentation.",
-    image: "/img/authors/rohan.webp",
-    linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
-  },
-  {
-    name: "Harsha Kalbalia",
-    role: " [Moderator] GTM & Founding Member @ Datazip ",
-    bio: "Harsha is a user-first GTM specialist at Datazip, transforming early-stage startups from zero to one. With a knack for technical market strategy and a startup enthusiast's mindset, she bridges the gap between innovative solutions and meaningful market adoption.",
-    image: "/img/authors/harsha.webp",
-    linkedin: "https://www.linkedin.com/in/harsha-kalbalia/",
-  },
+  HOSTS.VARUN_BAINSLA,
+  HOSTS.ROHAN_KHAMESHRA,
+  HOSTS.HARSHA_KALBALIA,
 ];
 
 const WebinarPage = () => {

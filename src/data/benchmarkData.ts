@@ -321,14 +321,14 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
       estuary: '0.34 Billion'
     },
     elapsedTime: {
-      olake: '3.5 hours',
+      olake: '1.91 hours',
       airbyte: '7.5 hours (failed sync)',
       fivetran: '24 hours',
       debezium: '24 hours',
       estuary: '24 hours'
     },
     speed: {
-      olake: '3,19,562 RPS',
+      olake: '5,80,113 RPS',
       airbyte: '457 RPS',
       fivetran: '46,395 RPS',
       debezium: '14,839 RPS',
@@ -336,13 +336,13 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     },
     comparison: {
       olake: '-',
-      airbyte: '699.2x slower',
-      fivetran: '6.8x slower',
-      debezium: '21.5x slower',
-      estuary: '80.2x slower'
+      airbyte: '1270x slower',
+      fivetran: '12.5x slower',
+      debezium: '39.1x slower',
+      estuary: '146x slower'
     },
     cost: {
-      olake: '< $ 10',
+      olake: '$ 6',
       airbyte: '$ 5,560',
       fivetran: '$ 0 (free full load)',
       debezium: '$ 75',

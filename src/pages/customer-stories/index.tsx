@@ -20,9 +20,18 @@ const CustomersPage = () => {
   // Customer stories data
   const customerStories: CustomerStory[] = [
     {
+      title: "From 40-Minute to Sub-Minute Segmentation Queries: How Bitespeed rebuilt its customer segmentation engine using OLake and Apache Iceberg",
+      description: 'Bitespeed is a customer engagement and messaging platform built for modern commerce brands. Learn how they rebuilt their segmentation engine using OLake and Apache Iceberg without breaking their budget.',
+      route: '/customer-stories/bitespeed-segmentation-queries',
+      img: '/img/customers/bitespeed/cover-image-bitespeed.webp',
+      alt: 'Bitespeed customer story',
+      companyName: 'Bitespeed',
+      category: CustomerCategory.CustomerInternet
+    },
+    {
       title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
       description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
-      route: '/blog/customer-stories/cordial-real-time-data-sync',
+      route: '/customer-stories/cordial-real-time-data-sync',
       img: '/img/customers/cordial/cover-image-cordial.webp',
       alt: 'Cordial customer story',
       companyName: 'Cordial',
@@ -31,10 +40,19 @@ const CustomersPage = () => {
     {
       title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
       description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
-      route: '/blog/customer-stories/astro-talk-lakehouse-transformation',
+      route: '/customer-stories/astro-talk-lakehouse-transformation',
       img: '/img/customers/astrotalk/cover-image-astro.webp',
       alt: 'Astro Talk customer story',
       companyName: 'Astro Talk',
+      category: CustomerCategory.CustomerInternet
+    },
+    {
+      title: "PhysicsWallah Evaluates MongoDB CDC Ingestion into a Lakehouse with Apache Iceberg and OLake",
+      description: 'At PhysicsWallah, the Data Engineering team operates a large-scale lakehouse platform that powers analytics, reporting, and AI-driven use cases. A significant portion of operational data originates from MongoDB, making reliable and scalable CDC ingestion a foundational requirement.',
+      route: '/customer-stories/physicswallah-mongodb-cdc-iceberg',
+      img: '/img/customers/physicswallah/cover-image-pw.webp',
+      alt: 'PhysicsWallah customer story',
+      companyName: 'PhysicsWallah',
       category: CustomerCategory.CustomerInternet
     }
   ];
