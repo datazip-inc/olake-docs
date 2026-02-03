@@ -164,6 +164,10 @@ const config = {
               {
                 label: "Contributor's Program",
                 href: `/community/contributor-program`
+              },
+              {
+                label: 'GSoC',
+                href: `/community/gsoc`
               }
             ]
           },
