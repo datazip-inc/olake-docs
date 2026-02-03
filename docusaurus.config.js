@@ -34,7 +34,7 @@ const config = {
 
   future: {
     v4: true,
-    experimental_faster: false  // disabled to avoid rspack cache panic; use webpack
+    experimental_faster: true
   },
 
   // Client modules for handling client-side functionality

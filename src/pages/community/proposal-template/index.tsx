@@ -140,7 +140,7 @@ const ProposalTemplatePage = () => {
               <button
                 type="button"
                 onClick={handleCopyTemplate}
-                className="inline-flex items-center justify-center rounded-full border-2 border-[#193ae6] bg-[#193ae6] px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-[#0d2eb8] dark:border-blue-400 dark:bg-blue-500 dark:hover:bg-blue-600"
+                className="inline-flex cursor-pointer items-center justify-center rounded-full border-2 border-[#193ae6] bg-[#193ae6] px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-[#0d2eb8] dark:border-blue-400 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 {copied ? 'Copied!' : 'Copy template'}
               </button>

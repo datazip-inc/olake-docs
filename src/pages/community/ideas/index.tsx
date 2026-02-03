@@ -14,27 +14,9 @@ import SectionHeader from '../../../components/community/improved/SectionHeader'
 import SectionLayout from '../../../components/community/SectionLayout'
 import CentralizedBreadcrumbs from '../../../components/Breadcrumbs/CentralizedBreadcrumbs'
 
-// Helper to render deliverable line: bold label (before first ": ") and <code> for metric/code snippets
-function DeliverableLine({ text }: { text: string }) {
-  const colonIdx = text.indexOf(': ')
-  const label = colonIdx >= 0 ? text.slice(0, colonIdx) : ''
-  const rest = colonIdx >= 0 ? text.slice(colonIdx + 2) : text
-  const parts = rest.split(/(olake_\w+\{[^}]+\}|toast_\w+)/g)
-  return (
-    <>
-      {label ? <span className="font-semibold">{label}: </span> : null}
-      {parts.map((p, i) =>
-        /^(olake_\w+\{[^}]+\}|toast_\w+)$/.test(p) ? (
-          <code key={i} className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-700">
-            {p}
-          </code>
-        ) : (
-          p
-        )
-      )}
-    </>
-  )
-}
+const code = (s: string) => (
+  <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-700">{s}</code>
+)
 
 const IDEAS = [
   {
@@ -49,16 +31,16 @@ const IDEAS = [
     summary: 'Add a Prometheus-compatible HTTP endpoint (GET /metrics) to OLake so users can monitor job health and throughput using Prometheus and Grafana.',
     problem: 'Today, operators have limited standardized observability into per-job sync throughput, job success/failure counts, and request volume trends. Prometheus-style metrics are the de-facto standard for production monitoring and alerting.',
     deliverables: [
-      'A /metrics endpoint: configurable enable/disable, bind address/port; works with existing OLake deployment modes (local + containerized)',
-      'Core metrics: olake_rows_synced_total{job="..."}, olake_job_runs_total{job="...",status="success|failed"}, olake_requests_total{job="..."}',
-      'Documentation: how to enable metrics, example Prometheus scrape config, example PromQL queries (throughput, error rate, request rate)',
-      'Tests: /metrics returns metrics text format; at least one test that verifies counters increment on lifecycle events'
+      <li key="d1"><span className="font-semibold">A /metrics endpoint: </span>configurable enable/disable, bind address/port; works with existing OLake deployment modes (local + containerized)</li>,
+      <li key="d2"><span className="font-semibold">Core metrics: </span>{code('olake_rows_synced_total{job="..."}')}, {code('olake_job_runs_total{job="...",status="success|failed"}')}, {code('olake_requests_total{job="..."}')}</li>,
+      <li key="d3"><span className="font-semibold">Documentation: </span>how to enable metrics, example Prometheus scrape config, example PromQL queries (throughput, error rate, request rate)</li>,
+      <li key="d4"><span className="font-semibold">Tests: </span>/metrics returns metrics text format; at least one test that verifies counters increment on lifecycle events</li>
     ],
     stretchGoals: 'Additional metrics (to be finalized with mentors): start/finish timestamps, per-stream table counts, lag metrics for CDC.',
     implementation: [
-      'Use Prometheus Go client; register counters in a small metrics package.',
-      'Update counters from job lifecycle events and request-handling paths.',
-      'Expose via existing HTTP server or dedicated metrics server (configurable).'
+      <li key="i1">Use Prometheus Go client; register counters in a small metrics package.</li>,
+      <li key="i2">Update counters from job lifecycle events and request-handling paths.</li>,
+      <li key="i3">Expose via existing HTTP server or dedicated metrics server (configurable).</li>
     ],
     timeline: [
       'Community Bonding: validate metric names/labels with mentors, locate job lifecycle hooks and request paths in code, draft docs and example dashboards.',
@@ -80,16 +62,16 @@ const IDEAS = [
     summary: 'Implement correct handling of PostgreSQL logical decoding events where unchanged TOASTed values are omitted (pgoutput marks them as unchanged using byte `u`). OLake should reconstruct missing values (or fail explicitly, depending on config).',
     problem: 'Postgres stores large values out-of-line using TOAST. In logical replication, unchanged TOASTed values may not be included in UPDATE/DELETE messages unless the table is configured with REPLICA IDENTITY FULL. For OLake CDC, this can cause partial row images and incorrect sink state.',
     deliverables: [
-      'Correct handling of TOAST "unchanged" markers: detect in decoding, treat as missing values requiring resolution',
-      'Configurable behavior modes: STRICT (fail with clear error when missing values cannot be resolved), REUSE_LAST (reuse last ingested TOAST value for same primary key), DB_RECOMMENDED (detect impacted tables; recommend REPLICA IDENTITY FULL)',
-      'Observability: logs and counters for toast_miss, toast_filled_from_cache, toast_filled_from_destination',
-      'Tests: unit tests for decoding and marker detection; integration test with Postgres table containing TOAST-able column (INSERT full value, UPDATE different column with TOAST unchanged, verify OLake writes correct full row downstream)'
+      <li key="d1"><span className="font-semibold">Correct handling of TOAST &quot;unchanged&quot; markers: </span>detect in decoding, treat as missing values requiring resolution</li>,
+      <li key="d2"><span className="font-semibold">Configurable behavior modes: </span>STRICT (fail with clear error when missing values cannot be resolved), REUSE_LAST (reuse last ingested TOAST value for same primary key), DB_RECOMMENDED (detect impacted tables; recommend REPLICA IDENTITY FULL)</li>,
+      <li key="d3"><span className="font-semibold">Observability: </span>logs and counters for {code('toast_miss')}, {code('toast_filled_from_cache')}, {code('toast_filled_from_destination')}</li>,
+      <li key="d4"><span className="font-semibold">Tests: </span>unit tests for decoding and marker detection; integration test with Postgres table containing TOAST-able column (INSERT full value, UPDATE different column with TOAST unchanged, verify OLake writes correct full row downstream)</li>
     ],
     stretchGoals: null,
     implementation: [
-      'Step 1: Detect missing TOAST values in Go decoder (u => unchanged TOASTed value).',
-      'Step 2: Reconstruct via local TOAST state store (KV keyed by table+primary_key); update on INSERT/UPDATE with full TOAST; on UPDATE with missing TOAST, fill from store before sending to writer.',
-      'Fallback: query destination (Iceberg) if cache misses; cache fetched value back. Document operational implications.'
+      <li key="i1"><span className="font-semibold">Step 1: </span>Detect missing TOAST values in Go decoder (u =&gt; unchanged TOASTed value).</li>,
+      <li key="i2"><span className="font-semibold">Step 2: </span>Reconstruct via local TOAST state store (KV keyed by table+primary_key); update on INSERT/UPDATE with full TOAST; on UPDATE with missing TOAST, fill from store before sending to writer.</li>,
+      <li key="i3">Fallback: query destination (Iceberg) if cache misses; cache fetched value back. Document operational implications.</li>
     ],
     timeline: [
       'Community Bonding: reproduce issue locally, identify pgoutput decode paths and record model changes, draft KV store design + failure semantics.',
@@ -112,17 +94,17 @@ const IDEAS = [
     summary: 'Upgrade OLake\'s Iceberg destination to support Iceberg v3 and implement CDC deletes/updates using deletion vectors (DV) as the primary row-level delete mechanism.',
     problem: 'OLake ingests from DBs/Kafka in Go and writes to Iceberg via a Java gRPC writer. Today the pipeline targets Iceberg v2 semantics. Iceberg v3 introduces deletion vectors stored in Puffin files and new writer constraints (at most one DV per data file per snapshot; merge new deletes with existing DVs; no new position delete files for v3).',
     deliverables: [
-      'Iceberg v3 compatibility in the Java writer: upgrade Iceberg Java dependencies (v3-capable); ensure metadata read/write and commit behavior works for v3 tables',
-      'DV-based CDC deletes and updates: Delete = write/merge deletion vectors per impacted data file; Update = delete old row (via DV) + append new row, within one commit flow when possible',
-      'Correctness: enforce at most one deletion vector per data file per snapshot; merge new deletes with existing DVs (and any legacy position deletes from upgraded v2 tables)',
-      'Design documentation: DV lifecycle (creation, merge, replace), commit flow and idempotency expectations, table maintenance implications and operational guardrails',
-      'End-to-end tests: validate correctness via a query engine (e.g., Spark); include cases: multiple updates to same key, retries/partial failures, schema evolution interactions'
+      <li key="d1"><span className="font-semibold">Iceberg v3 compatibility in the Java writer: </span>upgrade Iceberg Java dependencies (v3-capable); ensure metadata read/write and commit behavior works for v3 tables</li>,
+      <li key="d2"><span className="font-semibold">DV-based CDC deletes and updates: </span>Delete = write/merge deletion vectors per impacted data file; Update = delete old row (via DV) + append new row, within one commit flow when possible</li>,
+      <li key="d3"><span className="font-semibold">Correctness: </span>enforce at most one deletion vector per data file per snapshot; merge new deletes with existing DVs (and any legacy position deletes from upgraded v2 tables)</li>,
+      <li key="d4"><span className="font-semibold">Design documentation: </span>DV lifecycle (creation, merge, replace), commit flow and idempotency expectations, table maintenance implications and operational guardrails</li>,
+      <li key="d5"><span className="font-semibold">End-to-end tests: </span>validate correctness via a query engine (e.g., Spark); include cases: multiple updates to same key, retries/partial failures, schema evolution interactions</li>
     ],
     stretchGoals: 'Explore v3 extended types if relevant to OLake (variant, geometry/geography) and define a minimal support story.',
     implementation: [
-      'Java writer: implement DV writing and merging logic stored as Puffin blobs; update manifest/snapshot metadata correctly; expose DV apply primitives via gRPC (new RPCs or extended proto).',
-      'gRPC contract: add or extend RPC methods to apply row changes (inserts + deletes/updates); return commit metadata to Go.',
-      'Position planning for CDC: provide a defined strategy for mapping incoming CDC keys to file+position; first-cut reference implementation; document future optimizations.'
+      <li key="i1"><span className="font-semibold">Java writer: </span>implement DV writing and merging logic stored as Puffin blobs; update manifest/snapshot metadata correctly; expose DV apply primitives via gRPC (new RPCs or extended proto).</li>,
+      <li key="i2"><span className="font-semibold">gRPC contract: </span>add or extend RPC methods to apply row changes (inserts + deletes/updates); return commit metadata to Go.</li>,
+      <li key="i3"><span className="font-semibold">Position planning for CDC: </span>provide a defined strategy for mapping incoming CDC keys to file+position; first-cut reference implementation; document future optimizations.</li>
     ],
     timeline: [
       'Community Bonding: design doc draft, local setup and baseline v2 writer understanding, establish integration test harness.',
@@ -187,9 +169,7 @@ const IdeaCard = ({ idea, isExpanded, onToggle }: { idea: typeof IDEAS[0]; isExp
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Goals and deliverables</h3>
             <ul className="list-inside list-disc space-y-2 text-gray-700 dark:text-gray-300">
-              {idea.deliverables.map((d, i) => (
-                <li key={i}><DeliverableLine text={d} /></li>
-              ))}
+              {idea.deliverables}
             </ul>
             {idea.stretchGoals && (
               <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
@@ -200,18 +180,7 @@ const IdeaCard = ({ idea, isExpanded, onToggle }: { idea: typeof IDEAS[0]; isExp
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Implementation sketch</h3>
             <ul className="list-inside list-disc space-y-2 text-gray-700 dark:text-gray-300">
-              {idea.implementation.map((line, i) => {
-                const stepMatch = line.match(/^(Step \d+:)(.*)$/)
-                return (
-                  <li key={i}>
-                    {stepMatch ? (
-                      <><span className="font-semibold">{stepMatch[1]}</span>{stepMatch[2]}</>
-                    ) : (
-                      line
-                    )}
-                  </li>
-                )
-              })}
+              {idea.implementation}
             </ul>
           </div>
           <div>
