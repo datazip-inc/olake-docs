@@ -1,3 +1,4 @@
+import Link from '@docusaurus/Link'
 import React from 'react'
 
 const BenchmarkOlakeSection = () => {
@@ -27,9 +28,12 @@ const BenchmarkOlakeSection = () => {
               Run your benchmarks with OLake and see the difference. Our open-source EL <br />
               engine is optimized for Apache Iceberg, ensuring top-tier performance.
             </div>
-            <div className='mt-5 flex w-36 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-[9px] font-medium text-white sm:mt-12 sm:h-12 sm:w-60 sm:text-base'>
+            <Link
+              to='/docs/getting-started/quickstart'
+              className='mt-5 flex w-36 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-[9px] font-medium text-white hover:text-white hover:no-underline sm:mt-12 sm:h-12 sm:w-60 sm:text-base'
+            >
               Test Now
-            </div>
+            </Link>
           </div>
         </div>
       </section>

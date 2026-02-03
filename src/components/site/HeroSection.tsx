@@ -62,12 +62,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
 
           <div className='mt-3 flex flex-col items-center gap-2 font-helvetica text-sm sm:flex-row sm:text-base'>
-            <div className='bg-brand-blue-500 flex h-8 w-full items-center justify-center rounded-lg px-4 py-1 text-center font-medium text-white sm:h-12 sm:w-40'>
+            <Link
+              to='/docs/getting-started/quickstart'
+              className='bg-brand-blue-500 flex h-8 w-full items-center justify-center rounded-lg px-4 py-1 text-center font-medium text-white hover:text-white hover:no-underline sm:h-12 sm:w-40'
+            >
               Try OLake
-            </div>
-            <div className='!border-brand-blue-500 text-brand-blue-500 flex h-8 w-full items-center justify-center rounded-lg !border !border-solid bg-white px-4 py-1 text-center font-medium sm:h-12 sm:w-40'>
+            </Link>
+            <Link
+              to='/#olake-form-product'
+              className='!border-brand-blue-500 text-brand-blue-500 flex h-8 w-full items-center justify-center rounded-lg !border !border-solid bg-white px-4 py-1 text-center font-medium hover:no-underline sm:h-12 sm:w-40'
+            >
               Talk to us
-            </div>
+            </Link>
           </div>
 
           <div className='relative mt-12 hidden max-h-[50vh] overflow-hidden rounded-xl sm:block'>

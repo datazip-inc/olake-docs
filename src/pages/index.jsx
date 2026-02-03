@@ -276,7 +276,9 @@ export default function New3Page() {
           <LazyComponent component='BenchmarkOlakeSection' />
           <LazyComponent component='FeatureShowcase' />
           <LazyComponent component='SetupStepsSection' />
-          <LazyComponent component='RegistrationSection' />
+          <div id='olake-form-product' className='min-h-[80vh]'>
+            <LazyComponent component='RegistrationSection' />
+          </div>
           <LazyComponent component='TestimonialsSection' />
           <LazyComponent component='BlogShowcase' />
           <section

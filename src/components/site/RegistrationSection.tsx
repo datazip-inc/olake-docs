@@ -1,5 +1,4 @@
 import React, { useRef, useEffect } from 'react'
-import { useHistory } from '@docusaurus/router'
 
 declare global {
   interface Window {
@@ -16,7 +15,7 @@ const RegistrationSection: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null)
   const scriptLoadedRef = useRef<boolean>(false)
   const formInitializedRef = useRef<boolean>(false)
-  const history = useHistory()
+
   // const isMobile = useIsMobile()
 
   // Defer HubSpot script & form creation until near viewport or anchor requested
@@ -52,16 +51,9 @@ const RegistrationSection: React.FC = () => {
     const targetEl = sectionRef.current
     if (!targetEl) return
 
-    // If user arrived with anchor, load immediately and scroll
+    // If user arrived with anchor, load HubSpot immediately
     if (window.location.hash === '#olake-form-product') {
       loadHubSpot()
-      requestAnimationFrame(() => {
-        window.scrollTo(0, targetEl.offsetTop)
-        history.replace({
-          pathname: window.location.pathname,
-          search: window.location.search
-        })
-      })
       return
     }
 
@@ -85,11 +77,10 @@ const RegistrationSection: React.FC = () => {
 
     // Fallback for very old browsers
     loadHubSpot()
-  }, [history])
+  }, [])
 
   return (
     <section
-      id='olake-form-product'
       ref={sectionRef}
       className='relative mx-auto h-auto min-h-[80vh] w-full overflow-visible p-0 pb-12 sm:h-[80vh] sm:w-[90%] sm:overflow-hidden sm:rounded-4xl sm:p-6'
     >
@@ -156,8 +147,6 @@ const RegistrationSection: React.FC = () => {
                 <h3 className='mb-2 text-sm font-medium md:mb-6 md:text-2xl'>OLake</h3>
                 <h2 className='mb-6 text-[32px] font-medium md:mb-16 md:text-3xl lg:text-5xl'>
                   Interested?
-                  <br />
-                  Register Now.
                 </h2>
               </div>
 
