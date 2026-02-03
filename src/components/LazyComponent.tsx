@@ -1,9 +1,11 @@
 import React, { Suspense, lazy, ComponentType, useEffect, useRef, useState } from 'react'
+import TestimonialsSection from './site/TestimonialsSection'
 
 // Define component types for better type safety
 type LazyComponentName =
   | 'BlogShowcase'
   | 'BenchmarkSection'
+  | 'BenchmarkOlakeSection'
   | 'FeatureShowcase'
   | 'IcebergHero'
   | 'WorkflowDiagram'
@@ -13,6 +15,7 @@ type LazyComponentName =
   | 'Glace'
   | 'WebinarGrid'
   | 'ActiveContributors'
+  | 'TestimonialsSection'
 
 // Lazy load heavy components with error handling
 const createLazyComponent = (importFn: () => Promise<{ default: ComponentType<any> }>) => {
@@ -47,9 +50,13 @@ const WebinarGrid = createLazyComponent(() => import('./webinars/WebinarGrid'))
 const ActiveContributors = createLazyComponent(
   () => import('./community/improved/ActiveContributors')
 )
+const BenchmarkOlakeSection = createLazyComponent(() => import('./site/BenchmarkOlakeSection'))
 
 // Loading fallback component
-const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> = ({ componentName, minHeight = 200 }) => (
+const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> = ({
+  componentName,
+  minHeight = 200
+}) => (
   <div className='flex items-center justify-center p-8' style={{ minHeight }}>
     <div className='flex w-full animate-pulse space-x-4'>
       <div className='h-10 w-10 rounded-full bg-gray-300'></div>
@@ -68,6 +75,7 @@ const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> =
 const COMPONENT_MAP: Record<LazyComponentName, ComponentType<any>> = {
   BlogShowcase,
   BenchmarkSection,
+  BenchmarkOlakeSection,
   FeatureShowcase,
   IcebergHero,
   WorkflowDiagram,
@@ -76,7 +84,8 @@ const COMPONENT_MAP: Record<LazyComponentName, ComponentType<any>> = {
   RegistrationSection,
   Glace,
   WebinarGrid,
-  ActiveContributors
+  ActiveContributors,
+  TestimonialsSection
 } as const
 
 // Lazy component wrapper
@@ -143,7 +152,13 @@ const LazyComponent: React.FC<LazyComponentProps> = ({
   return (
     <div ref={containerRef}>
       {isVisible ? (
-        <Suspense fallback={fallback || <LoadingFallback componentName={component} minHeight={placeholderMinHeight} />}>
+        <Suspense
+          fallback={
+            fallback || (
+              <LoadingFallback componentName={component} minHeight={placeholderMinHeight} />
+            )
+          }
+        >
           <LazyComponent {...props} />
         </Suspense>
       ) : (
