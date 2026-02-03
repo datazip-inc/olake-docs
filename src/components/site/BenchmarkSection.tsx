@@ -156,8 +156,8 @@ const BenchmarkSection: React.FC = () => {
   return (
     <section className='w-full bg-white py-16 dark:bg-gray-900 md:py-24'>
       <div className='mx-auto mb-12 w-full text-center md:mb-16'>
-        <div className='mb-3 text-xs font-medium text-[#203FDD] sm:text-2xl'>Benchmarks</div>
-        <h2 className='mx-auto w-[85%] font-space text-[20px] font-medium leading-[120%] tracking-[-0.05em] text-[#333333] dark:text-white sm:w-full sm:text-5xl sm:leading-relaxed sm:tracking-normal'>
+        <div className='text-brand-blue-500 mb-3 text-xs font-medium sm:text-2xl'>Benchmarks</div>
+        <h2 className='text-brand-gray-900 mx-auto w-[85%] font-space text-[20px] font-medium leading-[120%] tracking-[-0.05em] dark:text-white sm:w-full sm:text-5xl sm:leading-relaxed sm:tracking-normal'>
           Designed for engineers who want to <br className='hidden sm:block' /> control complexity
         </h2>
       </div>
@@ -176,8 +176,8 @@ const BenchmarkSection: React.FC = () => {
             onClick={() => setBenchmarkMode('full_load')}
             className={`relative z-10 flex h-6 w-24 items-center justify-center rounded-[4px] border-none bg-transparent text-center font-space text-xs font-medium transition-colors duration-300 sm:h-auto sm:w-28 sm:rounded-lg sm:px-4 sm:py-2 sm:text-base ${
               benchmarkMode === 'full_load'
-                ? 'text-[#183AE6] dark:text-blue-400'
-                : 'text-[#939393] hover:text-[#666666] dark:text-gray-400 hover:dark:text-gray-300'
+                ? 'text-primary-600 dark:text-blue-400'
+                : 'text-brand-gray-400 hover:text-brand-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
             }`}
           >
             Full Load
@@ -186,8 +186,8 @@ const BenchmarkSection: React.FC = () => {
             onClick={() => setBenchmarkMode('cdc')}
             className={`relative z-10 flex h-6 w-24 items-center justify-center rounded-[4px] border-none bg-transparent text-center font-space text-xs font-medium transition-colors duration-300 sm:h-auto sm:w-28 sm:rounded-lg sm:px-4 sm:py-2 sm:text-base ${
               benchmarkMode === 'cdc'
-                ? 'text-[#183AE6] dark:text-blue-400'
-                : 'text-[#939393] hover:text-[#666666] dark:text-gray-400 hover:dark:text-gray-300'
+                ? 'text-primary-600 dark:text-blue-400'
+                : 'text-brand-gray-400 hover:text-brand-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
             }`}
           >
             CDC
@@ -204,8 +204,8 @@ const BenchmarkSection: React.FC = () => {
               onClick={() => setActiveConnector(connector.id)}
               className={`flex-shrink-0 rounded-xl border-none px-3 py-1 text-center font-space text-xs font-medium leading-[120%] tracking-[-0.05em] transition-all sm:px-6 sm:py-3 sm:font-sans sm:text-lg sm:font-normal sm:leading-normal sm:tracking-normal ${
                 activeConnector === connector.id
-                  ? 'bg-white text-[#183AE6] dark:bg-blue-900/30 dark:text-blue-400 sm:bg-[#E8EBFD]'
-                  : 'bg-transparent text-[#939393] dark:text-gray-400 hover:dark:text-gray-300 sm:text-neutral-700'
+                  ? 'bg-white text-primary-600 dark:bg-blue-900/30 dark:text-blue-400 sm:bg-[#E8EBFD]'
+                  : 'text-brand-gray-400 bg-transparent dark:text-gray-400 hover:dark:text-gray-300 sm:text-neutral-700'
               }`}
             >
               {connector.name}
@@ -224,7 +224,7 @@ const BenchmarkSection: React.FC = () => {
           </span>
           <Link
             to='/docs/benchmarks'
-            className='inline-flex items-center text-xs font-medium text-[#203FDD] hover:text-blue-700'
+            className='text-brand-blue-500 inline-flex items-center text-xs font-medium hover:text-blue-700'
           >
             View all Benchmarks
             <svg className='ml-1 h-3 w-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -263,7 +263,7 @@ const BenchmarkSection: React.FC = () => {
                   })}
 
                   {/* Top full-width border */}
-                  <div className='pointer-events-none absolute left-0 top-0 z-10 h-px w-full bg-[#D1D1D1]' />
+                  <div className='bg-brand-gray-250 pointer-events-none absolute left-0 top-0 z-10 h-px w-full' />
 
                   {/* Gradient border overlay for OLake column - using individual border lines */}
                   {/* Left border */}
@@ -284,7 +284,7 @@ const BenchmarkSection: React.FC = () => {
                   />
                   {/* Top border - extends to the right */}
                   <div
-                    className='pointer-events-none absolute top-0 z-10 h-px bg-[#389E0D]'
+                    className='bg-brand-green-600 pointer-events-none absolute top-0 z-10 h-px'
                     style={{
                       left: borderStyle.left,
                       width: borderStyle.width + 50
@@ -320,14 +320,14 @@ const BenchmarkSection: React.FC = () => {
                       <tr>
                         <th
                           ref={metricsHeaderRef}
-                          className='border-0 bg-white px-6 py-12 text-center text-xl font-medium text-[#333333]'
+                          className='text-brand-gray-900 border-0 bg-white px-6 py-12 text-center text-xl font-medium'
                           style={{ minWidth: 0, border: 'none' }}
                         >
                           Metrics
                         </th>
                         <th
                           ref={olakeHeaderRef}
-                          className='border-0 bg-transparent px-4 py-12 text-left font-medium text-[#333333]'
+                          className='text-brand-gray-900 border-0 bg-transparent px-4 py-12 text-left font-medium'
                           style={{ minWidth: 0, border: 'none' }}
                         >
                           <div className='flex items-center justify-center space-x-2'>
@@ -345,7 +345,7 @@ const BenchmarkSection: React.FC = () => {
                         </th>
                         <th
                           ref={airbyteHeaderRef}
-                          className='border-0 bg-white px-4 py-12 text-left font-medium text-[#333333]'
+                          className='text-brand-gray-900 border-0 bg-white px-4 py-12 text-left font-medium'
                           style={{ minWidth: 0, border: 'none' }}
                         >
                           <div className='flex items-center justify-center space-x-2'>
@@ -360,7 +360,7 @@ const BenchmarkSection: React.FC = () => {
                         </th>
                         <th
                           ref={fivetranHeaderRef}
-                          className='border-0 bg-white px-4 py-12 text-left font-medium text-[#333333]'
+                          className='text-brand-gray-900 border-0 bg-white px-4 py-12 text-left font-medium'
                           style={{ minWidth: 0, border: 'none' }}
                         >
                           <div className='flex items-center justify-center space-x-2'>
@@ -376,7 +376,7 @@ const BenchmarkSection: React.FC = () => {
                         {!isKafka && (
                           <th
                             ref={debeziumHeaderRef}
-                            className='border-0 bg-white px-4 py-12 text-left font-medium text-[#333333]'
+                            className='text-brand-gray-900 border-0 bg-white px-4 py-12 text-left font-medium'
                             style={{ minWidth: 0, border: 'none' }}
                           >
                             <div className='flex items-center justify-center space-x-2'>
@@ -392,7 +392,7 @@ const BenchmarkSection: React.FC = () => {
                         )}
                         <th
                           ref={estuaryHeaderRef}
-                          className='border-0 bg-white px-4 py-12 text-left font-medium text-[#333333]'
+                          className='text-brand-gray-900 border-0 bg-white px-4 py-12 text-left font-medium'
                           style={{ minWidth: 0, border: 'none' }}
                         >
                           <div className='flex items-center justify-center space-x-2'>
@@ -409,7 +409,7 @@ const BenchmarkSection: React.FC = () => {
                         {isKafka && (
                           <th
                             ref={flinkHeaderRef}
-                            className='border-0 bg-white px-4 py-12 text-left font-medium text-[#333333]'
+                            className='text-brand-gray-900 border-0 bg-white px-4 py-12 text-left font-medium'
                             style={{ minWidth: 0, border: 'none' }}
                           >
                             <div className='flex items-center justify-center space-x-2'>
@@ -435,7 +435,7 @@ const BenchmarkSection: React.FC = () => {
                             {row.metric}
                           </td>
                           <td
-                            className='border-0 bg-transparent p-6 text-center font-bold text-[#389E0D]'
+                            className='text-brand-green-600 border-0 bg-transparent p-6 text-center font-bold'
                             style={{ border: 'none' }}
                           >
                             {row.olake}
@@ -488,7 +488,7 @@ const BenchmarkSection: React.FC = () => {
                 </span>
                 <Link
                   to='/docs/benchmarks'
-                  className='inline-flex items-center font-medium text-[#203FDD] hover:text-blue-700'
+                  className='text-brand-blue-500 inline-flex items-center font-medium hover:text-blue-700'
                 >
                   View all Performance Benchmarks
                   <svg

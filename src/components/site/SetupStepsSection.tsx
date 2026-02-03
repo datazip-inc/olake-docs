@@ -51,8 +51,8 @@ const Connector: React.FC<{
         className={clsx(
           'duration-[800ms] absolute inset-0 transition-transform ease-out',
           isVertical
-            ? 'origin-top bg-gradient-to-b from-[#203FDD] to-[#4F6AE8]'
-            : 'origin-left bg-gradient-to-r from-[#203FDD] to-[#4F6AE8]',
+            ? 'from-brand-blue-500 to-brand-blue-400 origin-top bg-gradient-to-b'
+            : 'from-brand-blue-500 to-brand-blue-400 origin-left bg-gradient-to-r',
           isActive
             ? isVertical
               ? 'scale-y-100'
@@ -104,7 +104,7 @@ const SetupStepsSection: React.FC = () => {
         <div className='mx-auto flex flex-col gap-12 lg:grid lg:max-w-7xl lg:grid-cols-2 lg:items-center'>
           {/* Left Side - Steps Navigation */}
           <div className='w-full'>
-            <div className='mb-3 text-xs font-medium tracking-wide text-[#203FDD] sm:text-2xl'>
+            <div className='text-brand-blue-500 mb-3 text-xs font-medium tracking-wide sm:text-2xl'>
               The OLake Experience
             </div>
             <h2 className='mb-16 text-xl font-medium leading-tight tracking-[-0.05em] text-gray-900 dark:text-white sm:text-[40px] sm:tracking-wider md:text-5xl'>
@@ -138,9 +138,9 @@ const SetupStepsSection: React.FC = () => {
                         className={clsx(
                           'z-10 h-[7px] w-[7px] rounded-full border-[3px] border-solid transition-all duration-300 sm:h-4 sm:w-4',
                           isActive
-                            ? 'border-[#193AE6] bg-[#193AE6] shadow-[0_0_0_4px_#EEF2FF]'
+                            ? 'border-primary-600 bg-primary-600 shadow-[0_0_0_4px_#EEF2FF]'
                             : index < activeStep
-                              ? 'border-[#193AE6] bg-white'
+                              ? 'border-primary-600 bg-white'
                               : 'border-neutral-200 bg-white group-hover:border-neutral-400'
                         )}
                       />
@@ -161,7 +161,7 @@ const SetupStepsSection: React.FC = () => {
                         <span
                           className={clsx(
                             'font-helvetica text-sm font-medium leading-none transition-colors',
-                            isActive ? 'text-[#203FDD]' : 'text-black dark:text-white'
+                            isActive ? 'text-brand-blue-500' : 'text-black dark:text-white'
                           )}
                         >
                           {item.title}
@@ -176,7 +176,7 @@ const SetupStepsSection: React.FC = () => {
                         <div
                           className={clsx(
                             'font-helvetica text-xl font-medium leading-none transition-colors',
-                            isActive ? 'text-[#203FDD]' : 'text-black dark:text-white'
+                            isActive ? 'text-brand-blue-500' : 'text-black dark:text-white'
                           )}
                         >
                           {item.title}

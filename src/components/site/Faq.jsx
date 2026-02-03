@@ -20,7 +20,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
         </div>
         <div
           className={`text-xl transition-transform duration-200 ease-in-out ${
-            expanded ? 'text-black' : 'text-[#939393]'
+            expanded ? 'text-black' : 'text-brand-gray-400'
           }`}
         >
           {expanded ? '↑' : '↓'}
@@ -28,7 +28,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
       </div>
       {expanded && (
         <div className='-mt-2 rounded p-3 px-2'>
-          <div className='text-sm font-normal leading-relaxed text-[#333333] dark:text-gray-300'>
+          <div className='text-brand-gray-900 text-sm font-normal leading-relaxed dark:text-gray-300'>
             {answer}
           </div>
         </div>
@@ -44,7 +44,7 @@ const Faq = ({ data, showHeading }) => {
         // <SectionHeader showHr={false} heading={<>Frequently Asked Questions</>} />
         <div
           id='faq-heading'
-          className='mb-4 flex flex-col gap-4 text-xl font-medium text-[#333333] dark:text-white sm:text-[64px]'
+          className='text-brand-gray-900 mb-4 flex flex-col gap-4 text-xl font-medium dark:text-white sm:text-[64px]'
         >
           Frequently Asked Questions
         </div>

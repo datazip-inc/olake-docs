@@ -69,7 +69,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
             >
               <div className='flex w-full items-center justify-between gap-2 rounded-lg bg-[#F6F8FF] px-3 py-2 md:px-4 md:py-3'>
                 <div className='flex min-w-0 items-center gap-x-1.5 overflow-hidden md:gap-x-2'>
-                  <PiReadCvLogo className='size-4 shrink-0 text-[#193AE6] md:size-5' />
+                  <PiReadCvLogo className='size-4 shrink-0 text-primary-600 md:size-5' />
                   {/* Blog link: Space Grotesk, 8px mobile, 14px desktop */}
                   <span className='truncate font-space text-[8px] font-medium leading-none md:text-sm md:leading-normal'>
                     Blog: {blogTitle}

@@ -20,14 +20,14 @@ const BenchmarkOlakeSection = () => {
 
           {/* Main content container */}
           <div className='flex h-[50vh] flex-col items-center justify-center bg-[#FCFCFC] py-16'>
-            <div className='relative text-lg font-medium text-[#333333] sm:text-[40px]'>
-              Benchmark<span className='text-[#193AE6]'> OLake</span>
+            <div className='text-brand-gray-900 relative text-lg font-medium sm:text-[40px]'>
+              Benchmark<span className='text-primary-600'> OLake</span>
             </div>
             <div className='mt-4 text-center font-sans text-[9px] text-neutral-700 sm:text-xl'>
               Run your benchmarks with OLake and see the difference. Our open-source EL <br />
               engine is optimized for Apache Iceberg, ensuring top-tier performance.
             </div>
-            <div className='mt-5 flex w-36 items-center justify-center rounded-md bg-[#193AE6] px-4 py-2 text-[9px] font-medium text-white sm:mt-12 sm:h-12 sm:w-60 sm:text-base'>
+            <div className='mt-5 flex w-36 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-[9px] font-medium text-white sm:mt-12 sm:h-12 sm:w-60 sm:text-base'>
               Test Now
             </div>
           </div>

@@ -124,7 +124,7 @@ const Footer: React.FC = () => {
           <div className='grid grid-cols-3 gap-4'>
             {/* Company Links */}
             <div className='font-sans'>
-              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-[#0D1238] dark:text-white'>
+              <h3 className='text-brand-black mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider dark:text-white'>
                 COMPANY
               </h3>
               <ul className='list-none space-y-0 p-0'>
@@ -132,7 +132,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='font-sans text-[8px] leading-tight tracking-[0.01em] text-[#9B9B9B] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 font-sans text-[8px] leading-tight tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -143,7 +143,7 @@ const Footer: React.FC = () => {
 
             {/* Resources Links */}
             <div className='font-sans'>
-              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-[#0D1238] dark:text-white'>
+              <h3 className='text-brand-black mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider dark:text-white'>
                 RESOURCES
               </h3>
               <ul className='list-none space-y-0 p-0'>
@@ -151,7 +151,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='font-sans text-[8px] leading-tight tracking-[0.01em] text-[#9B9B9B] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 font-sans text-[8px] leading-tight tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -162,7 +162,7 @@ const Footer: React.FC = () => {
 
             {/* Top Reads Links */}
             <div className='font-sans'>
-              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-[#0D1238] dark:text-white'>
+              <h3 className='text-brand-black mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider dark:text-white'>
                 TOP READS
               </h3>
               <ul className='list-none space-y-0.5 p-0'>
@@ -170,7 +170,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-[#9B9B9B] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 font-sans text-[8px] leading-3 tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -216,7 +216,7 @@ const Footer: React.FC = () => {
 
             {/* Company Links Section */}
             <div className='col-span-1 font-sans'>
-              <h3 className='mb-4 text-base font-normal tracking-wider text-[#0D1238] dark:text-white'>
+              <h3 className='text-brand-black mb-4 text-base font-normal tracking-wider dark:text-white'>
                 COMPANY
               </h3>
               <ul className='list-none space-y-3 p-0'>
@@ -224,7 +224,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-[#9B9B9B] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -235,7 +235,7 @@ const Footer: React.FC = () => {
 
             {/* Resources Links Section */}
             <div className='col-span-1 font-sans'>
-              <h3 className='mb-4 text-base font-normal tracking-wider text-[#0D1238] dark:text-white'>
+              <h3 className='text-brand-black mb-4 text-base font-normal tracking-wider dark:text-white'>
                 RESOURCES
               </h3>
               <ul className='list-none space-y-3 p-0'>
@@ -243,7 +243,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-[#9B9B9B] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -254,7 +254,7 @@ const Footer: React.FC = () => {
 
             {/* Top Reads Links Section */}
             <div className='col-span-1 font-sans'>
-              <h3 className='mb-4 text-base font-normal tracking-wider text-[#0D1238] dark:text-white'>
+              <h3 className='text-brand-black mb-4 text-base font-normal tracking-wider dark:text-white'>
                 TOP READS
               </h3>
               <ul className='list-none space-y-3 p-0'>
@@ -262,7 +262,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-[#9B9B9B] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -275,7 +275,9 @@ const Footer: React.FC = () => {
       </div>
 
       {/* Copyright Section - Desktop only, positioned relative to footer */}
-      <div className='absolute bottom-8 left-12 hidden text-[#9B9B9B] sm:block'>By Datazip</div>
+      <div className='text-brand-gray-450 absolute bottom-8 left-12 hidden sm:block'>
+        By Datazip
+      </div>
     </footer>
   )
 }

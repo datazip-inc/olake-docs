@@ -23,10 +23,10 @@ const TestimonialCard = ({ title, description, author }) => {
 
 const TestimonialsSection = () => {
   return (
-    <div className='relative mt-12 flex flex-col items-center justify-start bg-[#F3F3F3] px-4 py-12 sm:mt-24 sm:p-16'>
+    <div className='bg-brand-gray-50 relative mt-12 flex flex-col items-center justify-start px-4 py-12 sm:mt-24 sm:p-16'>
       <div className='flex flex-col items-center justify-center gap-2'>
-        <div className='text-lg font-medium text-[#203FDD] sm:text-2xl'>Testimonials</div>
-        <div className='text-center text-2xl font-medium leading-tight text-[#333333] sm:text-4xl md:text-5xl lg:text-[64px]'>
+        <div className='text-brand-blue-500 text-lg font-medium sm:text-2xl'>Testimonials</div>
+        <div className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px]'>
           Don't take our word for it
         </div>
       </div>

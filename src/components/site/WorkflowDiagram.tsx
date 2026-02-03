@@ -45,7 +45,7 @@ const Pill: React.FC<PillProps> = ({ icon, label, isHighlighted = false }) => (
   >
     {icon && <span className='flex flex-shrink-0 items-center'>{icon}</span>}
     <span
-      className={`whitespace-nowrap text-center font-space text-[12px] font-medium leading-[120%] tracking-[-0.05em] transition-colors duration-300 sm:text-base sm:leading-normal sm:tracking-normal ${isHighlighted ? 'text-[#193AE6]' : 'text-[#939393] sm:text-gray-700'}`}
+      className={`whitespace-nowrap text-center font-space text-[12px] font-medium leading-[120%] tracking-[-0.05em] transition-colors duration-300 sm:text-base sm:leading-normal sm:tracking-normal ${isHighlighted ? 'text-primary-600' : 'text-brand-gray-400 sm:text-gray-700'}`}
     >
       {label}
     </span>
@@ -84,7 +84,7 @@ const Connector: React.FC<ConnectorProps> = ({
       }`}
     >
       <div
-        className={`absolute inset-0 bg-gradient-to-r from-[#193AE6] to-[#4F6AE8] ${
+        className={`from-brand-blue-500 to-brand-blue-400 absolute inset-0 bg-gradient-to-r ${
           isHorizontal ? 'origin-left' : 'origin-top'
         } ${getTransitionClass()} ${
           isActive

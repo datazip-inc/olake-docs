@@ -81,10 +81,10 @@ const FeatureShowcase: React.FC = () => {
     <section className='w-full bg-white py-12 dark:bg-gray-900 sm:py-16 md:py-24'>
       {/* Heading container - centered */}
       <div className='container mx-auto mb-8 px-4 text-center sm:mb-12 md:mb-24 md:px-6'>
-        <div className='mb-2 text-xs font-semibold text-[#193AE6] sm:mb-3 sm:text-2xl'>
+        <div className='mb-2 text-xs font-semibold text-primary-600 sm:mb-3 sm:text-2xl'>
           Why OLake?
         </div>
-        <h2 className='text-xl font-medium text-[#333333] dark:text-white sm:text-4xl md:text-[64px]'>
+        <h2 className='text-brand-gray-900 text-xl font-medium dark:text-white sm:text-4xl md:text-[64px]'>
           We know how to stand out
         </h2>
       </div>

@@ -188,7 +188,7 @@ export default function New3Page() {
       answer: (
         <>
           Check the{' '}
-          <a href='/docs/getting-started/quickstart' className='text-[#193AE6] hover:underline'>
+          <a href='/docs/getting-started/quickstart' className='text-primary-600 hover:underline'>
             Quickstart Guide
           </a>
           . With a single Docker command you can spin up OLake and access the UI.

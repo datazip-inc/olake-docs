@@ -27,7 +27,7 @@ const SourcesContent: React.FC = () => (
       {/* Sources header */}
       <div className='flex items-center gap-2'>
         <PiPath size={20} color='#193AE6' />
-        <span className='font-medium text-[#193AE6]'>Sources</span>
+        <span className='font-medium text-primary-600'>Sources</span>
       </div>
 
       {/* Main heading */}
@@ -39,10 +39,10 @@ const SourcesContent: React.FC = () => (
       <div className='mt-4 h-px w-3/5 bg-neutral-200' />
       {/* Sync Modes section */}
       <div>
-        <p className='m-0 text-[8px] font-medium tracking-wide text-[#333333] sm:text-sm'>
+        <p className='text-brand-gray-900 m-0 text-[8px] font-medium tracking-wide sm:text-sm'>
           Sync Modes
         </p>
-        <p className='m-0 mt-1 max-w-48 text-sm font-semibold text-[#333333] sm:text-2xl'>
+        <p className='text-brand-gray-900 m-0 mt-1 max-w-48 text-sm font-semibold sm:text-2xl'>
           CDC, Full Load & Incremental
         </p>
       </div>
@@ -136,7 +136,7 @@ const OLakeContent: React.FC = () => {
 
             {/* Left Text Block */}
             <div className='absolute left-[3%] top-3/4 max-w-[220px] -translate-y-1/2 text-right'>
-              <p className='font-space text-sm font-medium leading-[120%] tracking-[-0.05em] text-[#333333] sm:text-xl'>
+              <p className='text-brand-gray-900 font-space text-sm font-medium leading-[120%] tracking-[-0.05em] sm:text-xl'>
                 Effortlessly integrate with data sources, featuring adaptive schema migration and
                 zero downtime.
               </p>
@@ -144,14 +144,14 @@ const OLakeContent: React.FC = () => {
 
             {/* Top Right Text Block */}
             <div className='absolute right-[5%] top-[20%] max-w-[240px] text-left'>
-              <p className='font-space text-sm font-medium leading-[120%] tracking-[-0.05em] text-[#333333] sm:text-xl'>
+              <p className='text-brand-gray-900 font-space text-sm font-medium leading-[120%] tracking-[-0.05em] sm:text-xl'>
                 Quickly connect to data sources seamlessly.
               </p>
             </div>
 
             {/* Bottom Right Text Block */}
             <div className='absolute -right-[7%] bottom-[12%] max-w-[300px] text-left'>
-              <p className='font-space text-sm font-medium leading-[120%] tracking-[-0.05em] text-[#333333] sm:text-xl'>
+              <p className='text-brand-gray-900 font-space text-sm font-medium leading-[120%] tracking-[-0.05em] sm:text-xl'>
                 Achieve lightning-fast data replication from sources with sub-second latency.
               </p>
             </div>
@@ -175,24 +175,24 @@ const DestinationsContent: React.FC = () => (
     </div>
     {/* Content - below image on mobile, right on desktop */}
     <div className='order-2 mt-6 w-full sm:order-2 sm:mt-0 sm:w-auto'>
-      <div className='flex items-center gap-x-2 font-medium text-[#193AE6]'>
+      <div className='flex items-center gap-x-2 font-medium text-primary-600'>
         <PiLinktreeLogo className='size-5 sm:size-7' />
         <div className='text-lg sm:text-2xl'>Destinations</div>
       </div>
-      <div className='mt-2 text-xl font-medium tracking-tighter text-[#333333] sm:text-[32px]'>
+      <div className='text-brand-gray-900 mt-2 text-xl font-medium tracking-tighter sm:text-[32px]'>
         <div>
           <span className='font-bold'>Sync</span> data from sources to
         </div>
         <div>Iceberg or S3</div>
       </div>
-      <div className='mt-4 space-y-1 border-l-0 border-r-0 border-solid py-4 text-xs text-[#333333] sm:mt-8 sm:space-y-2 sm:py-8 sm:text-sm'>
+      <div className='text-brand-gray-900 mt-4 space-y-1 border-l-0 border-r-0 border-solid py-4 text-xs sm:mt-8 sm:space-y-2 sm:py-8 sm:text-sm'>
         <div className='text-base font-bold sm:text-lg'>S3</div>
         <div>
           <div>Fast landing for raw replication and downstream transforms.</div>
           <div>Optimized file sizing + multipart uploads.</div>
         </div>
       </div>
-      <div className='space-y-1 border-l-0 border-r-0 border-t-0 border-solid py-4 text-xs text-[#333333] sm:space-y-2 sm:py-8 sm:text-sm'>
+      <div className='text-brand-gray-900 space-y-1 border-l-0 border-r-0 border-t-0 border-solid py-4 text-xs sm:space-y-2 sm:py-8 sm:text-sm'>
         <div className='text-base font-bold sm:text-lg'>Apache Iceberg</div>
         <div>
           <div>Table-managed writes for governed analytics: snapshots, partitions,</div>
@@ -234,7 +234,7 @@ const IcebergCatalogsContent: React.FC = () => {
     <div ref={scrollRef} className='relative w-full overflow-x-auto lg:overflow-x-visible'>
       {/* Scrollable wrapper for mobile - content takes its natural width */}
       <div className='min-w-[1400px] lg:min-w-0'>
-        <div className='relative flex min-h-[550px] w-full items-center justify-center overflow-hidden px-4 py-8 text-[#333333] sm:px-6'>
+        <div className='text-brand-gray-900 relative flex min-h-[550px] w-full items-center justify-center overflow-hidden px-4 py-8 sm:px-6'>
           {/* Container for the diagram */}
           <div className='relative z-100 flex w-full max-w-7xl items-center justify-center'>
             {/* SVG Connector layer */}
@@ -295,8 +295,8 @@ const IcebergCatalogsContent: React.FC = () => {
 
             {/* Main Header (Top Left) */}
             <div className='absolute -left-10 -top-10'>
-              <h3 className='mb-2 font-medium text-[#193AE6]'>Catalogs</h3>
-              <p className='font-space font-bold leading-tight text-[#333333]'>
+              <h3 className='mb-2 font-medium text-primary-600'>Catalogs</h3>
+              <p className='text-brand-gray-900 font-space font-bold leading-tight'>
                 Use the catalog your platform already runs: OLake writes
                 <br />
                 tables that your engines can read consistently.
@@ -305,7 +305,7 @@ const IcebergCatalogsContent: React.FC = () => {
 
             {/* Hive Description (Left) */}
             <div className='absolute left-[7%] top-[40%] max-w-[280px] -translate-y-1/2 text-right'>
-              <p className='text-xs leading-relaxed text-[#333333]'>
+              <p className='text-brand-gray-900 text-xs leading-relaxed'>
                 The classic metastore used with Apache Hive to manage table schemas and partitions.
                 <br />A solid old-timer—reliable, widely supported, and still doing its job without
                 drama.
@@ -314,7 +314,7 @@ const IcebergCatalogsContent: React.FC = () => {
 
             {/* Rest Catalog Description (Bottom Left) */}
             <div className='absolute bottom-0 left-[7%] max-w-[280px] text-right'>
-              <p className='text-xs leading-relaxed text-[#333333]'>
+              <p className='text-brand-gray-900 text-xs leading-relaxed'>
                 A catalog exposed over REST APIs for flexible, decoupled metadata access.
                 <br />
                 Great for modern architectures where services talk over APIs, not handshakes.
@@ -337,7 +337,7 @@ const IcebergCatalogsContent: React.FC = () => {
 
             {/* AWS Glue Description (Top Right) */}
             <div className='absolute right-[6%] top-[18%] max-w-[280px] text-left'>
-              <p className='text-xs leading-relaxed text-[#333333]'>
+              <p className='text-brand-gray-900 text-xs leading-relaxed'>
                 A fully managed data catalog from AWS that automatically discovers and organizes
                 metadata.
                 <br />
@@ -348,7 +348,7 @@ const IcebergCatalogsContent: React.FC = () => {
 
             {/* JDBC Description (Bottom Right) */}
             <div className='absolute bottom-0 right-[6%] max-w-[280px] text-left'>
-              <p className='text-xs leading-relaxed text-[#333333]'>
+              <p className='text-brand-gray-900 text-xs leading-relaxed'>
                 Connects to external databases using standard JDBC interfaces as a catalog source.
                 <br />
                 Ideal when your metadata lives in relational databases and you want plug-and-play
@@ -371,7 +371,7 @@ const QueryEnginesContent: React.FC = () => (
       className='order-1 h-auto w-full object-contain sm:order-1 sm:w-auto'
     />
     <div className='order-2 w-full sm:order-2 sm:w-auto'>
-      <div className='text-lg font-medium leading-relaxed tracking-tighter text-[#193AE6] sm:mt-16 sm:text-xl'>
+      <div className='text-lg font-medium leading-relaxed tracking-tighter text-primary-600 sm:mt-16 sm:text-xl'>
         Query Engines
       </div>
       <div className='mt-2 text-xs font-normal sm:text-base'>

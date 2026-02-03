@@ -60,11 +60,11 @@ const BlogShowcase: React.FC = () => {
           {/* Heading section - shown first on mobile */}
           <div className='mb-8 flex flex-col justify-center md:hidden'>
             {/* "Blogs" label - mobile: 12px Space Grotesk Medium centered */}
-            <div className='mb-3 text-center font-space text-xs font-medium text-[#203fdd]'>
+            <div className='text-brand-blue-500 mb-3 text-center font-space text-xs font-medium'>
               Blogs
             </div>
             {/* "Stay ahead..." heading - mobile: 20px, line-height 120% (-5% from 125%), letter-spacing -0.05em */}
-            <h2 className='font-space text-xl font-medium leading-tight tracking-tighter text-[#333333] dark:text-white'>
+            <h2 className='text-brand-gray-900 font-space text-xl font-medium leading-tight tracking-tighter dark:text-white'>
               Stay ahead, with our latest reads
             </h2>
           </div>
@@ -148,17 +148,17 @@ const BlogShowcase: React.FC = () => {
 
             {/* Heading section - Right side on desktop */}
             <div className='flex w-full flex-col justify-center lg:w-1/2'>
-              <div className='mb-3 font-space text-2xl font-medium tracking-wider text-[#203fdd]'>
+              <div className='text-brand-blue-500 mb-3 font-space text-2xl font-medium tracking-wider'>
                 Blogs
               </div>
-              <h2 className='mb-8 font-space text-5xl font-medium tracking-wider text-[#333333] dark:text-white'>
+              <h2 className='text-brand-gray-900 mb-8 font-space text-5xl font-medium tracking-wider dark:text-white'>
                 Stay ahead,
                 <br />
                 with our latest reads
               </h2>
               <a
                 href='/blog'
-                className='flex w-fit items-center gap-x-2 font-medium text-[#203fdd]'
+                className='text-brand-blue-500 flex w-fit items-center gap-x-2 font-medium'
               >
                 View all Blogs
                 <PiArrowSquareOutBold className='size-4' />
@@ -200,7 +200,7 @@ const BlogShowcase: React.FC = () => {
           <div className='mt-8 flex justify-center md:hidden'>
             <a
               href='/blog'
-              className='flex items-center gap-x-2 font-sans text-base font-medium text-[#203fdd]'
+              className='text-brand-blue-500 flex items-center gap-x-2 font-sans text-base font-medium'
             >
               View all Blogs
               <PiArrowSquareOutBold className='size-4' />
