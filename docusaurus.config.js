@@ -34,7 +34,7 @@ const config = {
 
   future: {
     v4: true,
-    experimental_faster: true
+    experimental_faster: false  // disabled to avoid rspack cache panic; use webpack
   },
 
   // Client modules for handling client-side functionality
@@ -167,6 +167,10 @@ const config = {
               {
                 label: "Contributor's Program",
                 href: `/community/contributor-program`,
+              },
+              {
+                label: "GSoC",
+                href: `/community/gsoc`,
               },
             ],
           },

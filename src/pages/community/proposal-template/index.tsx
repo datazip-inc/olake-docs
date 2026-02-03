@@ -1,5 +1,5 @@
 // src/pages/community/proposal-template/index.tsx
-import React from 'react'
+import React, { useState } from 'react'
 import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
@@ -11,11 +11,89 @@ import PageHeader from '../../../components/community/improved/PageHeader'
 import SectionLayout from '../../../components/community/SectionLayout'
 import CentralizedBreadcrumbs from '../../../components/Breadcrumbs/CentralizedBreadcrumbs'
 
+const TEMPLATE_PLAINTEXT = `## Contributor information
+- Name:
+- Email:
+- Timezone:
+- GitHub:
+- LinkedIn / portfolio:
+- Resume (optional link):
+- Primary languages/stack:
+
+## Project selection
+- Project title:
+- Project size: Small (~90h) / Medium (~175h) / Large (~350h)
+- Difficulty: Easy / Medium / Hard
+- Proposed mentor(s):
+- Repos likely involved (olake / olake-ui / olake-docs / other):
+
+## Synopsis (short)
+1–2 paragraphs. What are you building and why?
+
+## Problem statement and motivation
+- What problem exists today?
+- Who is affected (users/operators/maintainers)?
+- Why is this worth solving in OLake?
+
+## Background and current state
+- Show that you understand how OLake works (data flow, relevant components).
+- Link to relevant code paths or docs you reviewed.
+
+## Proposed solution
+### Technical design
+Describe: new components/modules; API changes; data model implications; backward compatibility and rollout plan.
+### Implementation plan
+Break down into concrete steps. Mention how you will validate correctness and performance.
+
+## Deliverables
+### Required
+List the exact artifacts: code changes; tests; documentation updates; benchmarks (if relevant); example configs / sample pipelines.
+### Optional stretch goals
+Clearly mark stretch goals as optional.
+
+## Timeline and milestones
+Include: Community Bonding plan; week-by-week milestones; midterm milestone; final "code freeze" period for testing/docs/polish.
+
+## Testing plan
+- Unit tests:
+- Integration tests:
+- How you will reproduce failure cases locally:
+- CI considerations:
+
+## Risks and mitigations
+List realistic risks and how you will reduce them.
+
+## Communication plan
+- Weekly written updates (where you will post them)
+- Meeting cadence with mentors
+- How quickly you will respond to review feedback
+
+## Availability and other commitments
+- Estimated hours/week during coding:
+- Exams/internships/vacations:
+- Any known no-work periods:
+
+## Prior work / proof you can execute
+- OSS contributions (links)
+- Any OLake PRs/issues you participated in (links)
+- Relevant projects (short summary + links)`
+
 const ProposalTemplatePage = () => {
+  const [copied, setCopied] = useState(false)
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
   const siteUrl = siteConfig?.url || 'https://olake.io'
   const canonicalUrl = `${siteUrl}${location.pathname}`
+
+  const handleCopyTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(TEMPLATE_PLAINTEXT)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback not needed in modern browsers
+    }
+  }
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -59,6 +137,13 @@ const ProposalTemplatePage = () => {
           description="Copy this template into your proposal and fill it in with your own project plan. Use it as structure—write and own the content. Do not submit AI-generated boilerplate."
           cta={
             <div className="flex flex-wrap justify-center gap-4">
+              <button
+                type="button"
+                onClick={handleCopyTemplate}
+                className="inline-flex items-center justify-center rounded-full border-2 border-[#193ae6] bg-[#193ae6] px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-[#0d2eb8] dark:border-blue-400 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                {copied ? 'Copied!' : 'Copy template'}
+              </button>
               <Button href="/community/proposal-guidelines" variant="outline" size="lg">
                 Proposal Guidelines
               </Button>

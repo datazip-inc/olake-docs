@@ -167,7 +167,7 @@ const GSoCLandingPage = () => {
               Proposal Guidelines
             </Button>
             <Button href="/community/proposal-template" variant="outline" size="lg">
-              Copy Proposal Template
+              Proposal Template
             </Button>
           </div>
         </SectionLayout>

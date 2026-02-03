@@ -14,6 +14,28 @@ import SectionHeader from '../../../components/community/improved/SectionHeader'
 import SectionLayout from '../../../components/community/SectionLayout'
 import CentralizedBreadcrumbs from '../../../components/Breadcrumbs/CentralizedBreadcrumbs'
 
+// Helper to render deliverable line: bold label (before first ": ") and <code> for metric/code snippets
+function DeliverableLine({ text }: { text: string }) {
+  const colonIdx = text.indexOf(': ')
+  const label = colonIdx >= 0 ? text.slice(0, colonIdx) : ''
+  const rest = colonIdx >= 0 ? text.slice(colonIdx + 2) : text
+  const parts = rest.split(/(olake_\w+\{[^}]+\}|toast_\w+)/g)
+  return (
+    <>
+      {label ? <span className="font-semibold">{label}: </span> : null}
+      {parts.map((p, i) =>
+        /^(olake_\w+\{[^}]+\}|toast_\w+)$/.test(p) ? (
+          <code key={i} className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-700">
+            {p}
+          </code>
+        ) : (
+          p
+        )
+      )}
+    </>
+  )
+}
+
 const IDEAS = [
   {
     id: 'prometheus-metrics',
@@ -21,7 +43,7 @@ const IDEAS = [
     shortDesc: 'Add a Prometheus-compatible /metrics endpoint so users can monitor job health, throughput, and failures.',
     size: 'Small (~90 hours)',
     difficulty: 'Easy',
-    techStack: 'Go',
+    techStack: ['Go'] as const,
     mentors: ['Vaibhav', 'Vikash', 'Akshay', 'Nayan'],
     icon: <FaChartLine className="h-8 w-8" />,
     summary: 'Add a Prometheus-compatible HTTP endpoint (GET /metrics) to OLake so users can monitor job health and throughput using Prometheus and Grafana.',
@@ -33,8 +55,18 @@ const IDEAS = [
       'Tests: /metrics returns metrics text format; at least one test that verifies counters increment on lifecycle events'
     ],
     stretchGoals: 'Additional metrics (to be finalized with mentors): start/finish timestamps, per-stream table counts, lag metrics for CDC.',
-    implementation: 'Use Prometheus Go client; register counters in a small metrics package; update counters from job lifecycle events and request-handling paths; expose via existing HTTP server or dedicated metrics server (configurable).',
-    timeline: 'Community Bonding: validate metric names/labels with mentors, locate job lifecycle hooks and request paths in code, draft docs and example dashboards. Coding: Weeks 1–2 endpoint + scaffolding; Weeks 3–4 job lifecycle counters (rows + run status); Weeks 5–6 (midterm) request counter + first docs + basic tests; Weeks 7–8 CI polish, more tests, docs + examples, optional stretch metrics.'
+    implementation: [
+      'Use Prometheus Go client; register counters in a small metrics package.',
+      'Update counters from job lifecycle events and request-handling paths.',
+      'Expose via existing HTTP server or dedicated metrics server (configurable).'
+    ],
+    timeline: [
+      'Community Bonding: validate metric names/labels with mentors, locate job lifecycle hooks and request paths in code, draft docs and example dashboards.',
+      'Week 1–2: endpoint + scaffolding',
+      'Week 3–4: job lifecycle counters (rows + run status)',
+      'Week 5–6 (midterm): request counter + first docs + basic tests',
+      'Week 7–8: CI polish, more tests, docs + examples, optional stretch metrics'
+    ]
   },
   {
     id: 'postgres-toast',
@@ -42,7 +74,7 @@ const IDEAS = [
     shortDesc: 'Correctly ingest UPDATE/DELETE events when pgoutput omits unchanged TOASTed values (byte \'u\').',
     size: 'Medium (~175 hours)',
     difficulty: 'Medium',
-    techStack: 'Go (CDC ingest/decoder) + Java (Iceberg writer via gRPC)',
+    techStack: ['Go', 'Java'] as const,
     mentors: ['Vaibhav', 'Vikash'],
     icon: <FaDatabase className="h-8 w-8" />,
     summary: 'Implement correct handling of PostgreSQL logical decoding events where unchanged TOASTed values are omitted (pgoutput marks them as unchanged using byte `u`). OLake should reconstruct missing values (or fail explicitly, depending on config).',
@@ -54,8 +86,19 @@ const IDEAS = [
       'Tests: unit tests for decoding and marker detection; integration test with Postgres table containing TOAST-able column (INSERT full value, UPDATE different column with TOAST unchanged, verify OLake writes correct full row downstream)'
     ],
     stretchGoals: null,
-    implementation: 'Step 1: Detect missing TOAST values in Go decoder (u => unchanged TOASTed value). Step 2: Reconstruct via local TOAST state store (KV keyed by table+primary_key); update on INSERT/UPDATE with full TOAST; on UPDATE with missing TOAST, fill from store before sending to writer. Fallback: query destination (Iceberg) if cache misses; cache fetched value back. Document operational implications.',
-    timeline: 'Community Bonding: reproduce issue locally, identify pgoutput decode paths and record model changes, draft KV store design + failure semantics. Weeks 1–2 detection + config modes; Weeks 3–5 local state store + fill logic + unit tests; Weeks 6–8 (midterm) destination lookup fallback + caching + metrics/logs; Weeks 9–10 end-to-end integration tests + correctness validation; Weeks 11–12 docs (including DB-side mitigation tradeoffs) + polish + CI.'
+    implementation: [
+      'Step 1: Detect missing TOAST values in Go decoder (u => unchanged TOASTed value).',
+      'Step 2: Reconstruct via local TOAST state store (KV keyed by table+primary_key); update on INSERT/UPDATE with full TOAST; on UPDATE with missing TOAST, fill from store before sending to writer.',
+      'Fallback: query destination (Iceberg) if cache misses; cache fetched value back. Document operational implications.'
+    ],
+    timeline: [
+      'Community Bonding: reproduce issue locally, identify pgoutput decode paths and record model changes, draft KV store design + failure semantics.',
+      'Week 1–2: detection + config modes',
+      'Week 3–5: local state store + fill logic + unit tests',
+      'Week 6–8 (midterm): destination lookup fallback + caching + metrics/logs',
+      'Week 9–10: end-to-end integration tests + correctness validation',
+      'Week 11–12: docs (including DB-side mitigation tradeoffs) + polish + CI'
+    ]
   },
   {
     id: 'iceberg-v3-deletion-vectors',
@@ -63,7 +106,7 @@ const IDEAS = [
     shortDesc: 'Upgrade OLake to Iceberg v3 and implement CDC updates/deletes using deletion vectors stored in Puffin files.',
     size: 'Large (~350 hours)',
     difficulty: 'Hard',
-    techStack: 'Go (ingest/planning) + Java (Iceberg writer via gRPC)',
+    techStack: ['Go', 'Java'] as const,
     mentors: ['Vaibhav', 'Vikash', 'Ankit'],
     icon: <FaCode className="h-8 w-8" />,
     summary: 'Upgrade OLake\'s Iceberg destination to support Iceberg v3 and implement CDC deletes/updates using deletion vectors (DV) as the primary row-level delete mechanism.',
@@ -76,8 +119,19 @@ const IDEAS = [
       'End-to-end tests: validate correctness via a query engine (e.g., Spark); include cases: multiple updates to same key, retries/partial failures, schema evolution interactions'
     ],
     stretchGoals: 'Explore v3 extended types if relevant to OLake (variant, geometry/geography) and define a minimal support story.',
-    implementation: 'Java writer: implement DV writing and merging logic stored as Puffin blobs; update manifest/snapshot metadata correctly; expose DV apply primitives via gRPC (new RPCs or extended proto). gRPC contract: add or extend RPC methods to apply row changes (inserts + deletes/updates); return commit metadata to Go. Position planning for CDC: provide a defined strategy for mapping incoming CDC keys to file+position; first-cut reference implementation; document future optimizations.',
-    timeline: 'Community Bonding: design doc draft, local setup and baseline v2 writer understanding, establish integration test harness. Weeks 1–3 dependency bump + v3 append/commit happy path; Weeks 4–9 DV writer implementation (Puffin blob handling, manifest updates); Weeks 10–15 CDC apply path + position planning reference; Weeks 16–19 integration tests + correctness + edge cases; Weeks 20–22 polish + docs + final design doc + performance notes.'
+    implementation: [
+      'Java writer: implement DV writing and merging logic stored as Puffin blobs; update manifest/snapshot metadata correctly; expose DV apply primitives via gRPC (new RPCs or extended proto).',
+      'gRPC contract: add or extend RPC methods to apply row changes (inserts + deletes/updates); return commit metadata to Go.',
+      'Position planning for CDC: provide a defined strategy for mapping incoming CDC keys to file+position; first-cut reference implementation; document future optimizations.'
+    ],
+    timeline: [
+      'Community Bonding: design doc draft, local setup and baseline v2 writer understanding, establish integration test harness.',
+      'Week 1–3: dependency bump + v3 append/commit happy path',
+      'Week 4–9: DV writer implementation (Puffin blob handling, manifest updates)',
+      'Week 10–15: CDC apply path + position planning reference',
+      'Week 16–19: integration tests + correctness + edge cases',
+      'Week 20–22: polish + docs + final design doc + performance notes'
+    ]
   }
 ]
 
@@ -104,9 +158,11 @@ const IdeaCard = ({ idea, isExpanded, onToggle }: { idea: typeof IDEAS[0]; isExp
             <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
               {idea.difficulty}
             </span>
-            <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-              {idea.techStack}
-            </span>
+            {idea.techStack.map((tech, i) => (
+              <span key={i} className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                {tech}
+              </span>
+            ))}
           </div>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Mentors: {idea.mentors.join(', ')}
@@ -132,7 +188,7 @@ const IdeaCard = ({ idea, isExpanded, onToggle }: { idea: typeof IDEAS[0]; isExp
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Goals and deliverables</h3>
             <ul className="list-inside list-disc space-y-2 text-gray-700 dark:text-gray-300">
               {idea.deliverables.map((d, i) => (
-                <li key={i}>{d}</li>
+                <li key={i}><DeliverableLine text={d} /></li>
               ))}
             </ul>
             {idea.stretchGoals && (
@@ -143,11 +199,31 @@ const IdeaCard = ({ idea, isExpanded, onToggle }: { idea: typeof IDEAS[0]; isExp
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Implementation sketch</h3>
-            <p className="text-gray-700 dark:text-gray-300">{idea.implementation}</p>
+            <ul className="list-inside list-disc space-y-2 text-gray-700 dark:text-gray-300">
+              {idea.implementation.map((line, i) => {
+                const stepMatch = line.match(/^(Step \d+:)(.*)$/)
+                return (
+                  <li key={i}>
+                    {stepMatch ? (
+                      <><span className="font-semibold">{stepMatch[1]}</span>{stepMatch[2]}</>
+                    ) : (
+                      line
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Timeline (example)</h3>
-            <p className="whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">{idea.timeline}</p>
+            <ul className="list-inside space-y-1.5 text-sm text-gray-700 dark:text-gray-300">
+              {idea.timeline.map((line, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-gray-500 dark:text-gray-400">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
@@ -204,8 +280,8 @@ const IdeasPage = () => {
           description="Browse project ideas for Google Summer of Code at OLake. Pick a Small, Medium, or Large project and discuss with mentors before submitting your proposal."
           cta={
             <div className="flex flex-wrap justify-center gap-4">
-              <Button href="/community/proposal-guidelines" size="lg">
-                How to write a proposal
+              <Button href="/community/proposal-template" size="lg">
+                Proposal Template
               </Button>
               <Button href="/community/gsoc" variant="outline" size="lg">
                 GSoC at OLake
