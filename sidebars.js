@@ -153,8 +153,14 @@ const docSidebar = {
     // Community
     sectionHeader("COMMUNITY"),
     'community/contributing',
-    'community/setting-up-a-dev-env',
-    'community/commands-and-flags',
+    {
+      type: 'category',
+      label: 'Setting up a Development Environment',
+      link: { type: 'doc', id: 'community/setting-up-a-dev-env' },
+      items: [
+        'community/commands-and-flags',
+      ],
+    },
     'community/issues-and-prs',
     'community/code-of-conduct',
     'community/channels',

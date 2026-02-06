@@ -104,6 +104,10 @@ Overrides the default timeout value for the command.
     - [**`--state`**](/docs/community/commands-and-flags#5-state): Specifies path to the state file.
     - [**`--clear-destination`**](/docs/community/commands-and-flags#6-clear-destination): Clears existing data for the selected streams in the destination before syncing.
 
+    :::info
+    ➡️ You must learn about `stats.json` configuration. Refer to the [Stats Config](/docs/install/docker-cli#stats) guide.
+    :::
+
 ---
 
 ## Flags
@@ -141,7 +145,9 @@ Overrides the default timeout value for the command.
    - Adds new streams detected in the source database.
 
 
-To know more about `streams.json`, read [Streams Config](/docs/install/docker-cli#streams-config).
+:::info
+➡️ You must learn about `streams.json` configuration. Refer to the [Streams Config](/docs/install/docker-cli#streams-confi) guide.
+:::
 
 ### 4. Destination
 ```
@@ -165,6 +171,119 @@ To know more about `streams.json`, read [Streams Config](/docs/install/docker-cl
 - The state file contains metadata (such as offsets and positions) that enables:
    - Resuming interrupted syncs.
    - Continuing incremental or CDC syncs without restarting from scratch.
+
+The `state.json` file is organized into two main sections:
+
+#### 1. Global State
+
+The **`global`** section contains global state information that applies to all streams anddriver-specific replication metadata that tracks the overall position in the source database's change log. The structure varies by database driver:
+
+<Tabs>
+<TabItem value="mysql_global" label="MySQL" default>
+MySQL uses **binlog position** for global state tracking to maintain the replication position across all streams.
+
+```json title="state.json (MySQL)"
+{
+  "type": "STREAM",
+  "version": 1,
+  "global": {
+    "state": {
+      "server_id": 261398335,
+      "state": {
+        "position": {
+          "Name": "mysql-bin.000070",
+          "Pos": 811746
+        }
+      }
+    },
+    "streams": [
+      "my_db.decimal_test",
+      "my_db.incr_test"
+    ]
+  }
+}
+```
+</TabItem>
+
+<TabItem value="postgres_global" label="PostgreSQL">
+PostgreSQL uses **LSN (Log Sequence Number)** for global state tracking to maintain the replication position across all streams.
+
+```json title="state.json (PostgreSQL)"
+{
+  "type": "STREAM",
+  "version": 1,
+  "global": {
+    "state": {
+      "lsn": "BD7/650015C8"
+    },
+    "streams": [
+      "public.sample_data",
+      "public.employees"
+    ]
+  }
+}
+```
+</TabItem>
+
+<TabItem value="mongodb_global" label="MongoDB">
+MongoDB does not use a global state section. The state is maintained at the stream level only.
+</TabItem>
+</Tabs>
+
+#### 2. Streams State
+
+The **`streams`** section is an array where each element tracks the synchronization state for a specific stream. The structure varies by database driver:
+
+<Tabs>
+<TabItem value="mysql_postgres_streams" label="MySQL & PostgreSQL" default>
+Each stream state object contains:
+
+```json title="state.json"
+{
+  "stream": "table1",
+  "namespace": "my_db",
+  "sync_mode": "",
+  "state": {
+    "chunks": []
+  }
+}
+```
+</TabItem>
+
+<TabItem value="mongodb_streams" label="MongoDB">
+MongoDB stream state includes a `_data` field that stores the resume token:
+
+```json title="state.json (MongoDB)"
+{
+  "stream": "users",
+  "namespace": "public",
+  "sync_mode": "",
+  "state": {
+    "_data": "82696F0837000000012B0429296E1404",
+    "chunks": []
+  }
+}
+```
+</TabItem>
+</Tabs>
+
+#### State Configuration Elements
+
+| **Component**                    | **Type** | **Example Value**                                | **Description**                                                                                                                                               |
+|----------------------------------|----------|--------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`version`**                    | integer  | `1` or `0`                                              | Version `0` enables legacy, lenient handling for backward compatibility <br/> Version `1` and above enforce stricter validation and fail-fast behavior for newly created state                                                                      |
+| **`global`**                     | object   | For postgres : <br/>`"global": { "state" : { "lsn": "BD7/650015C8" }, "streams": [ "public.sample_data", "public.employees" ] }`                           | Contains global replication metadata. Structure varies by driver: MySQL uses binlog position, PostgreSQL uses LSN, MongoDB does not have a global section.  |
+| **`global.state.server_id`**    | integer  | `261398335`                                      | **(MySQL only)** The MySQL server ID used for replication tracking.                                                                                          |
+| **`global.state.state.position`**| object   | `{"Name": "mysql-bin.000070", "Pos": 811746}`    | **(MySQL only)** Tracks the current binlog file name and position for CDC replication.                                                                        |
+| **`global.state.lsn`**           | string   | `"BD7/650015C8"`                                 | **(PostgreSQL only)** Log Sequence Number (LSN) that tracks the position in the PostgreSQL write-ahead log (WAL) for CDC replication.                       |
+| **`global.streams`**             | array    | `["public.decimal_test", "public.incr_test"]`        | List of all streams that are being tracked in this state file.                                                            |
+| **`stream`**                     | string   | `"decimal_test"`, `"incr_test"`                            | The name of the stream being tracked. Must match the stream name defined in `streams.json`.                                                                   |
+| **`namespace`**                  | string   | `"my_db"`, `"public"`                  | The namespace (database/schema) that the stream belongs to.                                                                                                    |
+| **`sync_mode`**                  | string   | `""`, `"incremental"`, `"cdc"`                   | The synchronization mode being used for this stream. May be empty if not explicitly set.                                                                      |
+| **`state.chunks`**               | array    | `[]`                                             | Array tracking data chunks that have been processed. Used for resuming partial syncs and managing large data transfers.                                       |
+| **`state._data`**                | string   | `"82696F0837000000012B0429296E1404"`             | **(MongoDB only)** Resume token used to track the position in MongoDB's change stream for CDC replication.                                                    |
+
+**What's Next**: The state file is automatically created and updated during sync operations. You can manually specify a state file using the [`--state`](/docs/community/commands-and-flags#5-state) flag to resume from a previous synchronization point.
 
 ### 6. Clear Destination
 ```
