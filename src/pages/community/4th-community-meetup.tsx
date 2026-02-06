@@ -9,37 +9,14 @@ import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/4th-meetup.json'
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
-
 import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';
+import { HOSTS } from '../../data/webinarHosts';
 
 const decks: Slide[] = [
   { title: '4th Community Meetup', url: 'https://docs.google.com/presentation/d/1zU4lkoEoX9ilHfxgU7nlq5mGC_CW52uBgz-ZtEEFJJE/edit#slide=id.g330c4f6be02_0_0' }
 ];
 
-
-const hosts = [
-  {
-    name: "Priyansh Khodiyar",
-    role: "Ex DevRel",
-    bio: "",
-    image: "/img/authors/priyansh.webp",
-    linkedin: "https://www.linkedin.com/in/zriyansh/",
-  },
-  {
-    name: "Shubham Satish Baldava",
-    role: "Co-founder @ Datazip and OLake Maintainer",
-    bio: "",
-    image: "/img/authors/shubham.webp",
-    linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
-  },
-  {
-    name: "Ankit Kumar",
-    role: "Senior backend dev and OLake Maintainer",
-    bio: "",
-    image: "/img/authors/ankit.webp",
-    linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
-  },
-];
+const hosts = [HOSTS.PRIYANSH_KHODIYAR, HOSTS.SHUBHAM_SATISH_BALDAVA, HOSTS.ANKIT_KUMAR];
 
 const CommunityPage = () => {
 

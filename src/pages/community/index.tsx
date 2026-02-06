@@ -141,6 +141,19 @@ const CommunityPage = () => {
 
   const communityMeets = [
     {
+      title: 'OLake 10th Community Meetup',
+      subtitle:
+        "OLake Community Call | Engineers, Contributors & What's Next. We're moving into double digits with these calls. We'll talk openly about where OLake is headed next, new integrations (S3, MSSQL, DB2), MOR→COW improvements, Kubernetes enhancements, and community highlights. Join us for an open discussion—questions, ideas, and feedback welcome.",
+      route: '/community/10th-community-meetup',
+      img: `/img/community/10th-olake-community-call.webp`,
+      alt: 'OLake 10th Community Meetup',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '28 January 2025',
+      icon: FaVideo
+    },
+    {
       title: 'OLake 9th Community Meetup',
       subtitle:
         "Introducing Kafka-Powered CDC Pipelines and Smarter Ingestion Controls Across the Open Lakehouse. Join us to explore Kafka support, smarter sync management, simplified Iceberg destination handling, and secure connectivity options.",
