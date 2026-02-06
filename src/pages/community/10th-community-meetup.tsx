@@ -47,7 +47,7 @@ const CommunityPage = () => {
         <br />
 
         <WebinarOverview
-          date="January 28, 2025"
+          date="January 28, 2026"
           time="04:30 PM - 05:30 PM IST"
           duration="1 hour"
           summary={communityData.summary}
