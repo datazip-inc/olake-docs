@@ -7,14 +7,14 @@ export const CDC_SYNC = {
         isUniform: true // All tools have the same value
     },
     elapsedTimeCDC: {
-        olake: '20.1 minutes',
+        olake: '15 minutes',
         airbyte: '23 hours',
         fivetran: '31 minutes',
         debezium: '60 minutes',
         estuary: '4.5 hours'
     },
     speedCDC: {
-        olake: '41,390 RPS',
+        olake: '55,555 RPS',
         airbyte: '585 RPS',
         fivetran: '26,910 RPS',
         debezium: '13,808 RPS',
@@ -22,10 +22,10 @@ export const CDC_SYNC = {
     },
     comparisonCDC: {
         olake: '-',
-        airbyte: '70.7 X slower',
-        fivetran: '1.5 X slower',
-        debezium: '2.9 X slower',
-        estuary: '13.4 X slower'
+        airbyte: '95 X slower',
+        fivetran: '2 X slower',
+        debezium: '4 X slower',
+        estuary: '18 X slower'
     },
     costCDC: {
         olake: '$1',
