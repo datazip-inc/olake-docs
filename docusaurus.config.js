@@ -477,7 +477,7 @@ const config = {
   markdown: {
     mermaid: true,
   },
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: ['@docusaurus/theme-mermaid', 'docusaurus-theme-openapi-docs'],
 
 
   plugins: [
@@ -510,11 +510,12 @@ const config = {
         id: 'main-docs',             // must be unique
         path: 'docs',                // folder on disk
         routeBasePath: 'docs',       // URL => /docs/…
-        sidebarPath: require.resolve('./sidebars.js'),
+        sidebarPath: require.resolve('./sidebars.ts'),
         showLastUpdateAuthor: true,
         showLastUpdateTime: true,
         rehypePlugins: [imageFetchPriorityRehypePlugin],
         editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
+        docItemComponent: "@theme/ApiItem",
       },
     ],
 
@@ -1120,6 +1121,22 @@ const config = {
       },
     ],
     '@docusaurus/theme-live-codeblock',
+    [
+      'docusaurus-plugin-openapi-docs',
+      {
+        id: "api",
+        docsPluginId: "main-docs",
+        config: {
+          olakeApi: {
+            specPath: "src/data/docs/swagger.json",
+            outputDir: "docs/api",
+            sidebarOptions: {
+              groupPathsBy: "tag",
+            }
+          }
+        }
+      }
+    ]
   ],
 
   // Removed render-blocking stylesheets - fonts now loaded asynchronously via head tags
