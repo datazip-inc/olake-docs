@@ -1130,6 +1130,7 @@ const config = {
           olakeApi: {
             specPath: "src/data/docs/swagger.json",
             outputDir: "docs/api",
+            hideSendButton: true,
             sidebarOptions: {
               groupPathsBy: "tag",
             }
