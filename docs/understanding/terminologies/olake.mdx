@@ -468,31 +468,34 @@ OLake adds these metadata columns to every destination table: `_op_type`, `_olak
 
 ### 4. CDC Metadata Columns
 
-OLake also writes **driver-specific CDC ordering metadata columns**. These fields capture the exact log position and ordering information from each source system’s native CDC mechanism and is supported for **MongoDB**, **Postgres**, **MySQL** and **MSSQL** drivers. These columns are written for both the supported destinations (i.e. **Iceberg** and **Parquet on S3**) in both Normalized and Non-Normalized modes.
+OLake also writes **driver-specific CDC ordering metadata columns**. These fields capture the exact log position and ordering information from each source system’s native CDC mechanism and is supported for **MongoDB**, **Postgres**, **MySQL** and **MSSQL** drivers.
 
 These columns are especially useful in scenarios where multiple changes happen within the same transaction (and thus share a single `_cdc_timestamp`), because they provide a stable, log-based key (for example, binlog position or LSN) that downstream systems can use to order events exactly as they occurred in the source.
 
 #### MongoDB
 
-- Column: `_cdc_resume_token`
-- Derived from MongoDB Change Streams / oplog resume token, so each row carries the operation ordering and resume position used by OLake internally.
+- **Column:** `_cdc_resume_token`
+    - `_cdc_resume_token` stores the MongoDB Change Streams resume token that identifies the exact position in the oplog where this change event was captured. This token can be used to resume reading from the same point in the change stream.
+    - **Example:** If a document with `_id = "507f1f77bcf86cd799439011"` is inserted, then updated twice in the same transaction, all three events will have the same `_cdc_timestamp` but different `_cdc_resume_token` values. You can use `_cdc_resume_token` to sort these events in the exact order they occurred in MongoDB's oplog.
 
 #### MySQL
 
-- Columns: `_cdc_binlog_file_name`, `_cdc_binlog_file_pos`
-- Captures the underlying binlog ordering information (binlog file name + position) that OLake used when reading each change event.
+- **Columns:** `_cdc_binlog_file_name`, `_cdc_binlog_file_pos`
+    - Together, these columns identify the exact location in MySQL's binary log where the change event was read. `_cdc_binlog_file_name` specifies which binlog file, and `_cdc_binlog_file_pos` indicates the byte position within that file.
+    - **Example:** If a row with `id = 100` is inserted, then updated twice within the same transaction, all three events will share the same `_cdc_timestamp` (the commit time). However, `_cdc_binlog_file_name` and `_cdc_binlog_file_pos` will increment sequentially (for example, `mysql-bin.000003` at positions `1027`, `1150`, `1273`), allowing you to order the events exactly as they appeared in the binlog.
 
 #### Postgres
 
-- Column: `_cdc_lsn`
-- Stores WAL-based ordering details (LSN) per record, reflecting the source transaction log position.
+- **Column:** `_cdc_lsn`
+    - `_cdc_lsn` stores the Write-Ahead Log (WAL) Log Sequence Number that represents the precise position in Postgres's transaction log where this change was recorded. LSN values are monotonically increasing and can be used to order events in the exact sequence they were applied by Postgres.
+    - **Example:** If a row with `id = 42` is inserted, then updated twice in the same transaction, all three events will have the same `_cdc_timestamp` but different `_cdc_lsn` values (for example, `16/B374D848`, `16/B374D850`, `16/B374D858`). Sorting by `_cdc_lsn` will reconstruct the exact order of operations as they occurred in Postgres.
 
 #### MSSQL
 
-- Columns: `_cdc_start_lsn`, `_cdc_seqval`
-- Exposes SQL Server CDC ordering metadata (start LSN and sequence value from change tables) alongside each record.
+- **Columns:** `_cdc_start_lsn`, `_cdc_seqval`
+    - `_cdc_start_lsn` indicates the starting Log Sequence Number for the change row in SQL Server's CDC change table, while `_cdc_seqval` is a sequence value that orders multiple changes that share the same LSN. Together, they provide a stable ordering key that matches SQL Server's internal CDC ordering.
+    - **Example:** If a row with `order_id = 500` is inserted, then updated twice within the same transaction, all three events will share the same `_cdc_timestamp` but have different `_cdc_start_lsn` and `_cdc_seqval` combinations. Sorting by `(_cdc_start_lsn, _cdc_seqval)` will order the events exactly as they were recorded in SQL Server's CDC change tables.
 
 :::note Backward compatibility
-- For **jobs created after** this feature was released, these CDC metadata columns are always present for supported drivers, regardless of whether Normalization is enabled or disabled.
-- For **jobs created before** this feature, these columns appear only when Normalization was turned **on**, and will not be present for older jobs where Normalization remained **off**.
+For **jobs created before** this feature, these columns are always present for Parquet-on-S3 destinations, but for **Iceberg** they appear only when Normalization was turned **on** and will not be present for older jobs where Iceberg Normalization was **off**.
 :::
