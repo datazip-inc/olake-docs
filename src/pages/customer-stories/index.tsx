@@ -54,6 +54,15 @@ const CustomersPage = () => {
       alt: 'PhysicsWallah customer story',
       companyName: 'PhysicsWallah',
       category: CustomerCategory.CustomerInternet
+    },
+    {
+      title: "Reliable Lakehouse Ingestion at Scale: How LendingKart Improved Data Correctness and Compressed Lake Ingestion Volume by 100×",
+      description: 'How LendingKart reduced daily MongoDB data movement from gigabytes to megabytes while completing an 11 years historical backfill that their Debezium + Spark setup couldn\'t deliver reliably.',
+      route: '/customer-stories/lendingkart-Improved-Data-Correctness',
+      img: '/img/customers/lendingkart/cover-image-lendingkart.webp',
+      alt: 'LendingKart customer story',
+      companyName: 'LendingKart',
+      category: CustomerCategory.B2B
     }
   ];
 
