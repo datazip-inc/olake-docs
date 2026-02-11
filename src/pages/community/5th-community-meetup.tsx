@@ -9,23 +9,9 @@ import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/5th-meetup.json'
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
+import { HOSTS } from '../../data/webinarHosts';
 
-const hosts = [
-  {
-    name: "Priyansh Khodiyar",
-    role: "Ex DevRel",
-    bio: "",
-    image: "/img/authors/priyansh.webp",
-    linkedin: "https://www.linkedin.com/in/zriyansh/",
-  },
-  {
-    name: "Shubham Satish Baldava",
-    role: "Co-founder @ Datazip and OLake Maintainer",
-    bio: "",
-    image: "/img/authors/shubham.webp",
-    linkedin: "https://www.linkedin.com/in/rohan-khameshra/",
-  },
-];
+const hosts = [HOSTS.PRIYANSH_KHODIYAR, HOSTS.SHUBHAM_SATISH_BALDAVA];
 
 const CommunityPage = () => {
 
