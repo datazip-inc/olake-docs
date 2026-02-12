@@ -114,7 +114,7 @@ const GlaceLake: React.FC = () => {
       url: primaryUrl
     },
     serviceType: 'Data Lakehouse and AI Integration',
-    termsOfService: 'https://datazip.io/terms-of-use',
+    termsOfService: 'https://olake.io/terms-of-use',
     url: 'https://olake.io/ai-lake/'
   }
 
