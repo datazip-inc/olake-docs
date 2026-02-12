@@ -99,7 +99,7 @@ const SetupStepsSection: React.FC = () => {
 
   return (
     <section className='py-16 dark:bg-gray-900 md:py-24'>
-      <div className='container mx-auto px-4 md:px-6 md:w-[60%]'>
+      <div className='container mx-auto px-4 md:px-6 md:w-[70%]'>
         <div className='mx-auto flex flex-col gap-12 lg:grid lg:max-w-7xl lg:grid-cols-2 lg:items-center'>
           {/* Left Side - Steps Navigation */}
           <div className='w-full'>

@@ -1,4 +1,80 @@
-import React, { useRef, useEffect } from 'react'
+import React from 'react'
+import Marquee from 'react-fast-marquee'
+
+const FEATURE_DATA = [
+  {
+    title: 'Faster Resumable Full Load',
+    description:
+      'Full load performance is improved by splitting large collections into smaller virtual chunks, processed in parallel.',
+    illustration: (
+      <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
+        <img
+          src='/img/site/why-olake-1.svg'
+          alt='schema connecting to data lake with faster resumable full load'
+          loading='lazy'
+          decoding='async'
+          className='h-full w-auto max-w-full scale-125 object-contain'
+        />
+      </div>
+    ),
+    bgColor: 'bg-[#C7ECFF] dark:bg-blue-900/20',
+    href: '/docs/features/#3-stateful-resumable-syncs'
+  },
+  {
+    title: 'Schema-Aware Logs and Alerts for Integrity ',
+    description:
+      'Actively monitors sync failures, schema changes, and data type modifications, ensuring that issues like incompatible updates or ingestion errors are swiftly detected, clearly logged, and immediately surfaced through real-time alerts',
+    illustration: (
+      <div className='flex h-28 w-full items-center justify-center sm:h-28 md:h-32'>
+        <img
+          src='/img/site/why-olake-2.svg'
+          alt='Schema-aware logs and alerts for data integrity'
+          loading='lazy'
+          decoding='async'
+          className='h-full w-auto max-w-full scale-125 object-contain'
+        />
+      </div>
+    ),
+    bgColor: 'bg-[#E9EBFD] dark:bg-indigo-900/20',
+    href: '/blog/olake-architecture'
+  },
+  {
+    title: 'CDC Cursor Preservation',
+    description:
+      'When you add new big tables after a long time of setting up the ETL, we do full load for it, in parallel to already running incremental sync. So CDC cursors are never lost. We manage overhead of data ingestion order and deduplication.',
+    illustration: (
+      <div className='flex h-44 w-full items-center justify-end pr-11 sm:h-28 md:h-44'>
+        <img
+          src='/img/site/why-olake-3.svg'
+          alt='CDC cursor preservation with MongoDB source'
+          loading='lazy'
+          decoding='async'
+          className='h-full w-auto max-w-full scale-125 object-contain'
+        />
+      </div>
+    ),
+    bgColor: 'bg-[#E9EBFD] dark:bg-indigo-900/20',
+    href: '/blog/olake-architecture-deep-dive/#cdc-sync'
+  },
+  {
+    title: 'Achieve near real-time latency',
+    description:
+      'Using Databases change stream logs (binglogs for MySQL, oplogs for mongoDB, WAL logs for Postgres), OLake enables parallel updates for each collection. This method facilitates rapid synchronization and ensures that data is consistently updated with near real-time updates.',
+    illustration: (
+      <div className='flex h-36 w-full items-center justify-center sm:h-28 md:h-44'>
+        <img
+          src='/img/site/why-olake-4.svg'
+          alt='Connector selection for real-time database sync'
+          loading='lazy'
+          decoding='async'
+          className='h-full w-auto max-w-full scale-125 object-contain'
+        />
+      </div>
+    ),
+    bgColor: 'bg-[#DDF3FF] dark:bg-blue-900/20',
+    href: '/blog/what-makes-olake-fast'
+  }
+]
 
 const FeatureCard = ({
   title,
@@ -23,7 +99,7 @@ const FeatureCard = ({
 
   const cardContent = (
     <div
-      className={`${bgColor} relative flex min-h-[370px] min-w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:min-w-128 sm:rounded-[40px] sm:p-8 md:p-10 ${
+      className={`${bgColor} relative flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10 ${
         href ? 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]' : ''
       }`}
     >
@@ -61,22 +137,6 @@ const FeatureCard = ({
 }
 
 const FeatureShowcase: React.FC = () => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  // Scroll to center the third card on mobile on initial load
-  useEffect(() => {
-    if (scrollContainerRef.current && window.innerWidth < 640) {
-      const container = scrollContainerRef.current
-      const cards = container.children
-      if (cards.length >= 3) {
-        const thirdCard = cards[2] as HTMLElement
-        const scrollPosition =
-          thirdCard.offsetLeft - (container.offsetWidth - thirdCard.offsetWidth) / 2
-        container.scrollTo({ left: scrollPosition, behavior: 'auto' })
-      }
-    }
-  }, [])
-
   return (
     <section className='w-full bg-white py-12 dark:bg-gray-900 sm:py-16 md:py-24'>
       {/* Heading container - centered */}
@@ -89,82 +149,20 @@ const FeatureShowcase: React.FC = () => {
         </h2>
       </div>
 
-      {/* Cards container - full width scrollable with snap on mobile */}
-      <div
-        ref={scrollContainerRef}
-        className='flex w-full snap-x snap-mandatory gap-6 overflow-x-auto px-4 py-3 sm:snap-none sm:gap-8 md:px-6'
-      >
-        <FeatureCard
-          title='Faster Resumable Full Load'
-          description='Full load performance is improved by splitting large collections into smaller virtual chunks, processed in parallel.'
-          illustration={
-            <div className='flex h-24 w-full items-center justify-center sm:h-28 md:h-32'>
-              <img
-                src='/img/site/why-olake-1.svg'
-                alt='schema connecting to data lake with faster resumable full load'
-                loading='lazy'
-                decoding='async'
-                className='h-full w-auto max-w-full scale-125 object-contain'
-              />
+      {/* Marquee implementation with original cards */}
+      <div className="w-full">
+        <Marquee 
+          pauseOnHover={true} 
+          speed={60} 
+          gradient={false} 
+          className="py-4"
+        >
+          {FEATURE_DATA.map((feature, index) => (
+            <div key={index} className="mx-3 sm:mx-4">
+              <FeatureCard {...feature} />
             </div>
-          }
-          bgColor='bg-[#C7ECFF] dark:bg-blue-900/20'
-          href='/docs/features/#3-stateful-resumable-syncs'
-        />
-
-        <FeatureCard
-          title='Schema-Aware Logs and Alerts for Integrity '
-          description='Actively monitors sync failures, schema changes, and data type modifications, ensuring that issues like incompatible updates or ingestion errors are swiftly detected, clearly logged, and immediately surfaced through real-time alerts'
-          illustration={
-            <div className='flex h-28 w-full items-center justify-center sm:h-28 md:h-32'>
-              <img
-                src='/img/site/why-olake-2.svg'
-                alt='Schema-aware logs and alerts for data integrity'
-                loading='lazy'
-                decoding='async'
-                className='h-full w-auto max-w-full scale-125 object-contain'
-              />
-            </div>
-          }
-          bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
-          href='/blog/olake-architecture'
-        />
-
-        <FeatureCard
-          title='CDC Cursor Preservation'
-          description='When you add new big tables after a long time of setting up the ETL, we do full load for it, in parallel to already running incremental sync. So CDC cursors are never lost. We manage overhead of data ingestion order and deduplication.'
-          illustration={
-            <div className='flex h-44 w-full items-center justify-end pr-11 sm:h-28 md:h-44'>
-              <img
-                src='/img/site/why-olake-3.svg'
-                alt='CDC cursor preservation with MongoDB source'
-                loading='lazy'
-                decoding='async'
-                className='h-full w-auto max-w-full scale-125 object-contain'
-              />
-            </div>
-          }
-          bgColor='bg-[#E9EBFD] dark:bg-indigo-900/20'
-          href='/blog/olake-architecture-deep-dive/#cdc-sync'
-        />
-
-        <FeatureCard
-          title='Achieve near real-time latency'
-          description='Using Databases change stream logs (binglogs for MySQL, oplogs for mongoDB, WAL logs for Postgres), OLake enables parallel updates for each collection. This method facilitates rapid synchronization and ensures that data is consistently updated with near real-time updates.'
-          illustration={
-            <div className='flex h-36 w-full items-center justify-center sm:h-28 md:h-44'>
-              <img
-                src='/img/site/why-olake-4.svg'
-                alt='Connector selection for real-time database sync'
-                loading='lazy'
-                decoding='async'
-                className='h-full w-auto max-w-full scale-125 object-contain'
-              />
-            </div>
-          }
-          bgColor='bg-[#DDF3FF] dark:bg-blue-900/20'
-          href='/blog/what-makes-olake-fast'
-        />
+          ))}
+        </Marquee>
       </div>
     </section>
   )
