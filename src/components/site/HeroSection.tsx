@@ -18,18 +18,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Row 1: "Fastest way to replicate..." section */}
         <div className='mt-8 flex w-full flex-col justify-center sm:items-center'>
           <div className='flex gap-x-3'>
-            <div className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
+            <a href='https://github.com/datazip-inc/olake' target='_blank' rel='noopener noreferrer' className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium text-inherit hover:no-underline hover:text-inherit sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
               <FaGithub />
               <div>Live on Github. 1.2K </div>
               <FaRegStar />
-            </div>
-            <div className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
+            </a>
+            <a href='/slack' className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium text-inherit hover:no-underline hover:text-inherit sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
               <img src='/img/icon/slack.svg' alt='Slack' className='size-2 sm:size-4' />
               <div>500+ Active Community Members</div>
-            </div>
+            </a>
           </div>
 
-          <div className='mt-8 text-2xl font-light leading-tight sm:text-5xl sm:leading-normal'>
+          <div className='mt-8 text-2xl font-light leading-tight sm:text-5xl sm:leading-normal text-center'>
             <span className='font-medium'>
               Fastest Database & Kafka Replication to S3 and Iceberg
             </span>
@@ -61,8 +61,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             <img
               src='/img/site/jobs-page.webp'
               alt='OLake Jobs Page'
-              loading='lazy'
-              decoding='async'
+              fetchPriority='high'
               className='w-full rounded-xl border-2 border-[#DDDDDD] object-cover object-top shadow-[0_0_14px_0_rgba(0,0,0,0.07)]'
             />
             {/* Fade to white gradient overlay */}

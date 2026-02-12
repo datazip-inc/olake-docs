@@ -3,7 +3,7 @@ import React from 'react'
 
 const TestimonialCard = ({ title, description, author }) => {
   return (
-    <div className='flex h-[280px] w-[280px] flex-shrink-0 flex-col justify-between rounded-2xl bg-white p-6 shadow-[2px_3px_20px_1px_#00000014] sm:h-[320px] sm:w-full sm:rounded-[32px] sm:p-10'>
+    <div className='flex min-h-[280px] w-[280px] flex-shrink-0 flex-col justify-between rounded-2xl bg-white p-6 shadow-[2px_3px_20px_1px_#00000014] sm:min-h-[320px] sm:w-full sm:rounded-[32px] sm:p-10'>
       <div>
         <img src='/img/site/quote.png' alt='quote' className='h-4 w-auto sm:h-auto' />
 
@@ -23,7 +23,7 @@ const TestimonialCard = ({ title, description, author }) => {
 
 const TestimonialsSection = () => {
   return (
-    <div className='bg-brand-gray-50 relative mt-12 flex flex-col items-center justify-start px-4 py-12 sm:mt-24 sm:p-16'>
+    <div className='bg-brand-gray-50 relative mt-12 flex flex-col items-center justify-start overflow-hidden px-4 py-12 sm:mt-24 sm:p-16'>
       <div className='flex flex-col items-center justify-center gap-2'>
         <div className='text-brand-blue-500 text-lg font-medium sm:text-2xl'>Testimonials</div>
         <div className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px]'>

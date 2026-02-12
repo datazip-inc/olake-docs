@@ -9,15 +9,15 @@ const BenchmarkOlakeSection = () => {
 
       <section className='container relative mb-16 flex h-[50vh] flex-col py-16'>
         {/* Main wrapper for all expanding borders */}
-        <div className='relative'>
+        <div className='relative px-8 sm:px-24'>
           {/* Top horizontal line - full viewport width */}
           <div className='absolute left-1/2 top-0 h-px w-screen -translate-x-1/2 bg-neutral-300' />
           {/* Bottom horizontal line - full viewport width */}
           <div className='absolute bottom-0 left-1/2 h-px w-screen -translate-x-1/2 bg-neutral-300' />
           {/* Left vertical line - full height with extensions (hidden on mobile) */}
-          <div className='absolute left-0 top-0 hidden h-[calc(100%+4rem)] w-px -translate-y-8 bg-neutral-300 sm:block' />
+          <div className='absolute left-8 top-0 hidden h-[calc(100%+4rem)] w-px -translate-y-8 bg-neutral-300 sm:left-24 sm:block' />
           {/* Right vertical line - full height with extensions (hidden on mobile) */}
-          <div className='absolute right-0 top-0 hidden h-[calc(100%+4rem)] w-px -translate-y-8 bg-neutral-300 sm:block' />
+          <div className='absolute right-8 top-0 hidden h-[calc(100%+4rem)] w-px -translate-y-8 bg-neutral-300 sm:right-24 sm:block' />
 
           {/* Main content container */}
           <div className='flex h-[50vh] flex-col items-center justify-center bg-[#FCFCFC] py-16'>

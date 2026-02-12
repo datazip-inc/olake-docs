@@ -64,10 +64,10 @@ const StatsSection: React.FC<StatsSectionProps> = ({
               <div className='my-2 h-px w-full self-stretch bg-neutral-200 dark:bg-gray-700 sm:my-0 sm:h-auto sm:w-px'></div>
             )}
             <div className='flex flex-col items-center px-4 py-2 text-center sm:py-6'>
-              <div className='text-brand-gray-900 text-[28px] font-medium dark:text-white sm:text-4xl md:text-4xl'>
+              <div className='text-brand-gray-900 whitespace-nowrap text-[28px] font-medium leading-tight dark:text-white sm:text-4xl md:text-[74px]'>
                 {stat.value}
               </div>
-              <div className='text-brand-gray-500 text-center text-[9px] dark:text-gray-400 sm:text-lg'>
+              <div className='text-brand-gray-500 mt-4 text-center text-[9px] dark:text-gray-400 sm:text-2xl'>
                 {stat.label}
               </div>
             </div>

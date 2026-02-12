@@ -82,7 +82,7 @@ const RegistrationSection: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      className='relative mx-auto h-auto min-h-[80vh] w-full overflow-visible p-0 pb-12 sm:h-[80vh] sm:w-[90%] sm:overflow-hidden sm:rounded-4xl sm:p-6'
+      className='relative mx-auto h-auto min-h-[80vh] w-full overflow-visible p-0 pb-12 sm:w-[90%] sm:overflow-hidden sm:rounded-4xl sm:p-6'
     >
       {/* Background lake image (Desktop only) */}
       <div className='absolute inset-0 z-0 hidden sm:block'>
@@ -101,9 +101,9 @@ const RegistrationSection: React.FC = () => {
 
       <div className='relative z-10 mx-auto w-full px-0 py-0 sm:container sm:px-4 md:py-16'>
         <div className='mx-auto'>
-          <div className='flex flex-col gap-0 md:grid md:grid-cols-[50%_50%] md:items-center md:gap-8 lg:grid-cols-[50%_40%] lg:gap-16'>
+          <div className='flex flex-col gap-0 md:grid md:grid-cols-[55%_45%] md:items-center md:gap-8 lg:gap-16 2xl:grid-cols-[50%_50%]'>
             {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}
-            <div className='order-2 mx-auto mt-8 w-[95%] rounded-3xl bg-white p-6 shadow-[0.72px_0.72px_5.06px_0px_#0000001A] dark:bg-gray-800 sm:mt-0 sm:w-auto sm:rounded-2xl sm:p-6 md:order-1 md:ml-0 md:rounded-3xl md:p-8 lg:ml-36 lg:p-10'>
+            <div className='order-2 mx-auto mt-8 w-[95%] rounded-3xl bg-white p-6 shadow-[0.72px_0.72px_5.06px_0px_#0000001A] dark:bg-gray-800 sm:mt-0 sm:w-auto sm:rounded-2xl sm:p-6 md:order-1 md:ml-0 md:rounded-3xl md:p-8 lg:ml-16 lg:p-10'>
               <div className='mb-4 sm:mb-6 md:mb-8'>
                 <h3 className='mb-1 text-sm font-bold text-blue-600 dark:text-blue-400 sm:mb-2 sm:text-xl'>
                   OLake
@@ -116,7 +116,7 @@ const RegistrationSection: React.FC = () => {
                 </p>
               </div>
 
-              <div className='min-h-[400px] sm:h-[40vh]'>
+              <div className='min-h-[400px]'>
                 <div id='olake-product-form' ref={formRef}></div>
               </div>
 
@@ -129,7 +129,7 @@ const RegistrationSection: React.FC = () => {
             </div>
 
             {/* Right side - Feature Text */}
-            <div className='relative order-1 mx-auto flex h-[70vh] w-full flex-col justify-end px-4 pb-16 pt-10 text-white md:order-2 md:ml-0 md:mt-10 md:h-auto md:px-0 md:pb-16 lg:ml-24'>
+            <div className='relative order-1 mx-auto flex h-[70vh] w-full min-w-0 flex-col justify-end overflow-hidden px-4 pb-16 pt-10 text-white md:order-2 md:ml-0 md:mt-10 md:h-auto md:px-6 md:pb-16'>
               {/* Mobile Background Image */}
               <div className='absolute inset-0 -z-10 sm:hidden'>
                 <img

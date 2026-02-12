@@ -433,6 +433,11 @@ const BenchmarkSection: React.FC = () => {
                             style={{ border: 'none' }}
                           >
                             {row.metric}
+                            {row.metric === 'Cost' && (
+                              <div className='mt-1 text-xs font-normal text-gray-400 dark:text-gray-500'>
+                                OLake is OSS and self-hosted - only pay for your infrastructure.
+                              </div>
+                            )}
                           </td>
                           <td
                             className='text-brand-green-600 border-0 bg-transparent p-6 text-center font-bold'
@@ -483,12 +488,12 @@ const BenchmarkSection: React.FC = () => {
               </div>
 
               <div className='mt-2 flex w-full flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 2xl:pl-10 2xl:pr-40'>
-                <span className='text-xs text-gray-400 dark:text-gray-500'>
+                <span className='ml-5 text-xs text-gray-400 dark:text-gray-500'>
                   We are currently running benchmarks, numbers will be updated soon.
                 </span>
                 <Link
                   to='/docs/benchmarks'
-                  className='text-brand-blue-500 inline-flex items-center font-medium hover:text-blue-700'
+                  className='mr-5  text-brand-blue-500 inline-flex items-center font-medium hover:text-blue-700'
                 >
                   View all Performance Benchmarks
                   <svg

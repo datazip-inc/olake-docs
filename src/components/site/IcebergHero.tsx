@@ -53,7 +53,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
             decoding='async'
           />
         </div>
-        <div className='p-4 md:p-6'>
+        <div className='flex flex-grow flex-col p-4 md:p-6'>
           {/* Title: Space Grotesk, 14px mobile, 24px desktop */}
           <h3 className='mb-2 font-space text-sm font-medium leading-none text-gray-900 dark:text-white md:mb-3 md:text-2xl md:font-bold md:leading-normal'>
             {title}
@@ -65,7 +65,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
           {blogLink && blogTitle && (
             <a
               href={blogLink}
-              className='mt-3 flex items-center text-black hover:underline dark:text-blue-400 md:mt-4'
+              className='mt-auto flex items-center pt-3 text-black hover:underline dark:text-blue-400 md:pt-4'
             >
               <div className='flex w-full items-center justify-between gap-2 rounded-lg bg-[#F6F8FF] px-3 py-2 md:px-4 md:py-3'>
                 <div className='flex min-w-0 items-center gap-x-1.5 overflow-hidden md:gap-x-2'>

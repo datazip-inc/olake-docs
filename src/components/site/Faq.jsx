@@ -44,7 +44,7 @@ const Faq = ({ data, showHeading }) => {
         // <SectionHeader showHr={false} heading={<>Frequently Asked Questions</>} />
         <div
           id='faq-heading'
-          className='text-brand-gray-900 mb-4 flex flex-col gap-4 text-xl font-medium dark:text-white sm:text-[64px]'
+          className='text-brand-gray-900 mb-16 flex flex-col gap-4 text-xl font-medium leading-tight dark:text-white sm:text-[64px] sm:leading-tight'
         >
           Frequently Asked Questions
         </div>

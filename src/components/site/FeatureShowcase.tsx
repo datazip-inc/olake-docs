@@ -23,8 +23,8 @@ const FeatureCard = ({
 
   const cardContent = (
     <div
-      className={`${bgColor} relative flex min-h-[370px] min-w-[80vw] flex-shrink-0 snap-center flex-col overflow-hidden rounded-[20px] p-6 sm:h-[461px] sm:min-w-128 sm:rounded-[40px] sm:p-8 md:p-10 ${
-        href ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''
+      className={`${bgColor} relative flex min-h-[370px] min-w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:min-w-128 sm:rounded-[40px] sm:p-8 md:p-10 ${
+        href ? 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]' : ''
       }`}
     >
       <div className='relative z-10'>
@@ -92,7 +92,7 @@ const FeatureShowcase: React.FC = () => {
       {/* Cards container - full width scrollable with snap on mobile */}
       <div
         ref={scrollContainerRef}
-        className='flex w-full snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:snap-none sm:gap-8 md:px-6'
+        className='flex w-full snap-x snap-mandatory gap-6 overflow-x-auto px-4 py-3 sm:snap-none sm:gap-8 md:px-6'
       >
         <FeatureCard
           title='Faster Resumable Full Load'

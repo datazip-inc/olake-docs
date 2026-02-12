@@ -76,7 +76,7 @@ const BlogShowcase: React.FC = () => {
                 <a
                   key={post.url}
                   href={post.url}
-                  className='block w-[280px] flex-shrink-0 snap-start rounded-2xl shadow-lg'
+                  className='block w-[280px] flex-shrink-0 snap-start rounded-2xl shadow-[2px_3px_20px_1px_#00000014]'
                 >
                   <div className='h-full overflow-hidden rounded-2xl'>
                     <div className='flex h-full flex-col'>
@@ -116,7 +116,7 @@ const BlogShowcase: React.FC = () => {
           <div className='mb-12 hidden flex-col gap-8 md:flex lg:flex-row'>
             {/* Featured Blog Post - Left side on desktop */}
             <div className='w-full rounded-2xl lg:w-1/2'>
-              <a href={blogPosts[0].url} className='block h-full rounded-2xl shadow-lg'>
+              <a href={blogPosts[0].url} className='block h-full rounded-2xl shadow-[2px_3px_20px_1px_#00000014]'>
                 <div className='h-full overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1'>
                   <div className='flex h-full flex-col'>
                     <div className='flex items-center justify-center rounded-tl-2xl rounded-tr-2xl dark:bg-gray-800'>
@@ -169,7 +169,7 @@ const BlogShowcase: React.FC = () => {
           {/* Desktop: Other Blog Posts in a grid */}
           <div className='hidden gap-8 md:grid md:grid-cols-2 lg:grid-cols-3'>
             {blogPosts.slice(1).map((post) => (
-              <a key={post.url} href={post.url} className='block h-full rounded-3xl shadow-lg'>
+              <a key={post.url} href={post.url} className='block h-full rounded-3xl shadow-[2px_3px_20px_1px_#00000014]'>
                 <div className='h-full overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1'>
                   <div className='flex items-center justify-center rounded-tl-2xl rounded-tr-2xl dark:bg-gray-800'>
                     <img

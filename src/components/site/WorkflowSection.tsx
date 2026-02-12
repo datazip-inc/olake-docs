@@ -17,7 +17,7 @@ const WorkflowSection: React.FC = () => {
   }, [highlightedIndex])
 
   return (
-    <section className='h-screen bg-white dark:bg-gray-900'>
+    <section className=' bg-white dark:bg-gray-900'>
       <div className=''>
         <WorkflowHeader />
         <LazyComponent

@@ -15,15 +15,15 @@ const IconCard: React.FC<{ src: string; alt: string; className?: string }> = ({
       className
     )}
   >
-    <img src={src} alt={alt} className='h-6 w-6 object-contain md:h-10 md:w-10' />
+    <img src={src} alt={alt} loading='lazy' decoding='async' className='h-6 w-6 object-contain md:h-10 md:w-10' />
   </div>
 )
 
 // Step 0: Sources content
 const SourcesContent: React.FC = () => (
-  <div className='relative flex w-full flex-col items-center justify-center overflow-hidden px-4 pb-16 pt-8 sm:flex-row sm:px-6'>
+  <div className='relative flex  w-full flex-col items-center justify-center overflow-hidden px-2 pb-16 pt-8 lg:flex-row'>
     {/* Text content - positioned absolutely on desktop, stacked below on mobile */}
-    <div className='relative z-20 order-2 mt-8 w-full space-y-2 px-4 sm:absolute sm:left-48 sm:top-8 sm:order-1 sm:mt-0 sm:w-auto sm:space-y-6 sm:px-0'>
+    <div className='relative z-20 order-2 mt-8 w-full space-y-2 px-4 lg:absolute lg:left-28 lg:top-8 lg:order-1 lg:mt-0 lg:w-auto lg:space-y-6 lg:px-0'>
       {/* Sources header */}
       <div className='flex items-center gap-2'>
         <PiPath size={20} color='#193AE6' />
@@ -49,10 +49,12 @@ const SourcesContent: React.FC = () => (
     </div>
 
     {/* Sources illustration - scales automatically */}
-    <div className='relative order-1 w-full max-w-4xl sm:order-2 sm:ml-10'>
+    <div className='relative order-1 w-full max-w-4xl lg:order-2 lg:ml-10'>
       <img
-        src='/img/sources.webp'
+        src='/img/sources.svg'
         alt='OLake Sources - MongoDB, PostgreSQL, MySQL, Kafka, Oracle'
+        loading='lazy'
+        decoding='async'
         className='h-auto w-full object-contain'
       />
     </div>
@@ -169,8 +171,10 @@ const DestinationsContent: React.FC = () => (
     {/* Image - first on mobile, left on desktop */}
     <div className='order-1 w-full sm:order-1 sm:w-auto'>
       <img
-        src='/img/site/olake-destinations.webp'
+        src='/img/site/olake-destinations.svg'
         alt='olake-destinations'
+        loading='lazy'
+        decoding='async'
         className='h-auto w-full object-contain'
       />
     </div>
@@ -214,6 +218,8 @@ const CatalogItem: React.FC<{ src: string; alt: string; label: string }> = ({
     <img
       src={src}
       alt={alt}
+      loading='lazy'
+      decoding='async'
       className={label === 'Rest Catalog' ? 'h-[18px] w-[24px]' : 'size-[18px]'}
     />
     {label}
@@ -326,7 +332,7 @@ const IcebergCatalogsContent: React.FC = () => {
             {/* Center Content: Catalog Box */}
             <div className='relative z-10 rounded-[36px] border-solid border-[#E3E3E3] bg-zinc-50 px-6 py-8 shadow-[0_0_0_10px_#00000008]'>
               <div className='mb-8 mt-4 flex items-center justify-center gap-x-2'>
-                <img src='/img/logo/iceberg.webp' alt='iceberg' className='size-6' />
+                <img src='/img/logo/iceberg.webp' alt='iceberg' loading='lazy' decoding='async' className='size-6' />
                 <div className='font-medium'>Iceberg catalogs</div>
               </div>
               <div className='space-y-4 font-helvetica text-sm font-medium text-[#343434]'>
@@ -368,8 +374,10 @@ const IcebergCatalogsContent: React.FC = () => {
 const QueryEnginesContent: React.FC = () => (
   <div className='mx-auto flex min-h-[400px] w-full flex-col items-center justify-center gap-6 px-4 sm:flex-row sm:items-start sm:gap-x-24 sm:px-6'>
     <img
-      src='/img/site/query-engines.webp'
+      src='/img/site/query-engines.svg'
       alt='query-engines'
+      loading='lazy'
+      decoding='async'
       className='order-1 h-auto w-full object-contain sm:order-1 sm:w-auto'
     />
     <div className='order-2 w-full sm:order-2 sm:w-auto'>
@@ -408,7 +416,11 @@ interface InfoBoxesProps {
 const InfoBoxes: React.FC<InfoBoxesProps> = ({ highlightedIndex = 0 }) => {
   const StepComponent = STEP_COMPONENTS[highlightedIndex] || STEP_COMPONENTS[0]
 
-  return <StepComponent />
+  return (
+    <div className='min-h-screen lg:min-h-[70vh] w-full'>
+      <StepComponent />
+    </div>
+  )
 }
 
 export default InfoBoxes

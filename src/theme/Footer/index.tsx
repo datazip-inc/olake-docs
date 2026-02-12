@@ -73,10 +73,10 @@ const Footer: React.FC = () => {
   ]
 
   return (
-    <footer className='relative h-[62vh] overflow-hidden bg-neutral-100 py-8 dark:bg-gray-900 sm:py-12'>
+    <footer className='relative h-[62vh] md:h-[72vh] 2x:h-[62vh] overflow-hidden bg-neutral-100 py-8 dark:bg-gray-900 xl:py-12'>
       {/* Large OLake Watermark - smaller on mobile, positioned to not overlap */}
       <div
-        className='pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[-30%] select-none bg-[linear-gradient(180deg,#EAEAEA_0%,rgba(255,255,255,0)_80%)] font-space text-[133px] font-medium leading-[1.2] dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_15%,rgba(50,50,50,0)_85%)] sm:left-[52.5%] sm:translate-y-[36%] sm:bg-[linear-gradient(180deg,#EAEAEA_27.62%,rgba(255,255,255,0)_106.27%)] sm:text-[clamp(200px,40vw,572px)] sm:dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_15%,rgba(50,50,50,0)_85%)]'
+        className='pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[-30%] select-none bg-[linear-gradient(180deg,#EAEAEA_0%,rgba(255,255,255,0)_80%)] font-space text-[133px] font-medium leading-[1.2] dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_15%,rgba(50,50,50,0)_85%)] xl:left-[52.5%] xl:translate-y-[36%] xl:bg-[linear-gradient(180deg,#EAEAEA_27.62%,rgba(255,255,255,0)_106.27%)] xl:text-[clamp(200px,40vw,572px)] xl:dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_15%,rgba(50,50,50,0)_85%)]'
         style={{
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -85,9 +85,9 @@ const Footer: React.FC = () => {
       >
         OLake
       </div>
-      <div className='container relative z-10 mx-auto px-4 sm:px-0'>
+      <div className='container relative z-10 mx-auto px-4 xl:px-0'>
         {/* Mobile Layout */}
-        <div className='sm:hidden'>
+        <div className='xl:hidden'>
           {/* Logo Section - Mobile */}
           <div className='mb-4'>
             <Link
@@ -182,10 +182,10 @@ const Footer: React.FC = () => {
         </div>
 
         {/* Desktop Layout */}
-        <div className='hidden sm:block'>
-          <div className='grid grid-cols-2 gap-8 lg:grid-cols-10'>
+        <div className='hidden xl:block'>
+          <div className='grid grid-cols-2 gap-8 xl:grid-cols-10'>
             {/* Logo and Social Links Section */}
-            <div className='col-span-1 sm:col-span-7'>
+            <div className='col-span-1 xl:col-span-7'>
               <div className='mb-6'>
                 <Link to='/' className='text-2xl font-medium text-blue-600 dark:text-blue-400'>
                   OLake
@@ -275,7 +275,7 @@ const Footer: React.FC = () => {
       </div>
 
       {/* Copyright Section - Desktop only, positioned relative to footer */}
-      <div className='text-brand-gray-450 absolute bottom-8 left-12 hidden sm:block'>
+      <div className='text-brand-gray-450 absolute bottom-8 left-12 hidden xl:block'>
         By Datazip
       </div>
     </footer>
