@@ -476,7 +476,7 @@ const WebinarsPage = () => {
                 <div className='mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-950/30'>
                   <FaUsers className='h-6 w-6 text-purple-600 dark:text-purple-400' />
                 </div>
-                <div className='text-3xl font-bold text-gray-900 dark:text-gray-100'>250+</div>
+                <div className='text-3xl font-bold text-gray-900 dark:text-gray-100'>500+</div>
                 <div className='text-sm text-gray-600 dark:text-gray-400'>Community Members</div>
               </div>
               <div className='text-center'>

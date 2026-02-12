@@ -9,30 +9,9 @@ import Hr from '../../components/Hr';
 import MeetupNotes from '../../components/MeetupNotes';
 import meetupData from '../../data/meetup/9th-meetup.json';
 import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
+import { HOSTS } from '../../data/webinarHosts';
 
-const hosts = [
-  {
-    name: "Akshay Kumar Sharma",
-    role: "DevRel @ OLake",
-    bio: "OLake DevRel and community advocate, passionate about open-source data engineering and lakehouse architectures.",
-    image: "/img/authors/akshay.webp",
-    linkedin: "https://www.linkedin.com/in/akshay-kumar-sharma-devvoyager",
-  },
-  {
-    name: "Duke",
-    role: "Software Engineer @ OLake",
-    bio: "OLake Maintainer and Software Engineer with expertise in CDC architectures, Kafka integration, and building scalable data pipelines.",
-    image: "/img/authors/duke.webp",
-    linkedin: "https://www.linkedin.com/in/dukedhal",
-  },
-  {
-    name: "Nayan Joshi",
-    role: "DevRel Data Engineer @ OLake",
-    bio: "OLake Maintainer and DevRel Data Engineer specializing in data ingestion workflows, Iceberg integrations, and practical data engineering solutions.",
-    image: "/img/authors/nayan.webp",
-    linkedin: "https://www.linkedin.com/in/nayanjoshiutd",
-  },
-];
+const hosts = [HOSTS.AKSHAY_KUMAR_SHARMA, HOSTS.DUKE, HOSTS.NAYAN_JOSHI];
 
 const CommunityPage = () => {
   const communityData = {

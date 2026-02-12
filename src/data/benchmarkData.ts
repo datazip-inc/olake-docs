@@ -1,5 +1,4 @@
 // Benchmark data constants
-
 // Tool names and display info
 export const TOOLS = {
   olake: {
@@ -493,10 +492,10 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
       estuary: '-'
     },
     cost: {
-      olake: '$ 250',
-      airbyte: '$ 1,408',
-      fivetran: '$ 6,000',
-      debezium: '$ 900',
+      olake: '-',
+      airbyte: '-',
+      fivetran: '-',
+      debezium: '-',
       estuary: '-'
     }
   },
@@ -633,14 +632,14 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
       estuary: '50 Million'
     },
     elapsedTime: {
-      olake: '20.1 min',
+      olake: '15 min',
       airbyte: '23 hours',
       fivetran: '31 min',
       debezium: '60 min',
       estuary: '4.5 hours'
     },
     speed: {
-      olake: '41,390 RPS',
+      olake: '55,555 RPS',
       airbyte: '585 RPS',
       fivetran: '26,910 RPS',
       debezium: '13,808 RPS',
@@ -648,16 +647,16 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     },
     comparison: {
       olake: '-',
-      airbyte: '70.7x slower',
-      fivetran: '1.5x slower',
-      debezium: '2.9x slower',
-      estuary: '13.4x slower'
+      airbyte: '95x slower',
+      fivetran: '2x slower',
+      debezium: '4x slower',
+      estuary: '18x slower'
     },
     cost: {
-      olake: '< $ 10',
+      olake: '$ 1',
       airbyte: '$ 148.95',
-      fivetran: '$ 2,375.80',
-      debezium: '$ 75',
+      fivetran: '$ 2,257.80',
+      debezium: '$ 2.02',
       estuary: '$ 17.63'
     }
   },
