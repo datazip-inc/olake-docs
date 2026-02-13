@@ -19,13 +19,13 @@ const Footer: React.FC = () => {
   const { colorMode } = useColorMode()
   const isDarkTheme = colorMode === 'dark'
 
-  const companyLinks: LinkItem[] = [
-    { label: 'About us', href: '/about-us' },
-    { label: 'Contact us', href: '/contact' },
-    { label: 'Branding', href: '/branding' },
-    { label: 'Terms of Use', href: 'https://datazip.io/terms-of-use' },
-    { label: 'Privacy Policy', href: 'https://datazip.io/privacy-policy' }
-  ]
+    const companyLinks: LinkItem[] = [
+        { label: 'About us', href: '/about-us' },
+        { label: 'Contact us', href: '/contact' },
+        { label: 'Branding', href: '/branding' },
+        { label: 'Terms of Use', href: '/terms-of-use' },
+        { label: 'Privacy Policy', href: '/privacy-policy' },
+    ];
 
   const resourceLinks: LinkItem[] = [
     { label: 'Blogs', href: '/blog' },
