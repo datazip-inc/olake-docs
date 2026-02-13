@@ -19,13 +19,13 @@ const Footer: React.FC = () => {
   const { colorMode } = useColorMode()
   const isDarkTheme = colorMode === 'dark'
 
-    const companyLinks: LinkItem[] = [
-        { label: 'About us', href: '/about-us' },
-        { label: 'Contact us', href: '/contact' },
-        { label: 'Branding', href: '/branding' },
-        { label: 'Terms of Use', href: '/terms-of-use' },
-        { label: 'Privacy Policy', href: '/privacy-policy' },
-    ];
+  const companyLinks: LinkItem[] = [
+    { label: 'About us', href: '/about-us' },
+    { label: 'Contact us', href: '/contact' },
+    { label: 'Branding', href: '/branding' },
+    { label: 'Terms of Use', href: '/terms-of-use' },
+    { label: 'Privacy Policy', href: '/privacy-policy' }
+  ]
 
   const resourceLinks: LinkItem[] = [
     { label: 'Blogs', href: '/blog' },
@@ -73,10 +73,11 @@ const Footer: React.FC = () => {
   ]
 
   return (
-    <footer className='relative h-[62vh] md:h-[72vh] 2x:h-[62vh] overflow-hidden bg-neutral-100 py-8 dark:bg-gray-900 xl:py-12'>
+    <footer className='2x:h-[62vh] relative h-[62vh] overflow-hidden bg-neutral-100 py-8 dark:bg-gray-900 md:h-[72vh] xl:py-12'>
       {/* Large OLake Watermark - smaller on mobile, positioned to not overlap */}
       <div
-        className='pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[-30%] select-none bg-[linear-gradient(180deg,#EAEAEA_0%,rgba(255,255,255,0)_80%)] font-space text-[133px] font-medium leading-[1.2] dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_15%,rgba(50,50,50,0)_85%)] xl:left-[52.5%] xl:translate-y-[36%] xl:bg-[linear-gradient(180deg,#EAEAEA_27.62%,rgba(255,255,255,0)_106.27%)] xl:text-[clamp(200px,40vw,572px)] xl:dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_15%,rgba(50,50,50,0)_85%)]'
+        aria-hidden='true'
+        className='pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[36%] select-none bg-[linear-gradient(180deg,#EAEAEA_0%,#F1F1F1_85%,#F8F8F8_78%,rgba(248,248,248,0)_100%)] font-space text-[133px] font-medium leading-[1.2] opacity-80 dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_70%,rgba(50,50,50,0)_85%)] xl:translate-y-[36%] xl:bg-[linear-gradient(180deg,#E6E6E6_0%,#EEEEEE_55%,#F7F7F7_85%,rgba(247,247,247,0)_100%)] xl:text-[clamp(200px,40vw,572px)] xl:dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_70%,rgba(50,50,50,0)_85%)]'
         style={{
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -85,6 +86,7 @@ const Footer: React.FC = () => {
       >
         OLake
       </div>
+
       <div className='container relative z-10 mx-auto px-4 xl:px-0'>
         {/* Mobile Layout */}
         <div className='xl:hidden'>
@@ -124,15 +126,15 @@ const Footer: React.FC = () => {
           <div className='grid grid-cols-3 gap-4'>
             {/* Company Links */}
             <div className='font-sans'>
-              <h3 className='text-brand-black mb-2 text-[8px] lg:text-base font-normal uppercase leading-normal tracking-wider dark:text-white'>
+              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white lg:text-base'>
                 COMPANY
               </h3>
-              <ul className='list-none space-y-0 p-0'>
+              <ul className='list-none space-y-0.5 p-0'>
                 {companyLinks.map((link) => (
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-brand-gray-450 font-sans text-[8px] leading-tight tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300 lg:text-base'
                     >
                       {link.label}
                     </Link>
@@ -143,15 +145,15 @@ const Footer: React.FC = () => {
 
             {/* Resources Links */}
             <div className='font-sans'>
-              <h3 className='text-brand-black mb-2 text-[8px] lg:text-base font-normal uppercase leading-normal tracking-wider dark:text-white'>
+              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white lg:text-base'>
                 RESOURCES
               </h3>
-              <ul className='list-none space-y-0 p-0'>
+              <ul className='list-none space-y-0.5 p-0'>
                 {resourceLinks.map((link) => (
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-brand-gray-450 font-sans text-[8px] leading-tight tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300 lg:text-base'
                     >
                       {link.label}
                     </Link>
@@ -162,7 +164,7 @@ const Footer: React.FC = () => {
 
             {/* Top Reads Links */}
             <div className='font-sans'>
-              <h3 className='text-brand-black mb-2 text-[8px] lg:text-base font-normal uppercase leading-normal tracking-wider dark:text-white'>
+              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white lg:text-base'>
                 TOP READS
               </h3>
               <ul className='list-none space-y-0.5 p-0'>
@@ -170,7 +172,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-brand-gray-450 font-sans text-[8px] lg:text-base leading-3 tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300 lg:text-base'
                     >
                       {link.label}
                     </Link>
@@ -216,7 +218,7 @@ const Footer: React.FC = () => {
 
             {/* Company Links Section */}
             <div className='col-span-1 font-sans'>
-              <h3 className='text-brand-black mb-4 text-base font-normal tracking-wider dark:text-white'>
+              <h3 className='mb-4 text-base font-normal tracking-wider text-brand-black dark:text-white'>
                 COMPANY
               </h3>
               <ul className='list-none space-y-3 p-0'>
@@ -235,7 +237,7 @@ const Footer: React.FC = () => {
 
             {/* Resources Links Section */}
             <div className='col-span-1 font-sans'>
-              <h3 className='text-brand-black mb-4 text-base font-normal tracking-wider dark:text-white'>
+              <h3 className='mb-4 text-base font-normal tracking-wider text-brand-black dark:text-white'>
                 RESOURCES
               </h3>
               <ul className='list-none space-y-3 p-0'>
@@ -254,7 +256,7 @@ const Footer: React.FC = () => {
 
             {/* Top Reads Links Section */}
             <div className='col-span-1 font-sans'>
-              <h3 className='text-brand-black mb-4 text-base font-normal tracking-wider dark:text-white'>
+              <h3 className='mb-4 text-base font-normal tracking-wider text-brand-black dark:text-white'>
                 TOP READS
               </h3>
               <ul className='list-none space-y-3 p-0'>
@@ -275,7 +277,7 @@ const Footer: React.FC = () => {
       </div>
 
       {/* Copyright Section - Desktop only, positioned relative to footer */}
-      <div className='text-brand-gray-450 absolute bottom-8 left-12 hidden xl:block'>
+      <div className='absolute bottom-8 left-12 hidden text-brand-gray-450 xl:block'>
         By Datazip
       </div>
     </footer>

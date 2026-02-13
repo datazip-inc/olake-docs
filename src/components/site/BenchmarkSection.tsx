@@ -174,7 +174,7 @@ const BenchmarkSection: React.FC = () => {
           />
           <button
             onClick={() => setBenchmarkMode('full_load')}
-            className={`relative z-10 flex h-6 w-24 items-center justify-center rounded-[4px] border-none bg-transparent text-center font-space text-xs font-medium transition-colors duration-300 sm:h-auto sm:w-28 sm:rounded-lg sm:px-4 sm:py-2 sm:text-base ${
+            className={`relative z-10 cursor-pointer flex h-6 w-24 items-center justify-center rounded-[4px] border-none bg-transparent text-center font-space text-xs font-medium transition-colors duration-300 sm:h-auto sm:w-28 sm:rounded-lg sm:px-4 sm:py-2 sm:text-base ${
               benchmarkMode === 'full_load'
                 ? 'text-primary-600 dark:text-blue-400'
                 : 'text-brand-gray-400 hover:text-brand-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
@@ -184,7 +184,7 @@ const BenchmarkSection: React.FC = () => {
           </button>
           <button
             onClick={() => setBenchmarkMode('cdc')}
-            className={`relative z-10 flex h-6 w-24 items-center justify-center rounded-[4px] border-none bg-transparent text-center font-space text-xs font-medium transition-colors duration-300 sm:h-auto sm:w-28 sm:rounded-lg sm:px-4 sm:py-2 sm:text-base ${
+            className={`relative z-10 flex h-6 w-24 cursor-pointer items-center justify-center rounded-[4px] border-none bg-transparent text-center font-space text-xs font-medium transition-colors duration-300 sm:h-auto sm:w-28 sm:rounded-lg sm:px-4 sm:py-2 sm:text-base ${
               benchmarkMode === 'cdc'
                 ? 'text-primary-600 dark:text-blue-400'
                 : 'text-brand-gray-400 hover:text-brand-gray-600 dark:text-gray-400 hover:dark:text-gray-300'
@@ -202,7 +202,7 @@ const BenchmarkSection: React.FC = () => {
             <button
               key={connector.id}
               onClick={() => setActiveConnector(connector.id)}
-              className={`flex-shrink-0 rounded-xl border-none px-3 py-1 text-center font-space text-xs font-medium leading-[120%] tracking-[-0.05em] transition-all sm:px-6 sm:py-3 sm:font-sans sm:text-lg sm:font-normal sm:leading-normal sm:tracking-normal ${
+              className={`flex-shrink-0 cursor-pointer rounded-xl border-none px-3 py-1 text-center font-space text-xs font-medium leading-[120%] tracking-[-0.05em] transition-all sm:px-6 sm:py-3 sm:font-sans sm:text-lg sm:font-normal sm:leading-normal sm:tracking-normal ${
                 activeConnector === connector.id
                   ? 'bg-white text-primary-600 dark:bg-blue-900/30 dark:text-blue-400 sm:bg-[#E8EBFD]'
                   : 'text-brand-gray-400 bg-transparent dark:text-gray-400 hover:dark:text-gray-300 sm:text-neutral-700'

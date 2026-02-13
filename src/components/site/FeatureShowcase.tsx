@@ -99,7 +99,7 @@ const FeatureCard = ({
 
   const cardContent = (
     <div
-      className={`${bgColor} relative flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10 ${
+      className={`${bgColor} relative overflow-hidden flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10 ${
         href ? 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]' : ''
       }`}
     >
