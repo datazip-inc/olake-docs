@@ -1,6 +1,6 @@
-// @ts-check
 
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import apiSidebar from './docs/api/sidebar';
 
 /**
  * Creating a sidebar enables you to:
@@ -11,17 +11,16 @@
  * The sidebars can be generated from the filesystem, or explicitly defined here.
  *
  * Create as many sidebars as you want.
- *
- *
  */
-const sectionHeader = (title) => ({
-  type: "html",
+
+/** @param {string} title */
+const sectionHeader = (title: string) => ({
+  type: "html" as const,
   value: title,
   className: "navbar__category",
 });
 
-const docSidebar = {
-  // module.exports = {
+const sidebars: SidebarsConfig = {
   docSidebar: [
     sectionHeader("GETTING STARTED"),
     'intro',
@@ -150,6 +149,14 @@ const docSidebar = {
     'understanding/compatibility-engines',
     'core/use-cases',
 
+    // API REFERENCE
+    sectionHeader("API DOCUMENTATION"),
+    {
+      type: 'link',
+      label: 'OLake UI API',
+      href: '/docs/api/olake-ui-api',
+    },
+
     // Community
     sectionHeader("COMMUNITY"),
     'community/contributing',
@@ -182,6 +189,7 @@ const docSidebar = {
     },
     
   ],
+  openApiSidebar: apiSidebar,
 };
 
-export default docSidebar;
+export default sidebars;
