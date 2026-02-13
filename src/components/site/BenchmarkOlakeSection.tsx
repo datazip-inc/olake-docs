@@ -21,7 +21,11 @@ const BenchmarkOlakeSection = () => {
 
           {/* Main content container */}
           <div className='flex h-[50vh] flex-col items-center justify-center bg-[#FCFCFC] py-16'>
-            <div className='text-brand-gray-900 relative text-lg font-medium sm:text-[40px]'>
+            <div
+              className='text-brand-gray-900 relative text-lg font-medium sm:text-[40px]'
+              role='heading'
+              aria-level={2}
+            >
               Benchmark<span className='text-primary-600'> OLake</span>
             </div>
             <div className='mt-4 text-center font-sans text-[9px] text-neutral-700 sm:text-xl'>

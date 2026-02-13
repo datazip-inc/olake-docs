@@ -25,8 +25,18 @@ const TestimonialsSection = () => {
   return (
     <div className='bg-brand-gray-50 relative mt-12 flex flex-col items-center justify-start overflow-hidden px-4 py-12 sm:mt-24 sm:p-16'>
       <div className='flex flex-col items-center justify-center gap-2'>
-        <div className='text-brand-blue-500 text-lg font-medium sm:text-2xl'>Testimonials</div>
-        <div className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px]'>
+        <div
+          className='text-brand-blue-500 text-lg font-medium sm:text-2xl'
+          role='heading'
+          aria-level={3}
+        >
+          Testimonials
+        </div>
+        <div
+          className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px]'
+          role='heading'
+          aria-level={2}
+        >
           Don't take our word for it
         </div>
       </div>

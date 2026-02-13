@@ -103,7 +103,11 @@ const SetupStepsSection: React.FC = () => {
         <div className='mx-auto flex flex-col gap-12 lg:grid lg:max-w-7xl lg:grid-cols-2 lg:items-center'>
           {/* Left Side - Steps Navigation */}
           <div className='w-full'>
-            <div className='text-brand-blue-500 mb-3 text-xs font-medium tracking-wide sm:text-2xl'>
+            <div
+              className='text-brand-blue-500 mb-3 text-xs font-medium tracking-wide sm:text-2xl'
+              role='heading'
+              aria-level={3}
+            >
               The OLake Experience
             </div>
             <h2 className='mb-16 text-xl font-medium leading-tight tracking-[-0.05em] text-gray-900 dark:text-white sm:text-[40px] sm:tracking-wider md:text-5xl'>

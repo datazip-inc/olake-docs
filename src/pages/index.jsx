@@ -267,7 +267,7 @@ export default function New3Page() {
       <LightModeEnforcer />
       <div className='w-full overflow-x-hidden bg-white dark:bg-gray-900'>
         {/* Main heading for SEO and accessibility */}
-        <h1 className='sr-only'>OLake - Fastest Open Source Data Replication Tool</h1>
+
         <main id='main-content' role='main'>
           <DataWarehouseToLakes />
           <WorkflowSection />

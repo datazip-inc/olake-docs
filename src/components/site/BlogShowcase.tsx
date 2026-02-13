@@ -60,7 +60,11 @@ const BlogShowcase: React.FC = () => {
           {/* Heading section - shown first on mobile */}
           <div className='mb-8 flex flex-col justify-center md:hidden'>
             {/* "Blogs" label - mobile: 12px Space Grotesk Medium centered */}
-            <div className='text-brand-blue-500 mb-3 text-center font-space text-xs font-medium'>
+            <div
+              className='text-brand-blue-500 mb-3 text-center font-space text-xs font-medium'
+              role='heading'
+              aria-level={3}
+            >
               Blogs
             </div>
             {/* "Stay ahead..." heading - mobile: 20px, line-height 120% (-5% from 125%), letter-spacing -0.05em */}
@@ -71,11 +75,15 @@ const BlogShowcase: React.FC = () => {
 
           {/* Mobile: Horizontal scrollable blog cards */}
           <div className='-mx-4 px-4 md:hidden'>
-            <div className='flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4'>
+            <div
+              className='flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4'
+              role='list'
+            >
               {blogPosts.map((post) => (
                 <a
                   key={post.url}
                   href={post.url}
+                  role='listitem'
                   className='block w-[280px] flex-shrink-0 snap-start rounded-4xl shadow-[2px_3px_20px_1px_#00000014]'
                 >
                   <div className='h-full overflow-hidden rounded-4xl'>
@@ -151,7 +159,11 @@ const BlogShowcase: React.FC = () => {
 
             {/* Heading section - Right side on desktop */}
             <div className='flex w-full flex-col justify-center lg:w-1/2'>
-              <div className='text-brand-blue-500 mb-3 font-space text-2xl font-medium tracking-wider'>
+              <div
+                className='text-brand-blue-500 mb-3 font-space text-2xl font-medium tracking-wider'
+                role='heading'
+                aria-level={3}
+              >
                 Blogs
               </div>
               <h2 className='text-brand-gray-900 mb-8 font-space text-5xl font-medium tracking-wider dark:text-white'>
@@ -170,11 +182,15 @@ const BlogShowcase: React.FC = () => {
           </div>
 
           {/* Desktop: Other Blog Posts in a grid */}
-          <div className='hidden gap-y-8 gap-x-6 md:grid md:grid-cols-2 lg:grid-cols-3'>
+          <div
+            className='hidden gap-y-8 gap-x-6 md:grid md:grid-cols-2 lg:grid-cols-3'
+            role='list'
+          >
             {blogPosts.slice(1).map((post) => (
-              <a 
-                key={post.url} 
-                href={post.url} 
+              <a
+                key={post.url}
+                href={post.url}
+                role='listitem'
                 className='block h-full rounded-4xl shadow-[2px_3px_20px_1px_#00000014] transition-all duration-300 hover:-translate-y-1'
               >
                 <div className='h-full isolate overflow-hidden rounded-4xl'>

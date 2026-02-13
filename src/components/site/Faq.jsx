@@ -13,7 +13,11 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
     >
       <div
         className='flex cursor-pointer items-center justify-between rounded p-2 transition-colors'
+        role='button'
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setExpanded(!expanded)}
+        aria-expanded={expanded}
       >
         <div className='text-base font-bold leading-6 text-[#2f2f2f] dark:text-white'>
           {question}

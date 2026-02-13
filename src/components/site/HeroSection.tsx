@@ -30,9 +30,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
 
           <div className='mt-8 text-2xl font-light leading-tight sm:text-5xl sm:leading-normal sm:text-center'>
-            <span className='font-medium'>
+            <h1 className='font-medium mb-0 m-0 text-inherit leading-inherit font-inherit'>
               Fastest Database & Kafka Replication to S3 and Iceberg
-            </span>
+            </h1>
           </div>
           <div className='mt-4 font-sans text-xs font-normal leading-normal text-neutral-700 sm:text-xl'>
             Open-source EL (Extract & Load) engine built for Apache Iceberg
