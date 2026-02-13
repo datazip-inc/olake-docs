@@ -99,7 +99,7 @@ const BlogShowcase: React.FC = () => {
                           className='h-40 w-full object-contain p-2'
                         />
                       </div>
-                      <div className='flex flex-col bg-white p-4 dark:bg-gray-800'>
+                      <div className='flex flex-1 flex-col bg-white p-4 dark:bg-gray-800'>
                         {/* Blog title - mobile: text-sm (14px vs 13.79px = +0.21px) leading-5 (20px vs 18.39px = +1.61px) */}
                         <h3 className='mb-2 font-space text-sm font-bold leading-5 text-gray-900 dark:text-white'>
                           {post.title}
@@ -109,7 +109,7 @@ const BlogShowcase: React.FC = () => {
                           {post.description}
                         </p>
                         {/* Read time - mobile: text-[9px] (10px vs 9.2px = +0.8px) leading-4 (16px vs 13.79px = +2.21px) */}
-                        <div className='font-sans text-[9px] font-normal leading-4 text-gray-500 dark:text-gray-400'>
+                        <div className='mt-auto font-sans text-[9px] font-normal leading-4 text-gray-500 dark:text-gray-400'>
                           {post.readTime}
                         </div>
                       </div>
@@ -141,7 +141,7 @@ const BlogShowcase: React.FC = () => {
                         className='h-auto w-full object-contain p-2'
                       />
                     </div>
-                    <div className='flex flex-col justify-center bg-white p-8 dark:bg-gray-800'>
+                    <div className='flex flex-1 flex-col justify-center bg-white p-8 dark:bg-gray-800'>
                       <h3 className='mb-4 text-2xl font-bold text-gray-900 dark:text-white'>
                         {blogPosts[0].title}
                       </h3>
@@ -193,7 +193,7 @@ const BlogShowcase: React.FC = () => {
                 role='listitem'
                 className='block h-full rounded-4xl shadow-[2px_3px_20px_1px_#00000014] transition-all duration-300 hover:-translate-y-1'
               >
-                <div className='h-full isolate overflow-hidden rounded-4xl'>
+                <div className='flex flex-col h-full isolate overflow-hidden rounded-4xl'>
                   <div className='flex items-center justify-center rounded-tl-4xl rounded-tr-4xl dark:bg-gray-800'>
                     <img
                       src={post.imageSrc}
@@ -205,14 +205,14 @@ const BlogShowcase: React.FC = () => {
                       className='h-48 w-full object-contain px-2'
                     />
                   </div>
-                  <div className='flex h-full flex-col bg-white p-6 dark:bg-gray-800'>
+                  <div className='flex flex-1 flex-col bg-white p-6 dark:bg-gray-800'>
                     <h3 className='mb-3 text-lg font-bold text-gray-900 dark:text-white'>
                       {post.title}
                     </h3>
                     <p className='mb-4 text-sm text-gray-600 dark:text-gray-300'>
                       {post.description}
                     </p>
-                    <div className='text-sm text-gray-500 dark:text-gray-400'>{post.readTime}</div>
+                    <div className='mt-auto text-sm text-gray-500 dark:text-gray-400'>{post.readTime}</div>
                   </div>
                 </div>
               </a>
