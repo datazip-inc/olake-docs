@@ -124,7 +124,7 @@ const Footer: React.FC = () => {
           <div className='grid grid-cols-3 gap-4'>
             {/* Company Links */}
             <div className='font-sans'>
-              <h3 className='text-brand-black mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider dark:text-white'>
+              <h3 className='text-brand-black mb-2 text-[8px] lg:text-base font-normal uppercase leading-normal tracking-wider dark:text-white'>
                 COMPANY
               </h3>
               <ul className='list-none space-y-0 p-0'>
@@ -143,7 +143,7 @@ const Footer: React.FC = () => {
 
             {/* Resources Links */}
             <div className='font-sans'>
-              <h3 className='text-brand-black mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider dark:text-white'>
+              <h3 className='text-brand-black mb-2 text-[8px] lg:text-base font-normal uppercase leading-normal tracking-wider dark:text-white'>
                 RESOURCES
               </h3>
               <ul className='list-none space-y-0 p-0'>
@@ -162,7 +162,7 @@ const Footer: React.FC = () => {
 
             {/* Top Reads Links */}
             <div className='font-sans'>
-              <h3 className='text-brand-black mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider dark:text-white'>
+              <h3 className='text-brand-black mb-2 text-[8px] lg:text-base font-normal uppercase leading-normal tracking-wider dark:text-white'>
                 TOP READS
               </h3>
               <ul className='list-none space-y-0.5 p-0'>
@@ -170,7 +170,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='text-brand-gray-450 font-sans text-[8px] leading-3 tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
+                      className='text-brand-gray-450 font-sans text-[8px] lg:text-base leading-3 tracking-[0.01em] transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>

@@ -19,20 +19,26 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
           {question}
         </div>
         <div
-          className={`text-xl transition-transform duration-200 ease-in-out ${
-            expanded ? 'text-black' : 'text-brand-gray-400'
-          }`}
+          className={`text-xl transition-transform duration-200 ease-in-out ${expanded ? 'text-black' : 'text-brand-gray-400'
+            }`}
         >
           {expanded ? '↑' : '↓'}
         </div>
       </div>
-      {expanded && (
-        <div className='-mt-2 rounded p-3 px-2'>
-          <div className='text-brand-gray-900 text-sm font-normal leading-relaxed dark:text-gray-300'>
-            {answer}
+      <div
+        className={`grid transition-all duration-300 ease-in-out ${expanded
+          ? 'grid-rows-[1fr] opacity-100'
+          : 'grid-rows-[0fr] opacity-0'
+          }`}
+      >
+        <div className='overflow-hidden'>
+          <div className='-mt-2 rounded p-3 px-2'>
+            <div className='text-brand-gray-900 text-sm font-normal leading-relaxed dark:text-gray-300'>
+              {answer}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

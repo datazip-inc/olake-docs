@@ -227,7 +227,8 @@ const VideoPlayer: React.FC<{
   isActive: boolean
   onEnded: () => void
   alt: string
-}> = ({ src, isActive, onEnded, alt }) => {
+  speed?: number
+}> = ({ src, isActive, onEnded, alt, speed = 1.75 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [hasLoaded, setHasLoaded] = useState(false)
 
@@ -245,6 +246,7 @@ const VideoPlayer: React.FC<{
 
     if (isActive) {
       video.currentTime = 0
+      video.playbackRate = speed
       const playPromise = video.play()
       if (playPromise !== undefined) {
         playPromise.catch((error) => {
@@ -254,7 +256,7 @@ const VideoPlayer: React.FC<{
     } else {
       video.pause()
     }
-  }, [isActive, hasLoaded])
+  }, [isActive, hasLoaded, speed])
 
   return (
     <div

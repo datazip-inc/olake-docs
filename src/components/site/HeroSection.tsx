@@ -29,7 +29,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             </a>
           </div>
 
-          <div className='mt-8 text-2xl font-light leading-tight sm:text-5xl sm:leading-normal text-center'>
+          <div className='mt-8 text-2xl font-light leading-tight sm:text-5xl sm:leading-normal sm:text-center'>
             <span className='font-medium'>
               Fastest Database & Kafka Replication to S3 and Iceberg
             </span>

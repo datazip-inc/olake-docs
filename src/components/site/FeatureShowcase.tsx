@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Marquee from 'react-fast-marquee'
 
 const FEATURE_DATA = [
@@ -137,6 +137,28 @@ const FeatureCard = ({
 }
 
 const FeatureShowcase: React.FC = () => {
+  const [inView, setInView] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setInView(entry.isIntersecting)
+      },
+      { threshold: 0.1 } // Starts playing when 10% visible
+    )
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current)
+    }
+
+    return () => {
+      if (containerRef.current) {
+        observer.unobserve(containerRef.current)
+      }
+    }
+  }, [])
+
   return (
     <section className='w-full bg-white py-12 dark:bg-gray-900 sm:py-16 md:py-24'>
       {/* Heading container - centered */}
@@ -150,8 +172,9 @@ const FeatureShowcase: React.FC = () => {
       </div>
 
       {/* Marquee implementation with original cards */}
-      <div className="w-full">
+      <div className="w-full" ref={containerRef}>
         <Marquee 
+          play={inView}
           pauseOnHover={true} 
           speed={60} 
           gradient={false} 
