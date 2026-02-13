@@ -1,5 +1,8 @@
 // src/components/Iceberg/QueryEngineLayout.tsx
 import React from 'react';
+import Head from '@docusaurus/Head';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import { useLocation } from '@docusaurus/router';
 import { FeatureCard, FeatureCardProps } from './FeatureCard';
 import { InteractiveTable, InteractiveTableProps } from './InteractiveTable';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -11,6 +14,12 @@ import {
   ArrowTopRightOnSquareIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
+
+export interface FaqQuestion {
+  '@type': 'Question';
+  name: string;
+  acceptedAnswer: { '@type': 'Answer'; text: string };
+}
 
 export interface CodeExample {
   title: string;
@@ -40,6 +49,12 @@ export interface QueryEngineLayoutProps {
     url: string;
     type?: 'docs' | 'tutorial' | 'video' | 'blog';
   }[];
+  /** Optional FAQ items for JSON-LD FAQPage schema. When provided, base schemas (Organization, WebSite, WebPage, BreadcrumbList) are also injected. */
+  faqMainEntity?: FaqQuestion[];
+  /** Optional string used for WebPage/Breadcrumb JSON-LD when title prop is JSX. */
+  schemaTitle?: string;
+  /** Optional string used for WebPage JSON-LD when description prop is JSX. */
+  schemaDescription?: string;
 }
 
 const resourceTypeStyles = {
@@ -65,6 +80,8 @@ const resourceTypeStyles = {
   }
 };
 
+const SITE_URL = 'https://olake.io';
+
 export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
   title,
   description,
@@ -74,10 +91,119 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
   useCases,
   officialDocs,
   gettingStarted,
-  additionalResources
+  additionalResources,
+  faqMainEntity,
+  schemaTitle,
+  schemaDescription
 }) => {
+  const { siteConfig } = useDocusaurusContext();
+  const location = useLocation();
+  const siteUrl = siteConfig?.url?.replace(/\/$/, '') || SITE_URL;
+  const canonicalUrl = `${siteUrl}${location.pathname}`.replace(/\/$/, '') || `${siteUrl}${location.pathname}`;
+  const pageTitleStr = schemaTitle ?? (typeof title === 'string' ? title : 'Query Engine');
+  const pageDescriptionStr = schemaDescription ?? (typeof description === 'string' ? description : 'Apache Iceberg query engine documentation.');
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'OLake',
+    alternateName: 'Datazip, Inc. (OLake project)',
+    url: `${siteUrl}/`,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${siteUrl}/img/logo/olake-blue.svg`,
+      width: 32,
+      height: 32
+    },
+    sameAs: [
+      'https://github.com/datazip-inc/olake',
+      'https://x.com/_olake',
+      'https://www.linkedin.com/company/datazipio/',
+      'https://www.youtube.com/@olakeio'
+    ],
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '16192 COASTAL HWY',
+      addressLocality: 'LEWES',
+      addressRegion: 'DE',
+      postalCode: '19958',
+      addressCountry: 'US'
+    }
+  };
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    url: `${siteUrl}/`,
+    name: 'Fastest Open Source Data Replication Tool',
+    description: 'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    publisher: { '@type': 'Organization', name: 'OLake' },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${siteUrl}/search?q={search_term_string}`,
+      'query-input': 'required name=search_term_string'
+    }
+  };
+
+  const webPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: canonicalUrl,
+    name: pageTitleStr,
+    description: pageDescriptionStr,
+    isPartOf: { '@type': 'WebSite', url: `${siteUrl}/`, name: 'OLake' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'OLake',
+      url: `${siteUrl}/`,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/img/logo/olake-blue.svg`,
+        width: 32,
+        height: 32
+      }
+    }
+  };
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${siteUrl}/` },
+      { '@type': 'ListItem', position: 2, name: 'Iceberg', item: `${siteUrl}/iceberg/` },
+      { '@type': 'ListItem', position: 3, name: 'Query Engine', item: `${siteUrl}/iceberg/query-engine/` },
+      { '@type': 'ListItem', position: 4, name: pageTitleStr.slice(0, 100), item: canonicalUrl }
+    ]
+  };
+
+  const faqSchema = faqMainEntity?.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqMainEntity
+      }
+    : null;
+
+  const jsonLdSchemas = [
+    { id: 'organization', data: organizationSchema },
+    { id: 'website', data: websiteSchema },
+    { id: 'webPage', data: webPageSchema },
+    { id: 'breadcrumb', data: breadcrumbSchema },
+    ...(faqSchema ? [{ id: 'faq', data: faqSchema }] : [])
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+    <>
+      <Head>
+        {jsonLdSchemas.map((schema) => (
+          <script
+            key={schema.id}
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(schema.data) }}
+          />
+        ))}
+      </Head>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header with gradient background */}
         <div className="relative mb-16 overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-12 text-white shadow-2xl">
@@ -306,5 +432,6 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         </section>
       </div>
     </div>
+    </>
   );
 };
