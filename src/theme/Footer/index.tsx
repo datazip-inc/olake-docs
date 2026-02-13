@@ -73,11 +73,11 @@ const Footer: React.FC = () => {
   ]
 
   return (
-    <footer className='2x:h-[62vh] relative h-[62vh] overflow-hidden bg-neutral-100 py-8 dark:bg-gray-900 md:h-[72vh] xl:py-12'>
+    <footer className='2xl:h-[62vh] relative h-[62vh] overflow-hidden bg-neutral-100 py-8 dark:bg-gray-900 md:h-[72vh] xl:py-12'>
       {/* Large OLake Watermark - smaller on mobile, positioned to not overlap */}
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[36%] select-none bg-[linear-gradient(180deg,#EAEAEA_0%,#F1F1F1_85%,#F8F8F8_78%,rgba(248,248,248,0)_100%)] font-space text-[133px] font-medium leading-[1.2] opacity-80 dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_70%,rgba(50,50,50,0)_85%)] xl:translate-y-[36%] xl:bg-[linear-gradient(180deg,#E6E6E6_0%,#EEEEEE_55%,#F7F7F7_85%,rgba(247,247,247,0)_100%)] xl:text-[clamp(200px,40vw,572px)] xl:dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_70%,rgba(50,50,50,0)_85%)]'
+        className='pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[36%] select-none bg-[linear-gradient(180deg,#EAEAEA_27.62%,rgba(255,255,255,0)_70.27%)] font-space font-medium leading-[1.2] opacity-80 dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_27.62%,rgba(50,50,50,0)_70.27%)] xl:translate-y-[36%] xl:bg-[linear-gradient(180deg,#EAEAEA_27.62%,rgba(255,255,255,0)_70.27%)] text-[clamp(133px,25vw,420px)] xl:text-[clamp(200px,30vw,572px)] xl:dark:bg-[linear-gradient(180deg,rgba(50,50,50,1)_27.62%,rgba(50,50,50,0)_70.27%)]'
         style={{
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -126,7 +126,7 @@ const Footer: React.FC = () => {
           <div className='grid grid-cols-3 gap-4'>
             {/* Company Links */}
             <div className='font-sans'>
-              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white lg:text-base'>
+              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white'>
                 COMPANY
               </h3>
               <ul className='list-none space-y-0.5 p-0'>
@@ -134,7 +134,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300 lg:text-base'
+                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -145,7 +145,7 @@ const Footer: React.FC = () => {
 
             {/* Resources Links */}
             <div className='font-sans'>
-              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white lg:text-base'>
+              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white'>
                 RESOURCES
               </h3>
               <ul className='list-none space-y-0.5 p-0'>
@@ -153,7 +153,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300 lg:text-base'
+                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
@@ -164,7 +164,7 @@ const Footer: React.FC = () => {
 
             {/* Top Reads Links */}
             <div className='font-sans'>
-              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white lg:text-base'>
+              <h3 className='mb-2 text-[8px] font-normal uppercase leading-normal tracking-wider text-brand-black dark:text-white'>
                 TOP READS
               </h3>
               <ul className='list-none space-y-0.5 p-0'>
@@ -172,7 +172,7 @@ const Footer: React.FC = () => {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300 lg:text-base'
+                      className='font-sans text-[8px] leading-3 tracking-[0.01em] text-brand-gray-450 transition-colors hover:text-blue-500 dark:text-gray-300'
                     >
                       {link.label}
                     </Link>
