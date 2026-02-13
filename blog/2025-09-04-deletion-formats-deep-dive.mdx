@@ -42,23 +42,37 @@ This metadata layer consists of:
 
 This layered architecture is what makes Iceberg so powerful. When you want to query your data, the engine doesn't need to scan directories or enumerate files; it simply reads the metadata to understand exactly which data files contain the information you need.
 
-## The Deletion Challenge in Iceberg v2
+## The Deletion Challenge in Iceberg v2: When DELETE Makes Reads Slower
 
-In Iceberg format version 2 (v2), the system introduced two clever approaches to handle deletions without rewriting entire files:
+If you've ever run a `DELETE` on an Iceberg table and then noticed your reads got slower, you're not imagining it. Here's what's happening under the hood.
+
+In a file-based table, a `DELETE` often doesn't remove rows from existing Parquet files. Instead, the table starts carrying extra "ignore these rows" information, and every reader has to apply that on the fly. So the delete job can look fast, but you quietly moved work from write time to read time.
+
+In Iceberg format version 2 (v2), the system introduced two approaches to handle deletions without rewriting entire files:
 
 - **Position Deletes**: These are like having a detailed index that says "ignore row number 42 in file ABC and row number 1,337 in file XYZ." The delete file stores the exact file path and row position of deleted records. While this works well, it requires the query engine to read through potentially many small delete files and apply them during query time.
 
 - **Equality Deletes**: These work differently by storing the actual column values that should be considered deleted. For example, instead of saying "delete row 42," it says "delete all rows where customer_id = 12345." This is faster to write but can be more expensive to process during reads since the engine must compare every row against the deletion criteria.
 
-Both approaches follow what's called a **Merge-on-Read (MoR)** strategy. The beauty of MoR is that writing becomes much faster because you're not rewriting large files. However, there's a trade-off: reads become slightly more expensive because the query engine must merge the delete information with the base data files on-the-fly.
+Both approaches follow what's called a **Merge-on-Read (MoR)** strategy. The beauty of MoR is that writing becomes much faster because you're not rewriting large files. However, there's a trade-off: reads become more expensive because the query engine must merge the delete information with the base data files on-the-fly.
 
-### No More Centralized Delete Logs
+### The Nasty Part: Small but Frequent Deletes
 
-In Iceberg versions earlier than v3, deletions were handled through positional delete files. Each of these files contained references to data file paths along with the exact row positions that should be ignored. While functional, this approach introduced two big challenges:
+The problem becomes particularly acute when deletes are small but frequent. Consider these common scenarios:
 
-- **Disparate Delete Files** – Every batch of deletes could generate new small delete files scattered across storage. Over time, tables accumulated hundreds or thousands of these, creating the classic "small file problem" and making metadata management more complex.
+- **GDPR requests**: Individual users requesting data deletion
+- **Daily data corrections**: Fixing a few bad rows each day
+- **CDC corrections**: Handling update operations that manifest as delete+insert pairs
 
-- **Query-Time Merging** – When reading data, the engine had to scan not only the base data files but also locate and merge all relevant delete files. This added significant overhead, especially for queries touching many partitions.
+Each run adds more delete metadata. After a while, your simple `SELECT` isn't just "read data files"; it's "read data files plus collect delete info plus filter rows plus do extra planning and file opens." That's **read amplification**, and it shows up as higher latency and more CPU usage.
+
+### No More Centralized Delete Logs: The "Death by a Thousand Small Delete Files" Problem
+
+In Iceberg versions earlier than v3, deletions were handled through positional delete files. Each of these files contained references to data file paths along with the exact row positions that should be ignored. While functional, this approach introduced significant challenges:
+
+- **Disparate Delete Files** – Every batch of deletes could generate new small delete files scattered across storage. Over time, tables accumulated hundreds or thousands of these, creating the classic "small file problem" and making metadata management more complex. This is what we call **"death by a thousand small delete files"** – one of the main reasons read performance degrades over time.
+
+- **Query-Time Merging** – When reading data, the engine had to scan not only the base data files but also locate and merge all relevant delete files. This added significant overhead, especially for queries touching many partitions. The read amplification effect meant that what should be a simple data scan became a complex operation involving multiple file opens, metadata collection, and row filtering.
 
 Iceberg v3 solves this by attaching a **deletion vector (DV)** directly to each data file, stored in a compact Puffin sidecar. Instead of chasing down multiple delete files scattered across the table, the query engine can simply read the file and its paired DV together. This removes the need for centralized logs and fragmented delete files, drastically simplifying read paths and improving performance.
 
@@ -84,15 +98,19 @@ Iceberg v3 fundamentally improves the process of managing deletes by pairing eac
 
 - **Binary Format – On-Disk Parity With In-Memory Deletion State**: Previously, deletion vectors existed in-memory only; v3 persists them on disk with strong format guarantees, removing conversion overhead thus query engines no longer need to rebuild bitmaps from raw logs on every scan; they can load them directly into memory as-is, enabling increased performance.
 
-- **Maintenance and Enforcement**: The spec and most engines now require compaction at write time to ensure only a single DV exists per file, thereby keeping tables tidy and performant with minimal operational burden.
+- **Maintenance and Enforcement**: The spec requires that there's at most one deletion vector per data file in a snapshot, so writers must merge new deletes into the existing vector rather than letting delete files pile up. This is a big deal because "death by a thousand small delete files" is one of the main reasons read performance degrades over time. The spec and most engines now require compaction at write time to ensure only a single DV exists per file, thereby keeping tables tidy and performant with minimal operational burden.
 
-### Why This Matters
+### Why This Matters: A New Mental Model for DELETE
+
+Here's a crucial shift in thinking: **DELETE in Iceberg is not "remove rows", it's "choose where you want to pay"**. 
+
+In v2, you paid at read time – every query had to process multiple delete files, leading to read amplification. Iceberg v3 makes the "pay later" path much cheaper and more predictable, but you still need to treat deletes as a **performance feature, not just a SQL statement**.
 
 - **Scalability**: Deletion vectors make row-level deletes viable for tables with massive scale, where previous approaches would degrade rapidly.
 
-- **Minimal Read Overhead**: By localizing and compressing deletes, reads are significantly faster even as deletions accumulate, since there's no need to merge many files or reconstruct metadata from logs.
+- **Minimal Read Overhead**: By localizing and compressing deletes, reads are significantly faster even as deletions accumulate, since there's no need to merge many files or reconstruct metadata from logs. The compact bitmap format means read amplification is dramatically reduced.
 
-- **Powerful CDC**: This architecture is especially powerful for Change Data Capture (CDC), regulatory compliance, streaming ingestion, and other scenarios where deletions are frequent and need to happen without disrupting write throughput.
+- **Powerful CDC**: This architecture is especially powerful for Change Data Capture (CDC), regulatory compliance, streaming ingestion, and other scenarios where deletions are frequent and need to happen without disrupting write throughput. The ability to merge deletes into existing vectors prevents the accumulation of small delete files that would otherwise degrade performance.
 
 ### New Practical Considerations
 
@@ -209,13 +227,15 @@ So, how do you decide between Apache Iceberg and Delta Lake, and when should you
 
 Let's bring this full circle with the key points you should remember:
 
-- **Understanding the Trade-offs**: Deletion vectors represent a fundamental shift from eager to lazy deletion processing. You're trading some read performance for significantly better write performance and operational flexibility. This trade-off makes sense for most modern data workloads where real-time updates are increasingly important.
+- **Understanding the Trade-offs**: Deletion vectors represent a fundamental shift from eager to lazy deletion processing. You're trading some read performance for significantly better write performance and operational flexibility. This trade-off makes sense for most modern data workloads where real-time updates are increasingly important. Remember: DELETE is not "remove rows", it's "choose where you want to pay" – and v3 makes the "pay later" path much cheaper and more predictable.
 
-- **Maintenance Matters**: Whether you choose Iceberg or Delta Lake, success with merge-on-read approaches requires good operational practices. Regular compaction isn't optional – it's essential for maintaining performance over time.
+- **Treat Deletes as a Performance Feature**: Don't think of DELETE as just a SQL statement. It's a performance feature that requires careful consideration. Small but frequent deletes (GDPR requests, daily corrections, CDC updates) can accumulate delete metadata that causes read amplification. Monitor your delete patterns and plan accordingly.
+
+- **Maintenance Matters**: Whether you choose Iceberg or Delta Lake, success with merge-on-read approaches requires good operational practices. Regular compaction isn't optional – it's essential for maintaining performance over time. The "death by a thousand small delete files" problem is real, and v3's requirement for at most one deletion vector per file helps prevent it, but you still need to maintain your tables.
 
 - **The Ecosystem is Converging**: The collaboration between format communities means you're less likely to make a "wrong" choice. Both formats are evolving to address similar challenges with similar solutions, reducing the risk of technological lock-in.
 
-- **Start Simple, Scale Smart**: Begin with the default approaches (copy-on-write for batch workloads, deletion vectors for high-update scenarios) and optimize based on your actual performance characteristics and operational requirements.
+- **Start Simple, Scale Smart**: Begin with the default approaches (copy-on-write for batch workloads, deletion vectors for high-update scenarios) and optimize based on your actual performance characteristics and operational requirements. Monitor read performance after DELETE operations and adjust your strategy accordingly.
 
 The world of data lake deletion formats might seem complex, but it's really about solving a fundamental problem: **how do you efficiently manage changing data at scale?** Apache Iceberg and Delta Lake have both arrived at elegant solutions that make this possible, each with their own strengths and ideal use cases.
 <BlogCTA/> 
