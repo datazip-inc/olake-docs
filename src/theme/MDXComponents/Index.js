@@ -6,8 +6,6 @@ import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
 import TestimonialCard from '@site/src/components/TestimonialCard'
-import DiscoverCommand from '@site/src/components/CommandDocumentation'
-import StreamsFlag from '@site/src/components/StreamsFlag'
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
@@ -146,8 +144,6 @@ const MDXComponents = {
   BlogCTA,
   TestimonialCard,
   DocCardList,
-  DiscoverCommand,
-  StreamsFlag,
 
   DockerDiscoverMongoDB,
   DockerSyncMongoDB,
