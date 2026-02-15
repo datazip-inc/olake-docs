@@ -13,26 +13,36 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
     >
       <div
         className='flex cursor-pointer items-center justify-between rounded p-2 transition-colors'
+        role='button'
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setExpanded(!expanded)}
+        aria-expanded={expanded}
       >
         <div className='text-base font-bold leading-6 text-[#2f2f2f] dark:text-white'>
           {question}
         </div>
         <div
-          className={`text-xl transition-transform duration-200 ease-in-out ${
-            expanded ? 'text-black' : 'text-[#939393]'
-          }`}
+          className={`text-xl transition-transform duration-200 ease-in-out ${expanded ? 'text-black' : 'text-brand-gray-400'
+            }`}
         >
           {expanded ? '↑' : '↓'}
         </div>
       </div>
-      {expanded && (
-        <div className='rounded p-3 px-2 -mt-2'>
-          <div className='text-sm font-normal leading-relaxed text-[#333333] dark:text-gray-300'>
-            {answer}
+      <div
+        className={`grid transition-all duration-300 ease-in-out ${expanded
+          ? 'grid-rows-[1fr] opacity-100'
+          : 'grid-rows-[0fr] opacity-0'
+          }`}
+      >
+        <div className='overflow-hidden'>
+          <div className='-mt-2 rounded p-3 px-2'>
+            <div className='text-brand-gray-900 text-sm font-normal leading-relaxed dark:text-gray-300'>
+              {answer}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -44,7 +54,7 @@ const Faq = ({ data, showHeading }) => {
         // <SectionHeader showHr={false} heading={<>Frequently Asked Questions</>} />
         <div
           id='faq-heading'
-          className='mb-4 flex flex-col gap-4 text-5xl font-medium text-[#333333] dark:text-white'
+          className='text-brand-gray-900 mb-16 flex flex-col gap-4 text-xl font-medium leading-tight dark:text-white sm:text-[64px] sm:leading-tight'
         >
           Frequently Asked Questions
         </div>

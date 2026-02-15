@@ -1,6 +1,5 @@
 import React from 'react'
 import HeroSection from './HeroSection'
-import StatsSection from './StatsSection'
 
 const DataWarehouseToLakes: React.FC = () => {
   return (

@@ -9,7 +9,7 @@
   function loadFontStylesheet() {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap';
     link.media = 'all';
     
     // Add to head
