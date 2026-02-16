@@ -3,7 +3,7 @@ import React from 'react'
 
 const TestimonialCard = ({ title, description, author }) => {
   return (
-    <div className='flex min-h-[280px] w-[280px] flex-shrink-0 flex-col justify-between rounded-2xl bg-white p-6 shadow-[2px_3px_20px_1px_#00000014] sm:min-h-[320px] sm:w-full sm:rounded-[32px] sm:p-10'>
+    <div className='flex min-h-[280px] w-[280px] flex-shrink-0 flex-col justify-between rounded-2xl bg-white p-6 shadow-[2px_3px_20px_1px_#00000014] sm:min-h-[410px] sm:w-full sm:rounded-[32px] sm:p-10'>
       <div>
         <img src='/img/site/quote.png' alt='quote' className='h-4 w-auto sm:h-auto' />
 
@@ -11,7 +11,7 @@ const TestimonialCard = ({ title, description, author }) => {
           {title}
         </div>
 
-        <div className='mt-1 line-clamp-4 pb-1 text-xs leading-relaxed text-gray-700 sm:line-clamp-5 sm:text-base sm:leading-relaxed'>
+        <div className='sm:line-clamp-8 mt-1 line-clamp-4 pb-1 text-xs leading-relaxed text-gray-700 sm:text-base sm:leading-relaxed'>
           {description}
         </div>
       </div>
@@ -23,16 +23,10 @@ const TestimonialCard = ({ title, description, author }) => {
 
 const TestimonialsSection = () => {
   return (
-    <div className='bg-brand-gray-50 relative mt-12 flex flex-col items-center justify-start overflow-hidden px-4 py-12 sm:mt-24 sm:p-16'>
+    <div className='relative mt-12 flex flex-col items-center justify-start overflow-hidden bg-brand-gray-50 px-4 py-12 sm:mt-24 sm:p-16'>
       <div className='flex flex-col items-center justify-center gap-2'>
-        <h3
-          className='text-brand-blue-500 text-lg font-medium sm:text-2xl m-0'
-        >
-          Testimonials
-        </h3>
-        <h2
-          className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px] m-0'
-        >
+        <h3 className='m-0 text-lg font-medium text-brand-blue-500 sm:text-2xl'>Testimonials</h3>
+        <h2 className='m-0 text-center text-2xl font-medium leading-tight text-brand-gray-900 sm:text-4xl md:text-5xl lg:text-[64px]'>
           Don't take our word for it
         </h2>
       </div>
@@ -43,9 +37,6 @@ const TestimonialsSection = () => {
           <TestimonialCard key={index} {...testimonial} />
         ))}
       </div>
-
-      {/* Gradient */}
-      <div className='pointer-events-none absolute inset-x-0 -bottom-4 z-10 h-32 bg-gradient-to-t from-white via-white/80 to-transparent sm:-bottom-24 sm:h-[40%]' />
     </div>
   )
 }

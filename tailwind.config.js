@@ -222,6 +222,36 @@ module.exports = {
           '-webkit-line-clamp': '3',
           '-webkit-box-orient': 'vertical',
           'overflow': 'hidden'
+        },
+        '.line-clamp-4': {
+          'display': '-webkit-box',
+          '-webkit-line-clamp': '4',
+          '-webkit-box-orient': 'vertical',
+          'overflow': 'hidden'
+        },
+        '.line-clamp-5': {
+          'display': '-webkit-box',
+          '-webkit-line-clamp': '5',
+          '-webkit-box-orient': 'vertical',
+          'overflow': 'hidden'
+        },
+        '.line-clamp-6': {
+          'display': '-webkit-box',
+          '-webkit-line-clamp': '6',
+          '-webkit-box-orient': 'vertical',
+          'overflow': 'hidden'
+        },
+        '.line-clamp-7': {
+          'display': '-webkit-box',
+          '-webkit-line-clamp': '7',
+          '-webkit-box-orient': 'vertical',
+          'overflow': 'hidden'
+        },
+        '.line-clamp-8': {
+          'display': '-webkit-box',
+          '-webkit-line-clamp': '8',
+          '-webkit-box-orient': 'vertical',
+          'overflow': 'hidden'
         }
       }
 
