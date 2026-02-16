@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import React, { useEffect } from 'react'
 import { PiPath, PiLinktreeLogo } from 'react-icons/pi'
 
@@ -41,11 +42,17 @@ interface PillProps {
 
 const Pill: React.FC<PillProps> = ({ icon, label, isHighlighted = false }) => (
   <div
-    className={`flex items-center gap-2 rounded-full px-4 py-1 transition-all duration-300 sm:px-6 sm:py-3 ${isHighlighted ? 'sm:bg-[#E4E8FF] sm:shadow-[0_0_0_8px_#f4f5fe]' : 'sm:bg-[#F3F3F3]'}`}
+    className={clsx(
+      'flex items-center gap-2 rounded-full px-4 py-1 transition-all duration-300 sm:px-6 sm:py-3',
+      isHighlighted ? 'sm:bg-[#E4E8FF] sm:shadow-[0_0_0_8px_#f4f5fe]' : 'sm:bg-[#F3F3F3]'
+    )}
   >
     {icon && <span className='flex flex-shrink-0 items-center'>{icon}</span>}
     <span
-      className={`whitespace-nowrap text-center font-space text-[12px] font-medium leading-[120%] tracking-[-0.05em] transition-colors duration-300 sm:text-base sm:leading-normal sm:tracking-normal ${isHighlighted ? 'text-primary-600' : 'text-brand-gray-400 sm:text-gray-700'}`}
+      className={clsx(
+        'whitespace-nowrap text-center font-space text-[12px] font-medium leading-[120%] tracking-[-0.05em] transition-colors duration-300 sm:text-base sm:leading-normal sm:tracking-normal',
+        isHighlighted ? 'text-primary-600' : 'text-brand-gray-400 sm:text-gray-700'
+      )}
     >
       {label}
     </span>
@@ -79,14 +86,16 @@ const Connector: React.FC<ConnectorProps> = ({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden bg-gray-200 ${
+      className={clsx(
+        'relative shrink-0 overflow-hidden bg-gray-200',
         isHorizontal ? 'h-[2px] w-[50px]' : 'h-6 w-[2px]'
-      }`}
+      )}
     >
       <div
-        className={`from-brand-blue-500 to-brand-blue-400 absolute inset-0 bg-gradient-to-r ${
-          isHorizontal ? 'origin-left' : 'origin-top'
-        } ${getTransitionClass()} ${
+        className={clsx(
+          'from-brand-blue-500 to-brand-blue-400 absolute inset-0 bg-gradient-to-r',
+          isHorizontal ? 'origin-left' : 'origin-top',
+          getTransitionClass(),
           isActive
             ? isHorizontal
               ? 'scale-x-100'
@@ -94,7 +103,7 @@ const Connector: React.FC<ConnectorProps> = ({
             : isHorizontal
               ? 'scale-x-0'
               : 'scale-y-0'
-        }`}
+        )}
       />
     </div>
   )

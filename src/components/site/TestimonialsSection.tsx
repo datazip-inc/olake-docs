@@ -25,20 +25,16 @@ const TestimonialsSection = () => {
   return (
     <div className='bg-brand-gray-50 relative mt-12 flex flex-col items-center justify-start overflow-hidden px-4 py-12 sm:mt-24 sm:p-16'>
       <div className='flex flex-col items-center justify-center gap-2'>
-        <div
-          className='text-brand-blue-500 text-lg font-medium sm:text-2xl'
-          role='heading'
-          aria-level={3}
+        <h3
+          className='text-brand-blue-500 text-lg font-medium sm:text-2xl m-0'
         >
           Testimonials
-        </div>
-        <div
-          className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px]'
-          role='heading'
-          aria-level={2}
+        </h3>
+        <h2
+          className='text-brand-gray-900 text-center text-2xl font-medium leading-tight sm:text-4xl md:text-5xl lg:text-[64px] m-0'
         >
           Don't take our word for it
-        </div>
+        </h2>
       </div>
 
       {/* Mobile: Horizontal scroll, Medium: Auto-fit grid, Large: 3 columns */}

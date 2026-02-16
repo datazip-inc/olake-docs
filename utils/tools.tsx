@@ -34,4 +34,16 @@ function $t(text: string, isText = true): string | any {
   }
   return <Translate>{text}</Translate>;
 }
+
+// Formats a number into a compact string representation (e.g., 1.2K).
+export function formatCompactNumber(num: number, options: { suffix?: string } = {}): string {
+  const { suffix = '' } = options;
+  if (num >= 1000) {
+    const kValue = (Math.floor(num / 100) / 10).toFixed(1);
+    const exactK = parseFloat(kValue) * 1000;
+    return num > exactK ? `${kValue}K+` : `${kValue}K`;
+  }
+  return num.toString() + suffix;
+}
+
 export default $t;

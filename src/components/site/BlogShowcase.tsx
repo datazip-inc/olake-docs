@@ -60,13 +60,11 @@ const BlogShowcase: React.FC = () => {
           {/* Heading section - shown first on mobile */}
           <div className='mb-8 flex flex-col justify-center md:hidden'>
             {/* "Blogs" label - mobile: 12px Space Grotesk Medium centered */}
-            <div
-              className='text-brand-blue-500 mb-3 text-center font-space text-xs font-medium'
-              role='heading'
-              aria-level={3}
+            <h3
+              className='text-brand-blue-500 mb-3 text-center font-space text-xs font-medium m-0'
             >
               Blogs
-            </div>
+            </h3>
             {/* "Stay ahead..." heading - mobile: 20px, line-height 120% (-5% from 125%), letter-spacing -0.05em */}
             <h2 className='text-brand-gray-900 font-space text-xl font-medium leading-tight tracking-tighter dark:text-white'>
               Stay ahead, with our latest reads
@@ -159,13 +157,11 @@ const BlogShowcase: React.FC = () => {
 
             {/* Heading section - Right side on desktop */}
             <div className='flex w-full flex-col justify-center lg:w-1/2'>
-              <div
-                className='text-brand-blue-500 mb-3 font-space text-2xl font-medium tracking-wider'
-                role='heading'
-                aria-level={3}
+              <h3
+                className='text-brand-blue-500 mb-3 font-space text-2xl font-medium tracking-wider m-0'
               >
                 Blogs
-              </div>
+              </h3>
               <h2 className='text-brand-gray-900 mb-8 font-space text-5xl font-medium tracking-wider dark:text-white'>
                 Stay ahead,
                 <br />

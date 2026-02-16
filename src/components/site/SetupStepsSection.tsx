@@ -103,13 +103,11 @@ const SetupStepsSection: React.FC = () => {
         <div className='mx-auto flex flex-col gap-12 lg:grid lg:max-w-7xl lg:grid-cols-2 lg:items-center'>
           {/* Left Side - Steps Navigation */}
           <div className='w-full'>
-            <div
-              className='text-brand-blue-500 mb-3 text-xs font-medium tracking-wide sm:text-2xl'
-              role='heading'
-              aria-level={3}
+            <h3
+              className='text-brand-blue-500 mb-3 text-xs font-medium tracking-wide sm:text-2xl m-0'
             >
               The OLake Experience
-            </div>
+            </h3>
             <h2 className='mb-16 text-xl font-medium leading-tight tracking-[-0.05em] text-gray-900 dark:text-white sm:text-[40px] sm:tracking-wider md:text-5xl'>
               Fast & Efficient
               <span className='sm:hidden'>, </span>
@@ -126,14 +124,12 @@ const SetupStepsSection: React.FC = () => {
                 // const isPast = activeStep > index
 
                 return (
-                  <div
+                  <button
                     key={index}
                     id={`step-indicator-${index}`}
-                    className='group flex min-w-max flex-shrink-0 cursor-pointer items-center transition-opacity duration-300 sm:w-auto sm:min-w-0 sm:items-stretch'
+                    type='button'
+                    className='group flex min-w-max flex-shrink-0 appearance-none cursor-pointer items-center border-none bg-transparent p-0 text-left transition-opacity duration-300 sm:w-auto sm:min-w-0 sm:items-stretch'
                     onClick={() => handleStepClick(index)}
-                    role='button'
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && handleStepClick(index)}
                   >
                     <div className='mr-3 flex flex-col items-center sm:mr-6'>
                       {/* Circle Indicator */}
@@ -197,7 +193,7 @@ const SetupStepsSection: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>

@@ -1,16 +1,17 @@
 import React from 'react'
-
 import Link from '@docusaurus/Link'
 import StatsSection from './StatsSection'
 import { FaGithub, FaRegStar } from 'react-icons/fa'
+import { useNumberTicker } from '../../hooks/useNumberTicker'
+import useGetReleases from '../../hooks/useGetReleases'
+import { formatCompactNumber } from '@site/utils/tools'
 
-interface HeroSectionProps {
-  title?: string
-}
+const HeroSection: React.FC = () => {
+  const { stargazersCount, slackCount } = useGetReleases()
+  
+  const animatedStarCount = useNumberTicker(stargazersCount || 0)
+  const animatedSlackCount = useNumberTicker(slackCount)
 
-const HeroSection: React.FC<HeroSectionProps> = ({
-  title = 'Fastest Data Replication for Apache Iceberg'
-}) => {
   return (
     <div className='mx-auto flex w-full flex-col-reverse items-center justify-between overflow-hidden py-8 xl:container md:px-6 md:py-16 lg:flex-row lg:px-0 lg:py-20'>
       {/* Left Column - contains 2 rows */}
@@ -20,12 +21,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           <div className='flex gap-x-3'>
             <a href='https://github.com/datazip-inc/olake' target='_blank' rel='noopener noreferrer' className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium text-inherit hover:no-underline hover:text-inherit sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
               <FaGithub />
-              <div>Live on Github. 1.2K </div>
+              <div>
+                Live on Github. {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.2K'}
+              </div>
               <FaRegStar />
             </a>
             <a href='/slack' className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium text-inherit hover:no-underline hover:text-inherit sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
               <img src='/img/icon/slack.svg' alt='Slack' className='size-2 sm:size-4' />
-              <div>500+ Active Community Members</div>
+              <div>{formatCompactNumber(animatedSlackCount)} Active Community Members</div>
             </a>
           </div>
 

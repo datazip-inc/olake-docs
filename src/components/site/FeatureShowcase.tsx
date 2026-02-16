@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import React, { useState, useEffect, useRef } from 'react'
 import Marquee from 'react-fast-marquee'
 
@@ -99,9 +100,11 @@ const FeatureCard = ({
 
   const cardContent = (
     <div
-      className={`${bgColor} relative overflow-hidden flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10 ${
-        href ? 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]' : ''
-      }`}
+      className={clsx(
+        bgColor,
+        'relative overflow-hidden flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10',
+        href && 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]'
+      )}
     >
       <div className='relative z-10'>
         <div className='relative mb-10 pt-4 sm:mb-12'>

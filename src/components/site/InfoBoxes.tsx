@@ -27,21 +27,19 @@ const SourcesContent: React.FC = () => (
       {/* Sources header */}
       <div className='flex items-center gap-2'>
         <PiPath size={20} color='#193AE6' />
-        <span className='font-medium text-primary-600' role='heading' aria-level={3}>
+        <h3 className='font-medium text-primary-600 m-0'>
           Sources
-        </span>
+        </h3>
       </div>
 
       {/* Main heading */}
-      <div
-        className='text-xl font-medium leading-tight text-gray-900 sm:text-3xl'
-        role='heading'
-        aria-level={3}
+      <h3
+        className='text-xl font-medium leading-tight text-gray-900 sm:text-3xl m-0'
       >
         <div>High-throughput ingestion to</div>
         <div>S3/Iceberg without</div>
         <div>overloading the source.</div>
-      </div>
+      </h3>
       <div className='mt-4 h-px w-3/5 bg-neutral-200' />
       {/* Sync Modes section */}
       <div>
@@ -188,33 +186,31 @@ const DestinationsContent: React.FC = () => (
     <div className='order-2 mt-6 w-full sm:order-2 sm:mt-0 sm:w-auto'>
       <div className='flex items-center gap-x-2 font-medium text-primary-600'>
         <PiLinktreeLogo className='size-5 sm:size-7' />
-        <div className='text-lg sm:text-2xl' role='heading' aria-level={3}>
+        <h3 className='text-lg sm:text-2xl m-0'>
           Destinations
-        </div>
+        </h3>
       </div>
-      <div
-        className='text-brand-gray-900 mt-2 text-xl font-medium tracking-tighter sm:text-[32px]'
-        role='heading'
-        aria-level={3}
+      <h3
+        className='text-brand-gray-900 mt-2 text-xl font-medium tracking-tighter sm:text-[32px] m-0'
       >
         <div>
           <span className='font-bold'>Sync</span> data from sources to
         </div>
         <div>Iceberg or S3</div>
-      </div>
+      </h3>
       <div className='text-brand-gray-900 mt-4 space-y-1 border-l-0 border-r-0 border-solid py-4 text-xs sm:mt-8 sm:space-y-2 sm:py-8 sm:text-sm'>
-        <div className='text-base font-bold sm:text-lg' role='heading' aria-level={4}>
+        <h4 className='text-base font-bold sm:text-lg m-0'>
           S3
-        </div>
+        </h4>
         <div>
           <div>Fast landing for raw replication and downstream transforms.</div>
           <div>Optimized file sizing + multipart uploads.</div>
         </div>
       </div>
       <div className='text-brand-gray-900 space-y-1 border-l-0 border-r-0 border-t-0 border-solid py-4 text-xs sm:space-y-2 sm:py-8 sm:text-sm'>
-        <div className='text-base font-bold sm:text-lg' role='heading' aria-level={4}>
+        <h4 className='text-base font-bold sm:text-lg m-0'>
           Apache Iceberg
-        </div>
+        </h4>
         <div>
           <div>Table-managed writes for governed analytics: snapshots, partitions,</div>
           <div>schema evolution, and upserts/deletes (when enabled).</div>
@@ -319,9 +315,9 @@ const IcebergCatalogsContent: React.FC = () => {
 
             {/* Main Header (Top Left) */}
             <div className='absolute -left-10 -top-10'>
-              <h3 className='mb-2 font-medium text-primary-600' role='heading' aria-level={4}>
+              <h4 className='mb-2 font-medium text-primary-600 m-0'>
                 Catalogs
-              </h3>
+              </h4>
               <p className='text-brand-gray-900 font-space font-bold leading-tight'>
                 Use the catalog your platform already runs: OLake writes
                 <br />
@@ -399,13 +395,11 @@ const QueryEnginesContent: React.FC = () => (
       className='order-1 h-auto w-full object-contain sm:order-1 sm:w-auto'
     />
     <div className='order-2 w-full sm:order-2 sm:w-auto'>
-      <div
-        className='text-lg font-medium leading-relaxed tracking-tighter text-primary-600 sm:mt-16 sm:text-xl'
-        role='heading'
-        aria-level={3}
+      <h3
+        className='text-lg font-medium leading-relaxed tracking-tighter text-primary-600 sm:mt-16 sm:text-xl m-0'
       >
         Query Engines
-      </div>
+      </h3>
       <div className='mt-2 text-xs font-normal sm:text-base'>
         <div>
           Seamlessly connect with a wide range of query engines to

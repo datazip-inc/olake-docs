@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import React from 'react'
 import Link from '@docusaurus/Link'
 
@@ -9,7 +10,10 @@ interface StatItemProps {
 
 const StatItem: React.FC<StatItemProps> = ({ value, label, isLast = false }) => (
   <div
-    className={`flex flex-col items-center px-4 py-6 text-center md:items-start md:px-6 md:text-left ${!isLast ? 'border-b border-gray-300 dark:border-gray-700 md:border-b-0 md:border-r' : ''}`}
+    className={clsx(
+      'flex flex-col items-center px-4 py-6 text-center md:items-start md:px-6 md:text-left',
+      !isLast && 'border-b border-gray-300 dark:border-gray-700 md:border-b-0 md:border-r'
+    )}
   >
     <div className='text-brand-gray-900 text-4xl font-extrabold dark:text-white sm:text-5xl md:text-6xl'>
       {value}

@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import React, { useState } from 'react'
 import SectionHeader from '../SectionHeader'
 
@@ -11,29 +12,29 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
         borderBottom: '1px solid #e5e7eb'
       }}
     >
-      <div
-        className='flex cursor-pointer items-center justify-between rounded p-2 transition-colors'
-        role='button'
-        tabIndex={0}
+      <button
+        type='button'
+        className='flex w-full font-space appearance-none cursor-pointer items-center justify-between rounded border-none bg-transparent p-2 text-left transition-colors'
         onClick={() => setExpanded(!expanded)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setExpanded(!expanded)}
         aria-expanded={expanded}
       >
         <div className='text-base font-bold leading-6 text-[#2f2f2f] dark:text-white'>
           {question}
         </div>
         <div
-          className={`text-xl transition-transform duration-200 ease-in-out ${expanded ? 'text-black' : 'text-brand-gray-400'
-            }`}
+          className={clsx(
+            'text-xl transition-transform duration-200 ease-in-out',
+            expanded ? 'text-black' : 'text-brand-gray-400'
+          )}
         >
           {expanded ? '↑' : '↓'}
         </div>
-      </div>
+      </button>
       <div
-        className={`grid transition-all duration-300 ease-in-out ${expanded
-          ? 'grid-rows-[1fr] opacity-100'
-          : 'grid-rows-[0fr] opacity-0'
-          }`}
+        className={clsx(
+          'grid transition-all duration-300 ease-in-out',
+          expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        )}
       >
         <div className='overflow-hidden'>
           <div className='-mt-2 rounded p-3 px-2'>
