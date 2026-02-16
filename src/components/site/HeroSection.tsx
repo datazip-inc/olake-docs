@@ -8,7 +8,7 @@ import { formatCompactNumber } from '@site/utils/tools'
 
 const HeroSection: React.FC = () => {
   const { stargazersCount, slackCount } = useGetReleases()
-  
+
   const animatedStarCount = useNumberTicker(stargazersCount || 0)
   const animatedSlackCount = useNumberTicker(slackCount)
 
@@ -19,21 +19,37 @@ const HeroSection: React.FC = () => {
         {/* Row 1: "Fastest way to replicate..." section */}
         <div className='mt-8 flex w-full flex-col justify-center sm:items-center'>
           <div className='flex gap-x-3'>
-            <a href='https://github.com/datazip-inc/olake' target='_blank' rel='noopener noreferrer' className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium text-inherit hover:no-underline hover:text-inherit sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
+            <a
+              href='https://github.com/datazip-inc/olake'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='w-54 flex items-center gap-x-1 rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
+            >
               <FaGithub />
               <div>
-                Live on Github. {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.2K'}
+                Live on Github.{' '}
+                <span className='ml-0.5 inline-block min-w-[2.25rem] whitespace-nowrap text-left'>
+                  {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.2K'}
+                </span>
               </div>
               <FaRegStar />
             </a>
-            <a href='/slack' className='border-brand-gray-300 bg-brand-gray-100 flex w-fit items-center gap-x-1 rounded-full border border-solid px-2 py-1 font-space text-[8px] font-medium text-inherit hover:no-underline hover:text-inherit sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'>
+            <a
+              href='/slack'
+              className='flex w-[300px] items-center rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
+            >
               <img src='/img/icon/slack.svg' alt='Slack' className='size-2 sm:size-4' />
-              <div>{formatCompactNumber(animatedSlackCount)} Active Community Members</div>
+              <div className='flex items-center'>
+                <span className='ml-1 inline-block min-w-[2.5rem] whitespace-nowrap text-left'>
+                  {formatCompactNumber(animatedSlackCount, { suffix: '+' })}
+                </span>
+                Active Community Members
+              </div>
             </a>
           </div>
 
-          <div className='mt-8 text-2xl font-light leading-tight sm:text-5xl sm:leading-normal sm:text-center'>
-            <h1 className='font-medium mb-0 m-0 text-inherit leading-inherit font-inherit'>
+          <div className='mt-8 text-2xl font-light leading-tight sm:text-center sm:text-5xl sm:leading-normal'>
+            <h1 className='leading-inherit font-inherit m-0 mb-0 font-medium text-inherit'>
               Fastest Database & Kafka Replication to S3 and Iceberg
             </h1>
           </div>
@@ -41,20 +57,20 @@ const HeroSection: React.FC = () => {
             Open-source EL (Extract & Load) engine built for Apache Iceberg
           </div>
 
-          <div className='text-brand-gray-600 mx-auto mt-10 text-[10px] font-medium sm:text-sm'>
+          <div className='mx-auto mt-10 text-[10px] font-medium text-brand-gray-600 sm:text-sm'>
             Open Source / Apache 2.0 License
           </div>
 
           <div className='mt-3 flex flex-col items-center gap-2 font-helvetica text-sm sm:flex-row sm:text-base'>
             <Link
               to='/docs/getting-started/quickstart'
-              className='bg-brand-blue-500 flex h-8 w-full items-center justify-center rounded-lg px-4 py-1 text-center font-medium text-white hover:text-white hover:no-underline sm:h-12 sm:w-40'
+              className='flex h-8 w-full items-center justify-center rounded-lg bg-brand-blue-500 px-4 py-1 text-center font-medium text-white hover:text-white hover:no-underline sm:h-12 sm:w-40'
             >
               Try OLake
             </Link>
             <Link
               to='/#olake-form-product'
-              className='!border-brand-blue-500 text-brand-blue-500 flex h-8 w-full items-center justify-center rounded-lg !border !border-solid bg-white px-4 py-1 text-center font-medium hover:no-underline sm:h-12 sm:w-40'
+              className='flex h-8 w-full items-center justify-center rounded-lg !border !border-solid !border-brand-blue-500 bg-white px-4 py-1 text-center font-medium text-brand-blue-500 hover:no-underline sm:h-12 sm:w-40'
             >
               Talk to us
             </Link>

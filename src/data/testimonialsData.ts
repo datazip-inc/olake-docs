@@ -31,9 +31,9 @@ export const testimonials = [
     author: 'Nitish Gupta, Software Engineer at Bitespeed'
   },
   {
-    title: 'Effortless Data Streamlining',
+    title: '100x Reduction in Ingestion Volume',
     description:
-      'OLake has transformed our data workflows, providing seamless integration and a notable decrease in data processing duration.',
-    author: 'Someone at Lendingkart'
+      "One of the first and most visible outcomes was the dramatic drop in data movement for problematic collections. This reduction came from OLake's efficient handling of delta changes and conversion to parquet directly from source.",
+    author: 'Prasanna, Associate Director - Data Strategy & Engineering at Lendingkart'
   }
 ]
