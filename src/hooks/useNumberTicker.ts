@@ -4,6 +4,7 @@ const easeOutExpo = (t: number): number => {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
 }
 
+// This hook animates a number from a start value to an end value using an ease-out exponential function.
 export const useNumberTicker = (
   endValue: number,
   options: { startValue?: number; duration?: number; delay?: number } = {}
