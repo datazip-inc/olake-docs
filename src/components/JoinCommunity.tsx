@@ -1,6 +1,5 @@
 import React, { FC, ReactElement } from "react";
 import Link from "@docusaurus/Link";
-import useGetReleases from "@site/src/hooks/useGetReleases";
 import $t from "@site/utils/tools";
 import GitHub from "@site/static/img/logo/gitHub.svg";
 import X from "@site/static/img/logo/x.svg";
@@ -28,12 +27,10 @@ const JoinCommunity: FC<TProps> = ({
   maxWidth = 720,
   justifyContent = "center",
 }): ReactElement => {
-  const { formatStargazersCount } = useGetReleases();
 
   const community = [
     {
       icon: <GitHub />,
-      star: formatStargazersCount,
       title: "GitHub",
       link: "https://github.com/datazip-inc/olake",
     },
@@ -96,12 +93,12 @@ const JoinCommunity: FC<TProps> = ({
                 {item.title}
               </h6>
 
-              {/* Star Count (if available) */}
+              {/* Star Count (if available)
               {item.star ? (
                 <span className="text-sm px-1 rounded-sm text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-200">
                   🌟 {item.star} Stars
                 </span>
-              ) : null}
+              ) : null} */}
             </div>
           </Link>
         ))}

@@ -27,15 +27,15 @@ export const BlogPagination = ({ metadata }) => {
 
   const handleParams = () => {
     const path = history.location.pathname
-    const parts = path.split('/').filter(p => p !== '')
-    
+    const parts = path.split('/').filter((p) => p !== '')
+
     // Check if the path contains 'page' keyword
     const pageIndex = parts.indexOf('page')
     if (pageIndex !== -1 && pageIndex < parts.length - 1) {
       const pageNumber = parseInt(parts[pageIndex + 1], 10)
       return !isNaN(pageNumber) && pageNumber > 0 ? pageNumber : 1
     }
-    
+
     // Default to page 1 if no page number found
     return 1
   }
@@ -59,11 +59,11 @@ export const BlogPagination = ({ metadata }) => {
   // Generate array of page numbers - show current, prev, next, and last page
   const generatePagination = (currentPage, totalPages) => {
     const pages = []
-    
+
     // Ensure we have valid numbers
     const current = parseInt(currentPage, 10)
     const total = parseInt(totalPages, 10)
-    
+
     if (isNaN(current) || isNaN(total) || current < 1 || total < 1) {
       return [1] // Return safe default
     }
@@ -110,17 +110,11 @@ export const BlogPagination = ({ metadata }) => {
   }
 
   const pages = generatePagination(page, metadata.totalPages)
-  
-  console.log('Pagination Debug:', { 
-    currentPage: page, 
-    totalPages: metadata.totalPages, 
-    generatedPages: pages 
-  })
   const hasPrevious = page > 1
   const hasNext = page < metadata.totalPages
 
   return (
-    <Pagination className='mt-8 mb-8'>
+    <Pagination className='mb-8 mt-8'>
       <PaginationContent>
         <PaginationItem>
           <PaginationPrevious
