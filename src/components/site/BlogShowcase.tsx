@@ -1,5 +1,5 @@
 import React from 'react'
-import { PiArrowSquareOut, PiArrowSquareOutBold } from 'react-icons/pi'
+import { PiArrowSquareOutBold } from 'react-icons/pi'
 
 // Blog data structure
 interface BlogPost {

@@ -1,7 +1,6 @@
 import { usePluginData } from '@docusaurus/useGlobalData'
 import { useEffect, useState } from 'react'
 import { IGlobalData } from '@site/src/types/download'
-import { formatCompactNumber } from '@site/utils/tools'
 
 const useGetReleases = () => {
   // Attempt to fetch plugin data, fallback to undefined if not available.
