@@ -14,7 +14,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
     >
       <button
         type='button'
-        className='flex w-full font-space appearance-none cursor-pointer items-center justify-between rounded border-none bg-transparent p-2 text-left transition-colors'
+        className='flex w-full cursor-pointer appearance-none items-center justify-between rounded border-none bg-transparent p-2 text-left font-space transition-colors'
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
       >
@@ -38,7 +38,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
       >
         <div className='overflow-hidden'>
           <div className='-mt-2 rounded p-3 px-2'>
-            <div className='text-brand-gray-900 text-sm font-normal leading-relaxed dark:text-gray-300'>
+            <div className='text-sm font-normal leading-relaxed text-brand-gray-900 dark:text-gray-300'>
               {answer}
             </div>
           </div>
@@ -55,7 +55,7 @@ const Faq = ({ data, showHeading }) => {
         // <SectionHeader showHr={false} heading={<>Frequently Asked Questions</>} />
         <div
           id='faq-heading'
-          className='text-brand-gray-900 mb-16 flex flex-col gap-4 text-xl font-medium leading-tight dark:text-white sm:text-[64px] sm:leading-tight'
+          className='mb-16 flex flex-col gap-4 text-xl font-medium leading-tight text-brand-gray-900 dark:text-white sm:text-[64px] sm:leading-tight'
         >
           Frequently Asked Questions
         </div>

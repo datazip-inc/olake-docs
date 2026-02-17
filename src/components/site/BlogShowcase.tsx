@@ -60,23 +60,18 @@ const BlogShowcase: React.FC = () => {
           {/* Heading section - shown first on mobile */}
           <div className='mb-8 flex flex-col justify-center md:hidden'>
             {/* "Blogs" label - mobile: 12px Space Grotesk Medium centered */}
-            <h3
-              className='text-brand-blue-500 mb-3 text-center font-space text-xs font-medium m-0'
-            >
+            <h3 className='m-0 mb-3 text-center font-space text-xs font-medium text-brand-blue-500'>
               Blogs
             </h3>
             {/* "Stay ahead..." heading - mobile: 20px, line-height 120% (-5% from 125%), letter-spacing -0.05em */}
-            <h2 className='text-brand-gray-900 font-space text-xl font-medium leading-tight tracking-tighter dark:text-white'>
+            <h2 className='font-space text-xl font-medium leading-tight tracking-tighter text-brand-gray-900 dark:text-white'>
               Stay ahead, with our latest reads
             </h2>
           </div>
 
           {/* Mobile: Horizontal scrollable blog cards */}
           <div className='-mx-4 px-4 md:hidden'>
-            <div
-              className='flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4'
-              role='list'
-            >
+            <div className='flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4' role='list'>
               {blogPosts.map((post) => (
                 <a
                   key={post.url}
@@ -122,11 +117,11 @@ const BlogShowcase: React.FC = () => {
           <div className='mb-12 hidden flex-col gap-8 md:flex lg:flex-row'>
             {/* Featured Blog Post - Left side on desktop */}
             <div className='w-full rounded-4xl lg:w-1/2'>
-              <a 
-                href={blogPosts[0].url} 
+              <a
+                href={blogPosts[0].url}
                 className='block h-full rounded-4xl shadow-[2px_3px_20px_1px_#00000014] transition-all duration-300 hover:-translate-y-1'
               >
-                <div className='h-full isolate overflow-hidden rounded-4xl'>
+                <div className='isolate h-full overflow-hidden rounded-4xl'>
                   <div className='flex h-full flex-col'>
                     <div className='flex items-center justify-center rounded-tl-4xl rounded-tr-4xl dark:bg-gray-800'>
                       <img
@@ -157,19 +152,17 @@ const BlogShowcase: React.FC = () => {
 
             {/* Heading section - Right side on desktop */}
             <div className='flex w-full flex-col justify-center lg:w-1/2'>
-              <h3
-                className='text-brand-blue-500 mb-3 font-space text-2xl font-medium tracking-wider m-0'
-              >
+              <h3 className='m-0 mb-3 font-space text-2xl font-medium tracking-wider text-brand-blue-500'>
                 Blogs
               </h3>
-              <h2 className='text-brand-gray-900 mb-8 font-space text-5xl font-medium tracking-wider dark:text-white'>
+              <h2 className='mb-8 font-space text-5xl font-medium tracking-wider text-brand-gray-900 dark:text-white'>
                 Stay ahead,
                 <br />
                 with our latest reads
               </h2>
               <a
                 href='/blog'
-                className='text-brand-blue-500 flex w-fit items-center gap-x-2 font-medium'
+                className='flex w-fit items-center gap-x-2 font-medium text-brand-blue-500'
               >
                 View all Blogs
                 <PiArrowSquareOutBold className='size-4' />
@@ -178,10 +171,7 @@ const BlogShowcase: React.FC = () => {
           </div>
 
           {/* Desktop: Other Blog Posts in a grid */}
-          <div
-            className='hidden gap-y-8 gap-x-6 md:grid md:grid-cols-2 lg:grid-cols-3'
-            role='list'
-          >
+          <div className='hidden gap-x-6 gap-y-8 md:grid md:grid-cols-2 lg:grid-cols-3' role='list'>
             {blogPosts.slice(1).map((post) => (
               <a
                 key={post.url}
@@ -189,7 +179,7 @@ const BlogShowcase: React.FC = () => {
                 role='listitem'
                 className='block h-full rounded-4xl shadow-[2px_3px_20px_1px_#00000014] transition-all duration-300 hover:-translate-y-1'
               >
-                <div className='flex flex-col h-full isolate overflow-hidden rounded-4xl'>
+                <div className='isolate flex h-full flex-col overflow-hidden rounded-4xl'>
                   <div className='flex items-center justify-center rounded-tl-4xl rounded-tr-4xl dark:bg-gray-800'>
                     <img
                       src={post.imageSrc}
@@ -208,7 +198,9 @@ const BlogShowcase: React.FC = () => {
                     <p className='mb-4 text-sm text-gray-600 dark:text-gray-300'>
                       {post.description}
                     </p>
-                    <div className='mt-auto text-sm text-gray-500 dark:text-gray-400'>{post.readTime}</div>
+                    <div className='mt-auto text-sm text-gray-500 dark:text-gray-400'>
+                      {post.readTime}
+                    </div>
                   </div>
                 </div>
               </a>
@@ -219,7 +211,7 @@ const BlogShowcase: React.FC = () => {
           <div className='mt-8 flex justify-center md:hidden'>
             <a
               href='/blog'
-              className='text-brand-blue-500 flex items-center gap-x-2 font-sans text-base font-medium'
+              className='flex items-center gap-x-2 font-sans text-base font-medium text-brand-blue-500'
             >
               View all Blogs
               <PiArrowSquareOutBold className='size-4' />

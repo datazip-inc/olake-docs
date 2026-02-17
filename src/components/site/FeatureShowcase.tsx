@@ -102,7 +102,7 @@ const FeatureCard = ({
     <div
       className={clsx(
         bgColor,
-        'relative overflow-hidden flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10',
+        'relative flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col overflow-hidden rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10',
         href && 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]'
       )}
     >
@@ -169,22 +169,16 @@ const FeatureShowcase: React.FC = () => {
         <div className='mb-2 text-xs font-semibold text-primary-600 sm:mb-3 sm:text-2xl'>
           Why OLake?
         </div>
-        <h2 className='text-brand-gray-900 text-xl font-medium dark:text-white sm:text-4xl md:text-[64px]'>
+        <h2 className='text-xl font-medium text-brand-gray-900 dark:text-white sm:text-4xl md:text-[64px]'>
           We know how to stand out
         </h2>
       </div>
 
       {/* Marquee implementation with original cards */}
-      <div className="w-full" ref={containerRef}>
-        <Marquee 
-          play={inView}
-          pauseOnHover={true} 
-          speed={60} 
-          gradient={false} 
-          className="py-4"
-        >
+      <div className='w-full' ref={containerRef}>
+        <Marquee play={inView} pauseOnHover={true} speed={60} gradient={false} className='py-4'>
           {FEATURE_DATA.map((feature, index) => (
-            <div key={index} className="mx-3 sm:mx-4">
+            <div key={index} className='mx-3 sm:mx-4'>
               <FeatureCard {...feature} />
             </div>
           ))}

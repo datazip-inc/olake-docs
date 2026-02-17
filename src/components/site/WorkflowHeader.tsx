@@ -18,7 +18,7 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
       <h3 className='mb-4 text-xs font-medium text-primary-600 dark:text-blue-400 sm:text-xl'>
         {subtitle}
       </h3>
-      <h2 className='text-brand-gray-900 text-xl font-medium tracking-tighter dark:text-white sm:text-5xl'>
+      <h2 className='text-xl font-medium tracking-tighter text-brand-gray-900 dark:text-white sm:text-5xl'>
         {title}
       </h2>
     </div>

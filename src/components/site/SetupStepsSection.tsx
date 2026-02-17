@@ -51,8 +51,8 @@ const Connector: React.FC<{
         className={clsx(
           'duration-[800ms] absolute inset-0 transition-transform ease-out',
           isVertical
-            ? 'from-brand-blue-500 to-brand-blue-400 origin-top bg-gradient-to-b'
-            : 'from-brand-blue-500 to-brand-blue-400 origin-left bg-gradient-to-r',
+            ? 'origin-top bg-gradient-to-b from-brand-blue-500 to-brand-blue-400'
+            : 'origin-left bg-gradient-to-r from-brand-blue-500 to-brand-blue-400',
           isActive
             ? isVertical
               ? 'scale-y-100'
@@ -99,13 +99,11 @@ const SetupStepsSection: React.FC = () => {
 
   return (
     <section className='py-16 dark:bg-gray-900 md:py-24'>
-      <div className='container mx-auto px-4 md:px-6 md:w-[70%]'>
+      <div className='container mx-auto px-4 md:w-[70%] md:px-6'>
         <div className='mx-auto flex flex-col gap-12 lg:grid lg:max-w-7xl lg:grid-cols-2 lg:items-center'>
           {/* Left Side - Steps Navigation */}
           <div className='w-full'>
-            <h3
-              className='text-brand-blue-500 mb-3 text-xs font-medium tracking-wide sm:text-2xl m-0'
-            >
+            <h3 className='m-0 mb-3 text-xs font-medium tracking-wide text-brand-blue-500 sm:text-2xl'>
               The OLake Experience
             </h3>
             <h2 className='mb-16 text-xl font-medium leading-tight tracking-[-0.05em] text-gray-900 dark:text-white sm:text-[40px] sm:tracking-wider md:text-5xl'>
@@ -128,7 +126,7 @@ const SetupStepsSection: React.FC = () => {
                     key={index}
                     id={`step-indicator-${index}`}
                     type='button'
-                    className='group flex min-w-max flex-shrink-0 appearance-none cursor-pointer items-center border-none bg-transparent p-0 text-left transition-opacity duration-300 sm:w-auto sm:min-w-0 sm:items-stretch'
+                    className='group flex min-w-max flex-shrink-0 cursor-pointer appearance-none items-center border-none bg-transparent p-0 text-left transition-opacity duration-300 sm:w-auto sm:min-w-0 sm:items-stretch'
                     onClick={() => handleStepClick(index)}
                   >
                     <div className='mr-3 flex flex-col items-center sm:mr-6'>

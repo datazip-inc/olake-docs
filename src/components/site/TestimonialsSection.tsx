@@ -26,7 +26,7 @@ const TestimonialsSection = () => {
     <div className='relative mt-12 flex flex-col items-center justify-start overflow-hidden bg-brand-gray-50 px-4 py-12 md:mt-24 md:p-16'>
       <div className='flex flex-col items-center justify-center gap-2'>
         <h3 className='m-0 text-lg font-medium text-brand-blue-500 md:text-2xl'>Testimonials</h3>
-        <h2 className='m-0 text-center text-2xl font-medium leading-tight text-brand-gray-900 md:text-4xl md:text-5xl lg:text-[64px]'>
+        <h2 className='m-0 text-center text-2xl font-medium leading-tight text-brand-gray-900 md:text-5xl lg:text-[64px]'>
           Don't take our word for it
         </h2>
       </div>

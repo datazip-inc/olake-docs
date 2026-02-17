@@ -48,21 +48,21 @@ const SimpleBenchmarkCard: React.FC<{
       style={{ boxShadow: '2px 3px 20px 1px #00000014' }}
     >
       {/* Card Title */}
-      <h3 className='text-brand-gray-900 mb-4 pb-1 pt-2 font-space text-base font-bold leading-[23.02px] dark:text-white'>
+      <h3 className='mb-4 pb-1 pt-2 font-space text-base font-bold leading-[23.02px] text-brand-gray-900 dark:text-white'>
         {title}
       </h3>
 
       {/* OLake Row - Highlighted */}
       <div className='mb-3 flex items-center justify-between rounded-lg bg-[#E6F4E0] px-3 py-2 dark:bg-green-900/20'>
         <div className='flex items-baseline gap-1'>
-          <span className='text-brand-gray-900 font-space text-[12px] font-medium leading-none dark:text-white'>
+          <span className='font-space text-[12px] font-medium leading-none text-brand-gray-900 dark:text-white'>
             {TOOLS.olake.name}
           </span>
           <span className='font-space text-[8px] font-medium leading-none text-[#525252] dark:text-gray-400'>
             /{TOOLS.olake.description}
           </span>
         </div>
-        <span className='text-brand-green-600 font-space text-[10px] font-bold leading-6 tracking-[0.02em] dark:text-green-400'>
+        <span className='font-space text-[10px] font-bold leading-6 tracking-[0.02em] text-brand-green-600 dark:text-green-400'>
           {rowData.olake}
         </span>
       </div>
@@ -83,11 +83,11 @@ const SimpleBenchmarkCard: React.FC<{
                   className='h-3 w-3'
                   loading='lazy'
                 />
-                <span className='text-brand-gray-900 font-space text-[10px] font-medium leading-none dark:text-gray-300'>
+                <span className='font-space text-[10px] font-medium leading-none text-brand-gray-900 dark:text-gray-300'>
                   {TOOLS[tool.key].name}
                 </span>
               </div>
-              <span className='text-brand-gray-900 font-space text-[10px] font-medium leading-none dark:text-gray-300'>
+              <span className='font-space text-[10px] font-medium leading-none text-brand-gray-900 dark:text-gray-300'>
                 {value}
               </span>
             </div>

@@ -15,10 +15,10 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, isLast = false }) => 
       !isLast && 'border-b border-gray-300 dark:border-gray-700 md:border-b-0 md:border-r'
     )}
   >
-    <div className='text-brand-gray-900 text-4xl font-extrabold dark:text-white sm:text-5xl md:text-6xl'>
+    <div className='text-4xl font-extrabold text-brand-gray-900 dark:text-white sm:text-5xl md:text-6xl'>
       {value}
     </div>
-    <div className='text-brand-gray-500 mt-2 text-base dark:text-gray-400 sm:text-lg'>{label}</div>
+    <div className='mt-2 text-base text-brand-gray-500 dark:text-gray-400 sm:text-lg'>{label}</div>
   </div>
 )
 
@@ -42,12 +42,12 @@ const StatsSection: React.FC<StatsSectionProps> = ({
   return (
     <div className='mx-auto w-full max-w-7xl px-4 py-12 md:px-6 md:py-16 lg:px-2'>
       <div className='mb-6 flex flex-col items-center md:mb-8'>
-        <h2 className='text-brand-gray-900 mb-2 mt-10 text-lg font-medium dark:text-white sm:mt-0 sm:text-xl'>
+        <h2 className='mb-2 mt-10 text-lg font-medium text-brand-gray-900 dark:text-white sm:mt-0 sm:text-xl'>
           {title}
         </h2>
         <Link
           to={linkUrl}
-          className='text-brand-blue-500 inline-flex items-center text-xs font-medium hover:text-blue-700 sm:hidden'
+          className='inline-flex items-center text-xs font-medium text-brand-blue-500 hover:text-blue-700 sm:hidden'
         >
           {linkText}
           <svg className='ml-1 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -68,10 +68,10 @@ const StatsSection: React.FC<StatsSectionProps> = ({
               <div className='my-2 h-px w-full self-stretch bg-neutral-200 dark:bg-gray-700 sm:my-0 sm:h-auto sm:w-px'></div>
             )}
             <div className='flex flex-col items-center px-4 py-2 text-center sm:py-6'>
-              <div className='text-brand-gray-900 whitespace-nowrap text-[28px] font-medium leading-tight dark:text-white sm:text-4xl md:text-[74px]'>
+              <div className='whitespace-nowrap text-[28px] font-medium leading-tight text-brand-gray-900 dark:text-white sm:text-4xl md:text-[74px]'>
                 {stat.value}
               </div>
-              <div className='text-brand-gray-500 mt-4 text-center text-[9px] dark:text-gray-400 sm:text-2xl'>
+              <div className='mt-4 text-center text-[9px] text-brand-gray-500 dark:text-gray-400 sm:text-2xl'>
                 {stat.label}
               </div>
             </div>
@@ -80,7 +80,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({
       </div>
       <Link
         to={'/docs/benchmarks'}
-        className='border-brand-blue-500 text-brand-blue-500 mx-auto mt-16 hidden h-12 w-[415px] items-center justify-center rounded-lg border-solid px-4 py-1 text-center font-helvetica font-medium sm:flex sm:text-base'
+        className='mx-auto mt-16 hidden h-12 w-[415px] items-center justify-center rounded-lg border-solid border-brand-blue-500 px-4 py-1 text-center font-helvetica font-medium text-brand-blue-500 sm:flex sm:text-base'
       >
         View all performance benchmarks
       </Link>
