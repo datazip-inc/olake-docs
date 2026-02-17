@@ -17,34 +17,17 @@ const CustomersPage = () => {
   
   const [activeFilter, setActiveFilter] = useState<'All Stories' | CustomerCategory>('All Stories');
 
-  // Customer stories data
+  // Customer stories data (sorted by date, most recent first - same as blog)
   const customerStories: CustomerStory[] = [
     {
-      title: "From 40-Minute to Sub-Minute Segmentation Queries: How Bitespeed rebuilt its customer segmentation engine using OLake and Apache Iceberg",
-      description: 'Bitespeed is a customer engagement and messaging platform built for modern commerce brands. Learn how they rebuilt their segmentation engine using OLake and Apache Iceberg without breaking their budget.',
-      route: '/customer-stories/bitespeed-segmentation-queries',
-      img: '/img/customers/bitespeed/cover-image-bitespeed.webp',
-      alt: 'Bitespeed customer story',
-      companyName: 'Bitespeed',
-      category: CustomerCategory.CustomerInternet
-    },
-    {
-      title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
-      description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
-      route: '/customer-stories/cordial-real-time-data-sync',
-      img: '/img/customers/cordial/cover-image-cordial.webp',
-      alt: 'Cordial customer story',
-      companyName: 'Cordial',
-      category: CustomerCategory.B2B
-    },
-    {
-      title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
-      description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
-      route: '/customer-stories/astro-talk-lakehouse-transformation',
-      img: '/img/customers/astrotalk/cover-image-astro.webp',
-      alt: 'Astro Talk customer story',
-      companyName: 'Astro Talk',
-      category: CustomerCategory.CustomerInternet
+      title: "Reliable Lakehouse Ingestion at Scale: How LendingKart Improved Data Correctness and Compressed Lake Ingestion Volume by 100×",
+      description: 'How LendingKart reduced daily MongoDB data movement from gigabytes to megabytes while completing an 11 years historical backfill that their Debezium + Spark setup couldn\'t deliver reliably.',
+      route: '/customer-stories/lendingkart-Improved-Data-Correctness',
+      img: '/img/customers/lendingkart/cover-image-lendingkart.webp',
+      alt: 'LendingKart customer story',
+      companyName: 'LendingKart',
+      category: CustomerCategory.B2B,
+      date: '2026-02-11'
     },
     {
       title: "PhysicsWallah Evaluates MongoDB CDC Ingestion into a Lakehouse with Apache Iceberg and OLake",
@@ -53,18 +36,40 @@ const CustomersPage = () => {
       img: '/img/customers/physicswallah/cover-image-pw.webp',
       alt: 'PhysicsWallah customer story',
       companyName: 'PhysicsWallah',
-      category: CustomerCategory.CustomerInternet
+      category: CustomerCategory.CustomerInternet,
+      date: '2026-01-30'
     },
     {
-      title: "Reliable Lakehouse Ingestion at Scale: How LendingKart Improved Data Correctness and Compressed Lake Ingestion Volume by 100×",
-      description: 'How LendingKart reduced daily MongoDB data movement from gigabytes to megabytes while completing an 11 years historical backfill that their Debezium + Spark setup couldn\'t deliver reliably.',
-      route: '/customer-stories/lendingkart-Improved-Data-Correctness',
-      img: '/img/customers/lendingkart/cover-image-lendingkart.webp',
-      alt: 'LendingKart customer story',
-      companyName: 'LendingKart',
-      category: CustomerCategory.B2B
+      title: "From 40-Minute to Sub-Minute Segmentation Queries: How Bitespeed rebuilt its customer segmentation engine using OLake and Apache Iceberg",
+      description: 'Bitespeed is a customer engagement and messaging platform built for modern commerce brands. Learn how they rebuilt their segmentation engine using OLake and Apache Iceberg without breaking their budget.',
+      route: '/customer-stories/bitespeed-segmentation-queries',
+      img: '/img/customers/bitespeed/cover-image-bitespeed.webp',
+      alt: 'Bitespeed customer story',
+      companyName: 'Bitespeed',
+      category: CustomerCategory.CustomerInternet,
+      date: '2026-01-13'
+    },
+    {
+      title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
+      description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
+      route: '/customer-stories/cordial-real-time-data-sync',
+      img: '/img/customers/cordial/cover-image-cordial.webp',
+      alt: 'Cordial customer story',
+      companyName: 'Cordial',
+      category: CustomerCategory.B2B,
+      date: '2025-12-15'
+    },
+    {
+      title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
+      description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
+      route: '/customer-stories/astro-talk-lakehouse-transformation',
+      img: '/img/customers/astrotalk/cover-image-astro.webp',
+      alt: 'Astro Talk customer story',
+      companyName: 'Astro Talk',
+      category: CustomerCategory.CustomerInternet,
+      date: '2025-12-15'
     }
-  ];
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   const filters: Array<'All Stories' | CustomerCategory> = ['All Stories', CustomerCategory.B2B, CustomerCategory.CustomerInternet];
 
