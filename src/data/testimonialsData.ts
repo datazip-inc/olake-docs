@@ -22,7 +22,7 @@ export const testimonials = [
   {
     title: 'Custom Logic & Monitoring',
     description:
-      "We have a pretty unique environment with hundreds of Mongos routers, so no off-the-shelf solution was ever going to handle that magically. With OLake, we added a bit of custom logic and light monitoring, and it's been completely hands-off since. It saved us from building yet another bespoke sync system, and now we're even thinking about near real-time syncs because OLake makes that realistically achievable.",
+      "We have a pretty unique environment with hundreds of Mongos routers, so no off-the-shelf solution was ever going to handle that magically. With OLake, we added a bit of custom logic and light monitoring, and it's been completely hands-off since.",
     author: 'Daniel Schaaff, Principal DevOps Engineer at Cordial'
   },
   {
