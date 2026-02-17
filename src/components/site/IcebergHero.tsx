@@ -30,7 +30,6 @@ interface FeatureCardProps {
   image: string
   imageAlt: string
   blogLink?: string
-  blogTitle?: string
 }
 
 const FeatureCard: React.FC<FeatureCardProps> = ({
@@ -38,8 +37,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   description,
   image,
   imageAlt,
-  blogLink,
-  blogTitle
+  blogLink
 }) => {
   return (
     <div className='h-full overflow-hidden rounded-3xl bg-white shadow-lg dark:bg-gray-800'>
@@ -62,7 +60,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
           <p className='flex-grow text-[10px] leading-normal text-gray-600 dark:text-gray-300 md:text-base'>
             {description}
           </p>
-          {blogLink && blogTitle && (
+          {blogLink && (
             <a
               href={blogLink}
               className='mt-auto flex items-center pt-3 text-black hover:underline dark:text-blue-400 md:pt-4'
@@ -72,7 +70,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
                   <PiReadCvLogo className='size-4 shrink-0 text-primary-600 md:size-5' />
                   {/* Blog link: Space Grotesk, 8px mobile, 14px desktop */}
                   <span className='truncate font-space text-[8px] font-medium leading-none md:text-sm md:leading-normal'>
-                    Blog: {blogTitle}
+                    Learn more
                   </span>
                 </div>
                 <PiArrowSquareOut className='size-3 text-black md:size-[14px]' />
@@ -131,7 +129,6 @@ const IcebergHero: React.FC = () => {
             image='/img/site/iceberg-1.svg'
             imageAlt='Schema evolution'
             blogLink='/docs/features/?tab=schema-evolution'
-            blogTitle='Common Challenges Using Debezium...'
           />
           <FeatureCard
             title='Schema datatype changes'
@@ -139,7 +136,6 @@ const IcebergHero: React.FC = () => {
             image='/img/site/iceberg-2.svg'
             imageAlt='Schema type mapping migration'
             blogLink='/docs/features/?tab=overview#3-schema-evolution--data-types-changes'
-            blogTitle='Optimizing Data Lake Performance w...'
           />
           <FeatureCard
             title='Partitioning and partition evolution'
@@ -147,7 +143,6 @@ const IcebergHero: React.FC = () => {
             image='/img/site/iceberg-3.svg'
             imageAlt='Database partitions data flow'
             blogLink='/docs/writers/iceberg/partitioning/'
-            blogTitle='Best Practices for Data Governance i...'
           />
         </div>
       </div>
