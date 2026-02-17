@@ -102,7 +102,7 @@ const FeatureCard = ({
     <div
       className={clsx(
         bgColor,
-        'relative flex min-h-[370px] w-[80vw] flex-shrink-0 snap-center flex-col overflow-hidden rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10',
+        'relative flex min-h-[390px] w-[80vw] flex-shrink-0 snap-center flex-col overflow-hidden rounded-[20px] p-6 sm:h-[461px] sm:w-[32rem] sm:rounded-[40px] sm:p-8 md:p-10',
         href && 'cursor-pointer transition-transform duration-300 hover:scale-[1.02]'
       )}
     >
@@ -122,7 +122,7 @@ const FeatureCard = ({
           <h3 className='mb-2 text-xs font-bold text-gray-900 dark:text-white md:text-2xl'>
             {title}
           </h3>
-          <p className='text-[7px] text-gray-700 dark:text-gray-200 sm:text-sm'>{description}</p>
+          <p className='text-[10px] text-gray-700 dark:text-gray-200 sm:text-sm'>{description}</p>
         </div>
       </div>
     </div>

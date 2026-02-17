@@ -165,7 +165,7 @@ const RegistrationSection: React.FC = () => {
                       <div className='text-[11px] font-bold md:text-xl lg:text-xl'>
                         Iceberg Native
                       </div>
-                      <div className='break-words pr-4 text-[8px] text-gray-100 md:text-sm'>
+                      <div className='break-words pr-4 text-[11px] text-gray-100 md:text-sm'>
                         Instead of directly transforming data from Databases during extraction, we
                         first pull it in its native format.
                       </div>
@@ -195,7 +195,7 @@ const RegistrationSection: React.FC = () => {
                       <div className='text-[10px] font-bold md:text-xl lg:text-xl'>
                         Faster & More Efficient
                       </div>
-                      <div className='break-words pr-4 text-[8px] text-gray-100 md:text-sm'>
+                      <div className='break-words pr-4 text-[11px] text-gray-100 md:text-sm'>
                         Instead of directly transforming data from Databases during extraction, we
                         first pull it in its native format.
                       </div>
