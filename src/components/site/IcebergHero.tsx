@@ -90,7 +90,7 @@ const IcebergHero: React.FC = () => {
   const bgUrl = '/img/site/iceberg-bg.webp'
 
   return (
-    <section className='relative h-auto overflow-hidden rounded-t-none py-20 pb-32 md:rounded-t-[32px] md:py-32 md:pb-64'>
+    <section className='relative h-auto overflow-hidden rounded-t-none py-20 pb-32 md:rounded-t-[32px] md:py-32'>
       <div className='absolute inset-x-0 top-0 z-0 mx-0 flex h-[80vh] w-full overflow-hidden rounded-none sm:h-[500px] md:mx-auto md:h-[780px] md:w-[90%] md:rounded-[32px]'>
         <img
           src={bgUrl}
@@ -112,7 +112,7 @@ const IcebergHero: React.FC = () => {
       {/* Overlay */}
       <div className='absolute inset-0 z-0' />
 
-      <div className='container relative top-32 z-10 mx-auto px-4 md:px-6'>
+      <div className='container relative z-10 mx-auto mt-20 px-4 md:mt-32 md:px-6'>
         <div className='mb-16 text-center md:mb-16'>
           <div className='mb-10'>
             <IcebergBadge />

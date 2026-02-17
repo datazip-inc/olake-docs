@@ -93,7 +93,7 @@ const Connector: React.FC<ConnectorProps> = ({
     >
       <div
         className={clsx(
-          'from-brand-blue-500 to-brand-blue-400 absolute inset-0 bg-gradient-to-r',
+          'absolute inset-0 bg-gradient-to-r from-brand-blue-500 to-brand-blue-400',
           isHorizontal ? 'origin-left' : 'origin-top',
           getTransitionClass(),
           isActive
@@ -194,7 +194,7 @@ const WorkflowDiagram: React.FC<WorkflowDiagramProps> = ({ highlightedIndex = 0,
           {/* Mobile (below sm): Horizontal layout without connectors */}
           <div
             ref={mobileContainerRef}
-            className='flex items-center gap-4 overflow-x-auto py-8 sm:hidden'
+            className='scrollbar-hide flex items-center gap-4 overflow-x-auto py-8 sm:hidden'
           >
             <WorkflowPipeline
               highlightedIndex={highlightedIndex}

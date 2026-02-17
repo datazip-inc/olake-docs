@@ -23,12 +23,12 @@ const HeroSection: React.FC = () => {
               href='https://github.com/datazip-inc/olake'
               target='_blank'
               rel='noopener noreferrer'
-              className='w-54 flex items-center gap-x-1 rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
+              className='flex w-fit items-center gap-x-1 rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
             >
               <FaGithub />
               <div>
                 Live on Github.{' '}
-                <span className='ml-0.5 inline-block min-w-[2.25rem] whitespace-nowrap text-left'>
+                <span className='ml-0.5 inline-block min-w-[1.3rem] whitespace-nowrap text-left sm:min-w-[2.25rem]'>
                   {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.2K'}
                 </span>
               </div>
@@ -36,11 +36,11 @@ const HeroSection: React.FC = () => {
             </a>
             <a
               href='/slack'
-              className='flex w-[300px] items-center rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
+              className='flex w-fit items-center rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
             >
               <img src='/img/icon/slack.svg' alt='Slack' className='size-2 sm:size-4' />
               <div className='flex items-center'>
-                <span className='ml-1 inline-block min-w-[2.5rem] whitespace-nowrap text-left'>
+                <span className='ml-1 inline-block min-w-[1.4rem] whitespace-nowrap text-left sm:min-w-[2.5rem]'>
                   {formatCompactNumber(animatedSlackCount, { suffix: '+' })}
                 </span>
                 Active Community Members

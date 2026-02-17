@@ -484,6 +484,8 @@ const config = {
 
     ['./src/plugins/tailwind-config.js', {}],
 
+    ['./src/plugins/navbar-breakpoint/index.js', {}],
+
     ['./src/plugins/indexnow/index.js', {}],
 
     [
