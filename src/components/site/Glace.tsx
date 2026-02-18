@@ -68,12 +68,15 @@ const TallyForm: React.FC<TallyFormProps> = ({ src, title }) => {
           width='100%'
           height='700'
           title={title}
-          loading="lazy"
+          loading='lazy'
           className='w-full rounded-xl'
           style={{ border: 'none', minHeight: '600px', margin: 0 }}
         />
       ) : (
-        <div style={{ minHeight: '600px' }} className='w-full rounded-xl bg-gray-100 dark:bg-gray-800' />
+        <div
+          style={{ minHeight: '600px' }}
+          className='w-full rounded-xl bg-gray-100 dark:bg-gray-800'
+        />
       )}
     </div>
   )
@@ -96,9 +99,9 @@ const Glace: React.FC<GlaceProps> = ({
             </div>
 
             {/* Main Heading */}
-            <h1 className='mb-4 text-center text-3xl font-bold text-gray-900 dark:text-white md:text-4xl lg:text-left lg:text-5xl'>
+            <h2 className='mb-4 text-center text-3xl font-bold text-gray-900 dark:text-white md:text-4xl lg:text-left lg:text-5xl'>
               <span className='font-thin'>Migrate to Iceberg </span> In Days, Not Months
-            </h1>
+            </h2>
 
             {/* Subtitle */}
             <p className='mb-8 text-center text-lg text-[#000000] dark:text-gray-300 lg:text-left'>
@@ -111,8 +114,10 @@ const Glace: React.FC<GlaceProps> = ({
                 src='/img/site/glace-cards.svg'
                 alt='Migrate to Iceberg with AI-powered fast migration'
                 className='max-w-full lg:max-w-[90%]'
-                width="960" height="540"
-                loading="lazy" decoding="async"
+                width='960'
+                height='540'
+                loading='lazy'
+                decoding='async'
               />
             </div>
 
