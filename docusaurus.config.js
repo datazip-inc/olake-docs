@@ -123,7 +123,7 @@ const config = {
         },
         items: [
           { to: '/docs', label: 'Docs', position: 'left' },
-          { to: '/ai-lake', label: 'AILake', position: 'left' },
+          { to: '/ai-lake', label: 'Pricing', position: 'left' },
           { to: '/blog', label: 'Blogs', position: 'left' },
 
           {
