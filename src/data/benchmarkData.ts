@@ -141,37 +141,37 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
     hasData: true,
     rowsSynced: {
       olake: '230 Million',
-      airbyte: '230 Million',
+      airbyte: '-',
       fivetran: '230 Million',
-      debezium: '230 Million',
+      debezium: '-',
       estuary: '-'
     },
     elapsedTime: {
-      olake: '46 mins',
-      airbyte: '16 hours',
-      fivetran: '4 hours 39 mins',
-      debezium: '11.65 hours',
+      olake: '1 hour 42 mins',
+      airbyte: '-',
+      fivetran: '4 hours 20 mins',
+      debezium: '-',
       estuary: '-'
     },
     speed: {
-      olake: '83,333 RPS',
-      airbyte: '3,993 RPS',
-      fivetran: '13,738 RPS',
-      debezium: '5,485 RPS',
+      olake: '37,879 RPS',
+      airbyte: '-',
+      fivetran: '14,997 RPS',
+      debezium: '-',
       estuary: '-'
     },
     comparison: {
       olake: '-',
-      airbyte: '20x slower',
-      fivetran: '6x slower',
-      debezium: '15x slower',
+      airbyte: '-',
+      fivetran: '2.5x slower',
+      debezium: '-',
       estuary: '-'
     },
     cost: {
-      olake: '$ 10 - 50',
-      airbyte: '$ 6,000',
-      fivetran: '$0 (Free full load)',
-      debezium: '$ 900',
+      olake: '< $ 5',
+      airbyte: '-',
+      fivetran: '$ 0 (Free full load)',
+      debezium: '-',
       estuary: '-'
     }
   },
@@ -230,14 +230,14 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
       estuary: '-'
     },
     elapsedTime: {
-      olake: '4.25 hours',
+      olake: '2 hours 6 mins',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
       estuary: '-'
     },
     speed: {
-      olake: '2,61,793 RPS',
+      olake: '5,26,337 RPS',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
@@ -251,7 +251,7 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
       estuary: '-'
     },
     cost: {
-      olake: '< $ 12',
+      olake: '< $ 6',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
@@ -329,7 +329,7 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
       estuary: '146x slower'
     },
     cost: {
-      olake: '$ 6',
+      olake: '< $ 6',
       airbyte: '$ 5,560',
       fivetran: '$ 0 (free full load)',
       debezium: '$ 75',
@@ -462,33 +462,33 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
 
 export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
   mongodb: {
-    hasData: false,
+    hasData: true,
     rowsSynced: {
-      olake: '1 Million',
-      airbyte: '1 Million',
-      fivetran: '1 Million',
-      debezium: '1 Million',
+      olake: '25 Million',
+      airbyte: '-',
+      fivetran: '25 Million',
+      debezium: '-',
       estuary: '-'
     },
     elapsedTime: {
-      olake: '28.3 sec',
-      airbyte: '12 min 44 sec',
+      olake: '38 mins 58 sec',
+      airbyte: '-',
       fivetran: '3 min 10 sec',
-      debezium: '12 min 44 sec',
+      debezium: '-',
       estuary: '-'
     },
     speed: {
-      olake: '35,694 r/s',
-      airbyte: '1,308 r/s',
-      fivetran: '5,260 r/s',
-      debezium: '1,308 r/s',
+      olake: '10,692 RPS',
+      airbyte: '-',
+      fivetran: '5,787 RPS',
+      debezium: '-',
       estuary: '-'
     },
     comparison: {
       olake: '-',
-      airbyte: '27.3x slower',
-      fivetran: '6.7x slower',
-      debezium: '27.3x slower',
+      airbyte: '-',
+      fivetran: '1.85x slower',
+      debezium: '-',
       estuary: '-'
     },
     cost: {
@@ -614,9 +614,9 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
       estuary: '-'
     },
     cost: {
-      olake: '< $ 11',
+      olake: '-',
       airbyte: '-',
-      fivetran: '$ 2,375.80',
+      fivetran: '-',
       debezium: '-',
       estuary: '-'
     }
