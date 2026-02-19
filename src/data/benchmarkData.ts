@@ -473,7 +473,7 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
     elapsedTime: {
       olake: '38 mins 58 sec',
       airbyte: '-',
-      fivetran: '3 min 10 sec',
+      fivetran: '1 hour 12 mins',
       debezium: '-',
       estuary: '-'
     },
