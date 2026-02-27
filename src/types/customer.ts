@@ -12,4 +12,5 @@ export interface CustomerStory {
   alt: string;
   companyName: string;
   category: CustomerCategory;
+  date: string; // YYYY-MM-DD for sorting (most recent first)
 }

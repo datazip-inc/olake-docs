@@ -9,16 +9,16 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
   subtitle = 'The Fundamental',
   title = (
     <>
-      Experience the most <br className='hidden sm:block md:hidden lg:block' />
-      <span className='font-light tracking-wide'>seamless</span>{' '}
-      workflow
+      Experience the most <span className='font-light'>seamless</span> workflow
     </>
   )
 }) => {
   return (
-    <div className='mx-auto mb-16 max-w-4xl text-center'>
-      <h3 className='mb-4 text-lg font-medium text-[#193ae6] dark:text-blue-400'>{subtitle}</h3>
-      <h2 className='text-4xl font-normal tracking-wide text-[#333333] dark:text-white sm:text-5xl md:text-6xl'>
+    <div className='mx-auto mb-16 text-center'>
+      <h3 className='mb-4 text-xs font-medium text-primary-600 dark:text-blue-400 sm:text-xl'>
+        {subtitle}
+      </h3>
+      <h2 className='text-xl font-medium tracking-tighter text-brand-gray-900 dark:text-white sm:text-5xl'>
         {title}
       </h2>
     </div>

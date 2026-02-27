@@ -1,97 +1,98 @@
 import React from 'react'
-
 import Link from '@docusaurus/Link'
 import StatsSection from './StatsSection'
+import { FaGithub, FaRegStar } from 'react-icons/fa'
+import { useNumberTicker } from '../../hooks/useNumberTicker'
+import useGetReleases from '../../hooks/useGetReleases'
+import { formatCompactNumber } from '@site/utils/tools'
 
-interface HeroSectionProps {
-  title?: string
-  subtitle?: string
-  showIcebergBadge?: boolean
-}
+const HeroSection: React.FC = () => {
+  const { stargazersCount, slackCount } = useGetReleases()
 
-const HeroSection: React.FC<HeroSectionProps> = ({
-  title = 'Fastest way to replicate your data from',
-  subtitle = 'DataDases → Data Lakes',
-  showIcebergBadge = true
-}) => {
+  const animatedStarCount = useNumberTicker(stargazersCount || 0)
+  const animatedSlackCount = useNumberTicker(slackCount)
+
   return (
-    <div className='xl:container mx-auto flex w-full flex-col-reverse items-center lg:flex-row justify-between overflow-hidden px-4 py-8 md:px-6 md:py-16 lg:px-0 lg:py-20'>
-      {/* Mobile Image - Only visible on mobile */}
-
-      <div className='md:hidden'>
-        <StatsSection />
-      </div>
-
-      <div className='w-full mb-8 lg:hidden'>
-        <div className='flex justify-center'>
-          <img
-            src='/img/site/hero-section.svg'
-            alt='Olake Data Replication Dashboard'
-            className='max-w-[80%] h-auto dark:filter dark:brightness-90'
-            loading="eager" fetchPriority="high" decoding="async"
-          />
-        </div>
-      </div>
-
+    <div className='mx-auto flex w-full flex-col-reverse items-center justify-between overflow-hidden py-8 xl:container md:px-6 md:py-16 lg:flex-row lg:px-0 lg:py-20'>
       {/* Left Column - contains 2 rows */}
-      <div className='mt-0 container lg:mt-0 flex w-full flex-col lg:w-3/5'>
+      <div className='container mt-0 flex w-full flex-col lg:mt-0'>
         {/* Row 1: "Fastest way to replicate..." section */}
-        <div className='mb-8'>
-
-          <div className='flex flex-col gap-4'>
-            <h2 className='mb-6 text-[28px] font-medium text-center lg:text-left text-gray-800  dark:text-white md:text-3xl lg:text-2xl xl:text-3xl'>
-              {title}
-            </h2>
- 
-            <h3 className='text-2xl text-center leading-8 lg:text-left font-normal sm:text[32px] md:text-[32px] lg:text-[28px] xl:text-[41px] 2xl:text-[50px]'>
-              <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-wider text-[#193ae6] dark:bg-gray-800/80 dark:text-blue-400'>
-                Database
-              </span>
-              <span className='text-[#193AE6] dark:text-blue-400'>→</span>
-              <span className='rounded-3xl leading-8 bg-[#E9EBFC] px-2 py-1 md:py-1.5 tracking-widest text-[#193AE6] dark:bg-gray-800/80 dark:text-blue-400'>
-                Data Lakehouse
-              </span>
-            </h3>
+        <div className='mt-8 flex w-full flex-col justify-center sm:items-center'>
+          <div className='flex gap-x-3'>
+            <a
+              href='https://github.com/datazip-inc/olake'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='flex w-fit items-center gap-x-1 rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
+            >
+              <FaGithub />
+              <div>
+                Live on Github.{' '}
+                <span className='ml-0.5 inline-block min-w-[1.3rem] whitespace-nowrap text-left sm:min-w-[2.25rem]'>
+                  {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.2K'}
+                </span>
+              </div>
+              <FaRegStar />
+            </a>
+            <a
+              href='/slack'
+              className='flex w-fit items-center rounded-full border border-solid border-brand-gray-300 bg-brand-gray-100 px-2 py-1 font-space text-[8px] font-medium text-inherit hover:text-inherit hover:no-underline sm:gap-x-2 sm:px-4 sm:py-2 sm:text-sm'
+            >
+              <img src='/img/icon/slack.svg' alt='Slack' className='size-2 sm:size-4' />
+              <div className='flex items-center'>
+                <span className='ml-1 inline-block min-w-[1.4rem] whitespace-nowrap text-left sm:min-w-[2.5rem]'>
+                  {formatCompactNumber(animatedSlackCount, { suffix: '+' })}
+                </span>
+                Active Community Members
+              </div>
+            </a>
           </div>
 
-          <div className='mt-6 px-2 mx-auto lg:mx-0 max-w-full flex flex-col sm:flex-row gap-4 justify-center lg:justify-start'>
+          <div className='mt-8 text-2xl font-light leading-tight sm:text-center sm:text-5xl sm:leading-normal'>
+            <h1 className='leading-inherit font-inherit m-0 mb-0 font-medium text-inherit'>
+              Fastest Database & Kafka Replication to S3 and Iceberg
+            </h1>
+          </div>
+          <div className='mt-4 font-sans text-xs font-normal leading-normal text-neutral-700 sm:text-xl'>
+            Open-source EL (Extract & Load) engine built for Apache Iceberg
+          </div>
+
+          <div className='mx-auto mt-10 text-[10px] font-medium text-brand-gray-600 sm:text-sm'>
+            Open Source / Apache 2.0 License
+          </div>
+
+          <div className='mt-3 flex flex-col items-center gap-2 font-helvetica text-sm sm:flex-row sm:text-base'>
             <Link
-              to='#olake-form-product'
-              className='inline-flex items-center justify-center rounded-md bg-[#203FDD] px-4 sm:px-6 py-2.5 font-medium text-white transition-colors hover:text-gray-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-sm sm:text-base'
+              to='/docs/getting-started/quickstart'
+              className='flex h-8 w-full items-center justify-center rounded-lg bg-brand-blue-500 px-4 py-1 text-center font-medium text-white hover:text-white hover:no-underline sm:h-12 sm:w-40'
+            >
+              Try OLake
+            </Link>
+            <Link
+              to='/#olake-form-product'
+              className='flex h-8 w-full items-center justify-center rounded-lg !border !border-solid !border-brand-blue-500 bg-white px-4 py-1 text-center font-medium text-brand-blue-500 hover:no-underline sm:h-12 sm:w-40'
             >
               Talk to us
             </Link>
+          </div>
 
-            <Link
-              to='https://github.com/datazip-inc/olake'
-              className='inline-flex items-center justify-center rounded-full bg-[#f0f0f0] px-4 sm:px-6 py-2.5 font-medium text-gray-800 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 text-sm sm:text-base whitespace-nowrap'
-              style={{
-                border: '1px solid rgba(191, 191, 191, 0.8)',
-                borderColor: 'rgba(191, 191, 191, 0.8)'
-              }}
-            >
-              <svg className='mr-2 h-4 w-4 sm:h-5 sm:w-5' viewBox='0 0 24 24' fill='currentColor'>
-                <path d='M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.73.083-.73 1.205.085 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12' />
-              </svg>
-              Live on Github. Contribute
-            </Link>
+          <div className='relative mt-12 hidden max-h-[50vh] overflow-hidden rounded-xl sm:block'>
+            <img
+              src='/img/site/jobs-page.webp'
+              alt='OLake Jobs Page'
+              fetchPriority='high'
+              className='w-full rounded-xl border-2 border-[#DDDDDD] object-cover object-top shadow-[0_0_14px_0_rgba(0,0,0,0.07)]'
+            />
+            {/* Fade to white gradient overlay */}
+            <div className='pointer-events-none absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-white to-transparent' />
+          </div>
+
+          {/* Row 2: Stats Section */}
+          <div className='w-full justify-center lg:w-3/5 lg:justify-start'>
+            <StatsSection />
           </div>
         </div>
-
-        {/* Row 2: Stats Section */}
-        <div className='hidden lg:flex w-full lg:w-3/5 justify-center lg:justify-start'>
-          <StatsSection />
-        </div>
       </div>
-
-      {/* Desktop Image - Only visible on desktop */}
-      <div className='hidden lg:flex w-full lg:w-2/5 justify-center items-center'>
-        <div className='flex justify-center w-full'>
-          <img src='/img/site/hero-section.svg' alt='Olake Data Replication Dashboard' className='max-w-full h-auto dark:filter dark:brightness-90' loading="eager" fetchPriority="high" decoding="async" />
-        </div>
-      </div>
-
-
     </div>
   )
 }

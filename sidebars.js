@@ -153,7 +153,14 @@ const docSidebar = {
     // Community
     sectionHeader("COMMUNITY"),
     'community/contributing',
-    'community/setting-up-a-dev-env',
+    {
+      type: 'category',
+      label: 'Setting up a Development Environment',
+      link: { type: 'doc', id: 'community/setting-up-a-dev-env' },
+      items: [
+        'community/learning-modules',
+      ],
+    },
     'community/commands-and-flags',
     'community/issues-and-prs',
     'community/code-of-conduct',
@@ -166,6 +173,8 @@ const docSidebar = {
       label: 'Versions',
       items: [
         'release/overview',
+        'release/v0.4.0',
+        'release/v0.3.17',
         'release/v0.3.14',
         'release/v0.3.9-v0.3.11',
         'release/v0.3.5',
