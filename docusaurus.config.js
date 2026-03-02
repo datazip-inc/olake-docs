@@ -757,6 +757,11 @@ const config = {
           },
 
           {
+            to: '/docs/connectors/oracle/overview',
+            from: '/docs/category/oracle',
+          },
+
+          {
             to: '/docs/getting-started/quickstart',
             from: '/docs/category/getting-started'
           },
