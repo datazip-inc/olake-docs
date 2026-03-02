@@ -29,7 +29,7 @@ const HeroSection: React.FC = () => {
               <div>
                 Live on Github.{' '}
                 <span className='ml-0.5 inline-block min-w-[1.3rem] whitespace-nowrap text-left sm:min-w-[2.25rem]'>
-                  {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.2K'}
+                  {stargazersCount !== 0 ? formatCompactNumber(animatedStarCount) : '1.3K'}
                 </span>
               </div>
               <FaRegStar />
@@ -41,7 +41,9 @@ const HeroSection: React.FC = () => {
               <img src='/img/icon/slack.svg' alt='Slack' className='size-2 sm:size-4' />
               <div className='flex items-center'>
                 <span className='ml-1 inline-block min-w-[1.4rem] whitespace-nowrap text-left sm:min-w-[2.5rem]'>
-                  {formatCompactNumber(animatedSlackCount, { suffix: '+' })}
+                  {animatedSlackCount !== 0
+                    ? formatCompactNumber(animatedSlackCount, { suffix: '+' })
+                    : '500+'}
                 </span>
                 Active Community Members
               </div>
