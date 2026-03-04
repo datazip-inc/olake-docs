@@ -34,6 +34,8 @@ Our approach: a custom equality delete generator that would create **1,000 equal
 
 The goal was to create a large number of small equality delete files while keeping the table's logical content identical, so that any query performance difference we observed would be attributable purely to the file structure and not to data differences.
 
+In our run, the table lineitem which is supposed to be the biggest table in TPCH started with **843 data files**, almost all around 512 MB each. The script added 1,000 new data files and 1,000 equality delete files, so we ended up with **1,843 data files**.
+
 **How the Equality Delete Generator Works**
 
 The script used a deterministic hash over each table's primary key to pick 2% of rows across 1,000 non-overlapping batches. It scanned only the primary key columns for efficiency, wrote one small Parquet equality delete file per batch via Iceberg's native writer, then reinserted those same rows from the original snapshot. Net effect: zero data change logically — we deleted rows and added them back — but physically each table now had 1,000 equality delete files and 1,000 extra data files from the reinserts, which the merge-on-read engine must process at query time.
@@ -627,7 +629,8 @@ public class EqualityDeleteGenerator {
 
 With the small-file sabotage complete, we set up our EMR cluster and ran all 22 TPC-H queries. What followed was a series of painful infrastructure lessons before we got clean results.
 
-### 1. Initial Setup: 64 GB Workers 
+<Tabs>
+<TabItem value="initial-64gb" label="Initial setup: 64 GB workers (FAILED)">
 
 We started with what felt like a well-sized EMR cluster for a 1 TB workload:
 
@@ -665,8 +668,10 @@ The answer was the equality delete files. In a normal Iceberg table, a read task
 
 This is a form of memory pressure that no amount of Spark tuning can fully compensate for when the underlying hardware is undersized. The 64 GB workers simply did not have enough room for both the delete-file hash sets and the join intermediates of complex multi-table TPC-H queries.
 
-### 2. Upgraded Setup: 128GB Workers 
+</TabItem>
 
+<TabItem value="upgraded-128gb" label="Upgraded setup: 128 GB workers (FAILED)">
+ 
 | **Node role** | **Instance type** | **vCPUs** | **RAM** | **EBS Volume Size** |
 |---------------|-------------------|-----------|---------|---------------------|
 | Master | m6g.8xlarge | 32 | 128 GB | 64 GB |
@@ -684,7 +689,9 @@ Our EMR cluster's EBS volume was provisioned at the default size: 27 GB. That's 
 
 The compounding factor here is again the small file problem. A compacted table produces less shuffle data because Iceberg can apply more aggressive partition pruning and projection pushdown when reading well-structured files. Our fragmented table forced Spark to read more raw data per query (since delete file application happens at scan time, after data has already been fetched from S3), which directly inflated the size of intermediate shuffle stages.
 
-### 3. Final Setup: EBS Volume Size increased
+</TabItem>
+
+<TabItem value="final-ebs" label="Final setup: Increased EBS size">
 
 | **Node role** | **Instance type** | **vCPUs** | **RAM** | **EBS Volume Size** |
 |---------------|-------------------|-----------|---------|---------------------|
@@ -700,6 +707,9 @@ With the disk issue resolved, we ran the full 22-query suite again. Twenty-one q
 This means the JVM tried to open a new TCP socket to connect to S3, and the operating system refused because all available ephemeral ports on the instance were already in use. TPCH Query 13 performs an outer join between `customer` and `orders` table, which in a fragmented table triggers a very large number of concurrent S3 GET requests as Iceberg resolves equality deletes across many small files simultaneously. The sheer volume of concurrent S3 connections exhausted the OS-level port range.
 
 **Resolution:** We did not attempt to work around this in the pre-compaction run. Query 13's failure was logged as-is and carried forward as a benchmark data point. We expected compaction to resolve it by collapsing the 1,000 delete files into a handful of merged data files, dramatically reducing the S3 connection count during that scan.
+
+</TabItem>
+</Tabs>
 
 <details>
 <summary>View the TPC-H queries Python script</summary>
@@ -1456,13 +1466,11 @@ spark-submit \
 
 ## Compacting the Table
 
-Now is the time for running Iceberg compaction across all eight TPC-H tables to merge the thousands of small equality delete files into clean, right-sized Parquet data files. Once compaction completes, the equality deletes cease to exist as separate files — their effect is baked directly into the rewritten data files, and Iceberg's runtime no longer has to load and apply them at query time.
+Now we run Iceberg compaction across all eight TPC-H tables to merge thousands of small equality delete files into right-sized Parquet data files. After compaction, deletes are baked into the rewritten data files, so Iceberg no longer has to load and apply separate delete files at query time.
 
-The compaction script uses Iceberg's bin packing strategy, which is the default algorithm used by `rewrite_data_files`. Understanding how it works is important for understanding why we configured it the way we did.
+Iceberg’s `rewrite_data_files` uses a bin-packing strategy. It groups input files into “bins” that each target a specific output size: files are added to a bin until it reaches `max-file-group-size-bytes`, then a new bin starts. This keeps each rewrite task within a predictable memory budget while producing files close to `target-file-size-bytes`, which matters for us because table sizes and delete densities vary widely.
 
-Bin packing treats compaction as a bin-filling problem. Given a set of input files, it groups them into "bins" where each bin targets a specific output file size. Files are assigned to bins greedily — each file goes into the current bin until that bin reaches the `max-file-group-size-bytes` limit, at which point a new bin is opened. The goal is to produce output files that are as close to `target-file-size-bytes` as possible, without any single rewrite task having to hold more than `max-file-group-size-bytes` worth of data in memory at once.
-
-This matters a lot for our workload because our tables vary enormously in size and delete density. A small bin size means lower memory pressure per task, which is safer but produces more rewrite tasks. A larger bin size means fewer tasks but each one is more memory-hungry.
+After compaction, the lineitem table (the largest in TPC-H) had only **~850** data files and no separate equality delete files — down from 1,843 data files and 1,000 equality deletes. That drop in file count is why each query reads far fewer files and runs faster.
 
 <details>
 <summary>View the compaction script</summary>
@@ -1727,29 +1735,37 @@ Putting the numbers side by side makes it clear what compaction actually bought 
 
 Total query execution time on the fragmented table was **34,635 seconds (about 9.7 hours)**. After compaction, total execution time dropped to **7,377 seconds (about 2 hours)**. That’s roughly **4.7× faster** for the same workload on the same hardware and Spark config.
 
-Many queries saw massive improvements — some ran up to **6× faster**. The heaviest joins and shuffles benefited the most, since compaction removed the delete-file overhead and let the engine read fewer, better-organized files.
+Many queries saw massive improvements — some ran up to **6× faster**. We went from 1,843 data files (plus 1,000 equality delete files) to **~850** data files after compaction, so the engine had far fewer files to open and scan per query. The heaviest joins and shuffles benefited the most, since compaction removed the delete-file overhead and let the engine read fewer, better-organized files.
 
 The takeaway is straightforward: the small-file problem wasn’t a minor slowdown. It was costing us hours of runtime. Compaction fixed that.
 
 ### 2. Cost: what we paid for each run
 
+<Tabs>
+<TabItem value="pre-compaction" label="Pre-compaction worker nodes">
+
 **EMR cluster cost:**
 - Master (m6g.8xlarge): $0.810/hr
 - Worker (r6g.4xlarge): $0.520/hr
-
-<Tabs>
-<TabItem value="pre-compaction" label="Pre-compaction worker nodes">
 
 ![Pre-compaction active worker nodes](/img/blog/2026/4/before-compaction-count.webp)
 
 </TabItem>
 <TabItem value="post-compaction" label="Post-compaction worker nodes">
 
+**EMR cluster cost:**
+- Master (m6g.8xlarge): $0.810/hr
+- Worker (r6g.2xlarge): $0.260/hr
+
 ![Post-compaction active worker nodes](/img/blog/2026/4/after-compaction-count.webp)
 
 </TabItem>
 
 <TabItem value="compaction" label="Compaction worker nodes">
+
+**EMR cluster cost:**
+- Master (m6g.8xlarge): $0.810/hr
+- Worker (r6g.4xlarge): $0.520/hr
 
 ![Compaction active worker nodes](/img/blog/2026/4/compaction-node-count.webp)
 
@@ -1758,21 +1774,21 @@ The takeaway is straightforward: the small-file problem wasn’t a minor slowdow
 
 | Metric | Pre-compaction | Post-compaction | Compaction |
 |--------|----------------|-----------------|-----------------|
-| Benchmark duration | ~9 h 39 min | ~2 h 4 min | 3.03 h |
-| Master cost | ~$7.82 | ~$1.66 | ~$2.45 |
-| Worker cost | ~$20.07 | ~$2.13 | ~$5.92 |
-| **Total cost** | **~$27.89** | **~$3.79** | **~$8.37** |
+| Benchmark duration | ~9 h 39 min | ~2 h 7 min | 3.03 h |
+| Master cost | ~$7.82 | ~$1.71 | ~$2.45 |
+| Worker cost | ~$19.49 | ~$2.92 | ~$5.92 |
+| **Total cost** | **~$27.31** | **~$4.63** | **~$8.37** |
 
 For teams running TPC-H or similar workloads on fragmented Iceberg tables, this is the real story. Compaction doesn’t just improve query latency; it shortens job duration and reduces cluster spend. The savings compound as you run more benchmarks or production jobs on the same tables. As small files keep increasing over time, you would need to keep upgrading your EMR cluster size and run for more hours — and your costs would keep multiplying. Compaction breaks that cycle.
 
-**What about the cost of compaction itself?** As the table above shows, compaction costs about **$8.37**. We do not have to run compaction daily; it can be scheduled based on how many small files are being generated. Once compaction runs, query costs drop sharply. Even when we include compaction cost ($8.37) plus the post-compaction query run ($3.79), the total comes to about **$12**, still well under the **$28** we spent on the pre-compaction run alone. That's a clear saving for a single benchmark, and it compounds as we run more jobs over time.
+**What about the cost of compaction itself?** As the table above shows, compaction costs about **$8.37**. We do not have to run compaction daily; it can be scheduled based on how many small files are being generated. Once compaction runs, query costs drop sharply. Even when we include compaction cost ($8.37) plus the post-compaction query run ($4.63), the total comes to about **$13**, still well under the **$28** we spent on the pre-compaction run alone. That's a clear saving for a single benchmark, and it compounds as we run more jobs over time.
 
 As more data and small files accumulate over time, the gap widens:
 
 | Scenario | Without compaction (approx.) | With compaction (approx.) |
 |----------|------------------------------|----------------------------|
-| 4 runs (e.g. weekly) | ~$112+ (runs get slower and cost more as fragmentation grows) | ~$8 compaction + ~$16 (4 runs) ≈ **$24** |
-| 12 runs (e.g. over 3 months) | ~$336+ (and climbing; may need bigger clusters) | ~$16 compaction (2×) + ~$48 (12 runs) ≈ **$64** |
+| 4 runs (e.g. weekly) | ~$112+ (runs get slower and cost more as fragmentation grows) | ~$8 compaction + ~$19 (4 runs) ≈ **$27** |
+| 12 runs (e.g. over 3 months) | ~$336+ (and climbing; may need bigger clusters) | ~$17 compaction (2×) + ~$56 (12 runs) ≈ **$73** |
 
 Without compaction, each run stays expensive and gets worse as small files pile up. With compaction, you pay upfront once in a while, and query costs stay low.
 
@@ -1786,14 +1802,16 @@ Without compaction, each run stays expensive and gets worse as small files pile 
 </TabItem>
 <TabItem value="post-compaction-memory" label="Post-compaction memory allocated">
 
-![Post-compaction memory allocation](/img/blog/2026/4/after-memory-allocation.webp)
+![Post-compaction memory allocation](/img/blog/2026/4/after-memory-allocated.webp)
 
 </TabItem>
 </Tabs>
 
-Memory allocation tells a clear story. On the pre-compaction run, memory usage stayed high throughout the ~9.5-hour benchmark. The fragmented table — with its thousands of equality delete files and small data files — pushed the cluster into heavy memory pressure. Each query had to load delete-file and process inflated shuffle data, so executors consistently ran near capacity. That sustained high usage, combined with the delete-file overhead, is exactly what led to the OOM crashes and node failures we saw earlier.
+**Average memory usage before compaction:** ~456,000 MB (~445 GB) across the cluster over a ~9.5-hour run — and this was even with **16 vCPU and 128 GB RAM** worker nodes. Without compaction, the engine had to load and process numerous small data files along with equality delete files separately, leading to higher memory overhead and inefficient resource utilization.
 
-After compaction, memory usage remained high during query execution but dropped sharply as the workload completed. The full TPC-H benchmark finished in about 2 hours, compared to 9.5 hours before compaction, allowing the cluster to reach the end of the workload sooner and release resources.
+**Average memory usage after compaction:** dropped to ~346,000 MB (~338 GB) across the cluster over a ~40-minute run — and that was achieved on **8 vCPU and 64 GB RAM** worker nodes. Bin-pack compaction effectively merged small data files and resolved equality deletes, reducing memory pressure by approximately ~110 GB and resulting in leaner, faster and more efficient query execution.
+
+**Advantage:** Compaction delivers the same workload with much lower average memory usage and smaller, cheaper worker nodes.
 
 ## Conclusion
 
