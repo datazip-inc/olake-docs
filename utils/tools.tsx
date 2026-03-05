@@ -36,7 +36,7 @@ function $t(text: string, isText = true): string | any {
 export function formatCompactNumber(num: number, options: { suffix?: string } = {}): string {
   const { suffix = '' } = options
   if (num >= 1000) {
-    const kValue = (Math.floor(num / 100) / 10).toFixed(1)
+    const kValue = (Math.round(num / 100) / 10).toFixed(1)
     const exactK = parseFloat(kValue) * 1000
     return num > exactK ? `${kValue}K+` : `${kValue}K`
   }
