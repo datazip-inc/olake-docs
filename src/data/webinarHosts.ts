@@ -174,5 +174,40 @@ export const HOSTS = {
         image: "/img/authors/shubham.webp",
         linkedin: "https://www.linkedin.com/in/shubhamsatish"
     },
+    DUKE: {
+        name: "Duke",
+        role: "Software Engineer @ OLake",
+        bio: "OLake Maintainer and Software Engineer with expertise in CDC architectures, Kafka integration, and building scalable data pipelines.",
+        image: "/img/authors/duke.webp",
+        linkedin: "https://www.linkedin.com/in/dukedhal",
+    },
+    NAYAN_JOSHI: {
+        name: "Nayan Joshi",
+        role: "DevRel Data Engineer @ OLake",
+        bio: "OLake Maintainer and DevRel Data Engineer specializing in data ingestion workflows, Iceberg integrations, and practical data engineering solutions.",
+        image: "/img/authors/nayan.webp",
+        linkedin: "https://www.linkedin.com/in/nayanjoshiutd",
+    },
+    SCHITIZ_SHARMA: {
+        name: "Schitiz Sharma",
+        role: "DevOps Engineer @ OLake",
+        bio: "OLake Maintainer and DevOps engineer with expertise in Kubernetes deployments, Helm charts, and infrastructure automation for data engineering platforms.",
+        image: "/img/authors/schitiz.webp",
+        linkedin: "https://www.linkedin.com/in/schitizsharma",
+    },
+    PRIYANSH_KHODIYAR: {
+        name: "Priyansh Khodiyar",
+        role: "Ex DevRel",
+        bio: "",
+        image: "/img/authors/priyansh.webp",
+        linkedin: "https://www.linkedin.com/in/zriyansh/",
+    },
+    ANKIT_KUMAR: {
+        name: "Ankit Kumar",
+        role: "Senior backend dev and OLake Maintainer",
+        bio: "",
+        image: "/img/authors/ankit.webp",
+        linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
+    },
 };
 
