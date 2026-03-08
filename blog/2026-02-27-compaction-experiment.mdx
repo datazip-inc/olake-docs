@@ -18,13 +18,19 @@ We decided to stop guessing and run a real benchmark. We took 1 TB of TPC-H data
 
 This blog walks through the entire journey: the ingestion, the deliberate manipulating of our own dataset, the infrastructure battles we fought along the way, and what the benchmark results actually look like.
 
-> New to Iceberg compaction? Before going further, we recommend reading our deep-dive on [what compaction is and why it matters](/blog/olake-amoro-iceberg-lakehouse). This post assumes a basic familiarity with Apache Iceberg's Merge-on-Read (MOR) model and equality delete files.
+> New to Iceberg compaction? Before going further, we recommend reading our deep-dive on [what compaction is and why it matters](/blog/olake-amoro-iceberg-lakehouse). This post assumes a basic familiarity with Apache Iceberg's Merge-on-Read (MOR) model and equality delete files. 
+
+> Converting MOR tables to COW is another form of compaction—it applies equality delete files into the data files so the table can be read by engines that don't support equality deletes (e.g. Databricks). For that workflow, see our guide on [converting OLake MOR tables to COW](https://olake.io/blog/olake-mor-cow-databricks/).
 
 ## Getting 1 TB of TPC-H Data into Iceberg
 
 The TPC-H benchmark is a standard set of eight interrelated tables (region, nation, supplier, part, partsupp, orders, lineitem, and customer) designed to simulate a realistic business analytics workload. At scale factor 1000, it produces roughly 1 TB of data.
 
 We used OLake to ingest this data from PostgreSQL directly into Apache Iceberg tables stored in S3, with AWS Glue as the catalog. After the full load completed, we had eight clean Iceberg tables sitting in S3, backed by a Glue catalog, with zero delete files and well-sized Parquet data files. Query performance at this point was healthy.
+
+:::info
+For those benchmark results—including query times, memory utilization, and a comparison with Databricks—see [Running TPC-H queries](https://olake.io/iceberg/databricks-vs-iceberg/#c-running-tpch-queries) in our **Databricks vs Apache Iceberg** blog.
+:::
 
 ## Manufacturing the Small File Problem
 
@@ -630,6 +636,47 @@ public class EqualityDeleteGenerator {
 With the small-file sabotage complete, we set up our EMR cluster and ran all 22 TPC-H queries. What followed was a series of painful infrastructure lessons before we got clean results.
 
 <Tabs>
+
+<TabItem value="final-ebs" label="Final setup: Increased EBS size">
+
+| **Node role** | **Instance type** | **vCPUs** | **RAM** | **EBS Volume Size** |
+|---------------|-------------------|-----------|---------|---------------------|
+| Master | m6g.8xlarge | 32 | 128 GB | 256 GB |
+| Worker (1–10 on demand) | r6g.4xlarge | 16 | 128 GB | 256 GB |
+
+Because we were hitting disk spill issues, we bumped the EBS volume to 256 GB per node, hoping everything would run smoothly. It mostly did — except for one final issue that surfaced further down the track.
+
+**Problem: S3 Port Exhaustion on Query 13**
+
+With the disk issue resolved, we ran the full 22-query suite again. Twenty-one queries completed. Query 13 failed every time with `Unable to execute HTTP request: Cannot assign requested address (SDK Attempt Count: 1)` error.
+
+This means the JVM tried to open a new TCP socket to connect to S3, and the operating system refused because all available ephemeral ports on the instance were already in use. TPCH Query 13 performs an outer join between `customer` and `orders` table, which in a fragmented table triggers a very large number of concurrent S3 GET requests as Iceberg resolves equality deletes across many small files simultaneously. The sheer volume of concurrent S3 connections exhausted the OS-level port range.
+
+**Resolution:** We did not attempt to work around this in the pre-compaction run. Query 13's failure was logged as-is and carried forward as a benchmark data point. We expected compaction to resolve it by collapsing the 1,000 delete files into a handful of merged data files, dramatically reducing the S3 connection count during that scan.
+
+</TabItem>
+
+<TabItem value="upgraded-128gb" label="Upgraded setup: 128 GB workers (FAILED)">
+ 
+| **Node role** | **Instance type** | **vCPUs** | **RAM** | **EBS Volume Size** |
+|---------------|-------------------|-----------|---------|---------------------|
+| Master | m6g.8xlarge | 32 | 128 GB | 64 GB |
+| Worker (1–3 on demand) | r6g.4xlarge | 16 | 128 GB | 64 GB |
+
+With 128 GB workers, the executor OOM crashes stopped entirely. Queries began running end-to-end for the first time. We worked through the TPC-H suite and most queries completed — but two new failure modes appeared that we hadn't seen before, because the jobs hadn't been getting far enough to hit them.
+
+**Problem: Disk Overflow on Query 7**
+
+It joins `supplier`, `lineitem`, `orders`, `customer`, `nation`, and `part` — one of the largest multi-table joins in the TPC-H suite. At 1 TB scale with a fragmented table, this query generates an enormous amount of intermediate shuffle data.
+
+Spark's behaviour when shuffle data doesn't fit in memory is to spill it to local disk. This is completely normal and expected — Spark is designed to handle data that exceeds memory by spilling gracefully. The problem was what happened after the spill started.
+
+Our EMR cluster's EBS volume was provisioned at the default size: 27 GB. That's a reasonable default for a cluster that's mostly doing in-memory processing, but it is nowhere near sufficient as a spill target for a shuffle stage operating on a 1 TB fragmented dataset. The spill directory filled up almost immediately, and the task failed with a disk-full error `java.io.IOException: No space left on device`.
+
+The compounding factor here is again the small file problem. A compacted table produces less shuffle data because Iceberg can apply more aggressive partition pruning and projection pushdown when reading well-structured files. Our fragmented table forced Spark to read more raw data per query (since delete file application happens at scan time, after data has already been fetched from S3), which directly inflated the size of intermediate shuffle stages.
+
+</TabItem>
+
 <TabItem value="initial-64gb" label="Initial setup: 64 GB workers (FAILED)">
 
 We started with what felt like a well-sized EMR cluster for a 1 TB workload:
@@ -670,45 +717,6 @@ This is a form of memory pressure that no amount of Spark tuning can fully compe
 
 </TabItem>
 
-<TabItem value="upgraded-128gb" label="Upgraded setup: 128 GB workers (FAILED)">
- 
-| **Node role** | **Instance type** | **vCPUs** | **RAM** | **EBS Volume Size** |
-|---------------|-------------------|-----------|---------|---------------------|
-| Master | m6g.8xlarge | 32 | 128 GB | 64 GB |
-| Worker (1–3 on demand) | r6g.4xlarge | 16 | 128 GB | 64 GB |
-
-With 128 GB workers, the executor OOM crashes stopped entirely. Queries began running end-to-end for the first time. We worked through the TPC-H suite and most queries completed — but two new failure modes appeared that we hadn't seen before, because the jobs hadn't been getting far enough to hit them.
-
-**Problem: Disk Overflow on Query 7**
-
-It joins `supplier`, `lineitem`, `orders`, `customer`, `nation`, and `part` — one of the largest multi-table joins in the TPC-H suite. At 1 TB scale with a fragmented table, this query generates an enormous amount of intermediate shuffle data.
-
-Spark's behaviour when shuffle data doesn't fit in memory is to spill it to local disk. This is completely normal and expected — Spark is designed to handle data that exceeds memory by spilling gracefully. The problem was what happened after the spill started.
-
-Our EMR cluster's EBS volume was provisioned at the default size: 27 GB. That's a reasonable default for a cluster that's mostly doing in-memory processing, but it is nowhere near sufficient as a spill target for a shuffle stage operating on a 1 TB fragmented dataset. The spill directory filled up almost immediately, and the task failed with a disk-full error `java.io.IOException: No space left on device`.
-
-The compounding factor here is again the small file problem. A compacted table produces less shuffle data because Iceberg can apply more aggressive partition pruning and projection pushdown when reading well-structured files. Our fragmented table forced Spark to read more raw data per query (since delete file application happens at scan time, after data has already been fetched from S3), which directly inflated the size of intermediate shuffle stages.
-
-</TabItem>
-
-<TabItem value="final-ebs" label="Final setup: Increased EBS size">
-
-| **Node role** | **Instance type** | **vCPUs** | **RAM** | **EBS Volume Size** |
-|---------------|-------------------|-----------|---------|---------------------|
-| Master | m6g.8xlarge | 32 | 128 GB | 256 GB |
-| Worker (1–10 on demand) | r6g.4xlarge | 16 | 128 GB | 256 GB |
-
-Because we were hitting disk spill issues, we bumped the EBS volume to 256 GB per node, hoping everything would run smoothly. It mostly did — except for one final issue that surfaced further down the track.
-
-**Problem: S3 Port Exhaustion on Query 13**
-
-With the disk issue resolved, we ran the full 22-query suite again. Twenty-one queries completed. Query 13 failed every time with `Unable to execute HTTP request: Cannot assign requested address (SDK Attempt Count: 1)` error.
-
-This means the JVM tried to open a new TCP socket to connect to S3, and the operating system refused because all available ephemeral ports on the instance were already in use. TPCH Query 13 performs an outer join between `customer` and `orders` table, which in a fragmented table triggers a very large number of concurrent S3 GET requests as Iceberg resolves equality deletes across many small files simultaneously. The sheer volume of concurrent S3 connections exhausted the OS-level port range.
-
-**Resolution:** We did not attempt to work around this in the pre-compaction run. Query 13's failure was logged as-is and carried forward as a benchmark data point. We expected compaction to resolve it by collapsing the 1,000 delete files into a handful of merged data files, dramatically reducing the S3 connection count during that scan.
-
-</TabItem>
 </Tabs>
 
 <details>
@@ -1743,15 +1751,15 @@ The takeaway is straightforward: the small-file problem wasn’t a minor slowdow
 
 **EMR cluster cost:**
 - Master (m6g.8xlarge): $0.810/hr
-- Worker (r6g.2xlarge): $0.520/hr
+- Worker (r6g.4xlarge): $0.520/hr
 
 <Tabs>
-<TabItem value="pre-compaction" label="Pre-compaction worker nodes">
+<TabItem value="pre-compaction" label="TPC-H worker nodes (Pre-compaction)">
 
 ![Pre-compaction active worker nodes](/img/blog/2026/4/before-compaction-count.webp)
 
 </TabItem>
-<TabItem value="post-compaction" label="Post-compaction worker nodes">
+<TabItem value="post-compaction" label="TPC-H worker nodes (Post-Compaction)">
 
 ![Post-compaction active worker nodes](/img/blog/2026/4/after-compaction-128.webp)
 
