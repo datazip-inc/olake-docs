@@ -173,6 +173,7 @@ const docSidebar = {
       label: 'Versions',
       items: [
         'release/overview',
+        'release/v0.5.0',
         'release/v0.4.0',
         'release/v0.3.17',
         'release/v0.3.14',
