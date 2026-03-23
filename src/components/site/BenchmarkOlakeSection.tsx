@@ -29,7 +29,7 @@ const BenchmarkOlakeSection = () => {
               engine is optimized for Apache Iceberg, ensuring top-tier performance.
             </div>
             <Link
-              to='/docs/getting-started/quickstart'
+              to='/docs/getting-started/setup-olake'
               className='mt-5 flex w-36 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-[9px] font-medium text-white hover:text-white hover:no-underline md:mt-12 md:h-12 md:w-60 md:text-base'
             >
               Test Now

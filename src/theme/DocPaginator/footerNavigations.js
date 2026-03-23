@@ -3,7 +3,7 @@ export const paginationConfig = {
   '/docs': {
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -15,12 +15,12 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
   //Quickstart
-  '/docs/getting-started/quickstart': {
+  '/docs/getting-started/setup-olake': {
     previous: {
       title: 'Benchmarks',
       permalink: '/docs/benchmarks'
@@ -35,7 +35,7 @@ export const paginationConfig = {
   '/docs/getting-started/creating-first-pipeline': {
     previous: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     },
     next: {
       title: 'Playground',
@@ -51,7 +51,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -327,7 +327,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -339,7 +339,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -351,7 +351,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -363,7 +363,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -375,7 +375,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -387,7 +387,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 
@@ -399,7 +399,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/quickstart'
+      permalink: '/docs/getting-started/setup-olake'
     }
   },
 

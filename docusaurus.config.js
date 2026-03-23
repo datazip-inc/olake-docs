@@ -682,7 +682,7 @@ const config = {
             from: '/blog/customer-stories/astro-talk-lakehouse-transformation'
           },
           {
-            to: '/docs/getting-started/quickstart',
+            to: '/docs/getting-started/setup-olake',
             from: '/docs/getting-started/'
           },
           {
@@ -757,7 +757,7 @@ const config = {
           },
 
           {
-            to: '/docs/getting-started/quickstart',
+            to: '/docs/getting-started/setup-olake',
             from: '/docs/category/getting-started'
           },
           {
@@ -897,15 +897,15 @@ const config = {
             from: '/docs/category/resources'
           },
           {
-            to: '/docs/getting-started/quickstart',
+            to: '/docs/getting-started/setup-olake',
             from: '/docs/category/setup'
           },
           {
-            to: '/docs/getting-started/quickstart',
+            to: '/docs/getting-started/setup-olake',
             from: '/docs/category/setup-1'
           },
           {
-            to: '/docs/getting-started/quickstart',
+            to: '/docs/getting-started/setup-olake',
             from: '/docs/category/setup-2'
           },
           {
@@ -974,7 +974,7 @@ const config = {
             from: '/docs/writers/catalog/overview'
           },
           {
-            to: '/docs/getting-started/quickstart',
+            to: '/docs/getting-started/setup-olake',
             from: '/docs/writers/getting-started/overview'
           },
           {
@@ -1098,7 +1098,7 @@ const config = {
             from: '/docs/writers/connectors/postgres/config/'
           },
           {
-            to: '/docs/getting-started/olake-ui/',
+            to: '/docs/getting-started/setup-olake/',
             from: '/docs/connectors/getting-started/olake-ui/'
           },
           {
