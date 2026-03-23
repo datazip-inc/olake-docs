@@ -622,15 +622,15 @@ const config = {
         },
         redirects: [
           {
-            to: '/docs/benchmarks?tab=mongodb',
+            to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/docs/connectors/mongodb/benchmarks'
           },
           {
-            to: '/docs/benchmarks?tab=postgres',
+            to: '/docs/benchmarks/ingestion?tab=postgres',
             from: '/docs/connectors/postgres/benchmarks'
           },
           {
-            to: '/docs/benchmarks?tab=mysql',
+            to: '/docs/benchmarks/ingestion?tab=mysql',
             from: '/docs/connectors/mysql/benchmarks'
           },
           {
@@ -650,7 +650,7 @@ const config = {
             from: '/olake/mongodb/framework'
           },
           {
-            to: '/docs/benchmarks?tab=mongodb',
+            to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/olake/mongodb/benchmark'
           },
           {
