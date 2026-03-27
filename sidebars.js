@@ -51,8 +51,8 @@ const docSidebar = {
             },
             {
               type: 'doc',
-              id: 'install/kubernetes-optimisation',
-              label: 'Optimisation',
+              id: 'install/kubernetes-optimization',
+              label: 'Optimization',
             },
           ],
         },
@@ -68,14 +68,36 @@ const docSidebar = {
           label: 'Setup OLake',
         },
         {
-          type: 'doc',
-          id: 'getting-started/creating-first-pipeline',
-          label: 'Configure Your First Job / Pipeline',
+          type: 'category',
+          label: 'Ingestion',
+          items: [
+            {
+              type: 'doc',
+              id: 'getting-started/creating-first-pipeline',
+              label: 'Create Your First Job Pipeline',
+            },
+            {
+              type: 'doc',
+              id: 'getting-started/job-level-properties',
+              label: 'Job level Features',
+            },
+            {
+              type: 'doc',
+              id: 'getting-started/alerts-and-notifications',
+              label: 'Alerts and Notifications',
+            },
+          ],
         },
         {
-          type: 'doc',
-          id: 'getting-started/configure-first-optimisation',
-          label: 'Configure Your First Optimisation',
+          type: 'category',
+          label: 'Optimization',
+          items: [
+            {
+              type: 'doc',
+              id: 'getting-started/configure-first-optimization',
+              label: 'Configure Your First Optimization',
+            },
+          ],
         },
       ],
     },
@@ -90,8 +112,8 @@ const docSidebar = {
         },
         {
           type: 'doc',
-          id: 'benchmarks/optimisation',
-          label: 'Optimisation Benchmarks',
+          id: 'benchmarks/optimization',
+          label: 'Optimization Benchmarks',
         },
       ],
     },
@@ -229,16 +251,16 @@ const docSidebar = {
     },
     {
       type: 'category',
-      label: 'Optimisation',
+      label: 'Optimization',
       items: [
         {
           type: 'doc',
-          id: 'iceberg-maintenance/optimisation/overview',
+          id: 'iceberg-maintenance/optimization/overview',
           label: 'Overview',
         },
         {
           type: 'doc',
-          id: 'iceberg-maintenance/optimisation/configuration',
+          id: 'iceberg-maintenance/optimization/configuration',
           label: 'Configuration',
         },
       ],
@@ -246,7 +268,7 @@ const docSidebar = {
     {
       type: 'doc',
       id: 'iceberg-maintenance/runs-and-logs',
-      label: 'Runs & Logs',
+      label: 'Logs & Runs',
     },
     {
       type: 'doc',
@@ -274,8 +296,13 @@ const docSidebar = {
     'community/contributing',
     {
       type: 'category',
-      label: 'Setting up a Development Environment',
+      label: 'Development environment',
       items: [
+        {
+          type: 'doc',
+          id: 'community/setting-up-a-dev-env',
+          label: 'Setting up a development environment',
+        },
         'community/learning-modules',
       ],
     },

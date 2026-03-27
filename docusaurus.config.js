@@ -621,6 +621,27 @@ const config = {
           return undefined
         },
         redirects: [
+          // British → American spelling (`optimization` URLs)
+          {
+            to: '/docs/iceberg-maintenance/optimization/overview',
+            from: '/docs/iceberg-maintenance/optimisation/overview'
+          },
+          {
+            to: '/docs/iceberg-maintenance/optimization/configuration',
+            from: '/docs/iceberg-maintenance/optimisation/configuration'
+          },
+          {
+            to: '/docs/getting-started/configure-first-optimization',
+            from: '/docs/getting-started/configure-first-optimisation'
+          },
+          {
+            to: '/docs/benchmarks/optimization',
+            from: '/docs/benchmarks/optimisation'
+          },
+          {
+            to: '/docs/install/kubernetes-optimization',
+            from: '/docs/install/kubernetes-optimisation'
+          },
           {
             to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/docs/connectors/mongodb/benchmarks'
