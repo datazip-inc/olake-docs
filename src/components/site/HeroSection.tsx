@@ -65,7 +65,7 @@ const HeroSection: React.FC = () => {
 
           <div className='mt-3 flex flex-col items-center gap-2 font-helvetica text-sm sm:flex-row sm:text-base'>
             <Link
-              to='/docs/getting-started/setup-olake'
+              to='/docs/getting-started/quickstart'
               className='flex h-8 w-full items-center justify-center rounded-lg bg-brand-blue-500 px-4 py-1 text-center font-medium text-white hover:text-white hover:no-underline sm:h-12 sm:w-40'
             >
               Try OLake

@@ -31,9 +31,25 @@ const docSidebar = {
       label: 'Install',
       items: [
         {
-          type: 'doc',
-          id: 'install/olake-ui/index',
-          label: 'OLake UI (Docker Compose)',
+          type: 'category',
+          label: 'Docker (UI)',
+          items: [
+            {
+              type: 'doc',
+              id: 'install/olake-ui/index',
+              label: 'Docker Compose',
+            },
+            {
+              type: 'doc',
+              id: 'install/olake-ui/offline-environments-aws',
+              label: 'Offline Environments (AWS)',
+            },
+            {
+              type: 'doc',
+              id: 'install/olake-ui/offline-environments-generic',
+              label: 'Offline Environments (Generic)',
+            },
+          ],
         },
         {
           type: 'doc',
@@ -46,7 +62,7 @@ const docSidebar = {
           items: [
             {
               type: 'doc',
-              id: 'install/kubernetes-ingestion',
+              id: 'install/kubernetes',
               label: 'Ingestion',
             },
             {
@@ -64,7 +80,7 @@ const docSidebar = {
       items: [
         {
           type: 'doc',
-          id: 'getting-started/setup-olake',
+          id: 'getting-started/quickstart',
           label: 'Setup OLake',
         },
         {
@@ -85,6 +101,11 @@ const docSidebar = {
               type: 'doc',
               id: 'getting-started/alerts-and-notifications',
               label: 'Alerts and Notifications',
+            },
+            {
+              type: 'doc',
+              id: 'getting-started/playground',
+              label: 'Playground',
             },
           ],
         },

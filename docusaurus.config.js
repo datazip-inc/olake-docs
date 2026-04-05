@@ -635,12 +635,20 @@ const config = {
             from: '/docs/getting-started/configure-first-optimisation'
           },
           {
+            to: '/docs/benchmarks/ingestion',
+            from: '/docs/benchmarks'
+          },
+          {
             to: '/docs/benchmarks/optimization',
             from: '/docs/benchmarks/optimisation'
           },
           {
             to: '/docs/install/kubernetes-optimization',
             from: '/docs/install/kubernetes-optimisation'
+          },
+          {
+            to: '/docs/install/kubernetes',
+            from: '/docs/install/kubernetes-ingestion'
           },
           {
             to: '/docs/benchmarks/ingestion?tab=mongodb',
@@ -703,7 +711,7 @@ const config = {
             from: '/blog/customer-stories/astro-talk-lakehouse-transformation'
           },
           {
-            to: '/docs/getting-started/setup-olake',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/getting-started/'
           },
           {
@@ -778,7 +786,7 @@ const config = {
           },
 
           {
-            to: '/docs/getting-started/setup-olake',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/getting-started'
           },
           {
@@ -918,15 +926,15 @@ const config = {
             from: '/docs/category/resources'
           },
           {
-            to: '/docs/getting-started/setup-olake',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup'
           },
           {
-            to: '/docs/getting-started/setup-olake',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup-1'
           },
           {
-            to: '/docs/getting-started/setup-olake',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/category/setup-2'
           },
           {
@@ -995,7 +1003,7 @@ const config = {
             from: '/docs/writers/catalog/overview'
           },
           {
-            to: '/docs/getting-started/setup-olake',
+            to: '/docs/getting-started/quickstart',
             from: '/docs/writers/getting-started/overview'
           },
           {
@@ -1119,7 +1127,7 @@ const config = {
             from: '/docs/writers/connectors/postgres/config/'
           },
           {
-            to: '/docs/getting-started/setup-olake/',
+            to: '/docs/getting-started/quickstart/',
             from: '/docs/connectors/getting-started/olake-ui/'
           },
           {

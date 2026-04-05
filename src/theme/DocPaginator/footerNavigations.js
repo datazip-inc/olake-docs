@@ -3,7 +3,7 @@ export const paginationConfig = {
   '/docs': {
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -15,12 +15,12 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
   //Quickstart
-  '/docs/getting-started/setup-olake': {
+  '/docs/getting-started/quickstart': {
     previous: {
       title: 'Benchmarks',
       permalink: '/docs/benchmarks'
@@ -35,7 +35,7 @@ export const paginationConfig = {
   '/docs/getting-started/creating-first-pipeline': {
     previous: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     },
     next: {
       title: 'Playground',
@@ -51,11 +51,11 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
-  // Install Docker Compose UI
+  // Install — Docker Compose (OLake UI)
   '/docs/install/olake-ui': {
     previous: {
       title: 'Introduction',
@@ -64,6 +64,28 @@ export const paginationConfig = {
     next: {
       title: 'Create first job pipeline',
       permalink: '/docs/getting-started/creating-first-pipeline'
+    }
+  },
+
+  '/docs/install/olake-ui/offline-environments-aws': {
+    previous: {
+      title: 'Docker Compose',
+      permalink: '/docs/install/olake-ui'
+    },
+    next: {
+      title: 'Offline Environments (Generic)',
+      permalink: '/docs/install/olake-ui/offline-environments-generic'
+    }
+  },
+
+  '/docs/install/olake-ui/offline-environments-generic': {
+    previous: {
+      title: 'Offline Environments (AWS)',
+      permalink: '/docs/install/olake-ui/offline-environments-aws'
+    },
+    next: {
+      title: 'OLake CLI (Docker)',
+      permalink: '/docs/install/docker-cli'
     }
   },
 
@@ -327,7 +349,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -339,7 +361,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -351,7 +373,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -363,7 +385,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -375,7 +397,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -387,7 +409,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
@@ -399,7 +421,7 @@ export const paginationConfig = {
     },
     next: {
       title: 'Quickstart',
-      permalink: '/docs/getting-started/setup-olake'
+      permalink: '/docs/getting-started/quickstart'
     }
   },
 
