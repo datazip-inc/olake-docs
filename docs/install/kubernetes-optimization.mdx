@@ -1,13 +1,13 @@
 ---
-title: "Deploy OLake on Kubernetes | CronJob Setup & Management Guide"
-description: Learn to deploy OLake sync tasks as Kubernetes CronJobs with ConfigMaps, PVC, and manual control for automated, recurring data pipelines.
-sidebar_label: Kubernetes Ingestion Installation
+title: "Deploy OLake Optimization on Kubernetes"
+description: Deploy OLake Optimization on Kubernetes with Helm. Enable optimization services, configure Spark optimizer settings, and run compaction workflows for Iceberg tables.
+sidebar_label: Kubernetes Optimization Installation
 sidebar_position: 2
 ---
 
-# OLake UI Kubernetes Installation with Helm
+# OLake Optimization Kubernetes Installation with Helm
 
-This guide details the process for deploying OLake UI on Kubernetes using the official Helm chart.
+This guide details the process for deploying OLake Optimization on Kubernetes using the official Helm chart. The Fusion components run alongside the standard OLake stack and provide Iceberg table optimization services.
 
 ## Components
 
@@ -16,6 +16,8 @@ This guide details the process for deploying OLake UI on Kubernetes using the of
 - **PostgreSQL**: Primary database for storing job data, configurations, sync state, and Temporal visibility data
 - **Temporal**: Workflow orchestration engine for managing job execution
 - **Signup Init**: One-time initialization service that creates the default admin user
+- **Fusion**: Optimization control plane and API server
+- **Fusion Spark Optimizer**: Spark-on-Kubernetes execution layer for optimization jobs
 - **Elasticsearch (Legacy only)**: Search and indexing backend for Temporal workflow data (deprecated in new installations)
 
 <div style={{textAlign: 'center'}}>
@@ -45,6 +47,7 @@ Ensure the following requirements are met before proceeding:
   - Temporal
   - OLake workers
   - OLake UI
+  - Fusion and Spark optimizer workloads
 
 ## Quick Start
 
@@ -319,6 +322,53 @@ postgresql:
       ssl_mode: "require"
 ```
 
+### Optimization Configuration
+
+Optimization components provide Iceberg table compaction and optimization services. The documentation for optimization can be found [here](https://olake.io/docs/install/kubernetes/#optimization-configuration).
+
+To enable Optimization, set `fusion.enabled` to `true` in the `values.yaml` file:
+
+```yaml
+fusion:
+  enabled: true
+  adminUser: admin
+  adminPassword: password
+```
+
+#### Customizing Spark Optimizer Configuration
+
+The Spark optimizer in Optimization can be customized by providing additional Spark configurations via `fusion.optimizer.spark.extraConfig` and other container-specific properties via `fusion.optimizer.spark.properties`.
+
+For example, to set `spark.sql.shuffle.partitions` and `export.JAVA_HOME`:
+
+```yaml
+fusion:
+  optimizer:
+    spark:
+      extraConfig:
+        spark.sql.shuffle.partitions: "200"
+      properties:
+        export.JAVA_HOME: "/usr/lib/jvm/java-17-openjdk"
+```
+
+Refer to the [Spark documentation](https://spark.apache.org/docs/latest/configuration.html) for a comprehensive list of configurable properties for Spark containers.
+
+<details>
+<summary><strong>Optimization Scheduling</strong></summary>
+
+Configure `fusion.nodeSelector`, `fusion.tolerations`, and `fusion.affinity` in `values.yaml` to define scheduling behavior for Optimization workloads.
+These settings are applied to the Fusion pod and to Spark driver/executor pods created by Fusion. The following example shows the expected values structure:
+
+```yaml
+fusion:
+  nodeSelector:
+    workload: "fusion"
+  tolerations: []
+  affinity: {}
+```
+
+</details>
+
 ### Global Environment Variables
 
 Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, and Activity Pods:
@@ -349,6 +399,7 @@ Ensure the following images are mirrored to the private registry (`CONTAINER_REG
 - `library/busybox:latest`
 - `curlimages/curl:8.1.2`
 - `olakego/ui`, `olakego/ui-worker`
+- `olakego/fusion`, `olakego/fusion-spark`
 - `olakego/source-*` (connector images, example `1234567890123.dkr.ecr.us-east-1.amazonaws.com/dockerhub_mirror/olakego/source-mysql:v0.4.0`)
 - `temporalio/auto-setup:1.22.3`, `temporalio/ui:2.16.2`
 - `library/postgres:14-alpine`
@@ -451,8 +502,11 @@ kubectl rollout restart deployment/olake-workers
 ### Check Pod Logs
 
 ```bash
-# OLake UI logs  
+# OLake UI logs
 kubectl logs -l app.kubernetes.io/name=olake-ui -f
+
+# Fusion logs
+kubectl logs -l app.kubernetes.io/component=fusion -f
 
 # Temporal server logs
 kubectl logs -l app.kubernetes.io/name=temporal-server -f
