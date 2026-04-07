@@ -387,109 +387,112 @@ Of course. We are approaching the conclusion of our architectural blueprint. Bef
 
 ## Freaquently Asked Questions
 
-### Q1. Is Iceberg a replacement for Parquet?
-
-No. This is the most fundamental misconception. **Iceberg does not replace Parquet**; it organizes it. They operate at two different architectural layers to solve two completely different problems.
-
-Let's make this concrete. Think of your data lake as a massive digital music library.
-
-- **Parquet** files are the individual **MP3 files**. Each one is a perfectly encoded, high-fidelity container for the actual music—your data. It is the raw asset.
-
-- **Iceberg** is the **playlist**. The playlist file itself contains no music. It is a simple metadata file that points to the specific MP3s that constitute your "Workout Mix". It provides the logical grouping, the name, and the order.
-
-You can add or remove a song from the playlist (a transaction) or see what the playlist looked like last week (time travel) without ever altering the underlying MP3 files. Iceberg is the management layer; Parquet is the storage layer.
-
-### Q2. Can you use Iceberg with other file formats like ORC or Avro?
-
-Yes, absolutely. The Iceberg specification is **file-format-agnostic**. While it is most commonly used with Apache Parquet for analytical workloads due to Parquet's columnar performance benefits, it is fully capable of managing tables composed of **Apache ORC** or **Apache Avro** files. This flexibility is a core design principle, ensuring that the table format does not lock you into a single storage format.
-
-### Q3. What are the main differences between Iceberg, Delta Lake, and Hudi?
-
-All three are open table formats designed to solve similar problems (ACID transactions, schema evolution, time travel). The primary differences lie in their design philosophy and underlying implementation.
-
-- **Apache Iceberg:** Prioritizes a universal, open specification with zero engine dependencies. Its greatest strengths are **fast query planning at massive scale** (via its manifest file indexes) and **guaranteed interoperability**. It is architected to avoid the "list-then-filter" problem that can plague other formats on petabyte-scale tables, making it a robust choice for multi-engine, large-scale data lakehouses.
-
-- **Delta Lake:** Originated at Databricks and is deeply integrated with the Apache Spark ecosystem. It uses a chronological JSON transaction log (`_delta_log`) to track table state. It is often considered the most straightforward to adopt if your organization is already standardized on Databricks and Spark.
-
-- **Apache Hudi:** Originated at Uber with a strong focus on low-latency streaming ingest and incremental processing. It offers more granular control over the trade-off between write performance and read performance through its explicit **Copy-on-Write** and **Merge-on-Read** storage types.
-
-The choice is one of architectural trade-offs. Iceberg is built for interoperability and scale, Delta for deep integration with Spark, and Hudi for fine-grained control over streaming workloads.
-
-### Q4. Does using Iceberg add significant performance overhead?
-
-On the contrary, for any non-trivial table, Iceberg provides a **significant performance improvement**.
-
-The perceived "overhead" is the storage of a few extra kilobytes of metadata files. The problem it solves is the primary performance **bottleneck** in cloud data lakes: recursively listing the millions of files that make up a large table. This `LIST` operation is notoriously slow and expensive.
-
-Iceberg avoids this entirely by using its manifest files as a pre-built index of the table's data files. The query engine reads this small index to find the exact files it needs to scan, transforming a slow file-system operation into a fast metadata lookup. It trades a negligible amount of storage for a massive gain in query planning speed.
-
-### Q5. How does Iceberg handle row-level deletes on Parquet files?
-
-It's critical to remember that Parquet files are **immutable**. Iceberg never changes an existing Parquet file. Instead, it handles deletes using a metadata-driven, **merge-on-read** approach.
-
-When a `DELETE` command is issued, Iceberg creates lightweight **delete files**. These files store the path to a data file and the specific row positions within that file that are marked for deletion. At query time, the engine reads both the original Parquet data file and its associated delete file, merging them on the fly to present a view of the data where the deleted rows are filtered out.
-
-Think of it as an errata slip published for a book. The original book text is not altered, but the slip tells the reader to ignore a specific sentence on a specific page. The process of making this deletion permanent by rewriting the data files is handled by a separate, asynchronous **compaction** job.
-
-### Q6. What is the difference between Apache Parquet and Apache Iceberg?
- 
-Apache Parquet is a **columnar file format** that physically stores data on disk with efficient compression and fast analytical reads.
- 
-Apache Iceberg is an **open table format** — a metadata and management layer that sits on top of Parquet files. Iceberg does not replace Parquet; it manages collections of Parquet files to add:
- 
-- ACID transactions
-- Schema evolution
-- Time travel
-- Reliable concurrent reads and writes
-
-### Q7. Can I use Apache Iceberg without Parquet?
- 
-Yes. Apache Iceberg supports multiple underlying file formats including Parquet, Avro, and ORC, though Parquet is by far the most widely used due to its columnar efficiency and broad engine support.
- 
-Iceberg's value comes from its metadata layer, which works independently of which file format stores the actual data. You can mix file formats within the same table across different operations.
-
-### Q8. What makes Apache Iceberg better than storing raw Parquet files in S3?
- 
-Raw Parquet files in S3 lack transactional guarantees — concurrent writes can corrupt data, schema changes require full file rewrites, and there is no native time travel or partition evolution.
- 
-Apache Iceberg adds:
- 
-- **Atomic ACID commits** — writes are either fully visible or not at all
-- **Schema and partition evolution without data rewrites** — these are metadata-only operations that leave existing files untouched
-- **Full time-travel query support** — query any historical snapshot by timestamp or snapshot ID
-- **Metadata-driven file pruning** — query planners skip irrelevant files using pre-computed statistics, dramatically speeding up queries
-
-### Q9. What makes Apache Iceberg better than storing raw Parquet files in S3?
- 
-Raw Parquet files in S3 lack transactional guarantees — concurrent writes can corrupt data, schema changes require full file rewrites, and there is no native time travel or partition evolution.
- 
-Apache Iceberg adds:
- 
-- **Atomic ACID commits** — writes are either fully visible or not at all
-- **Schema and partition evolution without data rewrites** — these are metadata-only operations that leave existing files untouched
-- **Full time-travel query support** — query any historical snapshot by timestamp or snapshot ID
-- **Metadata-driven file pruning** — query planners skip irrelevant files using pre-computed statistics, dramatically speeding up queries
-
-### Q10. How does Apache Iceberg provide ACID transactions on object storage like S3?
- 
-Iceberg achieves ACID transactions through atomic metadata swaps:
- 
-1. Every write creates new Parquet data files and a new metadata JSON file independently
-2. The commit is a **single atomic pointer update** in the catalog — from the old metadata file to the new one
-3. If a write fails, the catalog pointer never changes — readers always see a consistent state
-4. Readers never acquire locks, so concurrent reads are never blocked by in-progress writes
-
-### Q9. What is the 'hidden partitioning' feature in Apache Iceberg?
- 
-Hidden partitioning means that Iceberg records partition values in its **manifest files and metadata layer**, so query engines can use these pre-recorded values to skip irrelevant files automatically — without users needing to write explicit partition filters in SQL.
- 
-Unlike Hive-style partitioning where users must write `WHERE dt = '2024-01-01'` to trigger partition pruning, Iceberg's engines handle this automatically by reading partition information from the manifests.
- 
-Key benefits:
- 
-- **Prevents user errors** — queries are correct even without explicit partition filters
-- **Simplifies SQL** — no need to know how the table is physically partitioned
-- **Enables partition evolution** — partition strategies can be changed over time without rewriting historical data. Old data written under the previous spec remains unchanged; new data is written using the new layout
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. Is Iceberg a replacement for Parquet?",
+    answer: <div>
+      <p>No. This is the most fundamental misconception. <strong>Iceberg does not replace Parquet</strong>; it organizes it. They operate at two different architectural layers to solve two completely different problems.</p>
+      <p>Let's make this concrete. Think of your data lake as a massive digital music library.</p>
+      <ul>
+        <li><strong>Parquet</strong> files are the individual <strong>MP3 files</strong>. Each one is a perfectly encoded, high-fidelity container for the actual music your data. It is the raw asset.</li>
+        <li><strong>Iceberg</strong> is the <strong>playlist</strong>. The playlist file itself contains no music. It is a simple metadata file that points to the specific MP3s that constitute your "Workout Mix". It provides the logical grouping, the name, and the order.</li>
+      </ul>
+      <p>You can add or remove a song from the playlist (a transaction) or see what the playlist looked like last week (time travel) without ever altering the underlying MP3 files. Iceberg is the management layer; Parquet is the storage layer.</p>
+    </div>
+  },
+  {
+    question: "Q2. Can you use Iceberg with other file formats like ORC or Avro?",
+    answer: <div>
+      <p>Yes, absolutely. The Iceberg specification is <strong>file-format-agnostic</strong>. While it is most commonly used with Apache Parquet for analytical workloads due to Parquet's columnar performance benefits, it is fully capable of managing tables composed of <strong>Apache ORC</strong> or <strong>Apache Avro</strong> files. This flexibility is a core design principle, ensuring that the table format does not lock you into a single storage format.</p>
+    </div>
+  },
+  {
+    question: "Q3. What are the main differences between Iceberg, Delta Lake, and Hudi?",
+    answer: <div>
+      <p>All three are open table formats designed to solve similar problems (ACID transactions, schema evolution, time travel). The primary differences lie in their design philosophy and underlying implementation.</p>
+      <ul>
+        <li><strong>Apache Iceberg:</strong> Prioritizes a universal, open specification with zero engine dependencies. Its greatest strengths are <strong>fast query planning at massive scale</strong> (via its manifest file indexes) and <strong>guaranteed interoperability</strong>. It is architected to avoid the "list then filter" problem that can plague other formats on petabyte-scale tables, making it a robust choice for multi-engine, large-scale data lakehouses.</li>
+        <li><strong>Delta Lake:</strong> Originated at Databricks and is deeply integrated with the Apache Spark ecosystem. It uses a chronological JSON transaction log (<code>_delta_log</code>) to track table state. It is often considered the most straightforward to adopt if your organization is already standardized on Databricks and Spark.</li>
+        <li><strong>Apache Hudi:</strong> Originated at Uber with a strong focus on low-latency streaming ingest and incremental processing. It offers more granular control over the trade-off between write performance and read performance through its explicit <strong>Copy-on-Write</strong> and <strong>Merge-on-Read</strong> storage types.</li>
+      </ul>
+      <p>The choice is one of architectural trade-offs. Iceberg is built for interoperability and scale, Delta for deep integration with Spark, and Hudi for fine-grained control over streaming workloads.</p>
+    </div>
+  },
+  {
+    question: "Q4. Does using Iceberg add significant performance overhead?",
+    answer: <div>
+      <p>On the contrary, for any non-trivial table, Iceberg provides a <strong>significant performance improvement</strong>.</p>
+      <p>The perceived "overhead" is the storage of a few extra kilobytes of metadata files. The problem it solves is the primary performance <strong>bottleneck</strong> in cloud data lakes: recursively listing the millions of files that make up a large table. This LIST operation is notoriously slow and expensive.</p>
+      <p>Iceberg avoids this entirely by using its manifest files as a pre-built index of the table's data files. The query engine reads this small index to find the exact files it needs to scan, transforming a slow file-system operation into a fast metadata lookup. It trades a negligible amount of storage for a massive gain in query planning speed.</p>
+    </div>
+  },
+  {
+    question: "Q5. How does Iceberg handle row-level deletes on Parquet files?",
+    answer: <div>
+      <p>It's critical to remember that Parquet files are <strong>immutable</strong>. Iceberg never changes an existing Parquet file. Instead, it handles deletes using a metadata-driven, <strong>merge-on-read</strong> approach.</p>
+      <p>When a DELETE command is issued, Iceberg creates lightweight <strong>delete files</strong>. These files store the path to a data file and the specific row positions within that file that are marked for deletion. At query time, the engine reads both the original Parquet data file and its associated delete file, merging them on the fly to present a view of the data where the deleted rows are filtered out.</p>
+      <p>Think of it as an errata slip published for a book. The original book text is not altered, but the slip tells the reader to ignore a specific sentence on a specific page. The process of making this deletion permanent by rewriting the data files is handled by a separate, asynchronous <strong>compaction</strong> job.</p>
+    </div>
+  },
+  {
+    question: "Q6. What is the difference between Apache Parquet and Apache Iceberg?",
+    answer: <div>
+      <p>Apache Parquet is a <strong>columnar file format</strong> that physically stores data on disk with efficient compression and fast analytical reads.</p>
+      <p>Apache Iceberg is an <strong>open table format</strong> a metadata and management layer that sits on top of Parquet files. Iceberg does not replace Parquet; it manages collections of Parquet files to add:</p>
+      <ul>
+        <li>ACID transactions</li>
+        <li>Schema evolution</li>
+        <li>Time travel</li>
+        <li>Reliable concurrent reads and writes</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q7. Can I use Apache Iceberg without Parquet?",
+    answer: <div>
+      <p>Yes. Apache Iceberg supports multiple underlying file formats including Parquet, Avro, and ORC, though Parquet is by far the most widely used due to its columnar efficiency and broad engine support.</p>
+      <p>Iceberg's value comes from its metadata layer, which works independently of which file format stores the actual data. You can mix file formats within the same table across different operations.</p>
+    </div>
+  },
+  {
+    question: "Q8. What makes Apache Iceberg better than storing raw Parquet files in S3?",
+    answer: <div>
+      <p>Raw Parquet files in S3 lack transactional guarantees concurrent writes can corrupt data, schema changes require full file rewrites, and there is no native time travel or partition evolution.</p>
+      <p>Apache Iceberg adds:</p>
+      <ul>
+        <li><strong>Atomic ACID commits</strong> writes are either fully visible or not at all</li>
+        <li><strong>Schema and partition evolution without data rewrites</strong> these are metadata-only operations that leave existing files untouched</li>
+        <li><strong>Full time-travel query support</strong> query any historical snapshot by timestamp or snapshot ID</li>
+        <li><strong>Metadata-driven file pruning</strong> query planners skip irrelevant files using pre-computed statistics, dramatically speeding up queries</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q9. How does Apache Iceberg provide ACID transactions on object storage like S3?",
+    answer: <div>
+      <p>Iceberg achieves ACID transactions through atomic metadata swaps:</p>
+      <ol>
+        <li>Every write creates new Parquet data files and a new metadata JSON file independently</li>
+        <li>The commit is a <strong>single atomic pointer update</strong> in the catalog from the old metadata file to the new one</li>
+        <li>If a write fails, the catalog pointer never changes readers always see a consistent state</li>
+        <li>Readers never acquire locks, so concurrent reads are never blocked by in-progress writes</li>
+      </ol>
+    </div>
+  },
+  {
+    question: "Q10. What is the 'hidden partitioning' feature in Apache Iceberg?",
+    answer: <div>
+      <p>Hidden partitioning means that Iceberg records partition values in its <strong>manifest files and metadata layer</strong>, so query engines can use these pre-recorded values to skip irrelevant files automatically without users needing to write explicit partition filters in SQL.</p>
+      <p>Unlike Hive-style partitioning where users must write <code>WHERE dt = '2024-01-01'</code> to trigger partition pruning, Iceberg's engines handle this automatically by reading partition information from the manifests.</p>
+      <p>Key benefits:</p>
+      <ul>
+        <li><strong>Prevents user errors</strong> queries are correct even without explicit partition filters</li>
+        <li><strong>Simplifies SQL</strong> no need to know how the table is physically partitioned</li>
+        <li><strong>Enables partition evolution</strong> partition strategies can be changed over time without rewriting historical data. Old data written under the previous spec remains unchanged; new data is written using the new layout</li>
+      </ul>
+    </div>
+  }
+]} />
 
 ## Conclusion
 

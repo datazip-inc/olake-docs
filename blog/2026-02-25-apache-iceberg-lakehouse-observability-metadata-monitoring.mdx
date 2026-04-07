@@ -431,6 +431,68 @@ It’s worth comparing Iceberg’s observability features to what’s available 
 
 In summary, **Iceberg stands out by making metadata a first-class citizen** of the data lake. As one blog noted, “unlike Hive or traditional file-based formats, where visibility depends on limited tooling, Iceberg exposes information as structured, queryable tables”. This design philosophy gives data engineers a uniform way to inspect and manage table health. While Delta and Hudi have their own strengths and do provide some monitoring capabilities, Iceberg’s comprehensive metadata tables and new metrics reporter framework offer an arguably more **unified and flexible observability toolkit.**
 
+## Freaquently Asked Questions
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. What are the four core components of OLake's modular architecture?",
+    answer: <div>
+      <p>OLake's architecture is built around four main components:</p>
+      <ol>
+        <li><strong>Core Framework:</strong> The central orchestrator that coordinates the entire data pipeline lifecycle, including command-line interface, configuration management, concurrency management, state management, and monitoring</li>
+        <li><strong>Drivers (Sources):</strong> Database-specific connectors for MongoDB, PostgreSQL, MySQL, and other supported sources. Each driver is autonomous with its own dependencies, keeping the overall binary size minimal</li>
+        <li><strong>Writers (Destinations):</strong> Components that write data to Apache Iceberg, local Parquet files, and other supported destinations</li>
+        <li><strong>Protocol Layer:</strong> Defines the interfaces and abstractions so sources and destinations remain interchangeable. The Type System, which handles data type conversions and schema management across different database and lakehouse type systems, is a sub-component of the Protocol Layer, not a separate top-level component</li>
+      </ol>
+    </div>
+  },
+  {
+    question: "Q2. How does OLake's CDC (Change Data Capture) mechanism work for ongoing replication?",
+    answer: <div>
+      <p>After the initial full snapshot, OLake switches to CDC mode to capture ongoing changes using the native replication mechanism of each source:</p>
+      <ul>
+        <li><strong>PostgreSQL:</strong> Uses logical replication slots and WAL events via the <code>pgoutput</code> protocol, scoped by a PostgreSQL publication. CDC uses a single WAL reader thread that distributes messages to multiple dedicated writer threads (one per stream)</li>
+        <li><strong>MySQL:</strong> Reads the binary log (binlog) using a single-reader/multi-writer pattern. One thread reads and maintains precise binlog position for resumability, while multiple writer threads process filtered events concurrently</li>
+        <li><strong>MongoDB:</strong> Tails change streams (built on top of the oplog) for near real-time updates after the snapshot completes</li>
+      </ul>
+      <p>Each captured event (insert, update, delete) is processed by the Type System, normalized to the target schema, and written as an Iceberg snapshot with atomic commit semantics, ensuring no partial writes reach the destination.</p>
+    </div>
+  },
+  {
+    question: "Q3. What is parallel chunking in OLake and how does it speed up large data loads?",
+    answer: <div>
+      <p>Parallel chunking splits a large source table into non-overlapping segments based on primary key ranges (MySQL) or CTID ranges (PostgreSQL), then assigns each segment to a separate worker thread. All chunks are read, transformed, and written to Iceberg concurrently.</p>
+      <p>A table that would take 4 hours to copy sequentially might complete in 30 minutes with 8 parallel threads. The number of threads is configurable per pipeline via <code>max_threads</code>. OLake caps active readers and writers accordingly to balance throughput against source database load and prevent CPU, memory, or network oversubscription.</p>
+    </div>
+  },
+  {
+    question: "Q4. How does OLake ensure data consistency during parallel writes to Apache Iceberg?",
+    answer: <div>
+      <p>OLake follows Iceberg's ACID commit protocol:</p>
+      <ol>
+        <li>Each worker thread is assigned a chunk of data and writes its Parquet data files to object storage independently and concurrently</li>
+        <li>After all workers complete their file writes, OLake performs a <strong>single atomic metadata commit</strong> that registers all new Parquet files under the Iceberg table format via an <code>AddFiles</code> (<code>REGISTER</code>) operation in one operation</li>
+      </ol>
+      <p>This ensures readers either see the complete batch or nothing. There are no partial states visible to concurrent readers during a bulk load. If an ingestion job fails midway, there is zero risk of a downstream consumer reading a partial or corrupted dataset.</p>
+    </div>
+  },
+  {
+    question: "Q5. What databases and destinations does OLake currently support?",
+    answer: <div>
+      <p><strong>Sources:</strong></p>
+      <ul>
+        <li>PostgreSQL, MySQL, MongoDB, IBM Db2, Microsoft SQL Server (MSSQL), and Kafka, all with full CDC support using native database logs (<code>pgoutput</code>, binlogs, oplogs)</li>
+        <li>Oracle supports Full Refresh and Incremental Sync only. <strong>Full CDC mode for Oracle is currently work-in-progress.</strong> Verify the latest status in OLake's official documentation before planning an Oracle CDC pipeline</li>
+      </ul>
+      <p><strong>Destinations:</strong></p>
+      <ul>
+        <li>Apache Iceberg on S3-compatible object storage (AWS S3, GCS, Azure Blob, MinIO) with support for REST catalogs (Lakekeeper, Tabular), AWS Glue, Hive Metastore, Nessie, Polaris, and Unity Catalog</li>
+        <li>Local Parquet files for development and testing</li>
+      </ul>
+      <p>OLake is actively expanding its source and destination coverage. Check the official documentation for the latest supported connectors.</p>
+    </div>
+  },
+]} />
+
 ## Conclusion
 Apache Iceberg brings much-needed observability to data lakes in a seamless, SQL-driven way. By introspecting table metadata, data engineers can monitor everything from file counts and sizes to schema changes and historical growth **all using the same engines and tools they use for data queries**. We saw how Iceberg’s metadata tables (history, snapshots, files, partitions, etc.) act as a built-in monitoring dashboard, and how new metrics reporters enable real-time alerts and automated maintenance. This means fewer surprises in production: you can catch issues like too many small files or an unexpected schema tweak before they wreak havoc on your pipelines. Iceberg essentially turns metadata into an **“always-on” guardian** of your data lake’s health.
 

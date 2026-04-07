@@ -123,6 +123,161 @@ In distributed systems, things go wrong. A Spark executor might crash, or a netw
 
 Think of this like construction debris left behind after a building is finished. The building is functional, but the site is cluttered. Running a regular `remove_orphan_files` procedure is a reliable way to sweep the underlying storage and delete any files that are not tracked by a valid snapshot. This ensures that your cloud storage costs reflect only the data you are actually using.
 
+## Freaquently Asked Questions
+
+<Faq showHeading={false} data={[
+  {
+    question: "What is Change Data Capture (CDC) and why is it better than snapshot ETL for data lake ingestion?",
+    answer: <div>
+      <p>Change Data Capture is a data integration technique that monitors a source database's transaction logs to capture every individual INSERT, UPDATE, and DELETE as it happens in real time, rather than periodically copying the entire table.</p>
+
+      <p>Traditional snapshot ETL (full table export once every 24 hours) creates three major problems that CDC eliminates:</p>
+
+      <ol>
+        <li><strong>Data staleness:</strong> Any analysis is based on data up to 24 hours old, making time-sensitive decisions unreliable.</li>
+        <li><strong>Source database strain:</strong> Full table scans during off-hours degrade production performance and create fragile scheduling dependencies (a single failure leads to outdated data for the entire day).</li>
+        <li><strong>Operational brittleness:</strong> Batch jobs either fully succeed or fully fail, with no graceful degradation.</li>
+      </ol>
+
+      <p>CDC solves these issues by streaming row-level changes continuously from transaction logs, minimizing load on the source system and processing data incrementally so failures affect only small time windows instead of entire batch runs.</p>
+    </div>
+  },
+
+  {
+    question: "What are the four main architectural patterns for CDC ingestion into Apache Iceberg and when should you use each?",
+    answer: <div>
+      <p>CDC ingestion into Apache Iceberg typically follows four architectural patterns, each with different trade-offs:</p>
+
+      <ol>
+        <li>
+          <strong>Direct Materialization</strong>
+          <ul>
+            <li>Streams CDC events from Kafka via Flink or Spark</li>
+            <li>Performs immediate UPSERTs into Iceberg tables</li>
+            <li><strong>Pros:</strong> Lowest latency ingestion</li>
+            <li><strong>Cons:</strong> High number of small delete files and frequent snapshots</li>
+            <li><strong>Use when:</strong> Sub-minute freshness is critical and compaction is in place</li>
+          </ul>
+        </li>
+
+        <li>
+          <strong>Raw Change Log</strong>
+          <ul>
+            <li>Appends every CDC event as a new row</li>
+            <li>No reconciliation or rewriting of data</li>
+            <li><strong>Pros:</strong> Perfect audit trail, easy replay</li>
+            <li><strong>Cons:</strong> Expensive reads due to merge-on-read processing</li>
+            <li><strong>Use when:</strong> Compliance and audit requirements dominate query performance needs</li>
+          </ul>
+        </li>
+
+        <li>
+          <strong>Hybrid Medallion Approach</strong>
+          <ul>
+            <li>Bronze layer stores raw CDC events</li>
+            <li>Silver/Gold layers updated via asynchronous MERGE INTO jobs</li>
+            <li><strong>Pros:</strong> Decouples ingestion speed from query performance</li>
+            <li><strong>Cons:</strong> More pipeline complexity</li>
+            <li><strong>Use when:</strong> Most production analytics systems</li>
+          </ul>
+        </li>
+
+        <li>
+          <strong>Continuous Compaction</strong>
+          <ul>
+            <li>Ingests data using equality deletes</li>
+            <li>Runs tiered compaction (Minor → Major → Full)</li>
+            <li>Gradually converts delete files into clean data files</li>
+            <li><strong>Pros:</strong> Prevents accumulation of delete files</li>
+            <li><strong>Cons:</strong> Requires sophisticated orchestration</li>
+            <li><strong>Use when:</strong> High-scale CDC systems requiring stable long-term performance</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+  },
+
+  {
+    question: "What is the difference between Copy-on-Write and Merge-on-Read in Apache Iceberg for CDC workloads and which should you choose?",
+    answer: <div>
+      <p>Copy-on-Write (CoW) and Merge-on-Read (MoR) are two different strategies for handling updates and deletes in Iceberg.</p>
+
+      <ol>
+        <li>
+          <strong>Copy-on-Write (CoW)</strong>
+          <ul>
+            <li>Rewrites entire data files when rows change</li>
+            <li><strong>Pros:</strong> Fast reads, no runtime merge needed</li>
+            <li><strong>Cons:</strong> Expensive writes for high-churn data, slow ingestion under heavy updates</li>
+          </ul>
+        </li>
+
+        <li>
+          <strong>Merge-on-Read (MoR)</strong>
+          <ul>
+            <li>Writes delete files instead of rewriting data files</li>
+            <li>Uses:
+              <ul>
+                <li>Position delete files (row-level location-based deletion)</li>
+                <li>Equality delete files (primary key-based deletion)</li>
+              </ul>
+            </li>
+            <li><strong>Pros:</strong> Fast ingestion, works well with high update frequency</li>
+            <li><strong>Cons:</strong> Read-time overhead due to merge processing ("Read Tax")</li>
+          </ul>
+        </li>
+      </ol>
+
+      <p><strong>Recommendation:</strong> Use Merge-on-Read for CDC ingestion, and control read overhead through scheduled compaction. A hybrid approach often converts MoR outputs into CoW-style clean files during background compaction.</p>
+    </div>
+  },
+
+  {
+    question: "How does Apache Iceberg handle schema evolution in CDC pipelines without breaking downstream consumers?",
+    answer: <div>
+      <p>Iceberg handles schema evolution using immutable column IDs instead of names or positions, making it safe for CDC pipelines.</p>
+
+      <ol>
+        <li><strong>Column identity:</strong> Every column is assigned a unique, permanent ID at creation time.</li>
+        <li><strong>Renaming columns:</strong> Only metadata changes; data files remain valid because they reference column IDs.</li>
+        <li><strong>Adding columns:</strong> New column is added with a new ID; existing files return null for that column.</li>
+        <li><strong>No rewrites required:</strong> Existing Parquet files and downstream queries continue working without modification.</li>
+      </ol>
+
+      <p>This design prevents pipeline breakage and avoids costly data rewrites when schemas evolve in upstream systems.</p>
+    </div>
+  },
+
+  {
+    question: "Why is time-based partitioning a poor choice for CDC workloads in Apache Iceberg and what should you use instead?",
+    answer: <div>
+      <p>Time-based partitioning (event_day, created_at_month, etc.) works well for append-only systems but performs poorly in CDC workloads where historical data is frequently updated.</p>
+
+      <ol>
+        <li>
+          <strong>Scattered writes:</strong> Updates to old records force writes into old partitions, spreading I/O across the entire dataset.
+        </li>
+        <li>
+          <strong>High fragmentation:</strong> Frequent updates create many small files across many partitions, degrading performance.
+        </li>
+        <li>
+          <strong>Inefficient compaction:</strong> Cleanup operations must scan across multiple historical partitions.
+        </li>
+      </ol>
+
+      <p><strong>Better alternative:</strong> Use bucketing or hidden partitioning based on primary key (e.g., bucket(user_id, 128)). This ensures:</p>
+
+      <ul>
+        <li>Updates for the same entity land in the same bucket</li>
+        <li>Localized writes instead of scattered historical writes</li>
+        <li>Reduced fragmentation and faster compaction</li>
+      </ul>
+
+      <p>Iceberg’s hidden partitioning makes this transparent to ingestion pipelines while significantly improving CDC performance.</p>
+    </div>
+  }
+]} />
+
 ## Conclusion
 
 Building a reliable CDC pipeline with Apache Iceberg is about selecting the right architectural patterns to handle the friction between real-time data and immutable storage. We have moved from the brittle world of daily snapshots to a future-proof model where data flows continuously and remains immediately actionable. To succeed, architects must embrace a strategy that prioritizes robust ingestion while maintaining a high-performance query experience for the end user.
