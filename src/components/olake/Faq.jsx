@@ -13,17 +13,13 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
         <div className='text-base font-bold leading-6 text-gray-900 dark:text-white'>
           {question}
         </div>
-        <div
-          className={`text-xl transition-transform duration-200 ease-in-out ${
-            expanded ? 'rotate-180' : ''
-          } text-gray-900 dark:text-white`}
-        >
-          &#9660;
-        </div>
+        <div className='text-2xl text-gray-400 dark:text-gray-500 flex-shrink-0 ml-4'>
+        {expanded ? '↑' : '↓'}
+      </div>
       </div>
       {expanded && (
         <div className='mt-3 px-2'>
-          <div className='text-sm font-normal leading-relaxed text-gray-700 dark:text-gray-300'>
+          <div className='text-sm font-normal leading-relaxed text-gray-900 dark:text-gray-500'>
             {answer}
           </div>
         </div>
