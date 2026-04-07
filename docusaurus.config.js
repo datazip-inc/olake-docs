@@ -643,10 +643,6 @@ const config = {
             from: '/docs/benchmarks/optimisation'
           },
           {
-            to: '/docs/install/kubernetes-optimization',
-            from: '/docs/install/kubernetes-optimisation'
-          },
-          {
             to: '/docs/install/kubernetes',
             from: '/docs/install/kubernetes-ingestion'
           },

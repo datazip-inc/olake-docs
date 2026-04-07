@@ -23,9 +23,30 @@ const sectionHeader = (title) => ({
 const docSidebar = {
   // module.exports = {
   docSidebar: [
-    // GETTING STARTED
-    sectionHeader("GETTING STARTED"),
+    // OVERVIEW
+    sectionHeader("Overview"),
     'intro',
+    {
+      type: 'category',
+      label: 'Benchmarks',
+      items: [
+        {
+          type: 'doc',
+          id: 'benchmarks/ingestion',
+          label: 'Ingestion Benchmarks',
+        },
+        {
+          type: 'doc',
+          id: 'benchmarks/optimization',
+          label: 'Optimization Benchmarks',
+        },
+        {
+          type: 'doc',
+          id: 'dmsvsolake',
+          label: 'AWS DMS vs OLake',
+        },
+      ],
+    },
     {
       type: 'category',
       label: 'Install',
@@ -54,53 +75,41 @@ const docSidebar = {
         {
           type: 'doc',
           id: 'install/docker-cli',
-          label: 'OLake CLI (Docker)',
+          label: 'Docker Compose (CLI)',
         },
         {
-          type: 'category',
+          type: 'doc',
+          id: 'install/kubernetes',
           label: 'Kubernetes Installation',
-          items: [
-            {
-              type: 'doc',
-              id: 'install/kubernetes',
-              label: 'Ingestion',
-            },
-            {
-              type: 'doc',
-              id: 'install/kubernetes-optimization',
-              label: 'Optimization',
-            },
-          ],
         },
       ],
     },
+
+    // SERVICES
+    sectionHeader("SERVICES"),
     {
       type: 'category',
-      label: 'Quickstart',
+      label: 'Ingestion',
       items: [
         {
           type: 'doc',
-          id: 'getting-started/quickstart',
-          label: 'Setup OLake',
+          id: 'features/index',
+          label: 'Overview',
         },
+        
         {
           type: 'category',
-          label: 'Ingestion',
+          label: 'Quickstart',
           items: [
+            {
+              type: 'doc',
+              id: 'getting-started/quickstart',
+              label: 'Getting Started',
+            },
             {
               type: 'doc',
               id: 'getting-started/creating-first-pipeline',
               label: 'Create Your First Job Pipeline',
-            },
-            {
-              type: 'doc',
-              id: 'getting-started/job-level-properties',
-              label: 'Job level Features',
-            },
-            {
-              type: 'doc',
-              id: 'getting-started/alerts-and-notifications',
-              label: 'Alerts and Notifications',
             },
             {
               type: 'doc',
@@ -111,7 +120,170 @@ const docSidebar = {
         },
         {
           type: 'category',
-          label: 'Optimization',
+          label: 'Sources',
+          items: [
+            {
+              type: 'doc',
+              id: 'connectors/postgres/index',
+              label: 'PostgreSQL',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/mongodb/index',
+              label: 'MongoDB',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/mysql/index',
+              label: 'MySQL',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/oracle/index',
+              label: 'Oracle',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/kafka/index',
+              label: 'Kafka',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/db2/index',
+              label: 'DB2 LUW',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/s3/index',
+              label: 'S3',
+            },
+            {
+              type: 'doc',
+              id: 'connectors/mssql/index',
+              label: 'MSSQL',
+            },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Destinations',
+          items: [
+            {
+              type: 'category',
+              label: 'Apache Iceberg',
+              items: [
+                {
+                  type: 'category',
+                  label: 'Catalogs',
+                  items: [
+                    {
+                      type: 'doc',
+                      id: 'writers/iceberg/catalog/glue',
+                      label: 'AWS Glue',
+                    },
+                    {
+                      type: 'doc',
+                      id: 'writers/iceberg/catalog/rest',
+                      label: 'REST Catalog',
+                    },
+                    {
+                      type: 'doc',
+                      id: 'writers/iceberg/catalog/jdbc',
+                      label: 'JDBC Catalog',
+                    },
+                    {
+                      type: 'doc',
+                      id: 'writers/iceberg/catalog/hive',
+                      label: 'Hive Metastore',
+                    },
+                  ],
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/iceberg/partitioning',
+                  label: 'Data Partitioning',
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/iceberg/azure',
+                  label: 'Iceberg On Azure',
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/iceberg/gcp',
+                  label: 'Iceberg on Google Cloud',
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/iceberg/troubleshooting-local',
+                  label: 'Troubleshooting & Local Testing',
+                },
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Parquet Writer',
+              items: [
+                {
+                  type: 'doc',
+                  id: 'writers/parquet/config',
+                  label: 'Configuration',
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/parquet/permission',
+                  label: 'IAM Permissions',
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/parquet/partitioning',
+                  label: 'Partitioning',
+                },
+                {
+                  type: 'doc',
+                  id: 'writers/parquet/troubleshoot',
+                  label: 'Troubleshooting',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Features',
+          items: [
+            {
+              type: 'doc',
+              id: 'getting-started/job-level-properties',
+              label: 'Job level features',
+            },
+            {
+              type: 'doc',
+              id: 'getting-started/alerts-and-notifications',
+              label: 'Alerts & Notifications',
+            },
+          ],
+        },
+        {
+          type: 'doc',
+          id: 'understanding/terminologies/olake',
+          label: 'Properties',
+        },
+      ],
+    },
+
+    {
+      type: 'category',
+      label: 'Iceberg Maintenance',
+      items: [
+        {
+          type: 'doc',
+          id: 'iceberg-maintenance/overview',
+          label: 'Overview',
+        },
+        {
+          type: 'category',
+          label: 'Quickstart',
           items: [
             {
               type: 'doc',
@@ -120,193 +292,43 @@ const docSidebar = {
             },
           ],
         },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Benchmarks',
-      items: [
         {
           type: 'doc',
-          id: 'benchmarks/ingestion',
-          label: 'Ingestion Benchmarks',
-        },
-        {
-          type: 'doc',
-          id: 'benchmarks/optimization',
-          label: 'Optimization Benchmarks',
-        },
-      ],
-    },
-
-    // INGESTION
-    sectionHeader("INGESTION"),
-    {
-      type: 'category',
-      label: 'Sources',
-      items: [
-        {
-          type: 'doc',
-          id: 'connectors/postgres/index',
-          label: 'PostgreSQL',
-        },
-        {
-          type: 'doc',
-          id: 'connectors/mysql/index',
-          label: 'MySQL',
-        },
-        {
-          type: 'doc',
-          id: 'connectors/mongodb/index',
-          label: 'MongoDB',
-        },
-        {
-          type: 'doc',
-          id: 'connectors/oracle/index',
-          label: 'Oracle',
-        },
-        {
-          type: 'doc',
-          id: 'connectors/kafka/index',
-          label: 'Kafka',
-        },
-        {
-          type: 'doc',
-          id: 'connectors/s3/index',
-          label: 'S3',
-        },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Destinations',
-      items: [
-        {
-          type: 'category',
-          label: 'Apache Iceberg',
-          items: [
-            {
-              type: 'category',
-              label: 'Catalogs',
-              items: [
-                {
-                  type: 'doc',
-                  id: 'writers/iceberg/catalog/glue',
-                  label: 'AWS Glue',
-                },
-                {
-                  type: 'doc',
-                  id: 'writers/iceberg/catalog/rest',
-                  label: 'REST Catalog',
-                },
-                {
-                  type: 'doc',
-                  id: 'writers/iceberg/catalog/hive',
-                  label: 'Hive Metastore',
-                },
-                {
-                  type: 'doc',
-                  id: 'writers/iceberg/catalog/jdbc',
-                  label: 'JDBC Catalog',
-                },
-              ],
-            },
-            {
-              type: 'doc',
-              id: 'writers/iceberg/partitioning',
-              label: 'Data Partitioning',
-            },
-            {
-              type: 'doc',
-              id: 'writers/iceberg/azure',
-              label: 'Iceberg On Azure',
-            },
-            {
-              type: 'doc',
-              id: 'writers/iceberg/gcp',
-              label: 'Iceberg on Google Cloud',
-            },
-            {
-              type: 'doc',
-              id: 'writers/iceberg/troubleshooting-local',
-              label: 'Troubleshooting & Local Testing',
-            },
-          ],
+          id: 'iceberg-maintenance/catalogs',
+          label: 'Catalogs',
         },
         {
           type: 'category',
-          label: 'Parquet Writer',
+          label: 'Optimization',
           items: [
             {
               type: 'doc',
-              id: 'writers/parquet/config',
+              id: 'iceberg-maintenance/optimization/overview',
+              label: 'Types of Optimization',
+            },
+            {
+              type: 'doc',
+              id: 'iceberg-maintenance/optimization/configuration',
               label: 'Configuration',
             },
-            {
-              type: 'doc',
-              id: 'writers/parquet/permission',
-              label: 'IAM Permissions',
-            },
-            {
-              type: 'doc',
-              id: 'writers/parquet/partitioning',
-              label: 'Partitioning',
-            },
-            {
-              type: 'doc',
-              id: 'writers/parquet/troubleshoot',
-              label: 'Troubleshooting',
-            },
           ],
         },
-      ],
-    },
-
-    // ICEBERG MAINTENANCE
-    sectionHeader("ICEBERG MAINTENANCE"),
-    'iceberg-maintenance/overview',
-    {
-      type: 'doc',
-      id: 'iceberg-maintenance/catalogs',
-      label: 'Catalogs',
-    },
-    {
-      type: 'category',
-      label: 'Optimization',
-      items: [
         {
           type: 'doc',
-          id: 'iceberg-maintenance/optimization/overview',
-          label: 'Overview',
+          id: 'iceberg-maintenance/runs-and-logs',
+          label: 'Logs & Runs',
         },
         {
           type: 'doc',
-          id: 'iceberg-maintenance/optimization/configuration',
-          label: 'Configuration',
+          id: 'iceberg-maintenance/metrics',
+          label: 'Metrics',
         },
       ],
     },
-    {
-      type: 'doc',
-      id: 'iceberg-maintenance/runs-and-logs',
-      label: 'Logs & Runs',
-    },
-    {
-      type: 'doc',
-      id: 'iceberg-maintenance/metrics',
-      label: 'Metrics',
-    },
 
+    // UNDERSTANDING OLAKE
     sectionHeader("UNDERSTANDING OLAKE"),
-    {
-      type: 'category',
-      label: 'Terminologies',
-      items: [
-        'understanding/terminologies/general',
-        'understanding/terminologies/olake',
-      ],
-    },
-    'features/index',
+    'understanding/terminologies/general',
     'core/architecture',
     'understanding/compatibility-catalogs',
     'understanding/compatibility-engines',
@@ -332,11 +354,11 @@ const docSidebar = {
     'community/code-of-conduct',
     'community/channels',
 
-    
+    // RELEASE NOTES
     sectionHeader("RELEASE NOTES"),
     {
       type: 'category',
-      label: 'Versions',
+      label: 'Ingestion',
       items: [
         'release/overview',
         'release/v0.5.0',
@@ -356,7 +378,13 @@ const docSidebar = {
         'release/v0.1.0-v0.1.1',
       ],
     },
-    
+    {
+      type: 'category',
+      label: 'Optimization',
+      items: [
+        'release/overview'
+      ],
+    },
   ],
 };
 
