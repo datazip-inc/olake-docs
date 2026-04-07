@@ -122,7 +122,7 @@ const RegistrationSection: React.FC = () => {
 
               {/* HubSpot form container - hidden, will be used for actual form submission */}
 
-              <div className='mt-6 text-[7px] text-gray-500 sm:text-xs'>
+              <div className='invisible mt-6 text-[7px] sm:text-xs' aria-hidden>
                 OLake makes data replication faster by parallelising full loads, leveraging change
                 streams for real-time sync, and pulling data in a lake house
               </div>
@@ -196,8 +196,8 @@ const RegistrationSection: React.FC = () => {
                         Faster & More Efficient
                       </div>
                       <div className='break-words pr-4 text-[11px] text-gray-100 md:text-sm'>
-                        Instead of directly transforming data from Databases during extraction, we
-                        first pull it in its native format.
+                      OLake makes data replication faster by parallelising full loads,
+                      leveraging change streams for real-time sync, and pulling data in a lake house.
                       </div>
                     </div>
                   </div>

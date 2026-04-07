@@ -621,16 +621,42 @@ const config = {
           return undefined
         },
         redirects: [
+          // British → American spelling (`optimization` URLs)
           {
-            to: '/docs/benchmarks?tab=mongodb',
+            to: '/docs/iceberg-maintenance/optimization/overview',
+            from: '/docs/iceberg-maintenance/optimisation/overview'
+          },
+          {
+            to: '/docs/iceberg-maintenance/optimization/configuration',
+            from: '/docs/iceberg-maintenance/optimisation/configuration'
+          },
+          {
+            to: '/docs/getting-started/configure-first-optimization',
+            from: '/docs/getting-started/configure-first-optimisation'
+          },
+          {
+            to: '/docs/benchmarks/ingestion',
+            from: '/docs/benchmarks'
+          },
+          {
+            to: '/docs/benchmarks/optimization',
+            from: '/docs/benchmarks/optimisation'
+          },
+          {
+            to: '/docs/install/kubernetes',
+            from: '/docs/install/kubernetes-ingestion'
+          },
+
+          {
+            to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/docs/connectors/mongodb/benchmarks'
           },
           {
-            to: '/docs/benchmarks?tab=postgres',
+            to: '/docs/benchmarks/ingestion?tab=postgres',
             from: '/docs/connectors/postgres/benchmarks'
           },
           {
-            to: '/docs/benchmarks?tab=mysql',
+            to: '/docs/benchmarks/ingestion?tab=mysql',
             from: '/docs/connectors/mysql/benchmarks'
           },
           {
@@ -650,7 +676,7 @@ const config = {
             from: '/olake/mongodb/framework'
           },
           {
-            to: '/docs/benchmarks?tab=mongodb',
+            to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/olake/mongodb/benchmark'
           },
           {
@@ -1098,7 +1124,7 @@ const config = {
             from: '/docs/writers/connectors/postgres/config/'
           },
           {
-            to: '/docs/getting-started/olake-ui/',
+            to: '/docs/getting-started/quickstart/',
             from: '/docs/connectors/getting-started/olake-ui/'
           },
           {
