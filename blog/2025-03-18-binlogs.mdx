@@ -202,4 +202,62 @@ Let’s dive into some lesser-known but crucial aspects of MySQL binlogs that ev
 ### Final Thought:
 Understanding these nuances gives you more control over how MySQL behaves, especially in complex environments where replication and recovery are critical. Binlogs are powerful, but like any powerful tool, they need to be managed carefully to avoid pitfalls and get the most out of them.
 
+## Frequently Asked Questions
+
+### Q1. What are MySQL binary logs (binlogs) and what do they record?
+ 
+MySQL binary logs (binlogs) are files that record every data-modification operation — INSERT, UPDATE, and DELETE statements — in chronological order. They do not log read-only SELECT queries.
+ 
+Binlogs can store information in three formats:
+ 
+- **Statement-based** — Records the actual SQL statement
+- **Row-based** — Records exact row-level before and after values for every changed row
+- **Mixed** — Uses statement-based by default, switching to row-based for queries that could produce inconsistent results
+ 
+> **Important:** `binlog_format` is deprecated as of MySQL 8.0.34 and is subject to removal in a future version. Row-based logging is now the default and the only recommended format for new MySQL replication and CDC setups.
+ 
+Binlogs are used for replication, point-in-time recovery, auditing, and Change Data Capture pipelines.
+ 
+### Q2. How do MySQL binlogs enable Change Data Capture (CDC) for data pipelines?
+ 
+CDC tools like OLake read MySQL binlogs to capture every data change without querying the source tables directly. The binlog records every insert, update, and delete as a stream of events. A CDC tool connects to MySQL as a replica, reads this stream, and forwards the changes to downstream systems like Apache Iceberg or data warehouses.
+ 
+This approach adds zero query load to the source database and delivers near-real-time data replication.
+ 
+> **Requirement:** For CDC to work correctly, `binlog_format` must be set to `ROW`. Statement-based or mixed format binlogs do not provide the exact before/after row values that CDC tools require to reconstruct changes reliably.
+
+### Q3. What is the difference between statement-based, row-based, and mixed binlog format?
+ 
+- **Statement-based logging** — Records the actual SQL statement (e.g. `UPDATE users SET age=30 WHERE id=5`). Uses less storage but risks inconsistency if the same query produces different results on a replica (e.g. queries using `UUID()`, `USER()`, or `AUTO_INCREMENT` with triggers). Only recommended when the binary log must be kept as small as possible and all functions are guaranteed deterministic.
+ 
+- **Row-based logging** — Records the exact before and after values for every changed row. Safer and more storage-intensive, but ensures perfect consistency. This is the safest format and the only one recommended for new replication setups.
+ 
+- **Mixed logging** — Uses statement-based by default and automatically switches to row-based for specific unsafe operations — including queries using `UUID()`, `AUTO_INCREMENT` columns updated with triggers, `USER()`, and `CURRENT_USER()`.
+ 
+> **Deprecation note:** `binlog_format` is deprecated as of MySQL 8.0.34. Statement-based and mixed formats are being phased out — row-based logging is the only format recommended for all new MySQL setups.
+ 
+### Q4. How can MySQL binlogs be used for point-in-time database recovery?
+ 
+If your database is corrupted or data is accidentally deleted, you can restore a backup from before the incident and then replay binlogs up to the exact moment just before the problem occurred.
+ 
+MySQL's `mysqlbinlog` utility extracts SQL or row events from binlog files by time range or log position. This gives you surgical recovery to any specific point in time rather than being forced to restore the entire backup from hours or days earlier.
+
+### Q5. What binlog retention settings should I configure for CDC pipelines?
+ 
+For CDC pipelines to work reliably, binlog retention must be longer than the maximum expected gap between syncs.
+ 
+**Recommended minimum: 7 days (604800 seconds)**
+ 
+- Use `binlog_expire_logs_seconds` on MySQL 8.0+ (takes precedence over `expire_logs_days` if both are set). The default is 2592000 seconds (30 days) — verify this has not been reduced in your environment.
+- Set to at least **604800 seconds (7 days)** — this is the consistent recommendation across CDC tool documentation and Percona's operational guidelines.
+ 
+If binlogs are deleted before a CDC tool catches up — such as after lag during maintenance or an outage — the tool cannot bridge the gap and must perform a full re-snapshot of the source tables, which can take hours for large datasets.
+ 
+> **Amazon RDS users:** The default `binlog retention hours` on RDS for MySQL is `NULL`, meaning binary logs are **not retained at all** unless explicitly configured. Set retention using:
+> ```sql
+> CALL mysql.rds_set_configuration('binlog retention hours', 168);
+> ```
+> This sets the maximum of 168 hours (7 days) on RDS.
+
+
 <BlogCTA/>

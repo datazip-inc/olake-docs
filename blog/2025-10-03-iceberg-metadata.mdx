@@ -513,7 +513,57 @@ In a Hive-style lake, auditing is a reactive and difficult process, often requir
 
 Furthermore, compliance requirements that were once a nightmare are now straightforward. For financial audits requiring perfect reproducibility, you can use time travel to query a table's exact state from a specific snapshot ID, providing a cryptographically certain view of the data at that time. For privacy regulations like GDPR or CCPA, which require the "right to be forgotten," Iceberg's row-level delete capabilities provide a surgical solution. Instead of a massive, risky job to rewrite entire partitions, you can issue a simple DELETE statement. This creates a new snapshot that clearly and auditably reflects the removal of specific data, simplifying compliance workflows immensely.
 
-## 14. Summary: The Metadata is the Architecture
+## 14. Freaquently Asked Questions
+
+### Q1. What is Apache Iceberg metadata and why does it matter?
+ 
+Apache Iceberg metadata is a multi-layered system of JSON and Avro files — catalog pointer → `metadata.json` → manifest list → manifest files — that fully describes a table's schema, partitioning, snapshots, and exact data file locations.
+ 
+It matters because it replaces slow, costly directory listings with fast, versioned file indexes, enabling ACID transactions, time travel, and concurrent reads/writes on a plain object store like S3.
+ 
+ ### Q2. What files make up Apache Iceberg's metadata layer?
+ 
+Four distinct layers make up Iceberg's metadata:
+1. **Catalog:** Stores a pointer to the current metadata file (e.g. `version-hint.text`). This is the single entry point engines use to find the table.
+2. **Table Metadata File (`metadata.json`):** Contains the full table schema, partition specs, and complete snapshot history. Every schema change and table operation produces a new version of this file.
+3. **Manifest List:** An Avro file listing all manifest files for a given snapshot, along with partition-level statistics and boundaries used for partition pruning.
+4. **Manifest Files:** List individual data files with column-level statistics including min/max values (serialized to bytes), null counts, and row counts used for file-level pruning during query planning. 
+> **Note:** A manifest file stores either data files or delete files — not both. Manifests containing delete files are scanned first during query planning.
+
+### Q3. How does Apache Iceberg achieve ACID transactions without a traditional database?
+ 
+Iceberg uses a **compare-and-swap (CAS)** atomic operation on the catalog. The process works as follows:
+ 
+1. Writers prepare all new data and metadata files independently, without locking the table
+2. The writer then attempts to atomically swap the catalog's pointer from the old `metadata.json` to the new one
+3. If this single pointer update succeeds, the transaction is committed and immediately visible to all readers
+4. If it fails due to a concurrent write, the table remains unchanged and the operation retries
+ 
+No locks, no corruption — readers always see a consistent snapshot.
+ 
+> **Important:** Iceberg's ACID guarantees are optimized for analytics workloads. They are not designed as a replacement for RDBMS-level concurrent OLTP transactions — Iceberg does not support `BEGIN/COMMIT TRANSACTION` semantics across multiple statements or tables.
+
+### Q4. What is the difference between Iceberg metadata and Hive Metastore metadata?
+ 
+The Hive Metastore stores schema and partition **directory paths** and requires engines to perform costly `LIST` operations on those directories to find actual files. In cloud environments, listing millions of files just to plan a query is slow and expensive.
+ 
+Iceberg metadata, by contrast, tracks **individual files** with rich column-level statistics. A query engine resolves the full file list entirely through fast metadata reads — it never lists directories. File pruning happens at the manifest level using pre-computed min/max and null count statistics, not at query runtime.
+ 
+Additionally, Hive's metastore is deeply involved in every query planning cycle, while Iceberg's catalog is consulted only once to fetch the current `metadata.json` path — all subsequent planning uses the local metadata files.
+
+### Q5. How do you recover from a bad data pipeline run in Apache Iceberg?
+ 
+Recovery is a **metadata-only operation** that takes seconds:
+ 
+1. Identify the last known-good snapshot ID from the table's snapshot log (visible in `metadata.json` or via `SELECT * FROM table.snapshots`)
+2. Execute a rollback command pointing `current-snapshot-id` back to that snapshot
+3. The atomic commit makes the rollback immediately visible to all readers
+ 
+The corrupt data files from the bad run are now **orphaned** — no snapshot references them. They will be safely deleted by the next garbage collection run with no manual file cleanup required.
+ 
+
+
+## 15. Summary: The Metadata is the Architecture
 
 Throughout this deep dive, one principle stands above all others: in Apache Iceberg, the metadata is the architecture. It's far more than simple bookkeeping or a secondary index; it is the intelligent, self-contained backbone that elevates a collection of files into a true, high-performance database table on the data lake.
 

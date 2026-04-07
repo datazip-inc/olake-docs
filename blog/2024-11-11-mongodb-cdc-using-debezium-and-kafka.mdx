@@ -1023,5 +1023,48 @@ To further explore Debezium, Kafka, and their integrations with MongoDB, here ar
     
 * **Monitoring Kafka with Prometheus and Grafana:** https://grafana.com/docs/grafana/latest/datasources/prometheus/
 
+## Frequently Asked Questions
+
+### Q1. Does Debezium read directly from MongoDB's oplog?
+ 
+No. While the oplog is the underlying source of truth, Debezium's MongoDB connector does not read the oplog directly. It delegates change capture to MongoDB's Change Streams feature, which abstracts oplog access into a clean event stream API. This is the recommended approach since MongoDB 4.x and avoids dealing with the raw oplog format.
     
+### Q2. What happens when the MongoDB primary fails and a new primary is elected?
+ 
+Debezium handles this automatically. When it detects a primary change, it stops streaming from the old primary, connects to the new primary, and resumes from the same oplog position. It uses exponential backoff when reconnecting to avoid overwhelming the replica set during transitions.
+ 
+No manual intervention is typically needed for normal failovers. However, if reconnection attempts exceed the configured maximum (`connect.max.attempts`), the connector will fail and require a manual restart.
+
+### Q3. Why is Debezium slow at processing changes for multiple collections simultaneously?
+ 
+Debezium is JVM-based and does not parallelize CDC across multiple collections or perform parallel full-load snapshots for a single collection.
+ 
+For a sharded cluster, you can increase `tasks.max` beyond the number of **replica sets** (each shard in a sharded cluster is its own replica set) to allow per-replica-set parallelism — tasks are assigned per replica set, not per shard directly. This allows the connector to create one task for each replica set and lets Kafka Connect coordinate and distribute those tasks across available worker processes.
+ 
+For large initial snapshots, plan for significant time — Debezium's single-threaded snapshotting means big collections can take hours.
+
+### Q4. What MongoDB permissions does the Debezium user need?
+ 
+The MongoDB user needs:
+ 
+- **Read access to the `admin` database** — where the oplog lives
+- **Read access to the `config` database** — required for sharded clusters
+- **`listDatabases` privilege** — to enumerate available databases
+- **Cluster-wide `find` and `changeStream` privilege actions** — required when using Change Streams (the default mode since MongoDB 4.x)
+ 
+Always create a dedicated, least-privilege user for Debezium rather than using a superuser account.
+ 
+### Q5. What causes silent ingestion failures in Debezium, and how can I prevent them?
+ 
+Silent failures often occur from:
+ 
+- **Schema evolution:** A new field or renamed collection that the connector isn't configured to handle
+- **Oplog overrun:** The cursor position was lost because MongoDB purged the oplog while the connector was inactive, creating an offset mismatch. The connector may appear to be running while actually not processing any changes
+- **Kafka topic mismatches:** Events are emitted to unexpected topics, causing downstream consumers to silently miss data
+ 
+To prevent them:
+- **Enable heartbeat messages:** Debezium will emit periodic heartbeats even when no changes are captured, so you can detect stalled pipelines. This is especially important when only non-captured collections are being written to, which would otherwise allow the oplog to rotate without the connector noticing
+- **Use a schema registry:** for schema evolution to handle new fields and type changes without breaking the pipeline
+- **Set monitoring alerts:** on connector lag and restart counts to catch issues before they become data gaps
+ 
 <BlogCTA/>

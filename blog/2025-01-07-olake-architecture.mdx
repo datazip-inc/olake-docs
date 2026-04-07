@@ -241,4 +241,55 @@ Feel free to explore the official OLake documentation or check out our open-sour
 
 By keeping performance, schema fidelity, and modular design at the forefront, OLake stands poised to simplify real-time data replication for modern analytics.
 
+## Frequently Asked Questions
+### Q1. What is OLake's core architecture for database-to-lakehouse replication?
+ 
+OLake is built around four modular components:
+ 
+- **CLI and UI** — Two distinct interfaces (command-line and web UI) that share the same underlying core framework
+- **Core Framework** — Orchestrates the entire data flow pipeline, handling state management, configuration validation, logging, and type detection
+- **Connectors / Drivers** — Source-specific plugins for MongoDB, PostgreSQL, MySQL, and other supported databases
+- **Writers** — Destination plugins for Apache Iceberg on S3 and local Parquet files
+ 
+Each component has a single responsibility and is independently extensible — adding a new source or destination does not require changes to the core framework. Each connector is also autonomous, with its own dependencies kept separate to minimize binary size.
+
+### Q2. How does OLake perform the initial historical data load for large tables?
+ 
+OLake splits large tables into parallel chunks and processes them concurrently across multiple worker threads. Chunking strategies vary by source:
+ 
+- **MongoDB** — Uses a timestamp-based strategy that generates chunk boundaries from the `_id` field's embedded timestamp
+- **PostgreSQL** — Uses CTID ranges, batch-size splits, and next-query paging
+ 
+Each chunk is independently processed by a dedicated thread, enabling concurrent extraction that can be configured via the `max_threads` setting in the source configuration. OLake also uses checkpointing to track chunk-level progress so a failed sync resumes from the last completed chunk rather than restarting the entire load.
+ 
+### Q3. What destinations does OLake currently support for writing replicated data?
+ 
+OLake supports:
+ 
+- **Apache Iceberg** on S3-compatible object storage (AWS S3, MinIO, GCS, Azure Blob) as its primary lakehouse destination
+- **Local Parquet files** for development and testing — writes to a local directory or uploads directly to an S3 bucket
+ 
+When writing to Iceberg, OLake registers tables with any supported Iceberg catalog including REST catalogs (Lakekeeper, Tabular), AWS Glue, Hive Metastore, Nessie, Polaris, and Unity Catalog.
+ 
+ ### Q4. How does OLake handle schema evolution during replication without data loss?
+ 
+When source table schemas change — new columns added, types changed — OLake detects the mismatch against the current Iceberg table schema and applies Iceberg's native schema evolution:
+ 
+- **New columns** are added via metadata-only operations without rewriting existing data files
+- **Compatible type promotions** (`int → bigint`, `float → double`) are applied automatically using Iceberg v2 widening promotion rules
+- **Incompatible type changes** (e.g. `INT → STRING`) are handled by routing the conflicting values to a Dead Letter Queue (DLQ) column, preventing sync failures and keeping downstream models stable without data loss
+ 
+ ### Q5. What makes OLake faster than traditional ETL tools for database replication?
+ 
+OLake achieves higher throughput through several architectural decisions:
+ 
+- **Parallel chunking** — Multiple table segments are processed concurrently rather than sequentially
+- **Direct Parquet writes** — Data flows directly from the driver into the destination, eliminating unnecessary read-and-write cycles to local disk and intermediate formats
+- **Apache Arrow as the columnar memory format** — Arrow data is already in columnar layout, so writing to Parquet requires only encoding and compression with no O(n) restructuring cost and no memory copying — just pointer arithmetic
+- **CDC for ongoing replication** — Only changed rows are read after the initial load, dramatically reducing ongoing data transfer
+ 
+OLake is benchmarked at approximately **7x faster than tools like Airbyte and Fivetran** for full historical loads, with the Arrow-based writer delivering an additional **1.75x throughput improvement** over OLake's previous internal writer.
+ 
+
+
 <BlogCTA/>

@@ -205,6 +205,64 @@ So, how do you decide between Apache Iceberg and Delta Lake, and when should you
 - You're implementing CDC pipelines or real-time data correction
 - Write performance is more critical than absolute read performance
 
+## Frequently Asked Questions
+### Q1. What are position deletes and equality deletes in Apache Iceberg v2?
+ 
+**Position delete files** store the exact file path and row position (row number) of deleted records in a separate delete file. **Equality delete files** store the column values of deleted rows — for example, all rows where `customer_id` equals `12345`.
+ 
+- **Position deletes** — efficient to read (direct index lookup) but expensive to write if many files are affected
+- **Equality deletes** — fast to write during CDC but require scanning every row at read time to apply the deletion criteria
+ 
+> **v3 deprecation note:** Position delete files are a v2-specific mechanism. In Iceberg v3, position delete files must not be added to new tables — v3 tables must use deletion vectors instead. Existing position delete files written under v2 remain valid and readable.
+
+### Q2. What is the difference between Merge-on-Read and Copy-on-Write deletion strategies?
+ 
+**Copy-on-Write (COW)** — when a row is deleted or updated, Iceberg rewrites the entire affected Parquet file with the change applied immediately. Reads are fast since there are no delete files to reconcile, but writes are expensive due to full file rewrites.
+ 
+**Merge-on-Read (MOR)** — deletions are recorded as separate small delete files and merged with data files at query time. Writes are fast and cheap, but reads are slightly slower since the engine must merge delete information on every query.
+ 
+| | Copy-on-Write | Merge-on-Read |
+|---|---|---|
+| Write cost | High (full file rewrite) | Low (small delete file) |
+| Read cost | Low (no delete files) | Slightly higher (merge at query time) |
+| Best for | Read-heavy, infrequent updates | Write-heavy, frequent CDC updates |
+
+### Q3. How do deletion vectors in Apache Iceberg v3 improve on v2 delete methods?
+ 
+Iceberg v3 introduces compact binary **deletion vectors (DVs)** stored in **Puffin sidecar files** — small companion files paired with each data file (e.g. `file_A.parquet` is paired with `file_A.puffin`). Each Puffin file contains a Roaring bitmap encoding the row positions of all deleted rows in the corresponding data file.
+ 
+This is a significant improvement over v2's approach:
+ 
+- **Eliminates accumulation of many small positional delete files** across object storage — a common v2 pain point at scale
+- **Reduces metadata complexity** — multiple deletion vectors can be stored in a single Puffin file, lowering file count overhead
+- **Faster scan filtering** — bitmap-based lookups allow engines to skip deleted rows much faster than reconciling scattered delete files
+- **Reduces both read and write amplification** compared to v2's separate positional or equality delete files
+ 
+> **Important:** Deletion vectors are a v3-only feature. They are not supported in v2 or earlier tables. Once a table is upgraded to use DVs, clients that do not support v3 will be unable to read it.
+
+### Q4. How does Delta Lake handle row-level deletions compared to Apache Iceberg?
+ 
+Delta Lake defaults to **Copy-on-Write** for the open-source version — rewriting affected files on `DELETE`, `UPDATE`, or `MERGE`. Databricks-managed Delta introduced **Deletion Vectors** that mark row-level changes without full file rewrites, similar to Iceberg v3's approach.
+ 
+Notably, Iceberg v3 DVs and Delta Lake DVs use compatible binary encodings — Databricks actively contributed deletion vectors to the Iceberg v3 specification specifically for cross-format interoperability. The two formats are converging on this feature rather than diverging.
+ 
+Open-source Delta's DV support is still maturing with some connectors lacking full read/write support, whereas Iceberg's delete strategies have broader ecosystem compatibility across Spark, Trino, Flink, and DuckDB.
+ 
+### Q5. When should I choose Copy-on-Write over Merge-on-Read for Iceberg tables?
+ 
+**Choose Copy-on-Write when:**
+- Your workload is read-heavy with infrequent updates
+- Reports and analytics dashboards query the same data many times, no delete-file overhead at read time means consistently fast queries
+- Data freshness requirements are low and writes are batched
+ 
+**Choose Merge-on-Read (equality or position deletes in v2, deletion vectors in v3) when:**
+- Your workload is write-heavy with frequent CDC updates and deletes
+- You are replicating an OLTP database where rows change constantly
+- COW's full file rewrites would become a throughput bottleneck at scale
+ 
+For most CDC pipelines (OLake, Debezium, Flink CDC), MOR is the correct default, the write volume makes COW impractical, and query engines like Trino handle the merge overhead efficiently.
+
+
 ## Wrapping Up: The Practical Takeaways
 
 Let's bring this full circle with the key points you should remember:

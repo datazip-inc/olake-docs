@@ -1099,7 +1099,62 @@ When you're done exploring, shut everything down cleanly so Docker resources don
 Need a completely fresh start (wipes data, buckets, Postgres catalog, etc.)? Use `docker compose down -v` inside the OLake UI repo, `docker-compose down -v` in this repo, and optionally `docker network prune` to clean up dangling networks.
 
 ---
+## Freaquently Asked Questions:
+### Q1. How do you connect ClickHouse to Apache Iceberg tables stored in MinIO?
 
+ClickHouse connects to Apache Iceberg through its `DataLakeCatalog` engine, which integrates with an Iceberg REST catalog that tracks table metadata and points to data files in MinIO.
+ 
+You create a **database** (not individual tables) using the `DataLakeCatalog` engine, this gives ClickHouse access to all tables in the specified namespace:
+ 
+```sql
+CREATE DATABASE demo
+ENGINE = DataLakeCatalog('http://rest:8181/v1', 'admin', 'password')
+SETTINGS
+    catalog_type = 'rest',
+    storage_endpoint = 'http://minio:9000/lakehouse',
+    warehouse = 'demo';
+```
+ 
+> **Note:** Backticks are required when querying tables with multi-level namespace paths, as ClickHouse does not natively support more than one namespace level in dot notation.
+ 
+Once configured, ClickHouse queries Iceberg tables through this database connection as if they were native ClickHouse tables.
+
+### Q2. What is OLake's role in the ClickHouse and Apache Iceberg lakehouse architecture?
+
+OLake acts as the CDC ingestion engine that captures changes from MySQL (or other databases) via binlog replication and writes them directly as Apache Iceberg tables in MinIO. It orchestrates the full pipeline from source to Iceberg without requiring Kafka or Spark, making the data immediately available for ClickHouse to query through the Iceberg REST catalog.
+
+### Q3. How does CDC from MySQL work in the OLake and ClickHouse Iceberg setup?
+
+OLake uses MySQL binlog-based CDC to capture every `INSERT`, `UPDATE`, and `DELETE` from the source database in real time. The full flow:
+ 
+1. OLake reads the MySQL binlog stream and processes change events
+2. Changes are written as Iceberg snapshots to a MinIO bucket
+3. An Iceberg REST catalog, backed by PostgreSQL metadata storage, tracks the current table state, schemas, snapshots, and manifest file locations
+4. ClickHouse queries this catalog to discover table schemas and file locations, always reading the latest committed snapshot
+
+### Q4. What is the three-layer architecture in a ClickHouse Iceberg lakehouse?
+
+The three layers follow the standard medallion architecture:
+ 
+| Layer | Contents | Performance |
+|---|---|---|
+| **Bronze** | Raw Iceberg tables written directly by OLake CDC unfiltered, original partitioning | Slower; unoptimized file layout |
+| **Silver** | Cleaned, filtered, and optimized Iceberg tables rewritten by ClickHouse for common query patterns | Faster; optimized layout and partitioning |
+| **Gold** | Pre-aggregated, business-ready summary tables stored in ClickHouse local MergeTree storage | Fastest; pre-computed metrics for instant dashboard queries |
+ 
+Queries on raw Bronze data are slower due to unoptimized file layout. Silver and Gold layers provide dramatically faster analytics for production dashboards.
+
+### Q5. Can I run this entire ClickHouse and Iceberg lakehouse stack locally with Docker?
+
+Yes. The complete stack, OLake UI, MySQL source database, MinIO object storage, Iceberg REST catalog, and ClickHouse; can be launched on a local machine using a single command:
+ 
+```bash
+docker compose up -d
+```
+ 
+This makes it straightforward to prototype the full lakehouse architecture before deploying to a cloud environment.
+
+---
 ## Where to Go Next
 
 * **Scale Up:** Point additional OLTP sources (PostgreSQL, SQL Server, Mongo CDC) into OLake while reusing the same Iceberg destination and ClickHouse readers.

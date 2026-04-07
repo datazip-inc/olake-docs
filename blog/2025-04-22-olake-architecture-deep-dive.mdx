@@ -1300,6 +1300,58 @@ OLake's architecture is guided by several key design principles:
 
 These principles ensure that OLake remains efficient, maintainable, and extensible as it evolves.
 
+## Frequently Asked Questions
+### Q1. What are the four core components of OLake's modular architecture?
+ 
+OLake's architecture is built around four main components:
+ 
+1. **Core Framework** — The central orchestrator that coordinates the entire data pipeline lifecycle, including command-line interface, configuration management, concurrency management, state management, and monitoring
+ 
+2. **Drivers (Sources)** — Database-specific connectors for MongoDB, PostgreSQL, MySQL, and other supported sources. Each driver is autonomous with its own dependencies, keeping the overall binary size minimal
+ 
+3. **Writers (Destinations)** — Components that write data to Apache Iceberg, local Parquet files, and other supported destinations
+ 
+4. **Protocol Layer** — Defines the interfaces and abstractions so sources and destinations remain interchangeable. The Type System — which handles data type conversions and schema management across different database and lakehouse type systems — is a sub-component of the Protocol Layer, not a separate top-level component
+ 
+### Q2. How does OLake's CDC (Change Data Capture) mechanism work for ongoing replication?
+ 
+After the initial full snapshot, OLake switches to CDC mode to capture ongoing changes using the native replication mechanism of each source:
+ 
+- **PostgreSQL** — Uses logical replication slots and WAL events via the `pgoutput` protocol, scoped by a PostgreSQL publication. CDC uses a single WAL reader thread that distributes messages to multiple dedicated writer threads (one per stream)
+- **MySQL** — Reads the binary log (binlog) using a single-reader/multi-writer pattern: one thread reads and maintains precise binlog position for resumability, while multiple writer threads process filtered events concurrently
+- **MongoDB** — Tails change streams (built on top of the oplog) for near real-time updates after the snapshot completes
+ 
+Each captured event (insert, update, delete) is processed by the Type System, normalized to the target schema, and written as an Iceberg snapshot with atomic commit semantics — ensuring no partial writes reach the destination.
+
+### Q3. What is parallel chunking in OLake and how does it speed up large data loads?
+ 
+Parallel chunking splits a large source table into non-overlapping segments based on primary key ranges (MySQL) or CTID ranges (PostgreSQL), then assigns each segment to a separate worker thread. All chunks are read, transformed, and written to Iceberg concurrently.
+ 
+A table that would take 4 hours to copy sequentially might complete in 30 minutes with 8 parallel threads. The number of threads is configurable per pipeline via `max_threads` — OLake caps active readers and writers accordingly to balance throughput against source database load and prevent CPU, memory, or network oversubscription.
+ 
+### Q4. How does OLake ensure data consistency during parallel writes to Apache Iceberg?
+ 
+OLake follows Iceberg's ACID commit protocol:
+ 
+1. Each worker thread is assigned a chunk of data and writes its Parquet data files to object storage independently and concurrently
+2. After all workers complete their file writes, OLake performs a **single atomic metadata commit** that registers all new Parquet files under the Iceberg table format via an `AddFiles` (`REGISTER`) operation in one operation
+ 
+This ensures readers either see the complete batch or nothing — there are no partial states visible to concurrent readers during a bulk load. If an ingestion job fails midway, there is zero risk of a downstream consumer reading a partial or corrupted dataset.
+
+### Q5. What databases and destinations does OLake currently support?
+ 
+**Sources:**
+ 
+- PostgreSQL, MySQL, MongoDB, IBM Db2, Microsoft SQL Server (MSSQL), and Kafka — all with full CDC support using native database logs (`pgoutput`, binlogs, oplogs)
+- Oracle — supports Full Refresh and Incremental Sync only. **Full CDC mode for Oracle is currently work-in-progress** — verify the latest status in OLake's official documentation before planning an Oracle CDC pipeline
+ 
+**Destinations:**
+ 
+- Apache Iceberg on S3-compatible object storage (AWS S3, GCS, Azure Blob, MinIO) with support for REST catalogs (Lakekeeper, Tabular), AWS Glue, Hive Metastore, Nessie, Polaris, and Unity Catalog
+- Local Parquet files for development and testing
+ 
+OLake is actively expanding its source and destination coverage — check the official documentation for the latest supported connectors.
+ 
 
 ## Conclusion
 

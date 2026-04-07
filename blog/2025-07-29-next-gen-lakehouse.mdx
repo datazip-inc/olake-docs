@@ -368,6 +368,73 @@ Security  stays one of the important concerns but lakekeeper enforces OIDC authe
 | Centralized auth | - | - | ✓ (via Lakekeeper/OPA) |
 | Engine-agnostic metadata | ✓ | ✓ | ✓ |
 
+## Frequently Asked Questions
+### Q1. What is Lakekeeper and how is it different from other Iceberg catalogs?
+ 
+Lakekeeper is an open-source Apache Iceberg REST Catalog written in Rust, designed to turn ordinary object storage into a fully governed Iceberg lakehouse.
+ 
+Key differentiators from Hive Metastore or AWS Glue:
+ 
+- **No JVM or Python runtime required** — ships as a single binary executable for all major platforms
+- **Natively implements the Iceberg REST Catalog API** — no adapters or shims needed; compatible with any Iceberg-compatible engine out of the box
+- **Enterprise access control** — hooks into OPA and OpenFGA for table, column, and row-level permissions
+- **Cloud-agnostic** — works with AWS S3, GCS, Azure Blob, and MinIO
+ 
+> **Dependency note:** While Lakekeeper eliminates the JVM overhead of Hive Metastore, production deployments do require a **PostgreSQL persistence backend** (currently the only supported metadata database) and a **secret store**. It is not entirely dependency-free — but the operational footprint is significantly smaller than Hive Metastore.
+
+### Q2. How do OLake and Lakekeeper work together for real-time data ingestion?
+ 
+OLake captures Change Data Capture events from operational databases (MongoDB, PostgreSQL, MySQL) and needs to commit Iceberg snapshots to object storage in a governed, discoverable way. Lakekeeper acts as the REST catalog authority throughout this process:
+ 
+1. OLake checks what tables exist through Lakekeeper's REST API
+2. OLake registers new tables and schema changes via Lakekeeper
+3. OLake commits new Iceberg snapshots through Lakekeeper
+ 
+This ensures every write is immediately discoverable and governed across all query engines — Trino, Spark, PyIceberg, and others — the moment the commit completes.
+
+### Q3. What is Trino's role in the Iceberg, OLake, and Lakekeeper lakehouse stack?
+ 
+Trino is the distributed SQL query engine that provides the analytics layer. After OLake writes data as Iceberg snapshots and Lakekeeper manages the metadata:
+ 
+- Trino connects to Lakekeeper's REST catalog using its native Iceberg connector
+- Trino discovers tables and reads current metadata from Lakekeeper
+- Trino executes federated SQL queries with massively parallel processing (MPP), delivering sub-second results on large datasets
+ 
+Full Iceberg feature support is available through Trino including time travel queries, partition pruning, and predicate pushdown — all metadata served by Lakekeeper.
+
+### Q4. Why should I choose Lakekeeper over Hive Metastore for Iceberg table management?
+ 
+| | Hive Metastore | Lakekeeper |
+|---|---|---|
+| Runtime | Requires JVM | Single Rust binary, no JVM |
+| Iceberg support | Requires adapter | Native REST Catalog spec |
+| Authentication | Basic | OIDC + OpenFGA/OPA |
+| Cloud support | Limited | S3, GCS, Azure Blob, MinIO |
+| Metadata backend | MySQL or PostgreSQL | PostgreSQL |
+ 
+The key practical differences:
+ 
+- **No JVM** — Lakekeeper eliminates the JVM dependency and operational overhead of Hive Metastore
+- **Native Iceberg REST API** — no adapter or compatibility layer needed; all Iceberg-compatible engines connect directly
+- **Modern auth** — OIDC identity provider integration and fine-grained access control via OpenFGA out of the box
+ 
+> **Note:** Lakekeeper still requires a PostgreSQL instance as its metadata persistence backend — it replaces Hive Metastore's JVM and adapter complexity, not its need for a backing database.
+
+### Q5. What is the complete data flow in the Iceberg, OLake, and Lakekeeper stack?
+ 
+The end-to-end flow across the four components:
+ 
+1. **OLake** captures database changes (inserts, updates, deletes) from MongoDB, PostgreSQL, or MySQL via CDC and writes Iceberg snapshots — Parquet data files and metadata — directly to object storage (S3, MinIO, GCS, Azure Blob)
+ 
+2. **Lakekeeper** manages all table metadata via its REST Catalog API, tracking which metadata file represents the current state of each table. PostgreSQL serves as Lakekeeper's backing metadata store.
+ 
+3. **Trino** connects its Iceberg connector to Lakekeeper, discovers tables and their current metadata, then executes distributed SQL queries by reading Parquet data files from object storage in parallel across worker nodes
+ 
+All three components operate in real time — a CDC event committed by OLake is immediately visible to Trino via Lakekeeper with no additional sync or polling step required.
+ 
+
+
+
 ## Conclusion
 
 We've covered a modern open-source lakehouse setup: **Iceberg for storage**, **OLake for loading data**, **Lakekeeper for metadata**, and **Trino for querying**.

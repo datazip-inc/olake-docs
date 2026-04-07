@@ -410,6 +410,66 @@ for {
 }
 ```
 
+## Frequently Asked Questions
+### Q1. What chunking strategies does OLake use to maximize parallel data extraction speed?
+
+OLake dynamically selects chunking strategies per database engine:
+
+- **MongoDB:** Three strategies are available:
+  - **Split Vector:** Calls MongoDB's internal `splitVector` command to compute chunk boundaries based on actual `_id` data distribution. Only works when all `_id` fields are ObjectIDs — collections with mixed or non-ObjectID `_id` types (UUIDs, integers, strings) will cause this strategy to fail and should use Bucket Auto instead
+  - **Bucket Auto:** Uses MongoDB's `$bucketAuto` aggregation stage to divide a collection into balanced buckets. Used as a fallback when `splitVector` is unavailable (e.g. MongoDB Atlas) or when `_id` fields are non-ObjectID types
+  - **Timestamp-based:** Generates chunk boundaries from time ranges derived from the `_id` field's embedded timestamp
+
+- **PostgreSQL** — Uses CTID range chunking based on physical storage page ranges, plus batch-size splits and next-query paging
+
+- **MySQL** — Uses primary key range splitting
+
+Each strategy ensures chunks are balanced to avoid skewed workloads across threads.
+
+### Q2. How does OLake's Split Vector strategy work for MongoDB parallel loading?
+
+The Split Vector strategy calls MongoDB's internal `splitVector` command on the target collection, specifying a maximum chunk size (default 1024MB):
+
+```js
+db.adminCommand({
+  splitVector: "your_collection",
+  keyPattern: { "_id": 1 },
+  maxChunkSize: 1024
+})
+```
+
+MongoDB calculates split points based on the collection's actual data distribution and `_id` values, returning balanced chunk boundaries. OLake uses these boundaries to create independent read ranges, each processed by a separate worker thread simultaneously.
+
+This data-distribution-aware approach avoids the skew that occurs with simple range or time-based splitting.
+
+> **Limitation:** Split Vector assumes all documents have ObjectID `_id` fields. Collections where `_id` fields are strings, integers, or UUIDs will cause this strategy to fail — use Bucket Auto for those collections instead.
+
+### Q3. What is the Bucket Auto chunking strategy in OLake and when is it used?
+
+Bucket Auto uses MongoDB's `$bucketAuto` aggregation stage to automatically divide a collection into a specified number of equal-sized buckets based on document distribution.
+
+OLake uses Bucket Auto in two scenarios:
+
+1. **When `splitVector` is unavailable:** for example, on MongoDB Atlas, which restricts the `splitVector` command due to its privileged admin access requirement
+2. **When `_id` fields are non-ObjectID types:** collections with UUID, integer, or string `_id` fields are incompatible with Split Vector and should use Bucket Auto instead
+
+Bucket Auto provides similar balanced chunking without requiring privileged admin access, using the standard aggregation framework.
+
+### Q4. How does OLake's parallel execution model prevent overwhelming the source database?
+
+OLake allows configuring the maximum number of concurrent threads via the `max_threads` setting in `source.json`. This caps how many parallel reads hit the source database simultaneously, preventing CPU, I/O, and connection pool saturation.
+
+For sensitive production databases, teams can set a conservative thread count. The chunking ensures each thread reads a non-overlapping portion of the table, so there is no contention between threads. OLake caps active readers and writers accordingly to prevent CPU, memory, or network oversubscription.
+
+### Q5. What makes OLake's CDC sync more efficient than batch replication for ongoing data pipelines?
+
+After the initial full load, OLake switches to CDC mode which reads only the database change log:
+
+- **PostgreSQL:** WAL (Write-Ahead Log) via `pgoutput`
+- **MySQL:** Binary log (binlog)
+- **MongoDB:** Oplog or change streams
+
+Instead of re-scanning the entire table on every sync, OLake captures only the rows that changed since the last sync — typically orders of magnitude smaller than the full table. CDC also provides near-real-time latency (seconds instead of hours) and consumes minimal source database resources since it reads from the log, not the primary tables.
 
 
 <BlogCTA/>

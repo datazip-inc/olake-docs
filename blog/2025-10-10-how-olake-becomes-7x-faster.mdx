@@ -539,6 +539,56 @@ Now if you have seen our headline about 7x or 700% improvement, here is the proo
 - **Better scalability**: Performance scales linearly with additional threads and partitions
 
 ---
+## Freaquently Asked Questions
+### Q1. Why was OLake's previous Iceberg writer slow?
+ 
+The previous writer used Debezium-format RPC communication with a Java Iceberg server, causing:
+ 
+- **Unnecessary serialization and deserialization overhead** — data was repeatedly converted between formats crossing the Go-to-Java boundary
+- **Double data buffers** that inflated memory usage beyond what the workload required
+- **A partition writer that closed files on every new partition record** — creating excessive small file overhead
+- **Heavy JVM-side processing** that created throughput bottlenecks at scale
+
+### Q2. How did OLake achieve a 7x performance improvement in Iceberg writes?
+ 
+OLake rebuilt its writer by making three key architectural changes:
+ 
+1. **Go/Java split** — shifted all data processing to Go (which excels at concurrency and fast data handling) and kept Java only for Iceberg I/O operations, where the Java Iceberg library remains the most mature implementation
+2. **Single 10k-record batch** — eliminated double data buffers in favor of one buffer with a 10k batch size, reducing memory footprint and increasing throughput
+3. **Full chunk commits** — writes complete 4GB chunks before committing (compressing to approximately 350MB files), rather than committing on every partition boundary
+ 
+**Apache Arrow** was subsequently introduced as a further optimization on top of this refactor — eliminating the Go-to-Java gRPC bridge for data writes entirely and enabling direct Parquet writes from the Go layer.
+
+### Q3. What is the role of Apache Arrow in OLake's new Iceberg writer?
+ 
+Apache Arrow provides a columnar in-memory data format that allows OLake's Go processing layer to write data directly to Parquet files without going through the Java server for data records.
+ 
+Arrow gives programs a shared memory format so they can understand the same data without translating it — cutting out slow serialization work. In OLake's architecture this means:
+ 
+- The Go layer handles all data path operations using Arrow's columnar format
+- The expensive Go-to-Java gRPC bridge for data writes is eliminated entirely
+- Java APIs are used only for Iceberg metadata management
+ 
+This cut down huge amounts of serialization overhead and JVM churn that remained after the initial 7x refactor.
+
+### Q4. What is schema evolution in the context of OLake Iceberg writes?
+ 
+Schema evolution means updating the Iceberg table schema when source tables gain new columns or change column types. OLake's writer handles this by:
+ 
+1. Detecting a schema change in the incoming CDC stream
+2. Closing the current Parquet writer cleanly
+3. Opening a new writer configured with the updated schema
+ 
+This ensures no data is lost during the transition, and queries on old snapshots still work correctly — Iceberg's metadata-only schema evolution guarantees that existing data files remain valid and readable under the old schema.
+
+### Q5. How does OLake ensure exactly-once writes to Apache Iceberg?
+ 
+OLake follows Iceberg's atomic commit model:
+ 
+1. Data files are written to object storage first, independently of the metadata layer
+2. A single metadata swap then commits the new snapshot atomically
+ 
+If a write fails mid-way, the old snapshot remains intact and readers never see partial data. Go's concurrency model ensures clean retry behavior — parsing, schema evolution, buffering, and batch management all happen in Go, preventing duplicate commits even under retry scenarios.
 
 
 ## Conclusion
