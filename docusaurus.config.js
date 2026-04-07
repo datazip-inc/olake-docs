@@ -650,6 +650,7 @@ const config = {
             to: '/docs/install/kubernetes',
             from: '/docs/install/kubernetes-ingestion'
           },
+
           {
             to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/docs/connectors/mongodb/benchmarks'
