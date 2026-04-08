@@ -82,6 +82,11 @@ const docSidebar = {
           id: 'install/kubernetes',
           label: 'Kubernetes Installation',
         },
+        {
+          type: 'doc',
+          id: 'install/kubernetes-optimization',
+          label: 'Kubernetes Optimization Installation',
+        },
       ],
     },
 
