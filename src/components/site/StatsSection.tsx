@@ -32,7 +32,7 @@ interface StatsSectionProps {
 const StatsSection: React.FC<StatsSectionProps> = ({
   title = 'Get the OLake Advantage',
   linkText = 'View all Performance Benchmarks',
-  linkUrl = '/docs/benchmarks',
+  linkUrl = '/docs/benchmarks/ingestion',
   stats = [
     { value: '5 - 500X', label: 'Faster than traditional tools' },
     { value: '90%', label: 'Cost Savings with OSS' }
@@ -79,7 +79,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({
         ))}
       </div>
       <Link
-        to={'/docs/benchmarks'}
+        to={'/docs/benchmarks/ingestion'}
         className='mx-auto mt-16 hidden h-12 w-[415px] items-center justify-center rounded-lg border-solid border-brand-blue-500 px-4 py-1 text-center font-helvetica font-medium text-brand-blue-500 sm:flex sm:text-base'
       >
         View all performance benchmarks
