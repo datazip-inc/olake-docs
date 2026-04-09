@@ -646,6 +646,10 @@ const config = {
             to: '/docs/install/kubernetes',
             from: '/docs/install/kubernetes-ingestion'
           },
+          {
+            to: '/docs/install/kubernetes-optimization',
+            from: '/docs/install/kubernetes-optimisation'
+          },
 
           {
             to: '/docs/benchmarks/ingestion?tab=mongodb',
