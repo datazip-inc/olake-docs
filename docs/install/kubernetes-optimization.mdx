@@ -1,0 +1,609 @@
+---
+title: "Deploy OLake Optimization on Kubernetes"
+description: Deploy OLake Optimization on Kubernetes with Helm. Enable optimization services, configure Spark optimizer settings, and run compaction workflows for Iceberg tables.
+sidebar_label: Kubernetes Optimization Installation
+sidebar_position: 2
+---
+
+# OLake Optimization Kubernetes Installation with Helm
+
+This guide details the process for deploying OLake Optimization on Kubernetes using the official Helm chart. The Fusion components run alongside the standard OLake stack and provide Iceberg table optimization services.
+
+## Components
+
+- **OLake UI**: Main web interface for job management and configuration
+- **OLake Worker**: Background worker for processing data replication jobs
+- **PostgreSQL**: Primary database for storing job data, configurations, sync state, and Temporal visibility data
+- **Temporal**: Workflow orchestration engine for managing job execution
+- **Signup Init**: One-time initialization service that creates the default admin user
+- **Fusion**: Optimization control plane and API server
+- **Fusion Spark Optimizer**: Spark-on-Kubernetes execution layer for optimization jobs
+- **Elasticsearch (Legacy only)**: Search and indexing backend for Temporal workflow data (deprecated in new installations)
+
+<div style={{textAlign: 'center'}}>
+
+![OLake Platform in Kubernetes connects users to activity pods, shared storage, and external data sources](/img/kubernetes-helm-architecture.webp)
+
+</div>
+
+## Prerequisites
+
+Ensure the following requirements are met before proceeding:
+
+- **Kubernetes 1.19+**: Administrative access to a Kubernetes cluster
+- **Helm 3.2.0+**: Helm client installed and configured. [Installation Guide](https://helm.sh/docs/intro/install/)
+- **kubectl**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL, Elasticsearch and the shared storage volume
+    ```bash
+    # List available StorageClass
+    kubectl get storageclass
+    ```
+- **System Requirements**: Minimum and recommended node specification for running Sync jobs
+  - Minimum: 8 vCPU, 16 GB RAM
+  - Recommended: 16 vCPU, 32 GB RAM
+- **Node class recommendations**: The following components should be scheduled on on-demand nodes to minimize disruption:
+  - nfs-server (if enabled)
+  - PostgreSQL (if enabled)
+  - Temporal
+  - OLake workers
+  - OLake UI
+  - Fusion and Spark optimizer workloads
+
+## Quick Start
+
+### 1. Add OLake Helm Repository
+
+```bash
+helm repo add olake https://datazip-inc.github.io/olake-helm
+helm repo update
+```
+
+### 2. Install the Chart
+<Tabs>
+
+<TabItem value="eks" label="AWS EKS" default>
+
+**Basic Installation:**
+```bash
+helm install olake olake/olake --set global.storageClass="gp2"
+```
+
+</TabItem>
+
+<TabItem value="others" label="Others">
+
+**Basic Installation:**
+```bash
+helm install olake olake/olake
+```
+
+</TabItem>
+
+</Tabs>
+
+### 3. Access OLake UI
+
+Forward the UI service port to local machine:
+
+```bash
+kubectl port-forward svc/olake-ui 8000:8000
+```
+
+Open browser and navigate to: `http://localhost:8000`
+
+**Default Credentials:**
+- Username: `admin`
+- Password: `password`
+
+:::tip
+If OLake is installed with **Ingress enabled**, port-forwarding is not necessary. Access the application using the configured Ingress hostname.
+:::
+
+## Configuration Options
+
+### Updating OLake UI Version
+Pull the latest images and restart the deployments without downtime:
+
+```bash
+# Restart OLake components
+kubectl rollout restart deployment/olake-ui
+kubectl rollout restart deployment/olake-workers
+```
+
+### Initial User Setup
+
+Create a Kubernetes secret to replace default credentials:
+
+```bash
+kubectl create secret generic olake-admin-credentials \
+  --from-literal=username='superadmin' \
+  --from-literal=password='a-very-secure-password' \
+  --from-literal=email='admin@mycompany.com'
+```
+
+Then configure in `values.yaml`:
+
+```yaml
+olakeUI:
+  initUser:
+    existingSecret: "olake-admin-credentials"
+    secretKeys:
+      username: "username"
+      password: "password"
+      email: "email"
+```
+
+Apply the configuration:
+
+```bash
+helm upgrade olake olake/olake -f values.yaml
+```
+
+### Ingress Configuration
+
+To expose OLake through an ingress controller, create a custom values file:
+
+```yaml
+# values.yaml
+olakeUI:
+  ingress:
+    enabled: true
+    className: "nginx"
+    hosts:
+      - host: olake.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: olake-tls
+        hosts:
+          - olake.example.com
+```
+
+### JobID-Based Scheduling
+With this powerful feature, data jobs can be routed to specific Kubernetes nodes with advanced scheduling controls.
+
+_**Where is the JobID found?**_ The JobID is an integer that is automatically assigned to each job created in OLake UI. The JobID can be found in the corresponding row for each job on the Jobs page.
+
+```yaml
+global:
+  jobProfiles:
+    123: # JobID
+      nodeSelector:
+        olake.io/workload-type: "heavy"
+      tolerations:
+        - key: "heavy-workload"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+    456: # JobID
+      tolerations:
+        - key: "spot-instance"
+          operator: "Exists"
+          effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "olake.io/workload-type"
+                    operator: "In"
+                    values:
+                      - "small"
+    0: # Default profile for unmapped jobs
+      nodeSelector:
+        olake.io/workload-type: "general"
+```
+:::note
+- If `"0"` (Default) is configured, it is used for all unmapped jobs and other activities (Fetch, Test, Discover).
+- If `"0"` is NOT configured, unmapped jobs are scheduled by the standard Kubernetes scheduler on any available node.
+:::
+
+:::warning
+**Deprecation Notice:** The legacy `global.jobMapping` configuration (which only supported `nodeSelector`) is deprecated and will be removed in a future release. Users are strongly advised to migrate to `global.jobProfiles`, which provides feature-rich scheduling capabilities including tolerations and affinity rules. If a jobID is defined in both `global.jobProfiles` and `global.jobMapping`, the `jobProfiles` configuration takes precedence.
+:::
+
+### Cloud IAM Integration
+
+OLake's activity pods (the pods by which the actual data sync is performed) can be allowed to securely access cloud resources(AWS Glue or S3) using IAM roles.
+
+```yaml
+global:
+  jobServiceAccount:
+    create: true
+    name: "olake-job-sa"
+    
+    # Cloud provider IAM role associations
+    annotations:
+      # AWS IRSA
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-job-role"
+      
+      # GCP Workload Identity
+      iam.gke.io/gcp-service-account: "olake-job@project.iam.gserviceaccount.com"
+      
+      # Azure Workload Identity
+      azure.workload.identity/client-id: "12345678-1234-1234-1234-123456789012"
+```
+:::note
+Note: For detailed instructions on the creation of IAM roles and service accounts, the official documentation for AWS IRSA, GCP Workload Identity, or Azure Workload Identity should be referred to. For a minimal Glue and S3 IAM access policy please refer [here](https://olake.io/docs/writers/iceberg/catalog/glue#required-iam-permissions).
+:::
+
+### Encryption Configuration
+
+Configure encryption of job metadata stored in Postgres database by setting the OLAKE_SECRET_KEY environment variable in the OLake Worker:
+
+```yaml
+global:
+  env:
+    # 1. For AWS KMS (starts with 'arn:aws:kms:'):
+    OLAKE_SECRET_KEY: "arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012"
+    
+    # 2. For local AES-256 (any other non-empty string):
+    OLAKE_SECRET_KEY: "your-secret-encryption-key"  # Auto-hashed to 256-bit key
+    
+    # 3. For no encryption (default, not recommended for production):
+    OLAKE_SECRET_KEY: ""  # Empty = no encryption
+```
+
+### Persistent Storage Configuration
+
+The OLake application components (UI, Worker, and Activity Pods) require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata.
+
+For production, a robust, highly-available RWX-capable storage solution such as AWS EFS, GKE Filestore, or Azure Files must be used. This is achieved by disabling the built-in NFS server and providing an existing Kubernetes StorageClass that is backed by a managed storage service. An example for using StorageClass is given below:
+
+```yaml
+nfsServer:
+  # 1. The development NFS server is disabled
+  enabled: false
+  
+  # 2. An existing ReadWriteMany PersistentVolumeClaim is specified
+  external:
+    storageClass: "efs-csi"
+```
+:::note
+For development and quick starts, a simple NFS server is included and enabled by default. This provides an out-of-the-box shared storage solution without any external dependencies. However, because this server runs as a single pod, it represents a single point of failure and is not recommended for production use.
+:::
+
+:::warning
+**Bottlerocket OS on AWS EKS:** The built-in NFS server is incompatible with Bottlerocket OS worker nodes. For such AWS EKS configurations, AWS EFS must be used as an alternative, which requires setting `nfsServer.enabled: false` and configuring the EFS CSI driver as shown above.
+:::
+
+### External PostgreSQL Configuration
+
+External PostgreSQL databases can be used instead of the built-in postgresql deployment. It is the primary database for storing job data, configurations, and sync state.
+
+**Requirements:**
+- PostgreSQL 12+ with `btree_gin` extension enabled
+- This can be enabled with `CREATE EXTENSION IF NOT EXISTS btree_gin;`, then run `\dx` to verify if its enabled.
+- Both OLake and Temporal databases created on the PostgreSQL instance
+- Network connectivity from Kubernetes cluster to PostgreSQL instance
+
+There are two ways to configure an external PostgreSQL database:
+
+#### Option 1: Using `existingSecret`
+
+Reference a pre-existing Kubernetes Secret containing the database credentials. The secret must be created manually before installing the chart.
+
+**1. Create the database secret:**
+```bash
+kubectl create secret generic external-postgres-secret \
+  --from-literal=host="postgres-host" \
+  --from-literal=port="5432" \
+  --from-literal=olake_database="olakeDB" \
+  --from-literal=temporal_database="temporalDB" \
+  --from-literal=username="username" \
+  --from-literal=password="password" \
+  --from-literal=ssl_mode="require"
+```
+
+**2. Configure values.yaml:**
+```yaml
+postgresql:
+  enabled: false
+  external:
+    existingSecret: "external-postgres-secret"
+```
+
+#### Option 2: Using `properties` (Recommended for ArgoCD/GitOps)
+
+Specify the database connection details directly in `values.yaml`. The chart automatically creates a Kubernetes Secret from these values at template time. This approach is fully compatible with ArgoCD and other GitOps tools that use `helm template` for rendering.
+
+```yaml
+postgresql:
+  enabled: false
+  external:
+    properties:
+      host: "postgres-host"
+      port: 5432
+      username: "username"
+      password: "password"
+      olake_database: "olakeDB"
+      temporal_database: "temporalDB"
+      ssl_mode: "require"
+```
+
+### Optimization Configuration
+
+Optimization components provide Iceberg table compaction and optimization services. The documentation for optimization can be found [here](https://olake.io/docs/iceberg-maintenance/optimization/overview/).
+
+To enable Optimization, set `fusion.enabled` to `true` in the `values.yaml` file:
+
+```yaml
+fusion:
+  enabled: true
+  adminUser: admin
+  adminPassword: password
+```
+
+#### Customizing Spark Optimizer Configuration
+
+The Spark optimizer in Optimization can be customized by providing additional Spark configurations via `fusion.optimizer.spark.extraConfig` and other container-specific properties via `fusion.optimizer.spark.properties`.
+
+For example, to set `spark.sql.shuffle.partitions` and `export.JAVA_HOME`:
+
+```yaml
+fusion:
+  optimizer:
+    spark:
+      extraConfig:
+        spark.sql.shuffle.partitions: "200"
+      properties:
+        export.JAVA_HOME: "/usr/lib/jvm/java-17-openjdk"
+```
+
+Refer to the [Spark documentation](https://spark.apache.org/docs/latest/configuration.html) for a comprehensive list of configurable properties for Spark containers.
+
+<details>
+<summary><strong>Optimization Scheduling</strong></summary>
+
+Configure `fusion.nodeSelector`, `fusion.tolerations`, and `fusion.affinity` in `values.yaml` to define scheduling behavior for Optimization workloads.
+These settings are applied to the Fusion pod and to Spark driver/executor pods created by Fusion. The following example shows the expected values structure:
+
+```yaml
+fusion:
+  nodeSelector:
+    workload: "fusion"
+  tolerations: []
+  affinity: {}
+```
+
+</details>
+
+### Global Environment Variables
+
+Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, and Activity Pods:
+
+```yaml
+global:
+  env:
+    OLAKE_SECRET_KEY: "your-secret-encryption-key"
+    RUN_MODE: "production"
+    # Add any custom environment variables here
+```
+
+### Private Container Registry
+
+For deployments in air-gapped environments or clusters without access to public registries (Docker Hub, registry.k8s.io), all container images can be pulled from a private registry by setting `CONTAINER_REGISTRY_BASE` in `global.env`:
+
+```yaml
+global:
+  env:
+    CONTAINER_REGISTRY_BASE: "1234567890123.dkr.ecr.us-east-1.amazonaws.com/dockerhub_mirror"
+```
+
+When set, all container images are automatically prefixed with this registry base — no additional `image.repository` overrides are needed. If left unset, images are pulled from Docker Hub (`registry-1.docker.io`) by default.
+
+:::note
+Ensure the following images are mirrored to the private registry (`CONTAINER_REGISTRY_BASE/...`) before deploying:
+
+- `library/busybox:latest`
+- `curlimages/curl:8.1.2`
+- `olakego/ui`, `olakego/ui-worker`
+- `olakego/fusion`, `olakego/fusion-spark`
+- `olakego/source-*` (connector images, example `1234567890123.dkr.ecr.us-east-1.amazonaws.com/dockerhub_mirror/olakego/source-mysql:v0.4.0`)
+- `temporalio/auto-setup:1.22.3`, `temporalio/ui:2.16.2`
+- `library/postgres:14-alpine`
+- `sig-storage/nfs-provisioner:v4.0.8` (built-in NFS server; sourced from `registry.k8s.io`, not Docker Hub)
+- When using a private container registry (e.g., Amazon ECR, Google Artifact Registry, Azure ACR), the `olake-ui` pod **requires permissions to list repositories and image tags** in order to discover available source connectors. To grant access, either:
+  - Pass registry credentials as environment variables under `olakeUI.env` (e.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` for ECR), or
+  - Attach the required read-only registry permissions to the Cloud Provider's IAM role referenced by `global.jobServiceAccount`.
+:::
+
+### Security Context Configuration
+
+OLake supports configuring `securityContext` for all its components to comply with restricted Kubernetes environments.
+
+#### General Component Configuration
+The `securityContext` can be set for `olakeUI`, `olakeWorker`, `elasticsearch`, `postgresql` and `temporal` in `values.yaml`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
+For eg,
+
+```yaml
+olakeWorker:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    runAsNonRoot: true
+```
+
+:::note
+- **PostgreSQL (UID 70 Requirement):**
+The default PostgreSQL image (Alpine-based) used by OLake requires a specific UID/GID to function correctly. If enforcing `runAsNonRoot: true`, the UID, GID, and FSGroup  **must** be set to **70**.
+```yaml
+postgresql:
+  securityContext:
+    runAsUser: 70
+    runAsGroup: 70
+    fsGroup: 70
+    runAsNonRoot: true
+```
+
+- OLake **doesnot support** setting securityContext for `nfsServer`.
+:::
+
+## Upgrading Chart Version
+
+<Tabs>
+<TabItem value="new" label="New (after v0.0.11)">
+
+### Upgrade to Latest Version
+
+```bash
+helm repo update
+helm upgrade olake olake/olake
+```
+
+### Upgrade with New Configuration
+
+```bash
+helm upgrade olake olake/olake -f new-values.yaml
+```
+
+</TabItem>
+
+<TabItem value="es" label="Legacy (with ES)">
+
+Starting from version `0.0.11`, the Helm chart disables Elasticsearch by default. OLake now uses PostgreSQL for both metadata and Temporal visibility by default.
+
+:::warning
+
+If installation is currently using Elasticsearch and is upgraded without additional configuration, OLake will **lose visibility of existing job task logs and history**, although the **overall system will work as expected** and new logs will appear from next schedule.
+
+To keep the existing job task logs or recover the logs if upgraded to `v0.0.11` by mistake, keep using pre-existing Elasticsearch instance, override the default values.
+
+:::
+
+### Upgrade to Latest Version keeping elasticsearch
+
+```bash
+helm repo update
+helm upgrade olake olake/olake --set elasticsearch.enabled=true
+```
+
+OR, set enabled to true in the `values.yaml` for elasticsearch like:
+
+```yaml
+elasticsearch:
+  enabled: true
+```
+
+### Post-Upgrade: Resume Stopped Syncs
+After upgrading, perform a rollout restart of the olake-workers:
+
+```bash
+kubectl rollout restart deployment/olake-workers
+```
+
+</TabItem>
+</Tabs>
+
+## Troubleshooting
+
+### Check Pod Logs
+
+```bash
+# OLake UI logs
+kubectl logs -l app.kubernetes.io/name=olake-ui -f
+
+# Fusion logs
+kubectl logs -l app.kubernetes.io/component=fusion -f
+
+# Temporal server logs
+kubectl logs -l app.kubernetes.io/name=temporal-server -f
+```
+
+### Common Issues
+
+**Pods Stuck in Pending State:**
+- Check if your cluster has sufficient resources
+- Check node selectors or affinity rules
+- Verify StorageClass is available and configured correctly
+
+**Pods Stuck in CrashLoopBackOff State:**
+- If pod logs show error like `failed to ping database`, check the `Database Connection Issues` section below
+- If pod restarts and goes into CrashLoopBackOff state, check for the resource requests and limits defined in Helm Values file
+- If pod events show error like `failed to mount volume`, check if the nfs-server pod is up and running
+
+**Database Connection Issues:**
+- Verify PostgreSQL pod is running: `kubectl get pods -l app.kubernetes.io/name=postgresql`
+- In case, setup is done with External PostgreSQL Configuration, check the following:
+  - Check if the host is pointing to Writer instance and not a Reader of the database
+  - Check if password contains special characters like `@` or `#` etc. If yes, use a different password
+  - Check if `ssl_mode` is correctly set in the kubernetes secret for external database
+- Check database connectivity from other pods
+- Review database credentials in secrets
+
+## Migration Guides
+
+<details>
+<summary><b>Migrating to v0.0.12</b></summary>
+
+When upgrading from a previous version, the `olake-signup-init` Job must be deleted before running `helm upgrade`. Kubernetes does not allow modifications to a Job's pod template, and the updated image references in this version will cause the upgrade to fail.
+
+```bash
+kubectl delete job olake-signup-init -n olake
+helm upgrade olake olake/olake
+```
+</details>
+
+<details>
+<summary><b>Migrating to v0.0.7 (Standard Resources)</b></summary>
+
+Version 0.0.7 introduced a significant change to how ServiceAccount, RBAC, and Secret resources are managed. By default, `useStandardResources` is now set to `true`, which converts these from Helm Hooks to standard resources. This improved compatibility with ArgoCD and prevents race conditions during updates.
+
+**For New Installations:**
+No action needed. The new default (`true`) is the recommended configuration.
+
+**For Existing Installations:**
+Upgrading directly may cause `resource already exists` errors because Helm tries to adopt resources that were previously created by hooks.
+
+**Option 1: Maintain Legacy Behavior (Easiest)**
+Set the flag to `false` in custom `values.yaml` to keep the old hook-based behavior:
+```yaml
+useStandardResources: false
+```
+
+**Option 2: Migrate to Standard Resources (Recommended)**
+To adopt the new behavior, manually remove the hook annotations and label the resources for Helm adoption before upgrading:
+
+```bash
+# 1. ServiceAccount
+kubectl annotate serviceaccount olake-workers meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label serviceaccount olake-workers app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 2. Role
+kubectl annotate role olake-workers meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label role olake-workers app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 3. RoleBinding
+kubectl annotate rolebinding olake-workers meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label rolebinding olake-workers app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 4. Secret
+kubectl annotate secret olake-workers-secret meta.helm.sh/release-name=olake meta.helm.sh/release-namespace=olake helm.sh/hook- helm.sh/hook-weight- helm.sh/hook-delete-policy- -n olake --overwrite
+kubectl label secret olake-workers-secret app.kubernetes.io/managed-by=Helm -n olake --overwrite
+
+# 5. Perform the upgrade
+helm upgrade olake olake/olake
+```
+</details>
+
+## Uninstallation
+
+### Remove OLake Installation
+
+```bash
+helm uninstall olake
+```
+:::warning
+Some resources are intentionally preserved after helm uninstall to prevent accidental data loss:
+
+- PersistentVolumeClaims (PVCs): olake-shared-storage and database PVCs are retained to preserve job data, configurations, and historical information
+- NFS Server Resources: If installed using the built-in NFS server, the following resources persist:
+    - Service/olake-nfs-server
+    - StatefulSet/olake-nfs-server
+    - ClusterRole/olake-nfs-server
+    - ClusterRoleBinding/olake-nfs-server
+    - StorageClass/nfs-server
+    - ServiceAccount/olake-nfs-server
+:::

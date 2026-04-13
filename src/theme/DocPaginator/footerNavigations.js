@@ -55,7 +55,7 @@ export const paginationConfig = {
     }
   },
 
-  // Install Docker Compose UI
+  // Install — Docker Compose (OLake UI)
   '/docs/install/olake-ui': {
     previous: {
       title: 'Introduction',
@@ -64,6 +64,28 @@ export const paginationConfig = {
     next: {
       title: 'Create first job pipeline',
       permalink: '/docs/getting-started/creating-first-pipeline'
+    }
+  },
+
+  '/docs/install/olake-ui/offline-environments-aws': {
+    previous: {
+      title: 'Docker Compose',
+      permalink: '/docs/install/olake-ui'
+    },
+    next: {
+      title: 'Offline Environments (Generic)',
+      permalink: '/docs/install/olake-ui/offline-environments-generic'
+    }
+  },
+
+  '/docs/install/olake-ui/offline-environments-generic': {
+    previous: {
+      title: 'Offline Environments (AWS)',
+      permalink: '/docs/install/olake-ui/offline-environments-aws'
+    },
+    next: {
+      title: 'OLake CLI (Docker)',
+      permalink: '/docs/install/docker-cli'
     }
   },
 
