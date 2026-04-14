@@ -1036,7 +1036,7 @@ const config = {
             from: '/docs/connectors/mongodb/state'
           },
           {
-            to: '/docs/release/overview',
+            to: '/docs/release/ingestion/overview',
             from: '/docs/release-notes'
           },
           {
