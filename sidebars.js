@@ -338,7 +338,15 @@ const docSidebar = {
     'understanding/compatibility-catalogs',
     'understanding/compatibility-engines',
     'core/use-cases',
-
+    
+    // API REFERENCE
+    sectionHeader("API DOCUMENTATION"),
+    {
+      type: 'doc',
+      label: 'OLake UI API',
+      id: 'api/olake-ui-api',
+    },
+    
     // Community
     sectionHeader("COMMUNITY"),
     'community/contributing',
