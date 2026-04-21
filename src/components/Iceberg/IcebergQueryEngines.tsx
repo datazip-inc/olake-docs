@@ -1,41 +1,76 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   MagnifyingGlassIcon, 
   ScaleIcon,
   ChartBarIcon,
   FunnelIcon
 } from '@heroicons/react/24/outline';
-import { QueryEngine, FilterOptions, ViewType } from '../../types/iceberg';
-import { QUERY_ENGINES } from '../../data/query-engines';
+import { QueryEngine, FilterOptions, ViewType, EngineVersion, EngineVersionSelection, VersionMode } from '../../types/iceberg';
+import { engines as QUERY_ENGINES } from '../../data/query-engines';
 import FilterControls from './FilterControls';
 import ViewTabs from './ViewTabs';
 import TableView from './TableView';
 import CardView from './CardView';
 import FeatureView from './FeatureView';
 import ComparisonView from './ComparisonView';
+import { ResolvedEngineView } from './versionedTypes';
+import { getVersionFromUrl, getPersistedVersion, persistVersion } from './versionState';
 
 interface IcebergQueryEnginesProps {
   fullWidth?: boolean;
   showComparison?: boolean;
   maxEngines?: number;
   defaultView?: ViewType;
+  defaultVersion?: 'v2' | 'v3';
 }
 
 const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({ 
   fullWidth = true,
   showComparison = true,
   maxEngines,
-  defaultView = 'table'
+  defaultView = 'table',
+  defaultVersion = 'v3'
 }) => {
   const [viewType, setViewType] = useState<ViewType>(defaultView);
   const [isComparisonMode, setIsComparisonMode] = useState(false);
-  const [selectedEngines, setSelectedEngines] = useState<string[]>([]);
+  const initialVersion = getVersionFromUrl(typeof window !== 'undefined' ? window.location.search : '') ?? getPersistedVersion() ?? defaultVersion;
+  const [versionMode, setVersionMode] = useState<VersionMode>(initialVersion);
+  const [selectedComparisons, setSelectedComparisons] = useState<EngineVersionSelection[]>([]);
   const [filters, setFilters] = useState<FilterOptions>({
     searchTerm: '',
     category: 'all'
   });
 
-  // Filtered engines
+  const getFallbackFeatures = (engine: QueryEngine): QueryEngine['features'] =>
+    engine.versions?.v3?.features ?? engine.features;
+
+  const resolveEngineForVersion = (engine: QueryEngine, version: EngineVersion): ResolvedEngineView => {
+    const versionData = engine.versions?.[version];
+    const fallbackFeatures = getFallbackFeatures(engine);
+    const features = versionData?.features ?? fallbackFeatures;
+    const score =
+      typeof versionData?.score === 'number'
+        ? versionData.score
+        : Object.values(features).reduce((sum, feature) => sum + (feature?.support === 'full' ? 4 : feature?.support === 'partial' ? 2 : feature?.support === 'preview' ? 1 : 0), 0);
+
+    return {
+      key: `${engine.id}-${version}`,
+      id: engine.id,
+      name: `${engine.name} (${version.toUpperCase()})`,
+      baseName: engine.name,
+      category: engine.category,
+      website: engine.website,
+      documentation: engine.documentation,
+      quickStart: engine.quickStart,
+      bestPractices: engine.bestPractices,
+      version,
+      features,
+      description: versionData?.description ?? engine.description ?? 'N/A',
+      score: versionData?.score ?? score
+    };
+  };
+
+  // Filtered base engines
   const filteredEngines = useMemo(() => {
     if (!QUERY_ENGINES || QUERY_ENGINES.length === 0) {
       return [];
@@ -63,6 +98,21 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
     return engines;
   }, [filters, maxEngines]);
 
+  const resolvedEngines = useMemo(
+    () => filteredEngines.map((engine) => resolveEngineForVersion(engine, versionMode)),
+    [filteredEngines, versionMode]
+  );
+
+  useEffect(() => {
+    persistVersion(versionMode);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('version', versionMode);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+    setSelectedComparisons((prev) => prev.filter((item) => item.version === versionMode));
+  }, [versionMode]);
+
   // JSON-LD structured data for SEO
   const structuredData = {
     "@context": "https://schema.org",
@@ -81,17 +131,29 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
     }
   };
 
-  const handleEngineSelection = (engineId: string, selected: boolean) => {
-    setSelectedEngines(prev => 
-      selected 
-        ? [...prev, engineId]
-        : prev.filter(id => id !== engineId)
-    );
+  const handleEngineSelection = (selection: EngineVersionSelection, selected: boolean) => {
+    setSelectedComparisons((prev) => {
+      const exists = prev.some(
+        (item) => item.engine === selection.engine && item.version === selection.version
+      );
+      if (selected && !exists) {
+        if (prev.length >= 4) {
+          return prev;
+        }
+        return [...prev, selection];
+      }
+      if (!selected) {
+        return prev.filter(
+          (item) => !(item.engine === selection.engine && item.version === selection.version)
+        );
+      }
+      return prev;
+    });
   };
 
   const toggleComparisonMode = () => {
     setIsComparisonMode(!isComparisonMode);
-    setSelectedEngines([]);
+    setSelectedComparisons([]);
   };
 
   const renderContent = () => {
@@ -99,7 +161,8 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
       return (
         <ComparisonView 
           engines={filteredEngines}
-          selectedEngines={selectedEngines}
+          selectedComparisons={selectedComparisons}
+          versionMode={versionMode}
           onEngineSelect={handleEngineSelection}
         />
       );
@@ -109,10 +172,11 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
       case 'table':
         return (
           <TableView 
-            engines={filteredEngines} 
+            engines={resolvedEngines}
+            versionMode={versionMode}
             fullWidth={fullWidth}
             selectionMode={isComparisonMode}
-            selectedEngines={selectedEngines}
+            selectedComparisons={selectedComparisons}
             onEngineSelect={handleEngineSelection}
           />
         );
@@ -120,24 +184,26 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
         return (
           <CardView 
             engines={filteredEngines}
-            selectionMode={isComparisonMode}
-            selectedEngines={selectedEngines}
-            onEngineSelect={handleEngineSelection}
+            resolvedEngines={resolvedEngines}
+            versionMode={versionMode}
+            onQuickCompare={(engineName) => {
+              setIsComparisonMode(true);
+              setSelectedComparisons([{ engine: engineName, version: versionMode }]);
+            }}
           />
         );
       case 'features':
         return (
           <FeatureView 
             engines={filteredEngines}
-            selectionMode={isComparisonMode}
-            selectedEngines={selectedEngines}
-            onEngineSelect={handleEngineSelection}
+            versionMode={versionMode}
           />
         );
       default:
         return (
           <TableView 
-            engines={filteredEngines} 
+            engines={resolvedEngines}
+            versionMode={versionMode}
             fullWidth={fullWidth}
           />
         );
@@ -195,11 +261,29 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
                 <div className="flex items-center space-x-2">
                   <ScaleIcon className="w-4 h-4 text-blue-600" />
                   <span className="text-sm text-blue-600 dark:text-blue-400">
-                    {selectedEngines.length} selected for comparison
+                    {selectedComparisons.length} selected for comparison
                   </span>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="mb-3 flex justify-center">
+          <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+            {(['v2', 'v3'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setVersionMode(mode)}
+                className={`px-3 py-1.5 text-sm font-medium border-none cursor-pointer transition-colors ${
+                  versionMode === mode
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {mode.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -208,7 +292,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
           <FilterControls
             filters={filters}
             onFiltersChange={setFilters}
-            resultsCount={filteredEngines.length}
+            resultsCount={resolvedEngines.length}
             totalCount={QUERY_ENGINES.length}
           />
         </div>
@@ -249,8 +333,8 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
                     Comparison Mode Active
                   </h4>
                   <p className="text-sm text-blue-700 dark:text-blue-300">
-                    Select engines from the list below to compare their features side-by-side. 
-                    You can select up to 4 engines for detailed comparison.
+                    Select engines from the list below to compare their features side-by-side.
+                    You can select up to 4 engines for {versionMode.toUpperCase()} comparison.
                   </p>
                 </div>
               </div>
@@ -264,7 +348,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
         </div>
 
         {/* No Results */}
-        {filteredEngines.length === 0 && QUERY_ENGINES.length > 0 && (
+        {resolvedEngines.length === 0 && QUERY_ENGINES.length > 0 && (
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 w-full">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">

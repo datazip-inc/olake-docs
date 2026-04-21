@@ -1,7 +1,8 @@
 // data/query-engines/snowflake.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const snowflake: QueryEngine = {
+export const snowflake: QueryEngine = createVersionedEngine({
   id: 'snowflake',
   name: 'Snowflake',
   description: 'Enterprise cloud data warehouse with native Iceberg catalog, automatic optimization, Snowpipe Streaming, UniForm interoperability, and full integration with Snowflake features',
@@ -11,7 +12,7 @@ export const snowflake: QueryEngine = {
   features: {
     catalogs: {
       support: 'partial',
-      details: 'Snowflake catalog (native) with full read/write. External catalogs (Glue, Open Table Catalog) read-only via catalog integration objects',
+      details: 'Snowflake Horizon Catalog (Polaris) native, REST Catalog, and AWS Glue supported for V3 (Public Preview). Hive Metastore, Nessie, Hadoop, JDBC not supported',
       externalLinks: [
         {
           label: 'CREATE ICEBERG TABLE Documentation',
@@ -24,8 +25,8 @@ export const snowflake: QueryEngine = {
       ]
     },
     readWrite: {
-      support: 'partial',
-      details: 'Full SELECT, DML & DDL on Snowflake-catalog tables including COPY INTO, CTAS, multi-statement transactions. External catalogs read-only',
+      support: 'full',
+      details: 'Full read and write support for Snowflake-managed Iceberg tables including Parquet, COPY INTO, CTAS, and multi-statement transactions. V3 support in Public Preview (March 2026)',
       externalLinks: [
         {
           label: 'Iceberg Table Tutorial',
@@ -38,22 +39,18 @@ export const snowflake: QueryEngine = {
       ]
     },
     dml: {
-      support: 'partial',
-      details: 'INSERT, UPDATE, DELETE, MERGE INTO fully ACID on Snowflake-catalog tables. Position-delete files, equality-delete in preview. External tables read-only',
+      support: 'full',
+      details: 'INSERT, UPDATE, DELETE, MERGE INTO fully ACID on Snowflake-managed Iceberg tables. V3 uses deletion vectors for row-level changes (Public Preview March 2026)',
       externalLinks: [
         {
           label: 'DML Commands with Iceberg',
-          url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg-manage'
-        },
-        {
-          label: 'Row-level Deletes',
           url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg-manage'
         }
       ]
     },
     morCow: {
       support: 'full',
-      details: 'DML writes merge-on-read delete files. Automatic Storage Optimization compacts files & merges delete files, switching to copy-on-write during clustering',
+      details: 'V3 supports full MoR via deletion vectors and CoW. V3 deletion vectors replace position deletes for improved write performance (Public Preview March 2026)',
       externalLinks: [
         {
           label: 'Iceberg Storage Management',
@@ -62,22 +59,18 @@ export const snowflake: QueryEngine = {
       ]
     },
     streaming: {
-      support: 'partial',
-      details: 'Snowpipe Streaming & Storage Write API for real-time ingestion (GA). Streams & Tasks supported on Snowflake-catalog tables. No built-in CDC ingestion',
+      support: 'full',
+      details: 'Snowflake V3 row lineage enables CDC capabilities for data governance and auditing. Snowpipe Streaming for real-time ingestion (Public Preview March 2026)',
       externalLinks: [
         {
           label: 'Snowpipe Streaming with Iceberg',
           url: 'https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-iceberg'
-        },
-        {
-          label: 'Introduction to Streams',
-          url: 'https://docs.snowflake.com/en/user-guide/streams-intro'
         }
       ]
     },
     formatV3: {
-      support: 'none',
-      details: 'Not yet supported. Snowflake-catalog tables use spec v2; external v3 tables readable if future reader upgrades land. Roadmap evaluation ongoing',
+      support: 'partial',
+      details: 'Iceberg V3 support in Public Preview (March 2026). Supports deletion vectors, nanosecond timestamps, geometry type, variant type, and row lineage',
       externalLinks: [
         {
           label: 'Apache Iceberg v3 Table Spec Blog',
@@ -148,6 +141,53 @@ AT(TIME => '2024-01-15 10:00:00');
 -- Create zero-copy clone
 CREATE ICEBERG TABLE sales_data_backup 
 CLONE sales_data;`,
+  versions: {
+    v2: {
+      features: {
+        catalogs: {
+          support: 'partial',
+          details: 'Snowflake Horizon Catalog (Polaris) native, REST Catalog, and AWS Glue supported. Hive Metastore, Nessie, Hadoop, JDBC, Unity Catalog (read-only via REST) not fully supported',
+          externalLinks: [{ label: 'Apache Iceberg Tables Overview', url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg' }]
+        },
+        readWrite: {
+          support: 'full',
+          details: 'Full read and write support for Snowflake-managed Iceberg tables. Parquet-only format. COPY INTO, CTAS, multi-statement transactions all supported',
+          externalLinks: [{ label: 'Manage Iceberg Tables', url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg-manage' }]
+        },
+        dml: {
+          support: 'full',
+          details: 'INSERT, UPDATE, DELETE, MERGE INTO fully ACID on Snowflake-managed Iceberg tables. All DML operations use copy-on-write mode',
+          externalLinks: [{ label: 'DML Commands with Iceberg', url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg-manage' }]
+        },
+        morCow: {
+          support: 'partial',
+          details: 'Copy-on-write is the exclusive write strategy for Snowflake-managed tables. Merge-on-read supported only for externally managed Iceberg tables via ENABLE_ICEBERG_MERGE_ON_READ session parameter',
+          externalLinks: [{ label: 'Iceberg Storage Management', url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg-storage' }]
+        },
+        streaming: {
+          support: 'partial',
+          details: 'Snowpipe Streaming & Storage Write API for real-time ingestion (GA). Streams & Tasks supported on Snowflake-catalog tables. No built-in CDC ingestion',
+          externalLinks: [{ label: 'Snowpipe Streaming with Iceberg', url: 'https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-iceberg' }]
+        },
+        formatV3: {
+          support: 'none',
+          details: 'Iceberg Format V3 features are not applicable to V2 tables.'
+        },
+        timeTravel: {
+          support: 'full',
+          details: 'Query snapshots with AT(SNAPSHOT => id) or AT(TIME => ts). Zero-Copy Clones work on Iceberg tables. Full time travel for Snowflake-managed tables',
+          externalLinks: [{ label: 'Understanding Time Travel', url: 'https://docs.snowflake.com/en/user-guide/data-time-travel' }]
+        },
+        security: {
+          support: 'full',
+          details: 'Full Snowflake RBAC, column masking, row-access policies, tag-based masking. Query activity in ACCOUNT_USAGE & ACCESS_HISTORY. Customer-managed IAM roles',
+          externalLinks: [{ label: 'Access Control Privileges', url: 'https://docs.snowflake.com/en/user-guide/security-access-control-privileges' }]
+        }
+      },
+      score: 22,
+      description: 'Snowflake provides complete Iceberg V2 support with full DML operations, automatic optimization, and enterprise-grade security for managed tables'
+    }
+  },
   bestPractices: [
     'Use Snowflake 8.20+ for GA Iceberg support and latest features',
     'Leverage native Snowflake catalog for full DML capabilities and Snowflake feature integration',
@@ -170,4 +210,4 @@ CLONE sales_data;`,
     'Use customer-managed IAM roles for secure access to external storage',
     'Monitor cross-region egress charges when compute and storage are in different regions'
   ]
-};
+});
