@@ -650,6 +650,75 @@ const config = {
             to: '/docs/install/kubernetes-optimization',
             from: '/docs/install/kubernetes-optimisation'
           },
+          // Legacy release-note URLs -> ingestion release notes
+          {
+            to: '/docs/release/ingestion/overview',
+            from: '/docs/release/overview'
+          },
+          {
+            to: '/docs/release/ingestion/v0.6.0',
+            from: '/docs/release/v0.6.0'
+          },
+          {
+            to: '/docs/release/ingestion/v0.5.0',
+            from: '/docs/release/v0.5.0'
+          },
+          {
+            to: '/docs/release/ingestion/v0.4.0',
+            from: '/docs/release/v0.4.0'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.17',
+            from: '/docs/release/v0.3.17'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.14',
+            from: '/docs/release/v0.3.14'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.9-v0.3.11',
+            from: '/docs/release/v0.3.9-v0.3.11'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.5',
+            from: '/docs/release/v0.3.5'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.10',
+            from: '/docs/release/v0.2.10'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.8',
+            from: '/docs/release/v0.2.8'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.5-v0.2.7',
+            from: '/docs/release/v0.2.5-v0.2.7'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.2-v0.2.4',
+            from: '/docs/release/v0.2.2-v0.2.4'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.0-v0.2.1',
+            from: '/docs/release/v0.2.0-v0.2.1'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.9-v0.1.11',
+            from: '/docs/release/v0.1.9-v0.1.11'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.6-v0.1.8',
+            from: '/docs/release/v0.1.6-v0.1.8'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.2-v0.1.5',
+            from: '/docs/release/v0.1.2-v0.1.5'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.0-v0.1.1',
+            from: '/docs/release/v0.1.0-v0.1.1'
+          },
 
           {
             to: '/docs/benchmarks/ingestion?tab=mongodb',
@@ -967,7 +1036,7 @@ const config = {
             from: '/docs/connectors/mongodb/state'
           },
           {
-            to: '/docs/release/overview',
+            to: '/docs/release/ingestion/overview',
             from: '/docs/release-notes'
           },
           {
