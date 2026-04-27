@@ -1,22 +1,24 @@
 ---
 slug: iceberg-compaction-spark-vs-fusion-benchmark
-title: "2x Faster Iceberg Compaction: How Fusion Beats Spark in CDC Workloads"
+title: "50% Cheaper and 2x Faster Iceberg Compaction: OLake Fusion - Open Source Beats Spark"
 description: "We benchmark Spark rewrite_data_files against OLake Fusion compaction on Apache Iceberg by running a full TPCH lineitem load from Postgres to GCP, applying 200k-record CDC batches every 2 minutes, and tracking TPC-H Query 6 performance, runtime, resource usage, and infrastructure cost."
 tags: [iceberg, tpch, compaction, benchmark, spark, olake, fusion]
 authors: [nayan]
-image: /img/blog/2026/4/fusion_vs_spark.webp
+image: /img/blog/2026/4/final_img.png
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-![compaction diagram](/img/blog/2026/4/fusion_vs_spark.webp)
+<div style={{textAlign: 'center'}}>
+  <img src="/img/blog/2026/4/final_img.png" alt="compaction diagram" style={{width: '80%'}} />
+</div>
 
 Over the last few years, most data teams have either moved to a lakehouse architecture or are actively moving in that direction. That shift solves several legacy warehouse and data lake limitations, but migration alone is not the finish line. Once you're on a lakehouse, you still need to manage table health carefully to keep performance stable and costs under control.
 
-Most data lakehouse problems are loud. Pipelines fail and errors show up in logs. But there is one problem that stays completely silent. Your queries just get a little slower each day until one morning something that used to finish in seconds is now taking minutes. The reason is almost always small files, and the solution is compaction.
+Most data lakehouse problems are loud. Pipelines fail and errors show up in logs. But there is one problem that stays completely silent. Your queries just get a little slower each day until one morning something that used to finish in seconds is now taking minutes. The reason is almost always small files. In CDC-heavy pipelines, every incremental sync writes a new batch of small data files and delete files into your Iceberg table, and over time these accumulate into thousands of tiny files that make every scan slower and more expensive. The solution is compaction.
 
-But here's the thing not all compaction is the same. The way you compact, how often you compact, and what engine you use to compact can make a dramatic difference in both query performance and operational cost. That's exactly what we set out to measure in this experiment.
+But here's the thing not all compaction is the same. The way you compact, how often you compact, and what engine you use to compact can make a dramatic difference in both query performance and resource plus operational cost. That's exactly what we set out to measure in this experiment.
 
 To answer this properly, we ran a controlled benchmark on Apache Iceberg tables under continuous CDC ingestion. We compared **Apache Spark's** `rewrite_data_files` with **OLake Fusion** compaction while keeping the data, infrastructure, and ingestion engine (i.e. **OLake Go**) exactly the same in both runs. The results were eye-opening.
 
@@ -30,11 +32,11 @@ In this blog, we skip the theory and go straight to the battlefield.
 
 ### 1. Data
 
-We used 300 GB of TPC-H data and focused exclusively on the lineitem table — the largest table in the TPC-H schema. The table was **unpartitioned** in both runs, meaning all files were stored together without any partitioning, so any file count growth from CDC directly impacts how long queries take to scan the table.
+We used the TPC-H dataset (300 GB total across all tables) and focused exclusively on the **lineitem** table — the largest table in the TPC-H schema. When loaded into Apache Iceberg on Google Cloud Storage, the lineitem table came to approximately **85 GB**. The table was **unpartitioned** in both runs, meaning all files were stored together without any partitioning, so any file count growth from CDC directly impacts how long queries take to scan the table.
 
 ### 2. Source
 
-PostgreSQL served as the OLTP source, where we continuously issued row-level updates to emulate production-like CDC traffic.
+PostgreSQL served as the OLTP source, where we continuously issued row-level updates every 2 mins to emulate production-like CDC traffic.
 
 ### 3. Destination
 
@@ -148,7 +150,20 @@ This is as close to a real-world production CDC scenario as you can get in a ben
 The total experiment ran for **2 hours and 10 minutes**, structured deliberately:
 
 - **First 10 minutes** CDC starts and the first 5 ingestion cycles run (one every 2 minutes)
-- **After first 2 CDC ingestions** TPC-H Query 6 starts executing at regular intervals so we can track query time from the beginning.
+- **After first 2 CDC ingestions** TPC-H Query 6 starts executing continuously so we can track query time from the beginning. Here is the query we used:
+
+    ```sql
+    SELECT
+        SUM(l_extendedprice * l_discount) AS revenue
+    FROM
+        lineitem
+    WHERE
+        l_shipdate >= DATE '1994-01-01'
+        AND l_shipdate <  DATE '1995-01-01'
+        AND l_discount BETWEEN 0.05 AND 0.07
+        AND l_quantity < 24
+    ```
+
 - **After first 5 CDC ingestions** compaction kicks in to take on the growing small-file load.
 - The **2-hour clock** starts the moment compaction kicks in — this is our primary observation window.
 
@@ -156,11 +171,7 @@ This structure gives us three distinct phases to observe: pre-compaction degrada
 
 ## What Happens Without Compaction?
 
-Before we compare Spark vs Fusion compaction head-to-head, it helps to see the baseline impact of not compacting at all. In our earlier benchmark, we ran TPC-H queries on Iceberg tables both without compaction and after compaction, and the query execution gap was massive. Read the full breakdown here: [Iceberg Compaction: How Much Faster Are TPC-H Queries?](/blog/iceberg-compaction-tpch-benchmark)
-
-The trend was unmistakable. Query execution time climbed steadily with each ingestion cycle. More files meant more metadata to read, more files to open, and more fragmented reads to execute. What started as a fast scan gradually became painfully slow — not because the data changed, but because the physical layout of the table had deteriorated.
-
-This baseline sets the stage for everything that follows.
+Without compaction, query execution time climbs steadily as each CDC cycle adds more small files. In our earlier benchmark comparing Iceberg query performance with and without compaction, the difference was significant. The full breakdown is available here: [Iceberg Compaction: How Much Faster Are TPC-H Queries?](/blog/iceberg-compaction-tpch-benchmark)
 
 ## Infrastructure and Resources
 
@@ -200,10 +211,7 @@ Fusion shows one additional resource because that node runs the Fusion service i
 
 ## Compaction Setup and Configuration
 
-<Tabs>
-  <TabItem value="fusion-compaction-config" label="OLake Fusion">
-
-### OLake Fusion Configuration
+### 1. OLake Fusion Configuration
 
 OLake Fusion takes a tiered compaction approach, giving you three levels of optimization that can be scheduled independently based on how aggressively you want to maintain your tables.
 
@@ -229,7 +237,7 @@ We used the following Fusion cluster configuration for running the compaction:
 
 Fusion runs table optimization on Spark, and these `spark-conf` values size that workload: enough **executors and cores** to keep compaction moving in parallel, and enough **memory** overall so rewrite and merge steps are not constantly fighting for space.
 
-### 1. How We Scheduled It
+### How We Scheduled It
 
 For this experiment, Fusion ran on the following schedule:
 
@@ -237,19 +245,20 @@ For this experiment, Fusion ran on the following schedule:
 - Medium compaction: every 40 minutes
 
 :::info Why Full compaction was skipped
-We intentionally skipped Full compaction in this benchmark because the observation window was short. In a small-period experiment like this, Full compaction would have had limited time to show its optimal long-term impact, so including it would likely not have changed the results meaningfully.
+- We intentionally skipped Full compaction in this benchmark because the observation window and total data size were quite small. It would have had limited time to show its optimal long-term impact, so including it would likely not have changed the results meaningfully.
+- Even without Full compaction, Fusion's query performance remained competitive with Spark throughout the experiment, which shows that Lite and Medium alone are sufficient for short to medium-term CDC workloads.
+- Full compaction becomes most valuable after several days or even a week of ingestion, when Medium compaction has accumulated a large number of files in the size range between the target file size and one-eighth of it. At that point a Full rewrite consolidates everything cleanly.
 :::
 
-### 2. Compaction Parameters
+### Compaction Parameters
 
 We used the following parameters for the compaction:
 
 - `target-file-size-bytes`: 512 MB (the desired output file size after compaction)
 
-</TabItem>
-<TabItem value="spark-compaction-config" label="Spark">
+- `max-task-size-bytes`: 512 MB (the maximum amount of data processed in one compaction task)
 
-### Spark Configuration
+### 2. Spark Configuration
 
 Spark's `rewrite_data_files` is the standard compaction tool in the Iceberg ecosystem for Spark-based environments. It rewrites data files based on configurable size bounds, consolidating fragmented files into right-sized outputs.
 
@@ -267,7 +276,7 @@ We used the following Spark cluster configuration for running the compaction:
 
 This configuration was chosen to balance parallelism and memory for Iceberg compaction. We used **4 executors** with **7 cores each** so `rewrite_data_files` could drive enough concurrent work, while keeping **generous executor memory** because compaction is **memory-intensive** (reads, shuffles, merges, and writes) and too little memory tends to slow the job down or even lead to OOM crashes.
 
-### 1. Compaction Parameters
+### Compaction Parameters
 
 We used the following parameters for the compaction:
 
@@ -284,7 +293,7 @@ We used the following parameters for the compaction:
 - `delete-file-threshold`: **1**  
   If a data file has even 1 delete file attached, Spark includes it in compaction.
 
-### 2. How We Scheduled It
+### How We Scheduled It
 
 In this experiment, Spark compaction was scheduled to run every **20 minutes**. We kept this interval fixed to reflect a practical CDC maintenance pattern, where small files keep accumulating and need regular cleanup.
 
@@ -769,9 +778,6 @@ In this experiment, Spark compaction was scheduled to run every **20 minutes**. 
 
 </details>
 
-  </TabItem>
-</Tabs>
-
 ## TPC-H Query Execution
 
 TPC-H Query 6 is a scan-heavy analytical query with filter predicates, making it extremely sensitive to file count and layout. It's the perfect canary for detecting compaction effectiveness.
@@ -1012,21 +1018,29 @@ Once query-time behavior was in a similar range, we had a stable baseline for ev
 In this section, we report the **minimum**, **maximum**, and **average** execution time of TPC-H Query 6 for both scenarios (Spark compaction and Fusion compaction). This gives a clear view of best-case, worst-case, and steady-state query behavior under continuous CDC and active maintenance.
 
 <Tabs>
-  <TabItem value="fusion_tpch" label="Fusion TPCH Time">
+  <TabItem value="fusion_tpch" label="Fusion TPCH Timing Details">
 
   ![TPC-H Query 6 execution time — Fusion compaction](/img/blog/2026/4/fusion_tpch.webp)
 
-  Over **134** consecutive runs with Fusion compaction enabled, TPC-H Query 6 was about **43s at best**, up to roughly **77s at worst**, with an **average near 56s**. Compaction keeps pulling the table back from small-file bloat, so query time does not stay stuck at the high end—it spikes and then settles again instead of drifting upward without bound.
-
+  {/* Over **134** consecutive runs with Fusion compaction enabled, TPC-H Query 6 was about **43s at best**, up to roughly **77s at worst**, with an **average near 56s**. Compaction keeps pulling the table back from small-file bloat, so query time does not stay stuck at the high end—it spikes and then settles again instead of drifting upward without bound.
+  */}
   </TabItem>
-  <TabItem value="spark_tpch" label="Spark TPCH Time">
+  <TabItem value="spark_tpch" label="Spark TPCH Timing Details">
 
   ![TPC-H Query 6 execution time — Spark compaction](/img/blog/2026/4/spark_tpch.webp)
 
-  Over about **123** consecutive runs with Spark `rewrite_data_files` compaction on the same schedule, TPC-H Query 6 was about **45s at best**, up to roughly **83s at worst**, with an **average near 59s**. Periodic Spark compaction keeps the layout from degrading unchecked, so runtimes climb during small-file buildup then **drop back** instead of staying pinned near the worst case.
-
+  {/* Over about **123** consecutive runs with Spark `rewrite_data_files` compaction on the same schedule, TPC-H Query 6 was about **45s at best**, up to roughly **83s at worst**, with an **average near 59s**. Periodic Spark compaction keeps the layout from degrading unchecked, so runtimes climb during small-file buildup then **drop back** instead of staying pinned near the worst case.
+  */}
   </TabItem>
 </Tabs>
+
+Comparison between Fusion and Spark TPC-H Query 6 execution time:
+
+| Metric | Fusion | Spark |
+| --- | --- | --- |
+| Average query time | 56.00 s | 58.72 s |
+| Min query time | 42.90 s | 45.62 s |
+| Max query time | 76.71 s | 83.46 s |
 
 ### 2. Compaction Time
 
