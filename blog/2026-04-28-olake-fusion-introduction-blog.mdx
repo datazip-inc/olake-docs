@@ -1,0 +1,135 @@
+---
+slug: olake-fusion-introduction
+title: "We Built an Easier Way to Maintain Iceberg Tables"
+description: Why Iceberg table maintenance tends to become a full-time headache, what teams are doing today to cope with it, and what we built at OLake to actually solve it.
+date: 2026-04-28
+tags: [iceberg, olake, fusion, compaction, optimization, apache-iceberg, iceberg-tables, iceberg-maintenance, small-files, binpack-compaction, sort-compaction, manifest-rewrite, lakehouse, metadata-optimization]
+authors: [siddharth]
+image: /img/blog/2026/5/introducing-olake-fusion.webp
+---
+
+# We Built a Better Way to Maintain Apache Iceberg Tables
+
+Apache Iceberg is the right choice for most modern lakehouses. It gives you ACID guarantees, schema evolution, time travel, and genuinely fast analytical queries — without locking you into any single vendor or engine. The adoption numbers back it up: Iceberg has quietly become the default open table format for teams building serious data infrastructure.
+
+But here's what nobody tells you when you're getting started: picking the right table format is only half the job. The other half is *keeping those tables healthy*. And that part? It's a lot harder than it looks.
+
+This post is about that second half — specifically, why Iceberg table maintenance tends to become a full-time headache, what teams are doing today to cope with it, and what we built at OLake to actually solve it.
+
+## The Problem That Sneaks Up on You
+
+When you first set up Iceberg, everything feels fast and clean. Queries return in seconds. Pipelines run smoothly. The team is happy.
+
+Then, slowly, things start to drift.
+
+Queries that used to finish in 10 seconds start taking 40. Your dashboards feel a little sluggish. File counts are climbing. Nothing is *broken*, exactly — but something is clearly off.
+
+What's happening is almost always the same thing: **Small Files**.
+
+Every time a CDC pipeline writes data to Iceberg, it creates new files in object storage. That's how the format works. The trouble is that modern CDC pipelines write constantly — row-level changes streaming in every few seconds, each batch producing a tiny new file. What should've been 50 well-sized Parquet files has turned into 50,000 tiny ones spread across your table.
+
+![Small files problem diagram](/img/blog/2026/5/small-file-problem.webp)
+
+This is the small files problem, and it triggers a cascade of issues.
+
+**Query engines have to work much harder.** Engines like Spark, Trino, or Athena don't read a table as a single unit — they read individual files. With 50,000 small files, every query involves thousands of extra file listings, metadata reads, and I/O round trips that have nothing to do with your actual data. The total data size hasn't changed, but the work has grown by orders of magnitude.
+
+![Query slowdown diagram](/img/blog/2026/5/query-slowdown.webp)
+
+**Metadata becomes a bottleneck on its own.** Iceberg tracks every file through a chain of manifests and snapshots. As file count grows, this metadata tree becomes enormous. Even simple operations — planning a query, committing a write — start taking longer because the system has to parse and resolve a much larger metadata structure before it can do anything useful.
+
+**Delete file accumulation makes this even worse.** In CDC-heavy pipelines, every sync doesn't just create new data files — it also creates equality delete files that track which rows were updated or deleted. These delete files are how Iceberg handles upserts without rewriting entire data files on every change. But delete files have a cost: every query has to apply them at read time to get the correct view of the data. As they pile up, the overhead of applying deletes during reads becomes significant. A table with thousands of equality delete files will be noticeably slower than the same table after they've been resolved.
+
+![Delete file problem diagram](/img/blog/2026/5/delete-file-problem.webp)
+
+**Object storage costs creep up silently.** Cloud storage doesn't just charge for how much data you store — it also charges per API request. More files means more reads, more listings, more API calls on every operation. You won't notice it until the bill shows up, and by then you've been overpaying for weeks.
+
+![Storage Costs problem diagram](/img/blog/2026/5/storage-cost.webp)
+
+None of this happens suddenly. It builds up quietly, which is exactly why it catches teams off guard. By the time performance is obviously degraded, the tables are already in rough shape.
+
+## What Teams Do Today (And Why It's a Grind)
+
+The standard fix for small files and delete accumulation is **compaction** — periodically rewriting fragmented small files into larger, well-organized ones and resolving accumulated deletes into the data. Iceberg's ecosystem supports this, and Apache Spark has become the de facto tool for it via `rewrite_data_files`.
+
+So most teams end up doing something like this:
+
+They write a Python script that calls `rewrite_data_files(...)` with the right parameters. They figure out executor counts, memory settings, file size bounds, and parallelism through trial and error. They wire it up to Airflow or a cron job to run every 20 or 30 minutes. They test it, watch it occasionally fail when a CDC write lands in the middle of a compaction run, and then adjust. A few weeks later, their ingestion rate changes, and the parameters they tuned are no longer appropriate for the table's current state.
+
+This works. Teams do make it work. But look at what they're actually doing:
+
+**Writing and maintaining infrastructure to maintain their infrastructure.** The compaction script itself becomes a thing that needs documentation, version control, incident response, and occasional debugging at 2am when a job fails and nobody knows why. That's before you account for the fact that most teams have more than one Iceberg table.
+
+**Running one-size-fits-all compaction when different situations call for different approaches.** A table that was just heavily fragmented by a burst of CDC events needs something different than a table with a moderate accumulation of small files over several hours. Spark's `rewrite_data_files` doesn't differentiate — it processes whatever files fall within your size bounds, regardless of whether that's the right level of intervention for the current table state.
+
+**Having no visibility into whether compaction is actually working.** Most custom setups log to files or Airflow. You might know that a job ran and didn't fail, but you don't know how many files it consolidated, what the table's health looks like now, or whether the compaction was actually effective. When a query is still slow after compaction, diagnosing why is painful.
+
+## Introducing OLake Fusion
+
+![Introducing OLake Fusion](/img/blog/2026/5/introducing-olake-fusion.webp)
+
+OLake Fusion is a dedicated Iceberg table maintenance service. It handles compaction for your Iceberg tables on a cron-based schedule you configure — with tiered optimization levels, built-in metrics, and enough observability to actually understand what's happening to your tables.
+
+No custom Spark scripts. No per-table tuning sessions. No wondering if last night's compaction job did anything useful.
+
+### Tiered Optimization: The Right Level of Work at the Right Time
+
+The most important thing about Fusion's approach is that it doesn't treat all compaction as the same operation. It offers three optimization tiers that you can schedule independently, each designed for a different kind of table maintenance need.
+
+**Lite** — Designed for small, frequent cleanup tasks. It keeps tables from slowly sliding into bad shape without using much compute, so you can run it often.
+
+**Medium** — Designed for regular cleanup when small files and deletes are starting to slow reads. It does more work than Lite, but avoids the cost of rewriting the whole table.
+
+**Full** — Designed for deep cleanup tasks where the whole table needs to be laid out fresh. It uses the most compute, so it makes sense for occasional resets, not frequent runs.
+
+One important detail: if multiple tiers are scheduled to run at the same time, Fusion automatically runs only the highest one. Medium overrides Lite. Full overrides both. You don't end up doing redundant work when schedules overlap.
+
+This tiered approach matters because it lets you optimize for cost and efficiency at the same time. Running Full compaction every 20 minutes on a CDC table is wasteful — you're rewriting data that doesn't need rewriting. Running only Lite is insufficient if delete files are building up and impacting read performance. The right answer is usually Lite frequently, Medium regularly, Full occasionally. Fusion makes it easy to express exactly that.
+
+### Faster and cheaper than Spark compaction
+
+Compared to Apache Spark’s `rewrite_data_files` on comparable infrastructure, Fusion is about **2× faster** end-to-end and lands around **50% lower cost** for the same compaction workload—without giving up table layout quality. Run-by-run timings, query checks, methodology, and cost breakdown are covered in [OLake Fusion vs Spark compaction benchmark](https://olake.io/blog/iceberg-compaction-spark-vs-fusion-benchmark/)
+
+### Observability That Actually Tells You Something
+
+Here's a problem that doesn't get talked about enough: most teams running custom Spark compaction scripts have no idea whether their compaction is actually working.
+
+They know the job ran. They know it didn't throw an error. But they don't know how many files were consolidated, what the table looks like now, whether the delete file count went down, or what the table's overall health score is. When a query is still slow after compaction, the debugging process is painful because you're working with almost no information.
+
+Fusion comes with observability built in, at two levels.
+
+**Per-run logs and status tracking.** Every time Fusion runs an optimization, it creates a run entry that tracks the optimization type (Lite, Medium, or Full), the table being optimized, the start time, duration, and outcome (Running, Success, Failed, Cancelled, or Skipped). Within each run, you get driver logs covering how the overall optimization progressed, and sub-task logs showing details for each individual piece of work the run was broken into. When something goes wrong, you're not staring at a generic error message — you can see exactly which sub-task failed and what happened.
+
+![Runs page](/img/docs/iceberg-maintenance/runs-and-logs/runs-page.webp)
+
+**Per-run metrics that show input vs. output.** For every optimization run, Fusion tracks the number of data files and delete files that went in, and the number that came out. You can see at a glance: before this run, there were 6 data files and 5 equality delete files. After it, there were 1 data file and 0 equality delete files. That's not just a log line — it's confirmation that the run actually did what it was supposed to do.
+
+![Runs Metrics](/img/blog/2026/5/run-metrics.webp)
+
+**Table-level health metrics.** At any point, you can pull up the current state of a table: total file count, average file size, data file count, delete file count, and a **health score** that combines small file pressure, equality delete accumulation, and positional delete accumulation into a single indicator. 
+
+![Table Metrics](/img/docs/iceberg-maintenance/metrics/table-metrics.webp)
+
+This health score surfaces on the tables page, so you can see at a glance which tables are in good shape and which ones are degrading and might need attention — without having to query Iceberg's metadata tables manually.
+
+![Table Metrics](/img/docs/iceberg-maintenance/metrics/health-score.webp)
+
+This is the kind of visibility that makes the difference between proactively maintaining your tables and reactively debugging performance issues after users are already complaining.
+
+## Setting It Up
+
+Fusion connects to your Iceberg catalog. For each table, you configure the optimization schedule — which tiers to enable, and how often each one should run. You can think of it like cron: you define the cadence, Fusion executes it.
+
+A typical setup for a CDC-heavy table might look like: Lite every 20 minutes, Medium every hour, and Full every 24 hours. That's it. Fusion handles the execution, the logging, and the metrics. If a run fails, you see it immediately in the runs view without having to dig through Airflow task logs or SSH into a Spark driver node.
+
+If you're already using OLake for CDC ingestion, Fusion integrates naturally — same catalog, same UI. But it also works as a standalone service if you're using a different ingestion tool.
+
+Refer here for a walkthrough guide: [Getting Started with Fusion](https://olake.io/docs/getting-started/configure-first-optimization)
+
+## TL;DR
+
+If you're running Iceberg with CDC pipelines, table maintenance isn't optional — it's the difference between a lakehouse that stays fast and one that gradually becomes unusable. The small files problem and delete file accumulation are real, they compound over time, and they're hard to notice until performance is already degraded.
+
+Custom Spark compaction scripts solve the problem technically, but they create a maintenance burden on top of your maintenance tool, they're slow, they're expensive, and they give you almost no visibility into whether they're working.
+
+OLake Fusion is built specifically for this. Tiered compaction that matches the level of work to what the table actually needs. 2x faster than Spark. About half the cost. And enough observability to actually understand what's happening to your tables — before your users start asking why queries are slow.
