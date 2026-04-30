@@ -37,8 +37,8 @@ const docSidebar = {
         },
         {
           type: 'doc',
-          id: 'benchmarks/optimization',
-          label: 'Optimization Benchmarks',
+          id: 'benchmarks/compaction',
+          label: 'Compaction Benchmarks',
         },
         {
           type: 'doc',
@@ -78,23 +78,29 @@ const docSidebar = {
           label: 'Docker Compose (CLI)',
         },
         {
-          type: 'doc',
-          id: 'install/kubernetes',
-          label: 'Kubernetes Installation',
-        },
-        {
-          type: 'doc',
-          id: 'install/kubernetes-optimization',
-          label: 'Kubernetes Optimization Installation',
+          type: 'category',
+          label: 'Kubernetes',
+          items: [
+            {
+              type: 'doc',
+              id: 'install/kubernetes',
+              label: 'Ingestion Installation',
+            },
+            {
+              type: 'doc',
+              id: 'install/kubernetes-compaction',
+              label: 'Maintenance Installation',
+            },
+          ],
         },
       ],
     },
 
     // SERVICES
-    sectionHeader("SERVICES"),
+    sectionHeader("PRODUCTS"),
     {
       type: 'category',
-      label: 'Ingestion',
+      label: 'OLake Go',
       items: [
         {
           type: 'doc',
@@ -279,7 +285,7 @@ const docSidebar = {
 
     {
       type: 'category',
-      label: 'Iceberg Maintenance',
+      label: 'OLake Fusion',
       items: [
         {
           type: 'doc',
@@ -287,15 +293,9 @@ const docSidebar = {
           label: 'Overview',
         },
         {
-          type: 'category',
-          label: 'Quickstart',
-          items: [
-            {
-              type: 'doc',
-              id: 'getting-started/configure-first-optimization',
-              label: 'Configure Your First Optimization',
-            },
-          ],
+          type: 'doc',
+          id: 'getting-started/configure-first-compaction',
+          label: 'Configure Your First Compaction',
         },
         {
           type: 'doc',
@@ -304,16 +304,16 @@ const docSidebar = {
         },
         {
           type: 'category',
-          label: 'Optimization',
+          label: 'Compaction',
           items: [
             {
               type: 'doc',
-              id: 'iceberg-maintenance/optimization/overview',
-              label: 'Types of Optimization',
+              id: 'iceberg-maintenance/compaction/overview',
+              label: 'Types of Compaction',
             },
             {
               type: 'doc',
-              id: 'iceberg-maintenance/optimization/configuration',
+              id: 'iceberg-maintenance/compaction/configuration',
               label: 'Configuration',
             },
           ],
@@ -394,10 +394,10 @@ const docSidebar = {
     },
     {
       type: 'category',
-      label: 'Optimization',
+      label: 'Maintenance',
       items: [
-        'release/optimization/overview',
-        'release/optimization/v0.1.0',
+        'release/maintenance/overview',
+        'release/maintenance/v0.1.0',
       ],
     },
   ],
