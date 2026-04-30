@@ -100,7 +100,7 @@ const docSidebar = {
     sectionHeader("PRODUCTS"),
     {
       type: 'category',
-      label: 'OLake Go',
+      label: 'OLake Go - Ingestion',
       items: [
         {
           type: 'doc',
@@ -285,7 +285,7 @@ const docSidebar = {
 
     {
       type: 'category',
-      label: 'OLake Fusion',
+      label: 'OLake Fusion - Maintenance',
       items: [
         {
           type: 'doc',
