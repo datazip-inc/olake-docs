@@ -621,34 +621,46 @@ const config = {
           return undefined
         },
         redirects: [
-          // British → American spelling (`optimization` URLs)
+          // British spelling + legacy `optimization` Iceberg Maintenance URLs → `compaction`
           {
-            to: '/docs/iceberg-maintenance/optimization/overview',
-            from: '/docs/iceberg-maintenance/optimisation/overview'
+            to: '/docs/iceberg-maintenance/compaction/overview',
+            from: [
+              '/docs/iceberg-maintenance/optimisation/overview',
+              '/docs/iceberg-maintenance/optimization/overview',
+            ],
           },
           {
-            to: '/docs/iceberg-maintenance/optimization/configuration',
-            from: '/docs/iceberg-maintenance/optimisation/configuration'
+            to: '/docs/iceberg-maintenance/compaction/configuration',
+            from: [
+              '/docs/iceberg-maintenance/optimisation/configuration',
+              '/docs/iceberg-maintenance/optimization/configuration',
+            ],
           },
           {
-            to: '/docs/getting-started/configure-first-optimization',
-            from: '/docs/getting-started/configure-first-optimisation'
+            to: '/docs/getting-started/configure-first-compaction',
+            from: [
+              '/docs/getting-started/configure-first-optimisation',
+              '/docs/getting-started/configure-first-optimization',
+            ],
           },
           {
             to: '/docs/benchmarks/ingestion',
             from: '/docs/benchmarks'
           },
           {
-            to: '/docs/benchmarks/optimization',
-            from: '/docs/benchmarks/optimisation'
+            to: '/docs/benchmarks/compaction',
+            from: ['/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
           },
           {
             to: '/docs/install/kubernetes',
             from: '/docs/install/kubernetes-ingestion'
           },
           {
-            to: '/docs/install/kubernetes-optimization',
-            from: '/docs/install/kubernetes-optimisation'
+            to: '/docs/install/kubernetes-compaction',
+            from: [
+              '/docs/install/kubernetes-optimisation',
+              '/docs/install/kubernetes-optimization',
+            ],
           },
           // Legacy release-note URLs -> ingestion release notes
           {
