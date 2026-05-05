@@ -374,6 +374,7 @@ const docSidebar = {
       label: 'Ingestion',
       items: [
         'release/ingestion/overview',
+        'release/ingestion/v0.7.0',
         'release/ingestion/v0.6.0',
         'release/ingestion/v0.5.0',
         'release/ingestion/v0.4.0',
