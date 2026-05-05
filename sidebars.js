@@ -273,12 +273,17 @@ const docSidebar = {
               id: 'getting-started/alerts-and-notifications',
               label: 'Alerts & Notifications',
             },
+            {
+              type: 'doc',
+              id: 'features/schema',
+              label: 'Schema Evolution',
+            },
           ],
         },
         {
           type: 'doc',
           id: 'understanding/terminologies/olake',
-          label: 'Properties',
+          label: 'Stream Properties',
         },
       ],
     },
