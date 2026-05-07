@@ -1545,7 +1545,64 @@ You can ingest `JSON` and XML directly into Snowflake, no problem. As for `BSON`
 
 `FLATTEN` handles basic unnesting of arrays or objects. `LATERAL FLATTEN` lets you dig deeper, applying flattening row by row in more complex scenarios.
 
-
+## Frequently Asked Questions
+## FAQs
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. Why does Snowflake sometimes fail to extract elements from a VARIANT column into columnar form, and how does it affect performance?",
+    answer: <div>
+      <p>Snowflake tries to extract VARIANT fields into columnar form at load time for faster querying, but two scenarios block this:</p>
+      <ul>
+        <li><strong>Elements that contain even a single <code>"null"</code> value</strong> are not extracted into a column</li>
+        <li><strong>Elements that contain multiple data types</strong> are also not extracted into a column</li>
+      </ul>
+      <p>When a field is not extracted into a column, the execution engine must scan the entire JSON structure and traverse it row by row — which directly impacts query performance. To avoid this:</p>
+      <ul>
+        <li>Extract semi-structured elements containing <code>null</code> values into relational columns <strong>before loading</strong></li>
+        <li>Or set the file format option <code>STRIP_NULL_VALUES = TRUE</code> when loading, which removes array or object elements containing <code>null</code> values</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q2. When should I use LATERAL FLATTEN vs. [] bracket notation to access array elements?",
+    answer: <div>
+      <p>These serve different purposes:</p>
+      <ul>
+        <li><strong><code>TABLE(FLATTEN(...))</code> vs <code>LATERAL FLATTEN(...)</code></strong> — For single-level arrays, both produce the same result. For nested data structures where you need to chain multiple <code>FLATTEN</code> calls, use <code>LATERAL</code> so each subsequent <code>FLATTEN</code> can reference the output of the previous one.</li>
+        <li><strong>Bracket <code>[]</code> notation</strong> — The right tool when you already know the exact index of the element you need. It avoids the overhead of exploding the entire array into rows and also handles keys containing hyphens, spaces, or other characters that dot notation cannot.</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q3. What are the real performance trade-offs of using LATERAL FLATTEN on large datasets?",
+    answer: <div>
+      <p><code>FLATTEN</code> should be used sparingly. Flattening large arrays expands rows exponentially, consuming more compute. Best practices to follow:</p>
+      <ul>
+        <li>Pre-aggregate or stage the data before flattening where possible</li>
+        <li>For very large arrays, consider filtering or flattening incrementally in smaller steps</li>
+        <li>Avoid running <code>LATERAL FLATTEN</code> across entire dbt projects at scale when only a subset of the nested structure is needed — flattening the whole JSON structure even when only a single column's history is required can cause queries to grow significantly as data volumes increase</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q4. When should I prefer OBJECT or ARRAY types over VARIANT for storing semi-structured data?",
+    answer: <div>
+      <ul>
+        <li><strong>Use typed <code>ARRAY</code> / <code>OBJECT</code></strong> when the nested schema is stable and you want strict type validation and predictable query performance. These structured types are ideal for production tables with repeated, well-known nested fields.</li>
+        <li><strong>Keep using <code>VARIANT</code></strong> when the nested shape is highly variable, evolving, or when ingestion is heterogeneous. <code>VARIANT</code> remains the best option for exploratory, ingestion-first workflows.</li>
+      </ul>
+      <p><strong>Important:</strong> Typed <code>ARRAY</code> and <code>OBJECT</code> columns are only supported in standard Snowflake-managed tables. They <strong>cannot</strong> be used in dynamic, hybrid, or external tables — an error will occur if you attempt to define them in those table types.</p>
+    </div>
+  },
+  {
+    question: "Q5. Can PARSE_JSON and LATERAL FLATTEN be used together to flatten an array stored as a plain string?",
+    answer: <div>
+      <p>Yes. If your array is stored as a raw string rather than a <code>VARIANT</code>, you first need to convert it using <code>PARSE_JSON</code> (or <code>TRY_PARSE_JSON</code> for safety when dealing with untrusted or dynamic data, as it returns <code>NULL</code> instead of throwing an error on invalid JSON), and then pass the result into <code>LATERAL FLATTEN</code>.</p>
+      <p><strong>Best practice:</strong> Use <code>PARSE_JSON</code> in your <code>COPY INTO</code> or <code>INSERT</code> statement so the data lands in the table as <code>VARIANT</code> at load time, rather than storing it as <code>VARCHAR</code> and parsing it at query time on every <code>SELECT</code>. Parsing at query time is an avoidable and repeated performance cost.</p>
+      <p>Note: If your column is already <code>VARIANT</code>, do not call <code>PARSE_JSON</code> on it again — that is unnecessary work and adds overhead on every query execution.</p>
+    </div>
+  },
+]} />
 
 I’d love to hear your thoughts about this, so feel free to reach out to me on [LinkedIn](https://www.linkedin.com/in/zriyansh/).
 

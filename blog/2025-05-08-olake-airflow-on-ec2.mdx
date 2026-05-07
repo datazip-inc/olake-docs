@@ -359,7 +359,73 @@ with DAG(
 	catchup=False, 
 	... 
 ```
+## Frequently Asked Questions
 
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. How do I automate OLake data sync on AWS EC2 using Apache Airflow?",
+    answer: <div>
+      <p>Create an Airflow DAG that uses the AWS provider to dynamically provision an EC2 instance, SSH into it, and run OLake inside a Docker container. The DAG handles the full EC2 lifecycle:</p>
+      <ol>
+        <li><strong>Launch</strong> - <code>EC2CreateInstanceOperator</code> provisions the instance</li>
+        <li><strong>Wait</strong> - <code>EC2InstanceStateSensor</code> polls until the instance is ready</li>
+        <li><strong>Execute</strong> - <code>SSHOperator</code> SSHes into the instance and runs the OLake sync command</li>
+        <li><strong>Terminate</strong> - <code>EC2TerminateInstanceOperator</code> shuts down the instance on completion</li>
+      </ol>
+      <p>OLake configuration files are stored in S3 and downloaded to the EC2 instance at runtime.</p>
+    </div>
+  },
+  {
+    question: "Q2. What AWS IAM permissions are required to run the OLake Airflow EC2 DAG?",
+    answer: <div>
+      <p>The Airflow AWS connection needs IAM permissions to:</p>
+      <ul>
+        <li><strong>Create and terminate EC2 instances</strong> - <code>ec2:RunInstances</code>, <code>ec2:TerminateInstances</code></li>
+        <li><strong>Describe EC2 instance status</strong> - <code>ec2:DescribeInstances</code>, <code>ec2:DescribeInstanceStatus</code></li>
+        <li><strong>Pass an IAM role to the EC2 instance</strong> - <code>iam:PassRole</code> (required security check at launch time to verify the caller is allowed to associate a specific role with the new instance)</li>
+        <li><strong>Retrieve the role being passed</strong> - <code>iam:GetRole</code> (recommended best practice alongside <code>iam:PassRole</code>)</li>
+        <li><strong>List instance profiles</strong> - <code>iam:ListInstanceProfiles</code> (required when using the EC2 console to assign instance profiles)</li>
+      </ul>
+      <p>The EC2 instance itself needs an IAM role with permissions to:</p>
+      <ul>
+        <li>Read OLake configuration files from the S3 config bucket</li>
+        <li>Read and write OLake state files to the S3 state path</li>
+        <li>Write Iceberg data files to the destination S3 bucket</li>
+      </ul>
+      <p>Using IAM roles attached to instances is preferred over embedding access keys in configuration files.</p>
+    </div>
+  },
+  {
+    question: "Q3. How does OLake use S3 for state persistence when running on ephemeral EC2 instances?",
+    answer: <div>
+      <p>Since EC2 instances are terminated after each sync run, OLake's state (checkpoints, cursor positions) cannot be stored on the instance's local disk. Instead, the DAG configures OLake to read and write its state files to a dedicated S3 path:</p>
+      <ul>
+        <li><strong>At the start of each run</strong> - state is downloaded from S3 to the instance</li>
+        <li><strong>At the end of a successful sync</strong> - the updated state is uploaded back to S3</li>
+      </ul>
+      <p>This enables incremental sync across stateless ephemeral instances - each run picks up exactly where the last one left off without needing a persistent server.</p>
+    </div>
+  },
+  {
+    question: "Q4. What is the benefit of dynamically provisioning EC2 instances for each OLake sync run?",
+    answer: <div>
+      <p>Dynamic provisioning means you only pay for compute when syncs are actually running - the instance is terminated immediately after each job completes. Key benefits:</p>
+      <ul>
+        <li><strong>Cost efficiency</strong> - Dramatically more cost-effective than running a persistent server for low-frequency syncs (e.g. hourly or daily). You are billed only for the minutes the sync runs.</li>
+        <li><strong>Clean state</strong> - Each sync starts on a fresh instance with no risk of accumulated state corruption from previous runs</li>
+        <li><strong>Right-sizing</strong> - You can choose the optimal EC2 instance type and size for each pipeline independently, rather than over-provisioning a shared persistent server</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q5. How do I configure Airflow connections for AWS and SSH to enable the OLake EC2 DAG?",
+    answer: <div>
+      <p><strong>AWS connection:</strong> In the Airflow UI, create an Amazon Web Services connection with your AWS credentials, or configure IAM role-based authentication if your Airflow instance runs on AWS (MWAA or EC2) and has an attached IAM role.</p>
+      <p><strong>SSH connection:</strong> The DAG dynamically creates a temporary SSH connection at runtime using the EC2 instance's public IP and your key pair, retrieved from the AWS API response after launch. The private key file should be stored in the Airflow DAGs directory on S3.</p>
+      <p><strong>Security note:</strong> Dynamic SSH connections to freshly provisioned EC2 instances cannot verify host keys, which produces a warning: <em>"No Host Key Verification. This won't protect against Man-In-The-Middle attacks."</em> For production deployments, consider using <strong>AWS Systems Manager Session Manager</strong> as an alternative to direct SSH - this avoids exposing port 22 entirely and uses IAM-based access control instead of key pairs.</p>
+    </div>
+  }
+]} />
 
 For more information on how to add a schedule, refer[ Cron & Time](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/cron.html#cron-time-intervals) Intervals docs. 
 
