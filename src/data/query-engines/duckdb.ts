@@ -1,7 +1,8 @@
 // data/query-engines/duckdb.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const duckdb: QueryEngine = {
+export const duckdb: QueryEngine = createVersionedEngine({
   id: 'duckdb',
   name: 'DuckDB v1.3+',
   description: 'A light-weight, read-only analytics engine for Iceberg with SQL time travel, external file caching, and REST catalog support',
@@ -11,12 +12,8 @@ export const duckdb: QueryEngine = {
   features: {
     catalogs: {
       support: 'partial',
-      details: 'Hadoop (file-system) and Iceberg REST catalogs supported via rest option with bearer/OAuth tokens; no native Hive/Glue catalog yet',
+      details: 'REST catalog, AWS Glue (via ENDPOINT_TYPE=glue), and Polaris supported for V3 tables with V2-compatible data types. Hive Metastore, Nessie, Hadoop, JDBC not supported',
       externalLinks: [
-        {
-          label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
-        },
         {
           label: 'Iceberg REST Catalogs',
           url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs.html'
@@ -24,36 +21,28 @@ export const duckdb: QueryEngine = {
       ]
     },
     readWrite: {
-      support: 'readonly',
-      details: 'Full SELECT support with predicate evaluation, manifest pruning and external file-cache to avoid re-downloading S3/GCS objects; write operations not available',
+      support: 'partial',
+      details: 'DuckDB can read V3 tables that use only V2-compatible data types. INSERT into V3 tables supported; UPDATE/DELETE on V3 not yet documented',
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
           url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
-        },
-        {
-          label: 'Troubleshooting - Write Limitations',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
         }
       ]
     },
     dml: {
       support: 'none',
-      details: 'iceberg_scan() and CREATE VIEW for reads; metadata helper functions available; no INSERT/UPDATE/DELETE/MERGE operations',
+      details: 'MERGE INTO not supported on any version. UPDATE/DELETE on V3 tables not yet documented. INSERT into V3 supported per extension limitations page',
       externalLinks: [
         {
-          label: 'GitHub - duckdb-iceberg README',
-          url: 'https://github.com/duckdb/duckdb-iceberg'
-        },
-        {
-          label: 'Troubleshooting - Writing Not Supported',
+          label: 'Troubleshooting - Current Limitations',
           url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
         }
       ]
     },
     morCow: {
-      support: 'limited',
-      details: 'Reading tables with deletes is not yet supported; only Copy-on-Write tables without delete files can be read',
+      support: 'partial',
+      details: 'V3 tables with position deletes can be read if only V2-compatible data types are used. Full MoR/CoW behavior on V3 not yet documented',
       externalLinks: [
         {
           label: 'Troubleshooting - Delete Limitations',
@@ -72,13 +61,9 @@ export const duckdb: QueryEngine = {
       ]
     },
     formatV3: {
-      support: 'none',
-      details: 'DuckDB 1.3 only reads v1 & v2 tables; v3 metadata changes will be evaluated post-GA of the spec',
+      support: 'partial',
+      details: 'DuckDB can read V3 tables that use only V2-compatible data types. V3-only data types (nanosecond timestamps, geometry, vector, shredded variant) are not supported',
       externalLinks: [
-        {
-          label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
-        },
         {
           label: 'Troubleshooting - Current Limitations',
           url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
@@ -86,8 +71,8 @@ export const duckdb: QueryEngine = {
       ]
     },
     timeTravel: {
-      support: 'full',
-      details: 'Convenient SQL syntax: SELECT * FROM tbl AT (VERSION => 314159) or AT (TIMESTAMP => \'2025-05-01 10:15:00\'); older function-style still works',
+      support: 'partial',
+      details: 'Time travel on V3 tables likely works for V2-compatible data types via AT (VERSION => snapshot_id) and AT (TIMESTAMP => ts) syntax, but not explicitly documented for V3',
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
@@ -96,13 +81,9 @@ export const duckdb: QueryEngine = {
       ]
     },
     security: {
-      support: 'basic',
-      details: 'Uses DuckDB\'s standard S3/Azure creds in httpfs extension; REST-catalog tokens may be supplied per-session; no built-in RBAC/row-masking',
+      support: 'partial',
+      details: 'Uses DuckDB\'s standard S3/Azure credentials in httpfs extension; REST-catalog OAuth2 tokens supported since v1.3+; no built-in RBAC or row-level masking',
       externalLinks: [
-        {
-          label: 'S3 Iceberg Import',
-          url: 'https://duckdb.org/docs/stable/guides/network_cloud_storage/s3_iceberg_import.html'
-        },
         {
           label: 'Iceberg REST Catalogs Authentication',
           url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs.html'
@@ -128,6 +109,64 @@ CREATE SECRET iceberg_rest (
 -- Time travel query
 SELECT * FROM iceberg_scan('/bucket/table/') 
 AT (TIMESTAMP => '2025-05-01 10:15:00');`,
+  versions: {
+    v2: {
+      features: {
+        catalogs: {
+          support: 'full',
+          details: 'Supports attaching to Iceberg REST Catalogs (OAuth2 since v1.3+), AWS Glue via ENDPOINT_TYPE=glue, Polaris, and S3 Tables. Only REST-based catalogs supported — no Hive Metastore, Hadoop, Nessie, or JDBC',
+          externalLinks: [
+            { label: 'Iceberg REST Catalogs', url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs.html' }
+          ]
+        },
+        readWrite: {
+          support: 'full',
+          details: 'Full read support for V1 and V2 tables via the iceberg extension with predicate push-down, manifest pruning, and external file cache. INSERT INTO supported since v1.4.0 via REST catalog attachment',
+          externalLinks: [
+            { label: 'Iceberg Extension Overview', url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html' }
+          ]
+        },
+        dml: {
+          support: 'partial',
+          details: 'UPDATE and DELETE supported since v1.4.2; MERGE INTO and ALTER TABLE are not supported. Requires REST catalog attachment for write operations',
+          externalLinks: [
+            { label: 'Troubleshooting - Current Limitations', url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html' }
+          ]
+        },
+        morCow: {
+          support: 'full',
+          details: 'Full MoR semantics: UPDATE/DELETE use positional deletes (MoR). INSERT uses COW semantics. Supports reading tables with position deletes and equality deletes',
+          externalLinks: [
+            { label: 'Iceberg Extension Overview', url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html' }
+          ]
+        },
+        streaming: {
+          support: 'none',
+          details: 'Batch-only analytics engine; no built-in streaming ingestion or CDC subscribe APIs'
+        },
+        formatV3: {
+          support: 'none',
+          details: 'Iceberg Format V3 features are not applicable to V2 tables.'
+        },
+        timeTravel: {
+          support: 'full',
+          details: 'SQL time travel via AT (VERSION => snapshot_id) and AT (TIMESTAMP => ts) syntax. Older iceberg_scan() function-style parameters still work',
+          externalLinks: [
+            { label: 'Iceberg Extension Overview', url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html' }
+          ]
+        },
+        security: {
+          support: 'partial',
+          details: 'Standard S3/Azure credentials via httpfs extension; REST-catalog OAuth2 tokens supported since v1.3+; no built-in RBAC or row-level masking',
+          externalLinks: [
+            { label: 'S3 Iceberg Import', url: 'https://duckdb.org/docs/stable/guides/network_cloud_storage/s3_iceberg_import.html' }
+          ]
+        }
+      },
+      score: 20,
+      description: 'DuckDB v1.4+ supports full Iceberg V2 read/write operations with REST catalog, time travel, MoR/CoW semantics, and partial DML (UPDATE/DELETE but no MERGE)'
+    }
+  },
   bestPractices: [
     'Use DuckDB v1.3.0 or later for the built-in Iceberg extension',
     'Configure external file-cache via SET s3_cache_size=\'4GB\'; to halve cold-scan latency',
@@ -146,4 +185,4 @@ AT (TIMESTAMP => '2025-05-01 10:15:00');`,
     'Use object-store IAM plus catalog ACLs for security and governance',
     'Rely on cost-based optimization improvements in 1.3 for better query planning'
   ]
-};
+});

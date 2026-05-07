@@ -1,7 +1,8 @@
 // data/query-engines/starrocks.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const starrocks: QueryEngine = {
+export const starrocks: QueryEngine = createVersionedEngine({
   id: 'starrocks',
   name: 'StarRocks v3.2/3.3',
   description: 'Vectorized OLAP engine with read-write Iceberg support, async materialized views, CBO optimization, and strong analytical performance for lakehouse analytics',
@@ -149,5 +150,21 @@ GROUP BY 1;`,
     'Configure appropriate row-group size and page size for Parquet write performance',
     'Plan migration path for when UPDATE/DELETE/MERGE operations become available',
     'Consider StarRocks as primary query engine in lakehouse architecture with other engines for writes'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'StarRocks v3.2/3.3 supports only Iceberg V1/V2 format tables; V3 format not yet supported' },
+        readWrite: { support: 'none', details: 'Cannot read or write Iceberg V3 format tables; V1/V2 Parquet & ORC only' },
+        dml: { support: 'none', details: 'INSERT/INSERT OVERWRITE available for V2 tables only; V3 format not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not supported; reads V2 MoR (position & equality deletes) only' },
+        streaming: { support: 'none', details: 'No native streaming for any format version' },
+        formatV3: { support: 'none', details: 'Not yet GA; supports V1/V2 (Parquet & ORC) only; V3 support on roadmap' },
+        timeTravel: { support: 'none', details: 'Time travel (v3.4+) only for V1/V2 format tables; V3-format tables not supported' },
+        security: { support: 'none', details: 'V3 format not supported; StarRocks RBAC and catalog ACLs apply to V1/V2 tables only' }
+      },
+      score: 0,
+      description: 'StarRocks v3.2/3.3 supports Iceberg V1/V2 tables only; Format V3 (deletion vectors, row lineage, new data types) not yet supported'
+    }
+  }
+});

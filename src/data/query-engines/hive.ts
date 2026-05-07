@@ -1,7 +1,8 @@
 // data/query-engines/hive.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const hive: QueryEngine = {
+export const hive: QueryEngine = createVersionedEngine({
   id: 'hive',
   name: 'Apache Hive 4.0+',
   description: 'Traditional data warehouse with first-class Iceberg support, full SQL DML, hidden partitioning, and Ranger-based governance for batch analytics',
@@ -98,12 +99,16 @@ export const hive: QueryEngine = {
       ]
     },
     timeTravel: {
-      support: 'partial',
-      details: 'Hidden partitioning supported (PARTITIONED BY SPEC); time-travel via snapshot/branch properties, not SQL clauses',
+      support: 'full',
+      details: 'FOR SYSTEM_TIME AS OF <timestamp> and FOR SYSTEM_VERSION AS OF <snapshot_id> SQL clauses supported in Hive 4.0+; hidden partitioning (PARTITIONED BY SPEC) also available',
       externalLinks: [
         {
-          label: 'Branching and Tagging',
-          url: 'https://iceberg.apache.org/docs/1.8.1/branching/'
+          label: 'Hive Time Travel',
+          url: 'https://iceberg.apache.org/docs/latest/hive/'
+        },
+        {
+          label: 'Iceberg Time Travel in CDW',
+          url: 'https://docs.cloudera.com/cdw-runtime/cloud/iceberg-how-to/topics/iceberg-hive-time-travel.html'
         }
       ]
     },
@@ -151,5 +156,21 @@ SELECT * FROM iceberg_table WHERE created_date >= '2024-01-01';`,
     'Use branch/tag properties for time travel rather than expecting SQL time travel syntax',
     'Configure appropriate storage handlers and catalog properties for different deployment scenarios',
     'Consider micro-batch processing patterns for near-real-time data ingestion requirements'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'Hive 4 bundles Iceberg 1.4.3, predating V3 spec; V3 catalog operations not supported' },
+        readWrite: { support: 'none', details: 'Hive cannot read or write Iceberg V3 format tables; requires Iceberg ≥ 1.8.0 for V3 support' },
+        dml: { support: 'none', details: 'DML operations only produce V2 format (CoW); V3 table format not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not readable or writable; Hive uses CoW rewrites only' },
+        streaming: { support: 'none', details: 'No native streaming for any format version' },
+        formatV3: { support: 'none', details: 'Not supported; Hive 4 bundles Iceberg 1.4.3, predating spec v3. Cannot write or reliably read v3 tables until upgrade to Iceberg ≥ 1.8.0' },
+        timeTravel: { support: 'none', details: 'FOR SYSTEM_TIME/VERSION AS OF works for V1/V2 tables; V3-format tables not supported in Hive 4.0.x (Iceberg 1.4.3)' },
+        security: { support: 'none', details: 'V3 format not supported; Ranger/SQL-standard policies apply to V1/V2 tables only' }
+      },
+      score: 0,
+      description: 'Apache Hive 4.0 (Iceberg 1.4.3) does not support Iceberg V3 format tables; upgrade to Iceberg ≥ 1.8.0 required for V3 support'
+    }
+  }
+});
