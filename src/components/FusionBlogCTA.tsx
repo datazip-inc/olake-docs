@@ -8,7 +8,7 @@ const FusionBlogCTA = () => {
         OLake Fusion
       </h2>
       <p className="text-lg font-light text-gray-700 dark:text-gray-300 mb-8">
-        Open-source lakehouse maintenance for Apache Iceberg tables. 50% cheaper (2x faster) compaction.
+        Open-source lakehouse maintenance for Apache Iceberg tables. 50% cheaper (2x faster) compaction than Vanilla Spark.
       </p>
 
       <div className="flex flex-col md:flex-row justify-center gap-4">
