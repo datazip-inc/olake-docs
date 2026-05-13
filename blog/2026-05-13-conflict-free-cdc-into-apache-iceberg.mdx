@@ -28,6 +28,9 @@ Manifests: Files that track the exact paths, row counts, and column-level statis
 When an autonomous agent runs a Time Travel query with FOR SYSTEM_TIME AS OF, the execution engine does not look through the raw data. It only opens metadata.json, finds the snapshot ID that was active at that millisecond, and uses the manifest statistics to quickly remove irrelevant files. 
 
 This metadata structure enables sub-second time-based reasoning. However, keeping this structure clean during the intense demands of real-time streaming is where traditional systems fail.
+
+![The Mechanics of Iceberg Time Travel](/img/blog/2026/6/mechanics-of-iceberg-timetravel.webp)
+
 Fig.1 The Mechanics of Iceberg Time Travel. This diagram illustrates how the query engine (ClickHouse or BigQuery) executes a temporal query without scanning the entire data lake.
 
 ## Defining the Streaming Bottleneck
@@ -71,6 +74,8 @@ While appending "sticky notes" takes microseconds and saves the write path, it p
 
 ### Architecting the Solution: The Mechanics of an OLake Commit
 
+![End to End Agentic Data Architecture](/img/blog/2026/6/agentic-data-architecture.webp)
+
 **Figure 2. The end-to-end Agentic Data Architecture.** Notice how the ingestion tier bypasses traditional message brokers like Kafka to minimise latency. On the left, OLake worker threads ingest CDC data directly from the PostgreSQL replication slot, using internal RAM buffers to fold noisy events before writing Parquet files directly to Google Cloud Storage. While OLake Fusion quietly compacts these files in the background, the Master Process handles the lightweight Iceberg catalog commits. On the right, this clean metadata allows the Vertex AI Control Plane to execute sub-second temporal reasoning via a vectorised execution engine.
 
 To enable sub-second Time Travel, the ingestion layer must rigorously manage metadata hygiene. OLake achieves this through a highly concurrent, conflict-free architecture.
@@ -96,6 +101,8 @@ In standard distributed ingestion pipelines, multiple workers often attempt to c
 OLake avoids this catalog contention entirely by utilizing a central Master Process. Because OLake streams directly from the Postgres replication slot, it pulls these high-velocity changes into an internal RAM buffer to form a micro-batch. This allows OLake to computationally "fold" noisy telemetry on the fly—if a network edge changes state 15 times in half a second, the buffer only retains the final state, preventing the "small files problem" in cloud storage.
 Crucially, the heavy I/O operations—generating the Parquet files and flushing them to Google Cloud Storage or S3—are executed entirely in parallel by the worker threads without any locking. It is only after these parallel flushes succeed that the Master Process takes a lightning-fast internal lock (under 200ms) solely to perform the atomic metadata swap in the Iceberg catalog. This decoupled design sequences the commit cleanly while keeping the data generation path completely unblocked. By coordinating the threads internally, OLake eliminates the CommitFailedException loop and maintains maximum ingestion throughput.
 
+
+![Resolving Catalog Contention](/img/blog/2026/6/resolving-catalog-contention.webp)
 
 **Figure 3.Resolving catalog contention through Master Process thread coordination.** Instead of multiple worker threads crashing into the Iceberg catalog and causing a "thundering herd" problem, OLake centralizes the commit phase. As shown, individual worker threads process the PostgreSQL WAL stream concurrently, writing the heavy physical Parquet files directly to Cloud Storage. However, the catalog update is strictly sequenced: the Master Process acquires a lightning-fast internal lock (under 200ms) to perform the atomic swap in the Iceberg Catalog, ensuring conflict-free ingestion even under massive throughput.
 
