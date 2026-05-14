@@ -100,8 +100,8 @@ While the Arrow-based mode already minimizes Garbage Collection (GC) overhead by
 #### Phase 3: Thread Coordination and the Master Process Lock
 
 In standard distributed ingestion pipelines, multiple workers often attempt to commit to the catalog simultaneously, resulting in a CommitFailedException (and the "thundering herd" problem).
-OLake avoids this catalog contention entirely by utilizing a central Master Process. Because OLake streams directly from the Postgres replication slot, it pulls these high-velocity changes into an internal RAM buffer to form a micro-batch. This allows OLake to computationally "fold" noisy telemetry on the fly—if a network edge changes state 15 times in half a second, the buffer only retains the final state, preventing the "small files problem" in cloud storage.
-Crucially, the heavy I/O operations—generating the Parquet files and flushing them to Google Cloud Storage or S3—are executed entirely in parallel by the worker threads without any locking. It is only after these parallel flushes succeed that the Master Process takes a lightning-fast internal lock (under 200ms) solely to perform the atomic metadata swap in the Iceberg catalog. This decoupled design sequences the commit cleanly while keeping the data generation path completely unblocked. By coordinating the threads internally, OLake eliminates the CommitFailedException loop and maintains maximum ingestion throughput.
+OLake avoids this catalog contention entirely by utilizing a central Master Process. Because OLake streams directly from the Postgres replication slot, it pulls these high-velocity changes into an internal RAM buffer to form a micro-batch. No matter how many edge changes happen, OLake keeps buffering in memory till the point it reaches a significant file size, so preventing small file problems. 
+Crucially, the heavy I/O operations—generating the Parquet files and flushing them to Google Cloud Storage or S3—are executed entirely in parallel by the worker threads without any locking. It is only after these parallel flushes succeed that the Master Process takes a lightning-fast internal lock (under 200ms) solely to perform the atomic metadata swap (snapshot) in the Iceberg catalog. This decoupled design sequences the commit cleanly while keeping the data generation path completely unblocked. By coordinating the threads internally, OLake eliminates the CommitFailedException loop and maintains maximum ingestion throughput.
 
 
 ![Resolving Catalog Contention](/img/blog/2026/6/resolving-catalog-contention.webp)
@@ -112,10 +112,10 @@ Crucially, the heavy I/O operations—generating the Parquet files and flushing 
 
 To address the read amplification caused by Equality Deletes, OLake Fusion runs asynchronously in the background to sanitise the storage layer:
 
-**Minor Compaction (Logical to Physical):**
+**Lite Compaction (Logical to Physical):**
 Resolving broad Equality Deletes on the fly requires the query engine to execute expensive dynamic anti-joins in memory. Fusion converts these logical rules into specific Position Deletes, specifying the exact file paths and row offsets to skip for the query engine. Additionally, it repairs fragmentation by rolling small micro-batches into larger segments (typically 1/8th of the target 256MB or 512MB file size).
 
-**Major Compaction (The Physical Purge):** 
+**Medium Compaction (The Physical Purge):** 
 A separate bin-packing process reduces these segments to the final target file size. Crucially, it physically removes the deleted rows from the Parquet blocks entirely. This restores contiguous memory layouts, allowing the query engine to scan only active data and maintain its SIMD vectorization efficiency.
 Architectural Warning: Merge-On-Read acts like a “computational” loan, and OLake Fusion is the repayment. If the background compaction tier lacks resources and can't keep pace with data ingestion, "delete file bloat" will accumulate. As these uncompacted files grow, the read amplification problem will resurface, leading to Time Travel queries missing their sub-second service-level agreements (SLAs). SRE teams must closely monitor the compaction queue depth to ensure the reasoning tier remains efficient.
 
