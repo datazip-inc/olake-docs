@@ -169,6 +169,70 @@ Achieving real-time data synchronization in MongoDB presents a unique set of cha
 3. **Data Consistency Challenges**: Ensuring data consistency across distributed systems is complex, particularly when multiple sources are writing to the same MongoDB instance.
     
     **Solution**: Above mentioned strategies can solve this problem as per MongoDB docs there are no chances of missing the data by using any of the above strategies properly.
-    
+
+## Frequently Asked Questions
+
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. What are the three main MongoDB real-time data synchronization strategies?",
+    answer: <div>
+      <p>The three strategies are:</p>
+      <ol>
+        <li><strong>Incremental sync</strong> — Uses an <code>updated_at</code> timestamp cursor to pull only records changed since the last run. Simple to implement but cannot track deletes and misses concurrent updates where two records share the same timestamp.</li>
+        <li><strong>Oplog-based sync</strong> — Reads MongoDB's internal operation log (<code>local.oplog.rs</code>) to capture every insert, update, and delete as a stream of events. Captures all changes without querying collections directly, avoiding load on the source database.</li>
+        <li><strong>Change Streams</strong> — MongoDB's higher-level API built on top of the oplog that provides a cleaner, more durable event stream with resume tokens for fault-tolerant consumption.</li>
+      </ol>
+    </div>
+  },
+  {
+    question: "Q2. What is the MongoDB oplog and how does it enable real-time data sync?",
+    answer: <div>
+      <p>The oplog (operation log) is a special capped collection in the <code>local</code> database of every MongoDB replica set that records every successful data modification in chronological order. It was originally designed for replica set replication to keep secondary nodes in sync with the primary.</p>
+      <p>CDC tools use the oplog by tailing it as a stream of insert, update, and delete events — capturing every change without querying the collections directly, which avoids putting read load on the source database.</p>
+      <p><strong>Note:</strong> Failed or no-op write operations do not create oplog entries. The oplog only reflects successful data modifications, so CDC pipelines should not assume the oplog is a complete record of all attempted writes.</p>
+    </div>
+  },
+  {
+    question: "Q3. What are the limitations of incremental cursor-based MongoDB sync?",
+    answer: <div>
+      <p>Incremental sync using an <code>updated_at</code> column has three key limitations:</p>
+      <ol>
+        <li><strong>Cannot detect deletes</strong> — Rows removed from the source simply disappear from the change stream with no trace for a timestamp-cursor query to find</li>
+        <li><strong>Can miss updates</strong> — If two records are updated simultaneously with the same timestamp, one update may be skipped on the next sync run</li>
+        <li><strong>Performance degrades without proper indexing</strong> — If the <code>updated_at</code> field is not indexed, the query requires a full collection scan on every sync run. With a proper index on <code>updated_at</code>, incremental queries remain efficient as data grows.</li>
+      </ol>
+      <p>For production pipelines requiring delete tracking or high accuracy, oplog or change stream strategies are necessary.</p>
+    </div>
+  },
+  {
+    question: "Q4. How do MongoDB change streams differ from reading the oplog directly?",
+    answer: <div>
+      <p>Change streams are a higher-level MongoDB API built on top of the oplog that provides several improvements:</p>
+      <ul>
+        <li><strong>Resume tokens</strong> — Allow a consumer to restart from exactly where it left off after a failure, by passing the token back when reopening the cursor</li>
+        <li><strong>Cleaner event filtering</strong> — Events are structured and easier to consume than raw oplog entries</li>
+        <li><strong>Sharded cluster support</strong> — Change streams work across sharded clusters when issued via <code>mongos</code></li>
+      </ul>
+      <p>However, change streams on sharded clusters have important caveats:</p>
+      <ul>
+        <li>They must be opened from the <code>mongos</code>, not individual shards</li>
+        <li>Shards with little or no activity (cold shards) can introduce latency in the event stream</li>
+        <li>A shard removal event can close an open change stream cursor, and the closed cursor may not be fully resumable</li>
+      </ul>
+      <p>Direct oplog reading requires replica set access and manual resume position management, making change streams the preferred approach for modern CDC implementations — but with the sharded cluster caveats above factored in.</p>
+    </div>
+  },
+  {
+    question: "Q5. What are the best practices for handling deletes in MongoDB real-time sync pipelines?",
+    answer: <div>
+      <ul>
+        <li><strong>Use oplog-based or change stream sync</strong> if deletes must propagate to the destination — incremental sync cannot detect deletes at all</li>
+        <li><strong>Ensure your MongoDB deployment is a replica set</strong> — oplog and change streams do not work on standalone MongoDB instances. Attempting to use <code>watch()</code> on a standalone server returns: <code>MongoServerError: The $changeStream stage is only supported on replica sets</code></li>
+        <li><strong>Set oplog retention</strong> long enough to cover the maximum lag your pipeline may experience — MongoDB only removes an oplog entry if both the oplog has reached its maximum configured size and the entry is older than the configured minimum retention hours</li>
+        <li><strong>Implement delete logic at the destination</strong> based on the operation type field in the CDC event (<code>op: "d"</code>) captured from the oplog or change stream — use this to apply either soft-delete (flag the row) or hard-delete (remove the row) depending on your downstream requirements</li>
+      </ul>
+    </div>
+  },
+]} /> 
 
 <BlogCTA/>
