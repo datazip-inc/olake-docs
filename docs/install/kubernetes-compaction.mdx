@@ -9,7 +9,7 @@ sidebar_position: 2
 This guide details the process for deploying OLake Fusion on Kubernetes using the official Helm chart. The Fusion components run alongside the standard OLake stack and provide Iceberg table maintenance services.
 
 <details>
-<summary><b>Components</b></summary>
+<summary><b>Components & Architecture</b></summary>
 
 - **OLake UI**: Main web interface for job management and configuration
 - **OLake Worker**: Background worker for processing data replication jobs
@@ -17,8 +17,7 @@ This guide details the process for deploying OLake Fusion on Kubernetes using th
 - **Temporal**: Workflow orchestration engine for managing job execution
 - **Signup Init**: One-time initialization service that creates the default admin user
 - **Fusion**: Maintenance control plane and API server
-- **Fusion Spark Optimizer (Compactor)**: Spark-on-Kubernetes execution layer for Maintenance jobs
-- **Elasticsearch (Legacy only)**: Search and indexing backend for Temporal workflow data (deprecated in new installations)
+- **Fusion Spark Optimizer**: Spark-on-Kubernetes execution layer for Maintenance jobs
 
 <div style={{textAlign: 'center'}}>
 
@@ -36,7 +35,7 @@ Ensure the following requirements are met before proceeding:
 - **Kubernetes 1.19+**: Administrative access to a Kubernetes cluster
 - **Helm 3.2.0+**: Helm client installed and configured. [Installation Guide](https://helm.sh/docs/intro/install/)
 - **kubectl**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL, Elasticsearch and the shared storage volume
+- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL and the shared storage volume
     ```bash
     # List available StorageClass
     kubectl get storageclass
@@ -54,20 +53,23 @@ Ensure the following requirements are met before proceeding:
   | Optimizer | 1 GB | — |
   | Spark executor | 4 GB | — |
 
-:::warning
-For conflict free compaction of OLake-Ingested tables, upgrade **OLake Go** (Ingestion) driver version to **v0.7.0 or higher**.
+:::note
+Sync pod sizing depends on the data volume to be synced. Use [JobID-Based Scheduling](/docs/install/kubernetes#jobid-based-scheduling) to map jobs to nodes with sufficient capacity.
 :::
 
-:::note
-- Sync pod sizing depends on the data volume to be synced. Use [JobID-Based Scheduling](/docs/install/kubernetes#jobid-based-scheduling) to map jobs to nodes with sufficient capacity.
-- The following node-class suggestions are **best practices**, not hard requirements. OLake will run on mixed capacity, but scheduling the components below on stable, non-preemptible (on-demand) nodes lowers the chance of spot or preemptible churn interrupting core services and compaction work:
-  - nfs-server (if enabled)
-  - PostgreSQL (if enabled)
-  - Temporal
-  - OLake workers
-  - OLake UI
-  - Fusion and Spark optimizer (Compactor) workloads
-:::
+<CollapsibleTip summary="Node-class suggestions">
+
+OLake will run on mixed capacity, but scheduling the components below on stable, non-preemptible (on-demand) nodes lowers the chance of spot or preemptible churn interrupting core services and compaction work:
+
+- nfs-server (if enabled)
+- PostgreSQL (if enabled)
+- Temporal
+- OLake workers
+- OLake UI
+- Fusion and Spark optimizer workloads
+
+</CollapsibleTip>
+
 
 ## Quick Start
 
@@ -343,7 +345,7 @@ Ensure the following images are mirrored to the private registry (`CONTAINER_REG
 OLake supports configuring `securityContext` for all its components to comply with restricted Kubernetes environments.
 
 #### General Component Configuration
-The `securityContext` can be set for `olakeUI`, `olakeWorker`, `elasticsearch`, `postgresql` and `temporal` in `values.yaml`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
+The `securityContext` can be set for `olakeUI`, `olakeWorker`, `postgresql` and `temporal` in `values.yaml`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
 For eg,
 
 ```yaml
@@ -372,8 +374,9 @@ postgresql:
 
 ## Upgrading Chart Version
 
-<Tabs>
-<TabItem value="new" label="New (after v0.0.11)">
+:::warning
+For conflict free compaction of OLake-Ingested tables, upgrade **OLake Go** (Ingestion) driver version to **v0.7.0 or higher**.
+:::
 
 ### Upgrade to Latest Version
 
@@ -388,43 +391,13 @@ helm upgrade olake olake/olake --set fusion.enabled=true
 helm upgrade olake olake/olake -f new-values.yaml --set fusion.enabled=true
 ```
 
-</TabItem>
-
-<TabItem value="es" label="Legacy (with ES)">
-
-Starting from version `0.0.11`, the Helm chart disables Elasticsearch by default. OLake now uses PostgreSQL for both metadata and Temporal visibility by default.
-
-:::warning
-
-If installation is currently using Elasticsearch and is upgraded without additional configuration, OLake will **lose visibility of existing job task logs and history**, although the **overall system will work as expected** and new logs will appear from next schedule.
-
-To keep the existing job task logs or recover the logs if upgraded to `v0.0.11` by mistake, keep using pre-existing Elasticsearch instance, override the default values.
-
-:::
-
-### Upgrade to Latest Version keeping elasticsearch
-
-```bash
-helm repo update
-helm upgrade olake olake/olake --set elasticsearch.enabled=true --set fusion.enabled=true
-```
-
-OR, set enabled to true in the `values.yaml` for elasticsearch like:
-
-```yaml
-elasticsearch:
-  enabled: true
-```
-
 ### Post-Upgrade: Resume Stopped Syncs
+
 After upgrading, perform a rollout restart of the olake-workers:
 
 ```bash
 kubectl rollout restart deployment/olake-workers
 ```
-
-</TabItem>
-</Tabs>
 
 ## Troubleshooting
 
