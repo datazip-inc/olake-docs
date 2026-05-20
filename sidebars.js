@@ -84,12 +84,12 @@ const docSidebar = {
             {
               type: 'doc',
               id: 'install/kubernetes',
-              label: 'Ingestion Installation',
+              label: 'Ingestion',
             },
             {
               type: 'doc',
               id: 'install/kubernetes-compaction',
-              label: 'Maintenance Installation',
+              label: 'Ingestion + Maintenance',
             },
           ],
         },
