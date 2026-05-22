@@ -227,7 +227,7 @@ const BenchmarkSection: React.FC = () => {
             We are currently running benchmarks, numbers will be updated soon.
           </span>
           <Link
-            to='/docs/benchmarks'
+            to='/docs/benchmarks/ingestion'
             className='inline-flex items-center text-xs font-medium text-brand-blue-500 hover:text-blue-700'
           >
             View all Benchmarks
@@ -493,7 +493,7 @@ const BenchmarkSection: React.FC = () => {
                   We are currently running benchmarks, numbers will be updated soon.
                 </span>
                 <Link
-                  to='/docs/benchmarks'
+                  to='/docs/benchmarks/ingestion'
                   className='mr-5 inline-flex items-center font-medium text-brand-blue-500 hover:text-blue-700'
                 >
                   View all Performance Benchmarks

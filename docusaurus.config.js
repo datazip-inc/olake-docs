@@ -621,16 +621,127 @@ const config = {
           return undefined
         },
         redirects: [
+          // British spelling + legacy `optimization` Iceberg Maintenance URLs → `compaction`
           {
-            to: '/docs/benchmarks?tab=mongodb',
+            to: '/docs/iceberg-maintenance/compaction/overview',
+            from: [
+              '/docs/iceberg-maintenance/optimisation/overview',
+              '/docs/iceberg-maintenance/optimization/overview',
+            ],
+          },
+          {
+            to: '/docs/iceberg-maintenance/compaction/configuration',
+            from: [
+              '/docs/iceberg-maintenance/optimisation/configuration',
+              '/docs/iceberg-maintenance/optimization/configuration',
+            ],
+          },
+          {
+            to: '/docs/getting-started/configure-first-compaction',
+            from: [
+              '/docs/getting-started/configure-first-optimisation',
+              '/docs/getting-started/configure-first-optimization',
+            ],
+          },
+          {
+            to: '/docs/benchmarks/ingestion',
+            from: '/docs/benchmarks'
+          },
+          {
+            to: '/docs/benchmarks/compaction',
+            from: ['/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
+          },
+          {
+            to: '/docs/install/kubernetes',
+            from: '/docs/install/kubernetes-ingestion'
+          },
+          {
+            to: '/docs/install/kubernetes-compaction',
+            from: [
+              '/docs/install/kubernetes-optimisation',
+              '/docs/install/kubernetes-optimization',
+            ],
+          },
+          // Legacy release-note URLs -> ingestion release notes
+          {
+            to: '/docs/release/ingestion/overview',
+            from: '/docs/release/overview'
+          },
+          {
+            to: '/docs/release/ingestion/v0.6.0',
+            from: '/docs/release/v0.6.0'
+          },
+          {
+            to: '/docs/release/ingestion/v0.5.0',
+            from: '/docs/release/v0.5.0'
+          },
+          {
+            to: '/docs/release/ingestion/v0.4.0',
+            from: '/docs/release/v0.4.0'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.17',
+            from: '/docs/release/v0.3.17'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.14',
+            from: '/docs/release/v0.3.14'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.9-v0.3.11',
+            from: '/docs/release/v0.3.9-v0.3.11'
+          },
+          {
+            to: '/docs/release/ingestion/v0.3.5',
+            from: '/docs/release/v0.3.5'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.10',
+            from: '/docs/release/v0.2.10'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.8',
+            from: '/docs/release/v0.2.8'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.5-v0.2.7',
+            from: '/docs/release/v0.2.5-v0.2.7'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.2-v0.2.4',
+            from: '/docs/release/v0.2.2-v0.2.4'
+          },
+          {
+            to: '/docs/release/ingestion/v0.2.0-v0.2.1',
+            from: '/docs/release/v0.2.0-v0.2.1'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.9-v0.1.11',
+            from: '/docs/release/v0.1.9-v0.1.11'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.6-v0.1.8',
+            from: '/docs/release/v0.1.6-v0.1.8'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.2-v0.1.5',
+            from: '/docs/release/v0.1.2-v0.1.5'
+          },
+          {
+            to: '/docs/release/ingestion/v0.1.0-v0.1.1',
+            from: '/docs/release/v0.1.0-v0.1.1'
+          },
+
+          {
+            to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/docs/connectors/mongodb/benchmarks'
           },
           {
-            to: '/docs/benchmarks?tab=postgres',
+            to: '/docs/benchmarks/ingestion?tab=postgres',
             from: '/docs/connectors/postgres/benchmarks'
           },
           {
-            to: '/docs/benchmarks?tab=mysql',
+            to: '/docs/benchmarks/ingestion?tab=mysql',
             from: '/docs/connectors/mysql/benchmarks'
           },
           {
@@ -650,7 +761,7 @@ const config = {
             from: '/olake/mongodb/framework'
           },
           {
-            to: '/docs/benchmarks?tab=mongodb',
+            to: '/docs/benchmarks/ingestion?tab=mongodb',
             from: '/olake/mongodb/benchmark'
           },
           {
@@ -937,7 +1048,7 @@ const config = {
             from: '/docs/connectors/mongodb/state'
           },
           {
-            to: '/docs/release/overview',
+            to: '/docs/release/ingestion/overview',
             from: '/docs/release-notes'
           },
           {
@@ -1098,7 +1209,7 @@ const config = {
             from: '/docs/writers/connectors/postgres/config/'
           },
           {
-            to: '/docs/getting-started/olake-ui/',
+            to: '/docs/getting-started/quickstart/',
             from: '/docs/connectors/getting-started/olake-ui/'
           },
           {

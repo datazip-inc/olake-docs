@@ -5,7 +5,9 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
+import FusionBlogCTA from '@site/src/components/FusionBlogCTA'
 import TestimonialCard from '@site/src/components/TestimonialCard'
+import CollapsibleTip from '@site/src/components/CollapsibleTip';
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
@@ -142,7 +144,9 @@ const MDXComponents = {
   TabItem,
   Hr,
   BlogCTA,
+  FusionBlogCTA,
   TestimonialCard,
+  CollapsibleTip,
   DocCardList,
 
   DockerDiscoverMongoDB,
