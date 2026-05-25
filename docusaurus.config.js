@@ -98,13 +98,14 @@ const config = {
       // Replace with your project's social card
       image: 'img/logo/olake-blue-with-text.webp',
 
-      // announcementBar: {
-      //   id: 'monthly-events-2025',
-      //   content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200" aria-label="View upcoming webinars" title="View upcoming webinars">here<span class="sr-only">View upcoming webinars</span></a>. Check out! 🎉',
-      //   backgroundColor: '#193ae6',
-      //   textColor: 'white',
-      //   isCloseable: true,
-      // },
+      announcementBar: {
+        id: 'olake-fusion-launch',
+        content:
+          '<style>.fusion-banner-link:hover { color: #cbd5e1 !important; }</style><span style="letter-spacing: 0.04em;">🚀 <strong>OLake Fusion is now live!</strong> Automate your Iceberg Table Maintenance. <a href="/docs/iceberg-maintenance/overview/" class="text-white underline transition-colors duration-200 fusion-banner-link" aria-label="Check out OLake Fusion" title="Check out OLake Fusion">Check it out here<span class="sr-only">Check out OLake Fusion</span></a>. 🎉</span>',
+        backgroundColor: '#193ae6',
+        textColor: 'white',
+        isCloseable: true
+      },
 
       docs: {
         sidebar: {
