@@ -122,7 +122,24 @@ const config = {
           src: 'img/logo/olake-blue-with-text.svg'
         },
         items: [
-          { to: '/docs', label: 'Docs', position: 'left' },
+          {
+            type: 'dropdown',
+            position: 'left',
+            label: 'Docs',
+            activeBasePath: '/docs',
+            items: [
+              {
+                label: 'OLake Go',
+                to: '/docs',
+                activeBaseRegex: '^/docs(?!/(fusion|iceberg-maintenance|benchmarks/compaction|getting-started/configure-first-compaction|release/maintenance|install/kubernetes-compaction))',
+              },
+              {
+                label: 'OLake Fusion',
+                to: '/docs/fusion/getting-started/quickstart',
+                activeBaseRegex: '^/docs/(fusion|iceberg-maintenance|benchmarks/compaction|getting-started/configure-first-compaction|release/maintenance|install/kubernetes-compaction)',
+              }
+            ]
+          },
           { to: '/ai-lake', label: 'Pricing', position: 'left' },
           { to: '/blog', label: 'Blogs', position: 'left' },
 
