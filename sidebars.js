@@ -26,7 +26,14 @@ const docSidebar = {
     // OVERVIEW
     sectionHeader("GET STARTED"),
     { type: 'doc', id: 'intro',                                   label: 'Overview' },
-    { type: 'doc', id: 'benchmarks/ingestion',                    label: 'Benchmarks' },
+    {
+      type: 'category',
+      label: 'Benchmarks',
+      items: [
+        { type: 'doc', id: 'benchmarks/ingestion', label: 'Ingestion Benchmarks' },
+        { type: 'doc', id: 'dmsvsolake',            label: 'AWS DMS vs OLake Go' },
+      ],
+    },
     { type: 'doc', id: 'getting-started/quickstart',              label: 'Quickstart' },
     { type: 'doc', id: 'getting-started/creating-first-pipeline', label: 'Configure Your Pipeline' },
     { type: 'doc', id: 'getting-started/playground',              label: 'Playground' },
