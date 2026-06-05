@@ -199,7 +199,7 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Compaction',
       items: [
-        { type: 'link', label: 'Overview',      href: '/docs/iceberg-maintenance/overview' },
+        { type: 'doc', id: 'fusion/iceberg-maintenance/compaction/types-of-compaction', label: 'Types of Compaction' },
         { type: 'doc',  id:   'iceberg-maintenance/compaction/configuration', label: 'Configuration' },
       ],
     },
