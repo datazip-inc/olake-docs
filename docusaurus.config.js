@@ -136,7 +136,7 @@ const config = {
               },
               {
                 label: 'OLake Fusion',
-                to: '/docs/fusion/getting-started/quickstart',
+                to: '/docs/iceberg-maintenance/overview',
                 activeBaseRegex: '^/docs/(fusion|iceberg-maintenance|benchmarks/compaction|getting-started/configure-first-compaction|release/maintenance|install/kubernetes-compaction)',
               }
             ]

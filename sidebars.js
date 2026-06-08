@@ -190,7 +190,6 @@ const fusionDocSidebar = {
     { type: 'doc', id: 'benchmarks/compaction',                       label: 'Benchmarks' },
     { type: 'doc', id: 'fusion/getting-started/quickstart',           label: 'Quickstart' },
     { type: 'doc', id: 'getting-started/configure-first-compaction',  label: 'Configure Your First Compaction' },
-    { type: 'doc', id: 'fusion/getting-started/playground',           label: 'Playground' },
 
     // MAINTENANCE
     sectionHeader("Maintenance"),
