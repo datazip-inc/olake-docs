@@ -377,39 +377,39 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
   },
 
   mssql: {
-    hasData: false,
+    hasData: true,
     rowsSynced: {
-      olake: '-',
+      olake: '4.0 Billion',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '4.0 Billion',
       debezium: '-',
       estuary: '-'
     },
     elapsedTime: {
-      olake: '-',
+      olake: '3.21 hours',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '13.92 hours',
       debezium: '-',
       estuary: '-'
     },
     speed: {
-      olake: '-',
+      olake: '3,45,866 RPS',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '79,982 RPS',
       debezium: '-',
       estuary: '-'
     },
     comparison: {
       olake: '-',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '4.32x slower',
       debezium: '-',
       estuary: '-'
     },
     cost: {
-      olake: '-',
+      olake: '< $ 11',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '$ 0 (free full load)',
       debezium: '-',
       estuary: '-'
     }
@@ -701,39 +701,39 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
   },
 
   mssql: {
-    hasData: false,
+    hasData: true,
     rowsSynced: {
-      olake: '-',
+      olake: '50 Million',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '50 Million',
       debezium: '-',
       estuary: '-'
     },
     elapsedTime: {
-      olake: '-',
+      olake: '26.83 mins',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '19.75 mins',
       debezium: '-',
       estuary: '-'
     },
     speed: {
-      olake: '-',
+      olake: '31,055 RPS',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '42,194 RPS',
       debezium: '-',
       estuary: '-'
     },
     comparison: {
       olake: '-',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '1.36x faster',
       debezium: '-',
       estuary: '-'
     },
     cost: {
-      olake: '-',
+      olake: '$ 1.45',
       airbyte: '-',
-      fivetran: '-',
+      fivetran: '$ 2, 375.80',
       debezium: '-',
       estuary: '-'
     }
