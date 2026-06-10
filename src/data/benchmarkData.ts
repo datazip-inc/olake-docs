@@ -701,39 +701,39 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
   },
 
   mssql: {
-    hasData: true,
+    hasData: false,
     rowsSynced: {
-      olake: '50 Million',
+      olake: '-',
       airbyte: '-',
-      fivetran: '50 Million',
+      fivetran: '-',
       debezium: '-',
       estuary: '-'
     },
     elapsedTime: {
-      olake: '26.83 mins',
+      olake: '-',
       airbyte: '-',
-      fivetran: '19.75 mins',
+      fivetran: '-',
       debezium: '-',
       estuary: '-'
     },
     speed: {
-      olake: '31,055 RPS',
+      olake: '-',
       airbyte: '-',
-      fivetran: '42,194 RPS',
+      fivetran: '-',
       debezium: '-',
       estuary: '-'
     },
     comparison: {
       olake: '-',
       airbyte: '-',
-      fivetran: '1.36x faster',
+      fivetran: '-',
       debezium: '-',
       estuary: '-'
     },
     cost: {
-      olake: '$ 1.45',
+      olake: '-',
       airbyte: '-',
-      fivetran: '$ 2, 375.80',
+      fivetran: '-',
       debezium: '-',
       estuary: '-'
     }
