@@ -132,12 +132,12 @@ const config = {
               {
                 label: 'OLake Go',
                 to: '/docs',
-                activeBaseRegex: '^/docs(?!/(fusion|iceberg-maintenance|benchmarks/compaction|release/maintenance))',
+                activeBaseRegex: '^/docs(?!/fusion)',
               },
               {
                 label: 'OLake Fusion',
                 to: '/docs/fusion/getting-started/overview',
-                activeBaseRegex: '^/docs/(fusion|iceberg-maintenance|benchmarks/compaction|release/maintenance)',
+                activeBaseRegex: '^/docs/fusion',
               }
             ]
           },
@@ -639,6 +639,15 @@ const config = {
           return undefined
         },
         redirects: [
+          // Fusion release notes moved to fusion/release/maintenance
+          {
+            to: '/docs/fusion/release/maintenance/overview',
+            from: '/docs/release/maintenance/overview',
+          },
+          {
+            to: '/docs/fusion/release/maintenance/v0.1.0',
+            from: '/docs/release/maintenance/v0.1.0',
+          },
           // Fusion maintenance pages moved from iceberg-maintenance to fusion/maintenance
           {
             to: '/docs/fusion/maintenance/catalogs',

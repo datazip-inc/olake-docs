@@ -25,18 +25,18 @@ const docSidebar = {
   docSidebar: [
     // OVERVIEW
     sectionHeader("GET STARTED"),
-    { type: 'doc', id: 'intro',                                   label: 'Overview' },
+    { type: 'doc', id: 'intro', label: 'Overview' },
     {
       type: 'category',
       label: 'Benchmarks',
       items: [
         { type: 'doc', id: 'benchmarks/ingestion', label: 'Ingestion Benchmarks' },
-        { type: 'doc', id: 'dmsvsolake',            label: 'AWS DMS vs OLake Go' },
+        { type: 'doc', id: 'dmsvsolake', label: 'AWS DMS vs OLake Go' },
       ],
     },
-    { type: 'doc', id: 'getting-started/quickstart',              label: 'Quickstart' },
+    { type: 'doc', id: 'getting-started/quickstart', label: 'Quickstart' },
     { type: 'doc', id: 'getting-started/creating-first-pipeline', label: 'Configure Your Pipeline' },
-    { type: 'doc', id: 'getting-started/playground',              label: 'Playground' },
+    { type: 'doc', id: 'getting-started/playground', label: 'Playground' },
 
     // MOVE AND MANAGE DATA
     sectionHeader("MOVE AND MANAGE DATA"),
@@ -45,13 +45,13 @@ const docSidebar = {
       label: 'Sources',
       items: [
         { type: 'doc', id: 'connectors/postgres/index', label: 'PostgreSQL' },
-        { type: 'doc', id: 'connectors/mongodb/index',  label: 'MongoDB' },
-        { type: 'doc', id: 'connectors/mysql/index',    label: 'MySQL' },
-        { type: 'doc', id: 'connectors/oracle/index',   label: 'Oracle' },
-        { type: 'doc', id: 'connectors/kafka/index',    label: 'Kafka' },
-        { type: 'doc', id: 'connectors/db2/index',      label: 'DB2 LUW' },
-        { type: 'doc', id: 'connectors/s3/index',       label: 'S3' },
-        { type: 'doc', id: 'connectors/mssql/index',    label: 'MSSQL' },
+        { type: 'doc', id: 'connectors/mongodb/index', label: 'MongoDB' },
+        { type: 'doc', id: 'connectors/mysql/index', label: 'MySQL' },
+        { type: 'doc', id: 'connectors/oracle/index', label: 'Oracle' },
+        { type: 'doc', id: 'connectors/kafka/index', label: 'Kafka' },
+        { type: 'doc', id: 'connectors/db2/index', label: 'DB2 LUW' },
+        { type: 'doc', id: 'connectors/s3/index', label: 'S3' },
+        { type: 'doc', id: 'connectors/mssql/index', label: 'MSSQL' },
       ],
     },
     {
@@ -72,9 +72,9 @@ const docSidebar = {
                 { type: 'doc', id: 'writers/iceberg/catalog/hive', label: 'Hive Metastore' },
               ],
             },
-            { type: 'doc', id: 'writers/iceberg/partitioning',         label: 'Data Partitioning' },
-            { type: 'doc', id: 'writers/iceberg/azure',                label: 'Iceberg On Azure' },
-            { type: 'doc', id: 'writers/iceberg/gcp',                  label: 'Iceberg on Google Cloud' },
+            { type: 'doc', id: 'writers/iceberg/partitioning', label: 'Data Partitioning' },
+            { type: 'doc', id: 'writers/iceberg/azure', label: 'Iceberg On Azure' },
+            { type: 'doc', id: 'writers/iceberg/gcp', label: 'Iceberg on Google Cloud' },
             { type: 'doc', id: 'writers/iceberg/troubleshooting-local', label: 'Troubleshooting & Local Testing' },
           ],
         },
@@ -82,8 +82,8 @@ const docSidebar = {
           type: 'category',
           label: 'Parquet Writer',
           items: [
-            { type: 'doc', id: 'writers/parquet/config',       label: 'Configuration' },
-            { type: 'doc', id: 'writers/parquet/permission',   label: 'IAM Permissions' },
+            { type: 'doc', id: 'writers/parquet/config', label: 'Configuration' },
+            { type: 'doc', id: 'writers/parquet/permission', label: 'IAM Permissions' },
             { type: 'doc', id: 'writers/parquet/partitioning', label: 'Partitioning' },
             { type: 'doc', id: 'writers/parquet/troubleshoot', label: 'Troubleshooting' },
           ],
@@ -94,8 +94,8 @@ const docSidebar = {
       type: 'category',
       label: 'Properties',
       items: [
-        { type: 'doc', id: 'getting-started/job-level-properties',     label: 'Job-level Properties' },
-        { type: 'doc', id: 'understanding/terminologies/olake',        label: 'Stream-level Properties' },
+        { type: 'doc', id: 'getting-started/job-level-properties', label: 'Job-level Properties' },
+        { type: 'doc', id: 'understanding/terminologies/olake', label: 'Stream-level Properties' },
         { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
       ],
     },
@@ -106,22 +106,22 @@ const docSidebar = {
       type: 'category',
       label: 'Docker UI',
       items: [
-        { type: 'doc', id: 'install/olake-ui/index',                        label: 'Docker Compose' },
-        { type: 'doc', id: 'install/olake-ui/offline-environments-aws',     label: 'Offline Environments (AWS)' },
+        { type: 'doc', id: 'install/olake-ui/index', label: 'Docker Compose' },
+        { type: 'doc', id: 'install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
         { type: 'doc', id: 'install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
       ],
     },
-    { type: 'doc', id: 'install/docker-cli',  label: 'Docker CLI' },
-    { type: 'doc', id: 'install/kubernetes',  label: 'Kubernetes/Helm' },
+    { type: 'doc', id: 'install/docker-cli', label: 'Docker CLI' },
+    { type: 'doc', id: 'install/kubernetes', label: 'Kubernetes/Helm' },
 
     // CORE CONCEPTS
     sectionHeader("CORE CONCEPTS"),
-    'core/architecture',
-    'understanding/compatibility-catalogs',
-    'understanding/compatibility-engines',
-    'understanding/terminologies/general',
+    { type: 'doc', id: 'core/architecture', label: 'Core Architecture' },
+    { type: 'doc', id: 'understanding/compatibility-catalogs', label: 'Catalog Compatibility' },
+    { type: 'doc', id: 'understanding/compatibility-engines', label: 'Query Engine Compatibility' },
+    { type: 'doc', id: 'understanding/terminologies/general', label: 'Terminologies' },
     { type: 'doc', id: 'features/schema', label: 'Schema Evolution' },
-    'core/use-cases',
+    { type: 'doc', id: 'core/use-cases', label: 'Use Cases' },
     
     // API REFERENCE
     sectionHeader("API DOCUMENTATION"),
@@ -186,9 +186,9 @@ const fusionDocSidebar = {
 
     // GET STARTED
     sectionHeader("Get Started"),
-    { type: 'doc', id: 'fusion/getting-started/overview',             label: 'Overview' },
-    { type: 'doc', id: 'fusion/getting-started/compaction',           label: 'Benchmarks' },
-    { type: 'doc', id: 'fusion/getting-started/quickstart',           label: 'Quickstart' },
+    { type: 'doc', id: 'fusion/getting-started/overview', label: 'Overview' },
+    { type: 'doc', id: 'fusion/getting-started/compaction', label: 'Benchmarks' },
+    { type: 'doc', id: 'fusion/getting-started/quickstart', label: 'Quickstart' },
     { type: 'doc', id: 'fusion/getting-started/configure-first-compaction', label: 'Configure Your First Compaction' },
 
     // MAINTENANCE
@@ -199,11 +199,11 @@ const fusionDocSidebar = {
       label: 'Compaction',
       items: [
         { type: 'doc', id: 'fusion/compaction/types-of-compaction', label: 'Types of Compaction' },
-        { type: 'doc',  id:   'fusion/compaction/configuration', label: 'Configuration' },
+        { type: 'doc',  id: 'fusion/compaction/configuration', label: 'Configuration' },
       ],
     },
     { type: 'doc', id: 'fusion/maintenance/runs-and-logs', label: 'Runs & Logs' },
-    { type: 'doc', id: 'fusion/maintenance/metrics',       label: 'Metrics' },
+    { type: 'doc', id: 'fusion/maintenance/metrics', label: 'Metrics' },
 
     // INSTALL & CONFIGURE
     sectionHeader("Install & Configure"),
@@ -211,8 +211,8 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Docker UI',
       items: [
-        { type: 'doc', id: 'fusion/install/olake-ui/index',                        label: 'Docker Compose' },
-        { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-aws',     label: 'Offline Environments (AWS)' },
+        { type: 'doc', id: 'fusion/install/olake-ui/index', label: 'Docker Compose' },
+        { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
         { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
       ],
     },
@@ -225,27 +225,27 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Compatibility',
       items: [
-        { type: 'doc',  id:   'fusion/core/compatibility/query-engines', label: 'Query Engines' },
+        { type: 'doc',  id: 'fusion/core/compatibility/query-engines', label: 'Query Engines' },
       ],
     },
     { type: 'doc', id: 'fusion/core/terminologies', label: 'Terminologies' },
-    { type: 'doc', id: 'fusion/core/use-cases',     label: 'Use Cases' },
+    { type: 'doc', id: 'fusion/core/use-cases', label: 'Use Cases' },
 
     // COMMUNITY
     sectionHeader("Community"),
-    { type: 'doc', id: 'fusion/community/contributing',    label: 'Contributing' },
-    { type: 'doc', id: 'fusion/community/issues-and-prs',  label: 'How to Raise a PR' },
+    { type: 'doc', id: 'fusion/community/contributing', label: 'Contributing' },
+    { type: 'doc', id: 'fusion/community/issues-and-prs', label: 'How to Raise a PR' },
     { type: 'doc', id: 'fusion/community/code-of-conduct', label: 'Code of Conduct' },
-    { type: 'doc', id: 'fusion/community/channels',        label: 'Channels' },
+    { type: 'doc', id: 'fusion/community/channels', label: 'Channels' },
 
     // RELEASE NOTES
     sectionHeader("Release Notes"),
-    { type: 'doc', id: 'release/maintenance/overview', label: 'Start Here' },
+    { type: 'doc', id: 'fusion/release/maintenance/overview', label: 'Start Here' },
     {
       type: 'category',
       label: 'Versions',
       items: [
-        { type: 'doc', id: 'release/maintenance/v0.1.0', label: 'v0.1.0' },
+        { type: 'doc', id: 'fusion/release/maintenance/v0.1.0', label: 'v0.1.0' },
       ],
     },
   ],
