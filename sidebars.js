@@ -186,24 +186,24 @@ const fusionDocSidebar = {
 
     // GET STARTED
     sectionHeader("Get Started"),
-    { type: 'doc', id: 'iceberg-maintenance/overview',                label: 'Overview' },
-    { type: 'doc', id: 'benchmarks/compaction',                       label: 'Benchmarks' },
+    { type: 'doc', id: 'fusion/getting-started/overview',             label: 'Overview' },
+    { type: 'doc', id: 'fusion/getting-started/compaction',           label: 'Benchmarks' },
     { type: 'doc', id: 'fusion/getting-started/quickstart',           label: 'Quickstart' },
-    { type: 'doc', id: 'getting-started/configure-first-compaction',  label: 'Configure Your First Compaction' },
+    { type: 'doc', id: 'fusion/getting-started/configure-first-compaction', label: 'Configure Your First Compaction' },
 
     // MAINTENANCE
     sectionHeader("Maintenance"),
-    { type: 'doc', id: 'iceberg-maintenance/catalogs', label: 'Catalogs' },
+    { type: 'doc', id: 'fusion/maintenance/catalogs', label: 'Catalogs' },
     {
       type: 'category',
       label: 'Compaction',
       items: [
-        { type: 'doc', id: 'fusion/iceberg-maintenance/compaction/types-of-compaction', label: 'Types of Compaction' },
-        { type: 'doc',  id:   'iceberg-maintenance/compaction/configuration', label: 'Configuration' },
+        { type: 'doc', id: 'fusion/compaction/types-of-compaction', label: 'Types of Compaction' },
+        { type: 'doc',  id:   'fusion/compaction/configuration', label: 'Configuration' },
       ],
     },
-    { type: 'doc', id: 'iceberg-maintenance/runs-and-logs', label: 'Runs & Logs' },
-    { type: 'doc', id: 'iceberg-maintenance/metrics',       label: 'Metrics' },
+    { type: 'doc', id: 'fusion/maintenance/runs-and-logs', label: 'Runs & Logs' },
+    { type: 'doc', id: 'fusion/maintenance/metrics',       label: 'Metrics' },
 
     // INSTALL & CONFIGURE
     sectionHeader("Install & Configure"),
@@ -216,7 +216,7 @@ const fusionDocSidebar = {
         { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
       ],
     },
-    { type: 'doc', id: 'install/kubernetes-compaction', label: 'Kubernetes/Helm' },
+    { type: 'doc', id: 'fusion/install/kubernetes-compaction', label: 'Kubernetes/Helm' },
 
     // CORE CONCEPTS
     sectionHeader("Core Concepts"),
@@ -225,7 +225,6 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Compatibility',
       items: [
-        { type: 'link', label: 'Iceberg Catalogs',  href: '/docs/iceberg-maintenance/catalogs' },
         { type: 'doc',  id:   'fusion/core/compatibility/query-engines', label: 'Query Engines' },
       ],
     },

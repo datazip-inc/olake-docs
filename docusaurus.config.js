@@ -101,7 +101,7 @@ const config = {
       announcementBar: {
         id: 'olake-fusion-launch',
         content:
-          '<style>.fusion-banner-link:hover { color: #cbd5e1 !important; }</style><span style="letter-spacing: 0.04em;">🚀 <strong>OLake Fusion is now live!</strong> Automate your Iceberg Table Maintenance. <a href="/docs/iceberg-maintenance/overview/" class="text-white underline transition-colors duration-200 fusion-banner-link" aria-label="Check out OLake Fusion" title="Check out OLake Fusion">Check it out here<span class="sr-only">Check out OLake Fusion</span></a>. 🎉</span>',
+          '<style>.fusion-banner-link:hover { color: #cbd5e1 !important; }</style><span style="letter-spacing: 0.04em;">🚀 <strong>OLake Fusion is now live!</strong> Automate your Iceberg Table Maintenance. <a href="/docs/fusion/getting-started/overview/" class="text-white underline transition-colors duration-200 fusion-banner-link" aria-label="Check out OLake Fusion" title="Check out OLake Fusion">Check it out here<span class="sr-only">Check out OLake Fusion</span></a>. 🎉</span>',
         backgroundColor: '#193ae6',
         textColor: 'white',
         isCloseable: true
@@ -132,12 +132,12 @@ const config = {
               {
                 label: 'OLake Go',
                 to: '/docs',
-                activeBaseRegex: '^/docs(?!/(fusion|iceberg-maintenance|benchmarks/compaction|getting-started/configure-first-compaction|release/maintenance|install/kubernetes-compaction))',
+                activeBaseRegex: '^/docs(?!/(fusion|iceberg-maintenance|benchmarks/compaction|release/maintenance))',
               },
               {
                 label: 'OLake Fusion',
-                to: '/docs/iceberg-maintenance/overview',
-                activeBaseRegex: '^/docs/(fusion|iceberg-maintenance|benchmarks/compaction|getting-started/configure-first-compaction|release/maintenance|install/kubernetes-compaction)',
+                to: '/docs/fusion/getting-started/overview',
+                activeBaseRegex: '^/docs/(fusion|iceberg-maintenance|benchmarks/compaction|release/maintenance)',
               }
             ]
           },
@@ -639,6 +639,24 @@ const config = {
           return undefined
         },
         redirects: [
+          // Fusion maintenance pages moved from iceberg-maintenance to fusion/maintenance
+          {
+            to: '/docs/fusion/maintenance/catalogs',
+            from: '/docs/iceberg-maintenance/catalogs',
+          },
+          {
+            to: '/docs/fusion/maintenance/metrics',
+            from: '/docs/iceberg-maintenance/metrics',
+          },
+          {
+            to: '/docs/fusion/maintenance/runs-and-logs',
+            from: '/docs/iceberg-maintenance/runs-and-logs',
+          },
+          // Fusion overview moved from iceberg-maintenance to fusion/getting-started
+          {
+            to: '/docs/fusion/getting-started/overview',
+            from: '/docs/iceberg-maintenance/overview',
+          },
           // British spelling + legacy `optimization` Iceberg Maintenance URLs → `compaction`
           {
             to: '/docs/iceberg-maintenance/compaction/overview',
@@ -648,15 +666,17 @@ const config = {
             ],
           },
           {
-            to: '/docs/iceberg-maintenance/compaction/configuration',
+            to: '/docs/fusion/compaction/configuration',
             from: [
+              '/docs/iceberg-maintenance/compaction/configuration',
               '/docs/iceberg-maintenance/optimisation/configuration',
               '/docs/iceberg-maintenance/optimization/configuration',
             ],
           },
           {
-            to: '/docs/getting-started/configure-first-compaction',
+            to: '/docs/fusion/getting-started/configure-first-compaction',
             from: [
+              '/docs/getting-started/configure-first-compaction',
               '/docs/getting-started/configure-first-optimisation',
               '/docs/getting-started/configure-first-optimization',
             ],
@@ -674,8 +694,9 @@ const config = {
             from: '/docs/install/kubernetes-ingestion'
           },
           {
-            to: '/docs/install/kubernetes-compaction',
+            to: '/docs/fusion/install/kubernetes-compaction',
             from: [
+              '/docs/install/kubernetes-compaction',
               '/docs/install/kubernetes-optimisation',
               '/docs/install/kubernetes-optimization',
             ],
