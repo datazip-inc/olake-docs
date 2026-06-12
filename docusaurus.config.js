@@ -695,8 +695,8 @@ const config = {
             from: '/docs/benchmarks'
           },
           {
-            to: '/docs/benchmarks/compaction',
-            from: ['/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
+            to: '/docs/fusion/getting-started/compaction',
+            from: ['/docs/benchmarks/compaction', '/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
           },
           {
             to: '/docs/install/kubernetes',
