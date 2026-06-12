@@ -38,6 +38,20 @@ const docSidebar = {
     { type: 'doc', id: 'getting-started/creating-first-pipeline', label: 'Configure Your Pipeline' },
     { type: 'doc', id: 'getting-started/playground', label: 'Playground' },
 
+    // INSTALL & CONFIGURE
+    sectionHeader("INSTALL & CONFIGURE"),
+    {
+      type: 'category',
+      label: 'Docker UI',
+      items: [
+        { type: 'doc', id: 'install/olake-ui/index', label: 'Docker Compose' },
+        { type: 'doc', id: 'install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
+        { type: 'doc', id: 'install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
+      ],
+    },
+    { type: 'doc', id: 'install/docker-cli', label: 'Docker CLI' },
+    { type: 'doc', id: 'install/kubernetes', label: 'Kubernetes/Helm' },
+
     // MOVE AND MANAGE DATA
     sectionHeader("MOVE AND MANAGE DATA"),
     {
@@ -99,20 +113,6 @@ const docSidebar = {
         { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
       ],
     },
-
-    // INSTALL & CONFIGURE
-    sectionHeader("INSTALL & CONFIGURE"),
-    {
-      type: 'category',
-      label: 'Docker UI',
-      items: [
-        { type: 'doc', id: 'install/olake-ui/index', label: 'Docker Compose' },
-        { type: 'doc', id: 'install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
-        { type: 'doc', id: 'install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
-      ],
-    },
-    { type: 'doc', id: 'install/docker-cli', label: 'Docker CLI' },
-    { type: 'doc', id: 'install/kubernetes', label: 'Kubernetes/Helm' },
 
     // CORE CONCEPTS
     sectionHeader("CORE CONCEPTS"),
@@ -185,14 +185,27 @@ const fusionDocSidebar = {
   fusionDocSidebar: [
 
     // GET STARTED
-    sectionHeader("Get Started"),
+    sectionHeader("GET STARTED"),
     { type: 'doc', id: 'fusion/getting-started/overview', label: 'Overview' },
     { type: 'doc', id: 'fusion/getting-started/compaction', label: 'Benchmarks' },
     { type: 'doc', id: 'fusion/getting-started/quickstart', label: 'Quickstart' },
     { type: 'doc', id: 'fusion/getting-started/configure-first-compaction', label: 'Configure Your First Compaction' },
 
+    // INSTALL & CONFIGURE
+    sectionHeader("INSTALL & CONFIGURE"),
+    {
+      type: 'category',
+      label: 'Docker UI',
+      items: [
+        { type: 'doc', id: 'fusion/install/olake-ui/index', label: 'Docker Compose' },
+        { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
+        { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
+      ],
+    },
+    { type: 'doc', id: 'fusion/install/kubernetes-compaction', label: 'Kubernetes/Helm' },
+
     // MAINTENANCE
-    sectionHeader("Maintenance"),
+    sectionHeader("MAINTENANCE"),
     { type: 'doc', id: 'fusion/maintenance/catalogs', label: 'Catalogs' },
     {
       type: 'category',
@@ -205,35 +218,22 @@ const fusionDocSidebar = {
     { type: 'doc', id: 'fusion/maintenance/runs-and-logs', label: 'Runs & Logs' },
     { type: 'doc', id: 'fusion/maintenance/metrics', label: 'Metrics' },
 
-    // INSTALL & CONFIGURE
-    sectionHeader("Install & Configure"),
-    {
-      type: 'category',
-      label: 'Docker UI',
-      items: [
-        { type: 'doc', id: 'fusion/install/olake-ui/index', label: 'Docker Compose' },
-        { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
-        { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
-      ],
-    },
-    { type: 'doc', id: 'fusion/install/kubernetes-compaction', label: 'Kubernetes/Helm' },
-
     // CORE CONCEPTS
-    sectionHeader("Core Concepts"),
+    sectionHeader("CORE CONCEPTS"),
     { type: 'doc', id: 'fusion/core/architecture', label: 'Architecture' },
     { type: 'doc', id: 'fusion/core/compatibility/query-engines', label: 'Query Engines' },
     { type: 'doc', id: 'fusion/core/terminologies', label: 'Terminologies' },
     { type: 'doc', id: 'fusion/core/use-cases', label: 'Use Cases' },
 
     // COMMUNITY
-    sectionHeader("Community"),
+    sectionHeader("COMMUNITY"),
     { type: 'doc', id: 'fusion/community/contributing', label: 'Contributing' },
     { type: 'doc', id: 'fusion/community/issues-and-prs', label: 'How to Raise a PR' },
     { type: 'doc', id: 'fusion/community/code-of-conduct', label: 'Code of Conduct' },
     { type: 'doc', id: 'fusion/community/channels', label: 'Channels' },
 
     // RELEASE NOTES
-    sectionHeader("Release Notes"),
+    sectionHeader("RELEASE NOTES"),
     { type: 'doc', id: 'fusion/release/maintenance/overview', label: 'Start Here' },
     {
       type: 'category',
