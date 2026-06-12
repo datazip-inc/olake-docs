@@ -221,13 +221,7 @@ const fusionDocSidebar = {
     // CORE CONCEPTS
     sectionHeader("Core Concepts"),
     { type: 'doc', id: 'fusion/core/architecture', label: 'Architecture' },
-    {
-      type: 'category',
-      label: 'Compatibility',
-      items: [
-        { type: 'doc',  id: 'fusion/core/compatibility/query-engines', label: 'Query Engines' },
-      ],
-    },
+    { type: 'doc', id: 'fusion/core/compatibility/query-engines', label: 'Query Engines' },
     { type: 'doc', id: 'fusion/core/terminologies', label: 'Terminologies' },
     { type: 'doc', id: 'fusion/core/use-cases', label: 'Use Cases' },
 
