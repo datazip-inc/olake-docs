@@ -639,6 +639,11 @@ const config = {
           return undefined
         },
         redirects: [
+          // Features page replaced by intro (intro.mdx has slug: / so it lives at /docs/)
+          {
+            to: '/docs/',
+            from: '/docs/features',
+          },
           // Fusion release notes moved to fusion/release/maintenance
           {
             to: '/docs/fusion/release/maintenance/overview',
@@ -664,12 +669,9 @@ const config = {
           // Fusion overview moved from iceberg-maintenance to fusion/getting-started
           {
             to: '/docs/fusion/getting-started/overview',
-            from: '/docs/iceberg-maintenance/overview',
-          },
-          // British spelling + legacy `optimization` Iceberg Maintenance URLs → `compaction`
-          {
-            to: '/docs/iceberg-maintenance/compaction/overview',
             from: [
+              '/docs/iceberg-maintenance/overview',
+              '/docs/iceberg-maintenance/compaction/overview',
               '/docs/iceberg-maintenance/optimisation/overview',
               '/docs/iceberg-maintenance/optimization/overview',
             ],
