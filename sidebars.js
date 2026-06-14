@@ -42,7 +42,7 @@ const docSidebar = {
     sectionHeader("INSTALL & CONFIGURE"),
     {
       type: 'category',
-      label: 'Docker UI',
+      label: 'Docker Compose (UI)',
       items: [
         { type: 'doc', id: 'install/olake-ui/index', label: 'Docker Compose' },
         { type: 'doc', id: 'install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
@@ -195,7 +195,7 @@ const fusionDocSidebar = {
     sectionHeader("INSTALL & CONFIGURE"),
     {
       type: 'category',
-      label: 'Docker UI',
+      label: 'Docker Compose (UI)',
       items: [
         { type: 'doc', id: 'fusion/install/olake-ui/index', label: 'Docker Compose' },
         { type: 'doc', id: 'fusion/install/olake-ui/offline-environments-aws', label: 'Offline Environments (AWS)' },
