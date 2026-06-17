@@ -234,12 +234,12 @@ const fusionDocSidebar = {
 
     // RELEASE NOTES
     sectionHeader("RELEASE NOTES"),
-    { type: 'doc', id: 'fusion/release/maintenance/overview', label: 'Start Here' },
+    'fusion/release/maintenance/overview',
     {
       type: 'category',
       label: 'Versions',
       items: [
-        { type: 'doc', id: 'fusion/release/maintenance/v0.1.0', label: 'v0.1.0' },
+        'fusion/release/maintenance/v0.1.0',
       ],
     },
   ],
