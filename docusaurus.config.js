@@ -98,13 +98,14 @@ const config = {
       // Replace with your project's social card
       image: 'img/logo/olake-blue-with-text.webp',
 
-      // announcementBar: {
-      //   id: 'monthly-events-2025',
-      //   content: 'Monthly events are <a href="/webinar" class="text-white underline hover:text-black transition-colors duration-200" aria-label="View upcoming webinars" title="View upcoming webinars">here<span class="sr-only">View upcoming webinars</span></a>. Check out! 🎉',
-      //   backgroundColor: '#193ae6',
-      //   textColor: 'white',
-      //   isCloseable: true,
-      // },
+      announcementBar: {
+        id: 'olake-fusion-launch',
+        content:
+          '<style>.fusion-banner-link:hover { color: #cbd5e1 !important; }</style><span style="letter-spacing: 0.04em;">🚀 <strong>OLake Fusion is now live!</strong> Automate your Iceberg Table Maintenance. <a href="/docs/fusion/getting-started/overview/" class="text-white underline transition-colors duration-200 fusion-banner-link" aria-label="Check out OLake Fusion" title="Check out OLake Fusion">Check it out here<span class="sr-only">Check out OLake Fusion</span></a>. 🎉</span>',
+        backgroundColor: '#193ae6',
+        textColor: 'white',
+        isCloseable: true
+      },
 
       docs: {
         sidebar: {
@@ -122,7 +123,24 @@ const config = {
           src: 'img/logo/olake-blue-with-text.svg'
         },
         items: [
-          { to: '/docs', label: 'Docs', position: 'left' },
+          {
+            type: 'dropdown',
+            position: 'left',
+            label: 'Docs',
+            activeBasePath: '/docs',
+            items: [
+              {
+                label: 'OLake Go',
+                to: '/docs',
+                activeBaseRegex: '^/docs(?!/fusion)',
+              },
+              {
+                label: 'OLake Fusion',
+                to: '/docs/fusion/getting-started/overview',
+                activeBaseRegex: '^/docs/fusion',
+              }
+            ]
+          },
           { to: '/ai-lake', label: 'Pricing', position: 'left' },
           { to: '/blog', label: 'Blogs', position: 'left' },
 
@@ -621,24 +639,55 @@ const config = {
           return undefined
         },
         redirects: [
-          // British spelling + legacy `optimization` Iceberg Maintenance URLs → `compaction`
+          // Features page replaced by intro (intro.mdx has slug: / so it lives at /docs/)
           {
-            to: '/docs/iceberg-maintenance/compaction/overview',
+            to: '/docs/',
+            from: '/docs/features',
+          },
+          // Fusion release notes moved to fusion/release/maintenance
+          {
+            to: '/docs/fusion/release/maintenance/overview',
+            from: '/docs/release/maintenance/overview',
+          },
+          {
+            to: '/docs/fusion/release/maintenance/v0.1.0',
+            from: '/docs/release/maintenance/v0.1.0',
+          },
+          // Fusion maintenance pages moved from iceberg-maintenance to fusion/maintenance
+          {
+            to: '/docs/fusion/maintenance/catalogs',
+            from: '/docs/iceberg-maintenance/catalogs',
+          },
+          {
+            to: '/docs/fusion/maintenance/metrics',
+            from: '/docs/iceberg-maintenance/metrics',
+          },
+          {
+            to: '/docs/fusion/maintenance/runs-and-logs',
+            from: '/docs/iceberg-maintenance/runs-and-logs',
+          },
+          // Fusion overview moved from iceberg-maintenance to fusion/getting-started
+          {
+            to: '/docs/fusion/getting-started/overview',
             from: [
+              '/docs/iceberg-maintenance/overview',
+              '/docs/iceberg-maintenance/compaction/overview',
               '/docs/iceberg-maintenance/optimisation/overview',
               '/docs/iceberg-maintenance/optimization/overview',
             ],
           },
           {
-            to: '/docs/iceberg-maintenance/compaction/configuration',
+            to: '/docs/fusion/compaction/configuration',
             from: [
+              '/docs/iceberg-maintenance/compaction/configuration',
               '/docs/iceberg-maintenance/optimisation/configuration',
               '/docs/iceberg-maintenance/optimization/configuration',
             ],
           },
           {
-            to: '/docs/getting-started/configure-first-compaction',
+            to: '/docs/fusion/getting-started/configure-first-compaction',
             from: [
+              '/docs/getting-started/configure-first-compaction',
               '/docs/getting-started/configure-first-optimisation',
               '/docs/getting-started/configure-first-optimization',
             ],
@@ -648,16 +697,17 @@ const config = {
             from: '/docs/benchmarks'
           },
           {
-            to: '/docs/benchmarks/compaction',
-            from: ['/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
+            to: '/docs/fusion/getting-started/compaction',
+            from: ['/docs/benchmarks/compaction', '/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
           },
           {
             to: '/docs/install/kubernetes',
             from: '/docs/install/kubernetes-ingestion'
           },
           {
-            to: '/docs/install/kubernetes-compaction',
+            to: '/docs/fusion/install/kubernetes-compaction',
             from: [
+              '/docs/install/kubernetes-compaction',
               '/docs/install/kubernetes-optimisation',
               '/docs/install/kubernetes-optimization',
             ],

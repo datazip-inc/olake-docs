@@ -68,6 +68,16 @@ const CustomersPage = () => {
       companyName: 'Astro Talk',
       category: CustomerCategory.CustomerInternet,
       date: '2025-12-15'
+    },
+    {
+      title: "Zero Pipeline Failures, 50% Faster Loads: How Xeno Rebuilt Their Data Foundation on OLake",
+      description: 'Xeno, an AI-powered customer engagement platform for retailers, kept hitting broken replication on AWS DMS whenever its MySQL schema changed. After migrating MySQL CDC to OLake on Kubernetes, full-load time dropped nearly 50% and schema changes stopped breaking pipelines.',
+      route: '/customer-stories/xeno-aws-dms-alternative-mysql-cdc',
+      img: '/img/customers/xeno/cover-image-xeno.webp',
+      alt: 'Xeno customer story',
+      companyName: 'Xeno',
+      category: CustomerCategory.B2B,
+      date: '2026-06-14'
     }
   ].sort((a, b) => b.date.localeCompare(a.date));
 
