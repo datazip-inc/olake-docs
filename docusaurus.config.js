@@ -198,7 +198,7 @@ const config = {
           },
 
           {
-            href: 'https://join.slack.com/t/getolake/shared_invite/zt-2uyphqf69-KQxih9Gwd4GCQRD_XFcuyw',
+            href: 'https://join.slack.com/t/getolake/shared_invite/zt-420z5tl04-1EOq5JK0Z4kpiAFoVQXIDQ',
             position: 'right',
             className: 'header-slack-link'
           },
