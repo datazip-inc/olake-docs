@@ -200,6 +200,31 @@ Apply the configuration:
 helm upgrade olake olake/olake -f values.yaml --set fusion.enabled=true
 ```
 
+### Cloud IAM Integration
+
+OLake Fusion's spark optimizer pods can be allowed to securely access cloud resources(AWS Glue or S3) using IAM roles.
+
+```yaml
+global:
+  jobServiceAccount:
+    create: true
+    name: "olake-job-sa"
+    
+    # Cloud provider IAM role associations
+    annotations:
+      # AWS IRSA
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-job-role"
+      
+      # GCP Workload Identity
+      iam.gke.io/gcp-service-account: "olake-job@project.iam.gserviceaccount.com"
+      
+      # Azure Workload Identity
+      azure.workload.identity/client-id: "12345678-1234-1234-1234-123456789012"
+```
+:::note
+Note: For detailed instructions on the creation of IAM roles and service accounts, the official documentation for AWS IRSA, GCP Workload Identity, or Azure Workload Identity should be referred to. For a minimal Glue and S3 IAM access policy please refer [here](https://olake.io/docs/writers/iceberg/catalog/glue#required-iam-permissions).
+:::
+
 ### Ingress Configuration
 
 To expose OLake through an ingress controller, create a custom values file:
@@ -299,50 +324,6 @@ postgresql:
       ssl_mode: "require"
 ```
 
-### External Temporal Configuration
-
-External Temporal server can be used instead of the built-in Temporal deployment. It is the primary tool for workflow orchestration of olake jobs.
-
-#### Option 1: Using `existingSecret`
-
-Reference a pre-existing Kubernetes Secret containing the Temporal credentials. The secret must be created before installing the chart.
-
-**1. Create the secret:**
-```bash
-kubectl create secret generic external-temporal-secret \
-  --from-literal=TEMPORAL_ADDRESS=<region>.<cloud>.api.temporal.io:7233 \
-  --from-literal=TEMPORAL_API_KEY=<temporal-api-key> \
-  --from-literal=TEMPORAL_ENABLE_TLS=true \
-  --from-literal=TEMPORAL_EXTERNAL=true \
-  --from-literal=TEMPORAL_NAMESPACE=<temporal-namespace> \
-  --from-literal=TEMPORAL_TASK_QUEUE=<temporal-task-queue>
-```
-
-**2. Configure `values.yaml`:**
-```yaml
-temporal:
-  enabled: false
-  external:
-    existingSecret: "external-temporal-secret"
-```
-
-#### Option 2: Using `properties` (Recommended for ArgoCD/GitOps)
-
-Specify connection details directly in `values.yaml`. The chart creates the Kubernetes Secret automatically at template time.
-
-```yaml
-temporal:
-  enabled: false
-  external:
-    properties:
-      TEMPORAL_ADDRESS: "<region>.<cloud>.api.temporal.io:7233"
-      TEMPORAL_API_KEY: "<temporal-api-key>"
-      TEMPORAL_ENABLE_TLS: "true"
-      TEMPORAL_EXTERNAL: "true"
-      TEMPORAL_NAMESPACE: "<temporal-namespace>"
-      TEMPORAL_TASK_QUEUE: "<temporal-task-queue>"
-```
-
 ### Global Environment Variables
 
 Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, and Activity Pods:
@@ -405,40 +386,21 @@ global:
 ```
 
 :::note
-For cloud-managed registries (Amazon ECR, Google Artifact Registry, Azure ACR), IAM-based authentication (IRSA / Workload Identity) is preferred over static credentials. See [Cloud IAM Integration](/docs/install/kubernetes/#cloud-iam-integration).
+- For cloud-managed registries (Amazon ECR, Google Artifact Registry, Azure ACR), IAM-based authentication (IRSA / Workload Identity) is preferred over static credentials. See [Cloud IAM Integration](/docs/install/kubernetes/#cloud-iam-integration).
 :::
 
-### Security Context Configuration
+### Global Pod Annotations
 
-OLake supports configuring `securityContext` for all its components to comply with restricted Kubernetes environments.
+Annotations defined in `global.podAnnotations` are applied to every pod managed by this chart — all Deployment pods (OLake UI, OLake Workers, PostgreSQL, Temporal, Elasticsearch, Fusion), Fusion Spark optimizer pods, and connector activity pods (sync, discover, check) spawned by olake-workers.
 
-#### General Component Configuration
-The `securityContext` can be set for `olakeUI`, `olakeWorker`, `postgresql` and `temporal` in `values.yaml`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
-For eg,
+This is useful for service mesh sidecar injection (Istio, Linkerd) or any admission-webhook-based tooling that requires pod-level annotations.
 
 ```yaml
-olakeWorker:
-  securityContext:
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
-    runAsNonRoot: true
+global:
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    linkerd.io/inject: enabled
 ```
-
-:::note
-- **PostgreSQL (UID 70 Requirement):**
-The default PostgreSQL image (Alpine-based) used by OLake requires a specific UID/GID to function correctly. If enforcing `runAsNonRoot: true`, the UID, GID, and FSGroup  **must** be set to **70**.
-```yaml
-postgresql:
-  securityContext:
-    runAsUser: 70
-    runAsGroup: 70
-    fsGroup: 70
-    runAsNonRoot: true
-```
-
-- OLake **doesnot support** setting securityContext for `nfsServer`.
-:::
 
 ## Upgrading Chart Version
 
