@@ -1,7 +1,8 @@
 // data/query-engines/starburst.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const starburst: QueryEngine = {
+export const starburst: QueryEngine = createVersionedEngine({
   id: 'starburst',
   name: 'Starburst Enterprise SEP 414-E+',
   description: 'End-to-end Iceberg analytics platform with comprehensive catalog support, full DML operations, enterprise governance, and advanced optimization features',
@@ -49,7 +50,7 @@ export const starburst: QueryEngine = {
     },
     morCow: {
       support: 'full',
-      details: 'Default copy-on-write for large rewrites; fine-grained updates create separate delete files (MoR) merged at query time; handles both position & equality deletes',
+      details: 'Default copy-on-write for large rewrites; V2 fine-grained updates use position/equality delete files (MoR); SEP 476-e+ writes deletion vectors (V3 MoR) when format-version=3',
       externalLinks: [
         {
           label: 'Data Management - Deletion Strategies',
@@ -68,12 +69,16 @@ export const starburst: QueryEngine = {
       ]
     },
     formatV3: {
-      support: 'preview',
-      details: 'Supports Iceberg spec v1 & v2; can read v3 preview metadata under feature flag but no v3 writes; production v3 GA on roadmap for 2025',
+      support: 'full',
+      details: 'Full Iceberg V3 read+write GA in SEP 476-e (September 2025); deletion vectors (MoR writes), VARIANT type, nanosecond timestamps, and row lineage all supported',
       externalLinks: [
         {
-          label: 'Iceberg Connector - Spec Support',
-          url: 'https://docs.starburst.io/latest/connector/iceberg.html'
+          label: 'SEP 476-e Release Notes',
+          url: 'https://docs.starburst.io/latest/release/release-476-e.html'
+        },
+        {
+          label: 'Iceberg V3 in Starburst Blog',
+          url: 'https://www.starburst.io/blog/iceberg-v3/'
         }
       ]
     },
@@ -137,5 +142,21 @@ FOR TIMESTAMP AS OF TIMESTAMP '2025-01-01 00:00:00';`,
     'Leverage $snapshots, $history, $manifests metadata tables for table introspection',
     'Configure appropriate data file formats (Parquet default, ORC, Avro) and codecs',
     'Use rollback_to_snapshot, expire_snapshots, remove_orphan_files procedures for maintenance'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'full', details: 'All catalog types (HMS, Glue, REST, Nessie, Snowflake, Galaxy) accessible; V3 table creation fully supported in SEP 476-e+' },
+        readWrite: { support: 'full', details: 'Full V3 read+write GA in SEP 476-e (September 2025); creates and queries V3-format Iceberg tables natively' },
+        dml: { support: 'full', details: 'INSERT, UPDATE, DELETE, MERGE with V3 deletion vectors for MoR writes; partition-aligned predicates become partition deletes' },
+        morCow: { support: 'full', details: 'Deletion vectors (V3 MoR) written for fine-grained updates; copy-on-write still available for large partition rewrites' },
+        streaming: { support: 'none', details: 'No built-in streaming ingestion for any format version' },
+        formatV3: { support: 'full', details: 'Full Iceberg V3 GA in SEP 476-e (September 2025); deletion vectors, VARIANT type, nanosecond timestamps, row lineage all supported' },
+        timeTravel: { support: 'full', details: 'FOR VERSION AS OF / FOR TIMESTAMP AS OF fully work on V3 tables; metadata tables expose row lineage columns' },
+        security: { support: 'full', details: 'Built-in ACL engine, LDAP/OAuth, Lake Formation, Ranger policies; row lineage (_row_id) visible for audit purposes' }
+      },
+      score: 28,
+      description: 'Starburst Enterprise SEP 476-e+ provides full Iceberg V3 read+write GA support including deletion vectors, VARIANT type, nanosecond timestamps, and row lineage (since September 2025)'
+    }
+  }
+});
