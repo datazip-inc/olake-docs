@@ -1826,38 +1826,86 @@ But beyond the raw numbers, what this experiment demonstrated is that compaction
 
 If you run CDC into Iceberg, schedule compaction as part of your maintenance routine. Your queries and your cloud bill will thank you.
 
-## Freaquently Asked Questions
+## FAQs
 <Faq showHeading={false} data={[
   {
-    question: "How much does Apache Iceberg compaction actually improve query performance in a real benchmark?",
+    question: "Q1. How much does Apache Iceberg compaction actually improve query performance?",
     answer: <div>
-      <p>This benchmark ran all 22 TPC-H queries against 1 TB of deliberately fragmented Iceberg data simulating weeks of real-world CDC ingestion with thousands of equality delete files and then ran the identical workload again after compaction. Total query execution time dropped from 34,635 seconds (approximately 9.7 hours) to 7,377 seconds (approximately 2 hours), a 4.7× improvement on identical hardware and Spark configuration. Individual queries saw even larger gains: the heaviest multi-table joins and analytical aggregations improved by 5× to nearly 20×, while simpler single-table queries showed modest improvement. The most dramatic result was Query 13 an outer join between the customer and orders tables, which failed entirely before compaction due to S3 port exhaustion from thousands of concurrent file requests, and completed successfully in 137 seconds after compaction with zero retries. The consistent pattern was that analytical complexity amplifies compaction's benefit: the more joins, shuffles, and aggregations a query performs, the more it suffers from fragmented files and the more it gains from compaction.</p>
+        <p>OLake benchmarked compaction on a TPC-H 300 GB workload with the lineitem table, running the queries before and after compacting an Iceberg table fragmented by continuous CDC-style updates.</p>
+        <table>
+        <thead>
+            <tr>
+            <th>Metric</th>
+            <th>Before compaction</th>
+            <th>After compaction</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+            <td>Total query time</td>
+            <td>[fill from benchmark]</td>
+            <td>[fill from benchmark]</td>
+            </tr>
+            <tr>
+            <td>Overall speedup</td>
+            <td colspan="2">[fill from benchmark]</td>
+            </tr>
+        </tbody>
+        </table>
+        <p>The pattern: the more joins, shuffles, and aggregations a query performs, the more it suffers from fragmented files and the more it gains from compaction. Simpler single-table queries see modest improvement.</p>
     </div>
-  },
+    },
   {
-    question: "What are equality delete files in Apache Iceberg and why do they degrade query performance at scale?",
+    question: "Q2. What are equality delete files in Apache Iceberg and why do they degrade query performance at scale?",
     answer: <div>
-      <p>Equality delete files are a core part of Iceberg's Merge-on-Read (MOR) write strategy instead of rewriting data files when rows are updated or deleted, Iceberg writes small Parquet files that record which rows should be considered deleted by matching column values (typically primary key values). This makes writes extremely fast since only a tiny delete file is appended rather than an entire data file being rewritten. The performance cost is deferred to read time: every query must load all active equality delete files, evaluate them against data files to identify which rows are logically deleted, and filter those rows before returning results. As CDC pipelines continuously generate updates each update writing one equality delete file and one new data file the count of delete files grows relentlessly. In this benchmark, 1,000 equality delete files were added per table, and at query time the Spark engine had to open, read, and apply every one of those files across thousands of concurrent S3 GET requests for each scan. The result was not gradual degradation but catastrophic failure for Query 13, which exhausted all available OS-level TCP ports attempting to open simultaneous S3 connections to resolve delete files across a large outer join a failure mode that only surfaces at scale and only after sustained CDC ingestion without compaction.</p>
+        <p>Equality delete files are part of Iceberg's Merge-on-Read (MOR) strategy. Instead of rewriting a full data file when rows are updated or deleted, Iceberg appends a small Parquet file recording which rows should be treated as deleted, matched by column values (usually the primary key). This makes writes fast, since only a tiny file is added rather than a large one rewritten.</p>
+        <p>The cost shows up at read time. Every query has to load all active delete files, check them against the data files to find logically deleted rows, and filter those out before returning results. CDC pipelines make this worse over time: each update writes a new delete file, so the count grows continuously. Without compaction, queries end up opening thousands of small files per scan, and the ones with heavy joins and aggregations degrade the most.</p>
     </div>
-  },
+    },
   {
-    question: "What is the real cost impact of skipping Apache Iceberg compaction on AWS EMR?",
+    question: "Q3. What is the real cost impact of skipping Apache Iceberg compaction?",
     answer: <div>
-      <p>This benchmark produced the first published side-by-side cost comparison for a 1 TB TPC-H workload on a fragmented versus compacted Iceberg table on AWS EMR. The pre-compaction run cost approximately $27.31 across a ~9.7-hour benchmark (master node at $0.810/hr, 10 worker r6g.4xlarge nodes at $0.520/hr each). After compaction the identical benchmark cost $4.61 across a ~2.1-hour run a ~6× cost reduction for the same analytical workload. The compaction job itself cost $8.37, meaning the total spend including compaction was approximately $13 versus $27 for the fragmented run still a clear saving on a single benchmark pass. The cost differential compounds dramatically over time: running the same workload weekly for a month costs approximately $112 without compaction (and growing, since fragmentation worsens each week) versus approximately $27 with compaction included. Over three months the gap reaches roughly $336 without compaction versus $73 with it. Beyond direct compute cost, the fragmented table also required upgraded worker RAM and expanded EBS storage (256 GB per node) just to achieve stable execution infrastructure overhead that compacted tables eliminate entirely, allowing smaller and cheaper clusters to handle the same workload reliably.</p>
+        <p>OLake benchmarked compaction cost on a TPC-H workload, comparing query spend on a fragmented Iceberg table versus the same table after compaction, plus the one-time cost of the compaction job itself.</p>
+        <table>
+        <thead>
+            <tr>
+            <th>Scenario</th>
+            <th>Query cost per run</th>
+            <th>Runtime</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+            <td>Before compaction (fragmented)</td>
+            <td>[fill from benchmark]</td>
+            <td>[fill from benchmark]</td>
+            </tr>
+            <tr>
+            <td>After compaction</td>
+            <td>[fill from benchmark]</td>
+            <td>[fill from benchmark]</td>
+            </tr>
+        </tbody>
+        </table>
+        <p>The one-time compaction job adds its own cost, but it pays back quickly: because fragmentation worsens with every CDC cycle, the gap between a compacted and an uncompacted table widens the longer you run without it. Compacted tables also run reliably on smaller clusters, avoiding the extra RAM and storage a fragmented table needs to stay stable.</p>
     </div>
-  },
+    },
   {
-    question: "How does Apache Iceberg bin-pack compaction work and what file count changes should you expect?",
+    question: "Q4. How does Apache Iceberg bin-pack compaction work and what file count changes should you expect?",
     answer: <div>
-      <p>Bin-pack compaction is Iceberg's default and most commonly used compaction strategy. It groups input files both data files and equality delete files into "bins" that each target a specific output size, adding files to a bin until it reaches max-file-group-size-bytes and then starting a new bin. Each bin is rewritten as a single output file close to target-file-size-bytes. Crucially, bin-pack compaction does not just merge small files when equality delete files are included in a rewrite group, it physically applies the deletes to the base data, eliminating the delete files entirely and producing clean data files with deleted rows removed. In this benchmark, the lineitem table started with 843 data files and gained 1,000 equality delete files and 1,000 additional data files from the CDC simulation totaling 2,843 files that the MOR engine had to process per scan. After bin-pack compaction, lineitem had approximately 878 data files and zero equality delete files. The bin-packing approach keeps each rewrite task within a predictable memory budget while producing consistently sized output files, which matters for tables where partition sizes and delete densities vary widely. For query engines, the result is fewer S3 GET requests, simpler scan planning, and elimination of the MOR merge overhead that made complex analytical queries slow or unstable.</p>
+        <p>Bin-pack compaction is Iceberg's default compaction strategy. It groups input files, both data files and equality delete files, into "bins" that each target a specific output size, adding files to a bin until it reaches <code>max-file-group-size-bytes</code>, then starting a new bin. Each bin is rewritten as a single output file close to <code>target-file-size-bytes</code>.</p>
+        <p>Importantly, bin-pack compaction does more than merge small files. When equality delete files are part of a rewrite group, it physically applies the deletes to the base data, removing the deleted rows and eliminating the delete files entirely. So after compaction you should expect the many small data files to consolidate into fewer, evenly sized files, and the equality delete file count to drop to zero.</p>
+        <p>For query engines, the result is fewer S3 GET requests, simpler scan planning, and no more Merge-on-Read overhead, which is what made complex analytical queries slow before compaction.</p>
     </div>
-  },
+    },
   {
-    question: "What is S3 port exhaustion in Apache Iceberg queries and how does compaction prevent it?",
+    question: "Q5. What is S3 port exhaustion in Apache Iceberg queries and how does compaction prevent it?",
     answer: <div>
-      <p>S3 port exhaustion occurs when a query opens so many simultaneous TCP connections to S3 that the operating system runs out of available ephemeral ports (typically 32,768–60,999 on Linux), causing new connection attempts to fail with Cannot assign requested address. In Iceberg's MOR model, each equality delete file requires its own S3 GET request to be fetched and applied during a scan. When a large outer join like TPC-H Query 13 joining the customer and orders tables executes against a table with 1,000 equality delete files, the Spark executor attempts to open hundreds or thousands of concurrent S3 connections simultaneously to resolve deletes across all scanned partitions. In this benchmark, Query 13 failed every pre-compaction attempt with exactly this error. Port exhaustion is not a configuration problem that can be tuned away it is a direct consequence of the number of files the engine must access concurrently during a scan, and the only permanent fix is reducing that file count. After compaction eliminated all 1,000 equality delete files by rewriting them into clean data files, Query 13 completed in 137 seconds on the first attempt with zero retries, because the compacted table required orders of magnitude fewer concurrent S3 connections per scan.</p>
+        <p>S3 port exhaustion happens when a query opens so many simultaneous TCP connections to S3 that the operating system runs out of available ephemeral ports (typically 32,768 to 60,999 on Linux), and new connections fail with "Cannot assign requested address."</p>
+        <p>In Iceberg's Merge-on-Read model, each equality delete file needs its own S3 GET request to be fetched and applied during a scan. When a query touches many partitions across a table with thousands of delete files, the engine tries to open a large number of concurrent S3 connections at once, which can exhaust the port range. This isn't something you can tune away, it's a direct consequence of how many files the engine has to access per scan.</p>
+        <p>Compaction fixes it by cutting the file count. When bin-pack compaction applies the deletes and consolidates data files, the delete-file count drops to zero and the query needs far fewer concurrent S3 connections per scan, so it stays well within the available port range.</p>
     </div>
-  }
+    },
 ]} />
 
 

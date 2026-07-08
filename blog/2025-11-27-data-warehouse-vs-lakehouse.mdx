@@ -322,84 +322,49 @@ For the vast majority of modern enterprises, the architectural decision should l
 
 The most robust and pragmatic solution for large organizations remains the unified hybrid architecture. Use the Data Lakehouse to manage the complex, high-volume, and raw data layers (Bronze/Silver), reaping the benefits of its low-cost storage and feature flexibility. Use the Data Warehouse only as a high-performance serving layer for the final, aggregated Gold data, leveraging its integrated speed precisely where sub-second latency matters most.
 
-## 11. Freaquently Asked Questions
+## FAQs
 
 <Faq showHeading={false} data={[
   {
-    question: "Q1. How does OLake ingest data from Kafka topics into Apache Iceberg tables?",
+    question: "Q1. What is the main difference between a data warehouse and a data lakehouse?",
     answer: <div>
-      <p>OLake's Kafka source connector reads messages from Kafka topics and writes them as Apache Iceberg tables with atomic commits and schema evolution. Each Kafka topic becomes a logical stream, and JSON message payloads are normalized into columnar Iceberg/Parquet format.</p>
-      <p>Commits happen only after all assigned partitions reach their latest offsets, guaranteeing exactly-once semantics.</p>
-      <p><strong>Important:</strong> OLake's Kafka ingestion operates in <strong>append-only mode</strong>. It does not support UPSERT or DELETE operations from Kafka topics — every message is appended as a new row in the Iceberg table.</p>
+      <p>The core difference is coupling. A data warehouse tightly integrates storage, compute, and governance into one proprietary platform, which delivers strong out-of-the-box performance but at premium cost and with vendor lock-in. A data lakehouse decouples them: data sits in cheap open-format files (Parquet/ORC) on cloud object storage, and an open table format like Apache Iceberg adds the ACID transactions, schema management, and governance that used to be exclusive to the warehouse.</p>
+      <p>In short, the warehouse trades flexibility and cost for integrated speed, while the lakehouse trades some out-of-the-box performance for openness, scale, and dramatically lower storage cost.</p>
     </div>
   },
   {
-    question: "Q2. How does OLake guarantee exactly-once delivery when reading from Kafka?",
+    question: "Q2. Is a data lakehouse cheaper than a data warehouse?",
     answer: <div>
-      <p>OLake commits to the Iceberg destination first — writing and committing Parquet data files and Iceberg metadata — and only then commits Kafka consumer group offsets.</p>
-      <ul>
-        <li>If a write fails, Kafka offsets are not advanced, so the data can be safely re-read and re-written</li>
-        <li>If an offset commit fails after a successful Iceberg write, the worst case is a re-read of already-written data, which is safe because Iceberg's atomic snapshot model ensures idempotent commits</li>
-      </ul>
-      <p>This prevents both data loss and duplication in the Iceberg tables.</p>
+      <p>At scale, usually yes, but the saving comes from the cost model, not a single line item. A warehouse bundles compute and proprietary storage, so cost climbs steeply as data grows. A lakehouse stores data on commodity object storage (S3, ADLS, GCS) and decouples compute, so you pay commodity prices for storage and only for the compute you actually run.</p>
+      <p>The tradeoff is that lakehouse savings depend on active engineering. Without file compaction, partitioning, and egress-aware design, decoupled compute and data-transfer costs can leak. The warehouse hides these costs by managing them for you at a premium.</p>
     </div>
   },
   {
-    question: "Q3. How does OLake handle multiple Kafka partitions concurrently?",
+    question: "Q3. How does schema evolution work in a lakehouse compared to a warehouse?",
     answer: <div>
-      <p>OLake uses a configurable thread pool where each thread acts as a Kafka consumer reader:</p>
-      <ul>
-        <li><strong>MaxThreads:</strong> caps concurrent readers to prevent CPU, memory, and network oversubscription</li>
-        <li><strong>ThreadsEqualTotalPartitions:</strong> when enabled, allocates one reader per partition for maximum throughput</li>
-        <li><strong>Custom Round Robin Group Balancer:</strong> distributes partitions evenly across readers to avoid uneven workload distribution</li>
-      </ul>
-      <p>Users set <code>max_threads</code> in the source configuration; OLake caps active readers and writers accordingly to balance throughput against resource use.</p>
+      <p>In a warehouse, schema changes are enforced through DDL and can trigger locking or a full data rewrite, so a stream arriving with a slightly changed schema is often rejected. In a lakehouse using a format like Iceberg, schema evolution is a metadata operation, not a data rewrite.</p>
+      <p>Adding a column is tracked in metadata, and old files simply return null for it. Renaming or dropping a column is non-destructive, because readers look up columns by ID rather than name, so the physical files never change. This turns schema change from a high-risk data operation into a low-risk metadata one.</p>
     </div>
   },
   {
-    question: "Q4. What security protocols does OLake's Kafka connector support?",
+    question: "Q4. What is time travel in a data lakehouse and why does it matter?",
     answer: <div>
-      <p>OLake's Kafka source connector supports three security protocols:</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Protocol</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>PLAINTEXT</code></td>
-            <td>Unencrypted, no authentication</td>
-          </tr>
-          <tr>
-            <td><code>SASL_PLAINTEXT</code></td>
-            <td>SASL authentication over unencrypted connection</td>
-          </tr>
-          <tr>
-            <td><code>SASL_SSL</code></td>
-            <td>SASL authentication over TLS-encrypted connection</td>
-          </tr>
-        </tbody>
-      </table>
-      <p>For SASL-based protocols, OLake supports:</p>
-      <ul>
-        <li><code>PLAIN</code> — username/password authentication</li>
-        <li><code>SCRAM-SHA-512</code> — salted challenge-response authentication</li>
-      </ul>
-      <p>Credentials are provided via a JAAS configuration string, covering common enterprise Kafka authentication setups.</p>
+      <p>Time travel is the ability to query a table as of a past state or roll it back to an earlier version, and it comes built in with open table formats. Because every write creates a new immutable snapshot in the metadata pointing to a set of data files, older snapshots are preserved and the underlying files are never overwritten, only logically retired.</p>
+      <p>The practical payoff is recovery. If a bad job deletes data, you roll back to a prior snapshot with a single metadata command instead of restoring from external backups. In a traditional warehouse this recovery is a slow, high-risk operation.</p>
     </div>
   },
   {
-    question: "Q5. How does OLake handle schema inference for Kafka JSON messages?",
+    question: "Q5. Does a lakehouse replace a data warehouse for high-concurrency BI?",
     answer: <div>
-      <p>OLake automatically infers schemas from Kafka JSON message payloads at <strong>level-0 normalization</strong>:</p>
-      <ul>
-        <li><strong>Primitive types</strong> (strings, numbers, booleans) are extracted as individual Iceberg columns</li>
-        <li><strong>Nested objects and arrays</strong> are stored as JSON strings rather than being recursively flattened</li>
-        <li><strong>Kafka metadata fields</strong> such as partition and offset are automatically added as additional columns</li>
-      </ul>
-      <p>Schema normalization can be disabled per stream in the configuration if the raw JSON format is preferred.</p>
+      <p>Not entirely. A lakehouse now matches the warehouse on ACID transactions, schema management, and governance, which makes it the stronger foundation for unifying batch, streaming, and ML/AI workloads at scale. The one area where the warehouse still leads is high-concurrency, sub-second BI serving for thousands of simultaneous dashboard users.</p>
+      <p>The common answer is a hybrid architecture: use the lakehouse to manage raw and refined layers (Bronze/Silver) cheaply, then load the small, aggregated Gold layer into a warehouse or a real-time query engine used only for the high-concurrency serving tier.</p>
+    </div>
+  },
+  {
+    question: "Q6. What are the biggest operational pitfalls when moving to a lakehouse?",
+    answer: <div>
+      <p>The main ones are responsibilities the warehouse used to handle silently. The small-files problem is the biggest: ingestion can create millions of tiny files that cripple query performance, so you need scheduled compaction to consolidate them into optimally sized files (roughly 128MB to 512MB).</p>
+      <p>Two others matter. Optimistic concurrency behaves differently from a warehouse's locking, so long-running updates can hit more conflicts and benefit from smaller atomic writes. And egress costs can surprise you, so keep compute co-located with storage in the same region to avoid paying to move data out.</p>
     </div>
   }
 ]} />

@@ -1308,39 +1308,41 @@ OLake provides a powerful, high-performance solution for replicating databases t
 By clearly understanding OLake's internal workings and principles, developers and organizations can better leverage its capabilities to drive insightful analytics and informed decision-making.  Whether using OLake for MongoDB, PostgreSQL, or MySQL, and writing to Parquet files or Apache Iceberg tables, the system's consistent design principles ensure a reliable and efficient data replication experience.
 
 If this excites you, check out OLake, check out the [GitHub repository](https://github.com/datazip-inc/olake) and join the [Slack community](https://olake.io/slack) to get started.
-## Frequently Asked Questions
+## FAQs
 <Faq showHeading={false} data={[
   {
-    question: "Q1. What are the four core components of OLake's modular architecture?",
+    question: "Q1. What are the five core components of OLake's modular architecture?",
     answer: <div>
-      <p>OLake's architecture is built around four main components:</p>
-      <ol>
-        <li><strong>Core Framework:</strong> The central orchestrator that coordinates the entire data pipeline lifecycle, including command-line interface, configuration management, concurrency management, state management, and monitoring</li>
-        <li><strong>Drivers (Sources):</strong> Database-specific connectors for MongoDB, PostgreSQL, MySQL, and other supported sources. Each driver is autonomous with its own dependencies, keeping the overall binary size minimal</li>
-        <li><strong>Writers (Destinations):</strong> Components that write data to Apache Iceberg, local Parquet files, and other supported destinations</li>
-        <li><strong>Protocol Layer:</strong> Defines the interfaces and abstractions so sources and destinations remain interchangeable. The Type System, which handles data type conversions and schema management across different database and lakehouse type systems, is a sub-component of the Protocol Layer, not a separate top-level component</li>
-      </ol>
+        <p>OLake's architecture is built around five main components:</p>
+        <ol>
+        <li><strong>Core Framework:</strong> The central orchestrator that coordinates the entire data pipeline lifecycle, including command-line interface, configuration management, concurrency management, state management, and monitoring.</li>
+        <li><strong>Drivers (Sources):</strong> Database-specific connectors for MongoDB, PostgreSQL, MySQL, and other supported sources. Each driver is autonomous with its own dependencies, keeping the overall binary size minimal.</li>
+        <li><strong>Writers (Destinations):</strong> Components that write data to OLake's two supported destinations: Apache Iceberg and Parquet files on S3.</li>
+        <li><strong>Protocol Layer:</strong> Defines the interfaces and abstractions so sources and destinations remain interchangeable.</li>
+        <li><strong>Type System:</strong> Handles data type conversions and schema management across different database and lakehouse type systems.</li>
+        </ol>
     </div>
-  },
+    },
   {
     question: "Q2. How does OLake's CDC (Change Data Capture) mechanism work for ongoing replication?",
     answer: <div>
-      <p>After the initial full snapshot, OLake switches to CDC mode to capture ongoing changes using the native replication mechanism of each source:</p>
-      <ul>
-        <li><strong>PostgreSQL:</strong> Uses logical replication slots and WAL events via the <code>pgoutput</code> protocol, scoped by a PostgreSQL publication. CDC uses a single WAL reader thread that distributes messages to multiple dedicated writer threads (one per stream)</li>
-        <li><strong>MySQL:</strong> Reads the binary log (binlog) using a single-reader/multi-writer pattern: one thread reads and maintains precise binlog position for resumability, while multiple writer threads process filtered events concurrently</li>
-        <li><strong>MongoDB:</strong> Tails change streams (built on top of the oplog) for near real-time updates after the snapshot completes</li>
-      </ul>
-      <p>Each captured event (insert, update, delete) is processed by the Type System, normalized to the target schema, and written as an Iceberg snapshot with atomic commit semantics, ensuring no partial writes reach the destination.</p>
+        <p>After the initial full snapshot, OLake switches to CDC mode to capture ongoing changes using the native replication mechanism of each source:</p>
+        <ul>
+        <li><strong>PostgreSQL:</strong> Uses logical replication slots and WAL events via the <code>pgoutput</code> protocol, scoped by a PostgreSQL publication. A single WAL reader thread distributes messages to multiple dedicated writer threads, one per stream.</li>
+        <li><strong>MySQL:</strong> Reads the binary log (binlog) using a single-reader, multi-writer pattern: one thread reads and tracks its exact binlog position for resumability, while multiple writer threads process the events concurrently.</li>
+        <li><strong>MongoDB:</strong> After the snapshot completes, OLake watches MongoDB's change stream, which reports every insert, update, and delete as it happens, to keep the destination current in near real time. Change streams are MongoDB's built-in API over the oplog, so OLake does not read the raw oplog directly.</li>
+        </ul>
+        <p>Each captured event (insert, update, delete) is written to the destination as an Iceberg snapshot with atomic commit semantics, so no partial writes reach the destination. When normalization is enabled, events are also processed by the Type System and normalized to the target schema before they are written; with normalization turned off, the data is written without that schema normalization step.</p>
     </div>
-  },
+    },
   {
     question: "Q3. What is parallel chunking in OLake and how does it speed up large data loads?",
     answer: <div>
-      <p>Parallel chunking splits a large source table into non-overlapping segments based on primary key ranges (MySQL) or CTID ranges (PostgreSQL), then assigns each segment to a separate worker thread. All chunks are read, transformed, and written to Iceberg concurrently.</p>
-      <p>A table that would take 4 hours to copy sequentially might complete in 30 minutes with 8 parallel threads. The number of threads is configurable per pipeline via <code>max_threads</code>. OLake caps active readers and writers accordingly to balance throughput against source database load and prevent CPU, memory, or network oversubscription.</p>
+        <p>Parallel chunking splits a large source table into smaller, non-overlapping segments and processes several of them at once across separate worker threads, instead of reading the table top to bottom in a single pass. Each chunk is read, transformed, and written to the destination concurrently, which is what makes large loads fast.</p>
+        <p>A table that would take 4 hours to copy sequentially might finish in around 30 minutes with 8 parallel threads. You control the thread count per pipeline with <code>max_threads</code>. OLake also adjusts how many threads actually run at once so it doesn't overload the source database or the machine's CPU, memory, and network.</p>
+        <p>OLake uses different strategies to decide where to split each source (for example, primary key ranges, CTID ranges, or row-count based splits). The chunking strategies are covered in detail here: <a href="https://olake.io/blog/what-makes-olake-fast/">What makes OLake fast</a>.</p>
     </div>
-  },
+    },
   {
     question: "Q4. How does OLake ensure data consistency during parallel writes to Apache Iceberg?",
     answer: <div>
@@ -1355,19 +1357,20 @@ If this excites you, check out OLake, check out the [GitHub repository](https://
   {
     question: "Q5. What databases and destinations does OLake currently support?",
     answer: <div>
-      <p><strong>Sources:</strong></p>
-      <ul>
-        <li>PostgreSQL, MySQL, MongoDB, IBM Db2, Microsoft SQL Server (MSSQL), and Kafka, all with full CDC support using native database logs (<code>pgoutput</code>, binlogs, oplogs)</li>
-        <li>Oracle supports Full Refresh and Incremental Sync only. <strong>Full CDC mode for Oracle is currently work-in-progress.</strong> Verify the latest status in OLake's official documentation before planning an Oracle CDC pipeline</li>
-      </ul>
-      <p><strong>Destinations:</strong></p>
-      <ul>
-        <li>Apache Iceberg on S3-compatible object storage (AWS S3, GCS, Azure Blob, MinIO) with support for REST catalogs (Lakekeeper, Tabular), AWS Glue, Hive Metastore, Nessie, Polaris, and Unity Catalog</li>
-        <li>Local Parquet files for development and testing</li>
-      </ul>
-      <p>OLake is actively expanding its source and destination coverage. Check the official documentation for the latest supported connectors.</p>
+        <p><strong>Sources:</strong></p>
+        <ul>
+        <li>PostgreSQL, MySQL, MongoDB, Oracle, IBM Db2, Microsoft SQL Server (MSSQL), Apache Kafka, and Amazon S3.</li>
+        <li>CDC is supported for PostgreSQL, MySQL, MongoDB, and MSSQL using each source's native replication mechanism (<code>pgoutput</code>/WAL, binlogs, oplogs). Apache Kafka is CDC-only, ingesting directly from the event stream.</li>
+        <li>Oracle, IBM Db2, and Amazon S3 support Full Refresh and Full Refresh + Incremental, but not CDC. Full CDC mode for Oracle is currently work-in-progress; check OLake's documentation for the latest status.</li>
+        </ul>
+        <p><strong>Destinations:</strong></p>
+        <ul>
+        <li>Apache Iceberg on S3-compatible object storage (AWS S3, GCS, Azure Blob, MinIO). Supported catalog types are AWS Glue, REST, JDBC/SQL, and Hive. The REST catalog covers Generic REST, Lakekeeper, Nessie, S3 Tables, Unity Catalog, and Apache Polaris.</li>
+        <li>Parquet files on S3, plus local Parquet for development and testing.</li>
+        </ul>
+        <p>OLake is actively expanding its source and destination coverage. Check the official documentation for the latest supported connectors and CDC availability per source.</p>
     </div>
-  },
+    },
 ]} />
 
 <BlogCTA/>

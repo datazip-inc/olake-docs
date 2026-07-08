@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import SectionHeader from '../SectionHeader'
 
-const Accordion = ({ question, answer, defaultExpanded }) => {
-  const [expanded, setExpanded] = useState(defaultExpanded || false)
+const Accordion = ({ question, answer }) => {
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <div className='border-b py-4 '>
@@ -19,7 +19,7 @@ const Accordion = ({ question, answer, defaultExpanded }) => {
       </div>
       {expanded && (
         <div className='mt-3 px-2'>
-          <div className='text-sm font-normal leading-relaxed text-gray-900 dark:text-gray-500'>
+          <div className='text-sm font-normal leading-relaxed text-gray-900 dark:text-gray-300'>
             {answer}
           </div>
         </div>
@@ -47,7 +47,6 @@ const Faq = ({ data, showHeading }) => {
           key={index}
           question={item.question}
           answer={item.answer}
-          defaultExpanded={index === 0}
         />
       ))}
     </div>
