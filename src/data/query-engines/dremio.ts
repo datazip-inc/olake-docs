@@ -1,7 +1,8 @@
 // data/query-engines/dremio.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const dremio: QueryEngine = {
+export const dremio: QueryEngine = createVersionedEngine({
   id: 'dremio',
   name: 'Dremio v26',
   description: 'Full Iceberg authoring engine with built-in Polaris catalog, complete DML including MERGE, Arctic git-like branching, and Data Reflections acceleration',
@@ -88,9 +89,13 @@ export const dremio: QueryEngine = {
       ]
     },
     formatV3: {
-      support: 'none',
-      details: 'Planned (2025) - roadmap calls for reading Deletion Vectors & row-lineage columns first; writer support (DV emission) to follow once Iceberg 1.8+ library adopted',
+      support: 'full',
+      details: 'GA for Dremio Cloud (announced April 6, 2026): full V3 read+write including Deletion Vectors, VARIANT columns for JSON, and row-level lineage. Self-managed deployment roadmap follows',
       externalLinks: [
+        {
+          label: 'Dremio V3 GA Announcement (April 2026)',
+          url: 'https://www.globenewswire.com/news-release/2026/04/06/3268593/0/en/Dremio-Deepens-Apache-Iceberg-Leadership-with-V3-Support-New-Community-Appointments-and-Polaris-Momentum.html'
+        },
         {
           label: 'What\'s New in Iceberg v3?',
           url: 'https://www.dremio.com/blog/apache-iceberg-v3/'
@@ -176,5 +181,21 @@ SELECT * FROM iceberg_catalog.sales.orders@main;`,
     'Use Arctic commit logs for comprehensive audit trails and data lineage',
     'Leverage Dremio\'s catalog credential vending for secure multi-tenant access',
     'Plan for Format V3 support arriving in 2025 with deletion vectors and row lineage'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'full', details: 'Polaris/Dremio Catalog, Generic REST, Arctic/Nessie, HMS, AWS Glue, Hadoop fully support V3 table registration and queries (Dremio Cloud, April 2026)' },
+        readWrite: { support: 'full', details: 'Full V3 read+write GA for Dremio Cloud (April 2026): reads and writes tables with Deletion Vectors, VARIANT columns, and row lineage' },
+        dml: { support: 'full', details: 'MERGE, UPDATE, DELETE, INSERT with V3 Deletion Vectors for efficient MoR-style row-level changes (Dremio Cloud GA, April 2026)' },
+        morCow: { support: 'full', details: 'V3 Deletion Vectors supported for MoR-style writes; Copy-on-Write also available (Dremio Cloud, April 2026); self-managed roadmap follows' },
+        streaming: { support: 'none', details: 'No native streaming for any format version; external engines ingest into V3 tables' },
+        formatV3: { support: 'full', details: 'GA for Dremio Cloud (April 6, 2026): Deletion Vectors, VARIANT type for JSON, row-level lineage. Self-managed deployment V3 roadmap follows' },
+        timeTravel: { support: 'full', details: 'Arctic/Nessie branches, tags, and snapshot-based time travel fully supported for V3 tables in Dremio Cloud' },
+        security: { support: 'full', details: 'Dremio RBAC, column masking, and credential vending apply to V3 tables; Arctic commit log provides full audit trail' }
+      },
+      score: 28,
+      description: 'Dremio Cloud (April 2026) provides full Iceberg V3 GA support including Deletion Vectors, VARIANT type, and row lineage; self-managed Dremio v26 V3 support on roadmap'
+    }
+  }
+});

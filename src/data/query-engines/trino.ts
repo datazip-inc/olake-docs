@@ -1,7 +1,8 @@
 // data/query-engines/trino.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const trino: QueryEngine = {
+export const trino: QueryEngine = createVersionedEngine({
   id: 'trino',
   name: 'Trino 475+',
   description: 'High-performance distributed SQL query engine with advanced DML, time travel, and native Iceberg optimization for interactive analytics',
@@ -152,5 +153,21 @@ FOR TIMESTAMP AS OF TIMESTAMP '2024-01-01 12:00:00';`,
     'Use hidden partition transforms for automatic partition pruning without explicit WHERE clauses',
     'Configure security delegation to underlying catalog systems (Ranger, IAM, Nessie policies)',
     'Be aware that proliferation of small files can degrade performance - optimize regularly'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'Trino only supports Iceberg V1/V2 format tables; V3 format not yet supported' },
+        readWrite: { support: 'none', details: 'Trino cannot read or write V3-format tables with deletion vectors or row lineage; V1/V2 only' },
+        dml: { support: 'none', details: 'All DML operations produce V2 format outputs only; V3 table format not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not supported; Trino only handles V2 position/equality delete files' },
+        streaming: { support: 'none', details: 'No streaming support for any format version' },
+        formatV3: { support: 'none', details: 'Not yet GA; connector supports spec v1/v2 only; deletion vectors & row lineage planned post-Iceberg 1.8 library update' },
+        timeTravel: { support: 'none', details: 'Time travel only available for V1/V2 format tables; V3-format tables not supported' },
+        security: { support: 'none', details: 'V3 format not supported; security features apply to V1/V2 tables only' }
+      },
+      score: 0,
+      description: 'Trino supports Iceberg V1/V2 tables only; Format V3 (deletion vectors, row lineage, new data types) not yet supported'
+    }
+  }
+});
