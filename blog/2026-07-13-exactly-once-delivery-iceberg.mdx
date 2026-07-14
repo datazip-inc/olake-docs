@@ -5,13 +5,16 @@ description: "How OLake guarantees exactly-once delivery into Apache Iceberg acr
 date: 2026-07-13
 authors: [vaibhav]
 tags: [iceberg, cdc, exactly-once, olake, lakehouse, postgres, mysql, mongodb, mssql]
-image: /img/blog/cover/onetime-delivery-iceberg-cover.webp
+image: /img/blog/cover/exactly-once-delivery-iceberg-cover.webp
 ---
 
 import BlogCTA from '@site/src/components/BlogCTA';
 
-![How OLake Guarantees One-Time Delivery of Data](/img/blog/cover/onetime-delivery-iceberg-cover.webp)
-## TL;DR:
+![How OLake Guarantees Exactly-Once Delivery to Apache Iceberg](/img/blog/cover/exactly-once-delivery-iceberg-cover.webp)
+
+[OLake](https://olake.io/) is an open-source tool for replicating databases into Apache Iceberg and S3 compaitable destinations, built for fast, reliable Full Refresh, Incremental, and CDC syncs. To know more about how OLake Go works read, [deep dive into OLake's architecture](/blog/olake-architecture-deep-dive).
+
+## TL;DR
 
 Every OLake sync makes two writes that are not atomic with each other: the data commit into Apache Iceberg and the checkpoint save to `state.json`. A crash between the two leaves the destination ahead of the checkpoint, which historically meant duplicated rows on retry or, worse, a recovery that misread the gap as corruption.
 
@@ -29,9 +32,9 @@ If the process dies between those two writes, the destination is ahead of what t
 
 This isn't hypothetical, it's what used to happen. Some cases might be: A writer would commit a chunk to Iceberg and then die before the checkpoint was saved, so the retry reprocessed the same chunk and duplicated rows. On the CDC side, a Postgres slot would get acknowledged, the process would crash before the checkpoint caught up, and recovery would misread the gap as corruption and ask the user to wipe the destination and start over.
 
-One-time delivery fixes both. It adds one check that runs across all sync modes, Full Refresh, Incremental, and CDC, and behaves the same on every driver. Here is how it works.
+Exactly-once delivery fixes both. It adds one check that runs across all sync modes, Full Refresh, Incremental, and CDC, and behaves the same on every driver. Here is how it works.
 
-## How OLake's Exactly-Once Mechanism Works
+## How OLake's Exactly-Once Delivery Mechanism Works
 
 Every mode and every driver follows the same underlying pattern. Here is the brief idea before we move into the depth of each mode.
 
@@ -57,7 +60,7 @@ Closing a writer also takes a per-stream lock on the Go side, so when several ba
 
 ## Full Refresh
 
-![Full Refresh commit and recovery flow](/img/blog/2026/7/onetime-delivery-full-refresh.webp)
+![Full Refresh commit and recovery flow](/img/blog/2026/7/exactly-once-delivery-full-refresh.webp)
 
 ### How It Runs
 
@@ -96,7 +99,7 @@ When a writer is created for `[1, 10000]`, it generates the same thread ID `publ
 
 ### Global LSN Sources: Postgres and MySQL
 
-![Global LSN CDC recovery flow for Postgres and MySQL](/img/blog/2026/7/onetime-delivery-cdc-global-lsn.webp)
+![Global LSN CDC recovery flow for Postgres and MySQL](/img/blog/2026/7/exactly-once-delivery-cdc-global-lsn.webp)
 
 Postgres and MySQL represent all change events from a single, ordered stream, the WAL replication slot (Postgres) or binlog (MySQL). Every change, regardless of which table it affects, has a position in this global sequence. OLake reads this stream sequentially: one replication connection covers all selected streams in a single pass.
 
@@ -173,7 +176,7 @@ After the bounded sync and Checkpoint step:
 
 ### Per-Stream LSN Sources: MSSQL and MongoDB
 
-![Per-stream LSN CDC recovery flow for MSSQL and MongoDB](/img/blog/2026/7/onetime-delivery-cdc-per-stream-lsn.webp)
+![Per-stream LSN CDC recovery flow for MSSQL and MongoDB](/img/blog/2026/7/exactly-once-delivery-cdc-per-stream-lsn.webp)
 
 MSSQL and MongoDB do not share a global change position across tables. Each collection or table has its own independent LSN or resume token. OLake runs a concurrent change stream per selected stream, each stream is processed independently and in parallel.
 
@@ -227,7 +230,7 @@ The next sync then reads change events starting after `826B8C4D...`.
 
 ## Incremental
 
-![Incremental sync cursor recovery flow](/img/blog/2026/7/onetime-delivery-incremental.webp)
+![Incremental sync cursor recovery flow](/img/blog/2026/7/exactly-once-delivery-incremental.webp)
 
 Incremental syncs advance a cursor column (such as `updated_at`) forward with each run. OLake records the maximum cursor value seen at the start of the sync, reads all rows up to that value, and then saves the new high bookmark.
 
@@ -295,27 +298,28 @@ On the next run, OLake reads the cursor from `state.json`, fetches `updated_at` 
 
 Every mode comes down to one comparison: the position saved in `state.json` against the position committed to Iceberg. When they agree, or `state.json` is ahead, OLake just moves forward. When Iceberg is ahead, a crash landed between the commit and the checkpoint, so OLake reads the committed position back out of the metadata and repairs `state.json`, without re-reading or re-writing any data. No coordinator, no transaction log, no locks, just Iceberg's atomic commit and few comparison logics.
 
-Whenever a sync dies, the table always ends up correct, with nothing duplicated and nothing missing. And that is what really counts: you might be running your dashboards, reports, and models straight off this Iceberg table, and with one-time delivery you can trust those numbers are right, every single time.
+Whenever a sync dies, the table always ends up correct, with nothing duplicated and nothing missing. And that is what really counts: you might be running your dashboards, reports, and models straight off this Iceberg table, and with exactly-once delivery you can trust those numbers are right, every single time.
 
-## FAQs
+## FAQ
 
 ### Q1. Does OLake guarantee exactly-once delivery to Apache Iceberg?
 
-Yes. OLake guarantees exactly-once delivery of data into Apache Iceberg across all three sync modes: Full Refresh, Incremental, and CDC. It commits data files and a progress marker to Iceberg in a single atomic operation, then reconciles its checkpoint file against that marker on every restart, so crashed syncs resume without duplicating or skipping records.
+Yes, across all three sync modes: Full Refresh, Incremental, and CDC. OLake commits data files and a progress marker to Iceberg in a single atomic operation, then compares that marker against its `state.json` checkpoint on every restart, so a crashed sync resumes without duplicating or skipping records.
 
-### Q2. What happens if an OLake sync crashes in the middle of a write?
+### Q2. What happens if a sync crashes between the Iceberg commit and the checkpoint save?
 
-On the next run, before reading anything from the source, OLake compares the progress marker stored in the Iceberg table's metadata against its `state.json` checkpoint. If the Iceberg marker is ahead, the data already committed, so OLake skips it and repairs the checkpoint to match. If they agree, the sync runs normally. Committed chunks are never reprocessed, and chunks whose commit failed are reprocessed from scratch.
+On the next run, before reading anything from the source, OLake reads the progress marker back from the Iceberg table's metadata and compares it to `state.json`. If the metadata is ahead, that data already committed, so OLake skips re-reading and re-writing it and just repairs `state.json` to match. If they already agree, the sync runs normally.
 
-### Q3. How does OLake prevent duplicate records after a crash and retry?
+### Q3. How does OLake avoid writing the same record twice after a crash and retry?
 
-OLake generates a deterministic thread ID for each unit of work, built from the stream ID plus the chunk bounds (Full Refresh) or cursor value (Incremental). Because the ID is derived from content rather than a random value, a retry produces the same ID. OLake finds that ID already recorded in the Iceberg table's `olake_2pc` property and skips the work instead of writing the data twice.
+OLake fetches the metadata file and compares `olake_2pc` information with the state file before writing it. In case the state file is left behind, its corrected and avoids re read. Olake never assumes the next checkpoint, hence there remains no chance of skipping a data incorrectly.
 
-### Q4. Does OLake need an external coordinator for exactly-once delivery?
+### Q4. Does OLake need an external coordinator or transaction log for this?
 
-No. OLake's exactly-once guarantee relies only on Apache Iceberg's atomic commits and a comparison between the table's committed metadata and OLake's checkpoint. There is no external coordinator, no transaction log, and no locks involved.
+No. The guarantee comes entirely from Iceberg's atomic commit plus the comparison between the committed metadata and `state.json`. No coordinator, no transaction log, no locks.
 
-### Q5. Which databases does OLake's exactly-once delivery support?
-The guarantee behaves the same on every driver. PostgreSQL and MySQL recover using a single global position (WAL LSN or binlog position), while MSSQL and MongoDB recover per stream using each table or collection's own LSN or resume token.
+### Q5. Does exactly-once delivery work the same way across all sources?
+
+Yes, broadly. Every source runs the same core check, comparing the committed marker in metadata file against `state.json` before doing any work. The differences are in how each sync mode saves and recovers that marker, and [CDC](#cdc) in particular parses and stores it a bit differently across drivers. See the [Full Refresh](#full-refresh), [Incremental](#incremental), and [CDC](#cdc) sections above for the exact mechanics per mode.
 
 <BlogCTA/>
