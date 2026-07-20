@@ -24,7 +24,7 @@ This blog walks through the entire journey: the ingestion, the deliberate manipu
 
 The TPC-H benchmark is a standard set of eight interrelated tables (region, nation, supplier, part, partsupp, orders, lineitem, and customer) designed to simulate a realistic business analytics workload. At scale factor 1000, it produces roughly 1 TB of data.
 
-We used OLake to ingest this data from PostgreSQL directly into Apache Iceberg tables stored in S3, with AWS Glue as the catalog. After the full load completed, we had eight clean Iceberg tables sitting in S3, backed by a Glue catalog, with zero delete files and well-sized Parquet data files. Query performance at this point was healthy.
+We used OLake Go to ingest this data from PostgreSQL directly into Apache Iceberg tables stored in S3, with AWS Glue as the catalog. After the full load completed, we had eight clean Iceberg tables sitting in S3, backed by a Glue catalog, with zero delete files and well-sized Parquet data files. Query performance at this point was healthy.
 
 :::info
 For those benchmark results—including query times, memory utilization, and a comparison with Databricks—see [Running TPC-H queries](https://olake.io/iceberg/databricks-vs-iceberg/#c-running-tpch-queries) in our **Databricks vs Apache Iceberg** blog.
@@ -1831,7 +1831,7 @@ If you run CDC into Iceberg, schedule compaction as part of your maintenance rou
   {
     question: "Q1. How much does Apache Iceberg compaction actually improve query performance?",
     answer: <div>
-        <p>OLake benchmarked compaction on a TPC-H 300 GB workload with the lineitem table, running the queries before and after compacting an Iceberg table fragmented by continuous CDC-style updates.</p>
+        <p>This benchmark ran all 22 TPC-H queries on 1 TB of data (scale factor 1000) across eight Iceberg tables, first on tables fragmented with 1,000 equality delete files each to simulate CDC-heavy ingestion, then again after compaction on the same cluster and Spark configuration.</p>
         <table>
         <thead>
             <tr>
@@ -1843,16 +1843,21 @@ If you run CDC into Iceberg, schedule compaction as part of your maintenance rou
         <tbody>
             <tr>
             <td>Total query time</td>
-            <td>[fill from benchmark]</td>
-            <td>[fill from benchmark]</td>
+            <td>34,635 s (~9.7 hours)</td>
+            <td>7,377 s (~2 hours)</td>
             </tr>
             <tr>
             <td>Overall speedup</td>
-            <td colspan="2">[fill from benchmark]</td>
+            <td colspan="2">~4.7x faster</td>
+            </tr>
+            <tr>
+            <td>Queries completed</td>
+            <td>21 of 22 (Query 13 failed)</td>
+            <td>22 of 22</td>
             </tr>
         </tbody>
         </table>
-        <p>The pattern: the more joins, shuffles, and aggregations a query performs, the more it suffers from fragmented files and the more it gains from compaction. Simpler single-table queries see modest improvement.</p>
+        <p>The pattern: the more joins, shuffles, and aggregations a query performs, the more it suffers from fragmented files and the more it gains from compaction. Complex multi-table joins improved by 5x to nearly 20x, while simple single-table queries like Q1 and Q6 stayed roughly the same.</p>
     </div>
     },
   {
@@ -1865,36 +1870,41 @@ If you run CDC into Iceberg, schedule compaction as part of your maintenance rou
   {
     question: "Q3. What is the real cost impact of skipping Apache Iceberg compaction?",
     answer: <div>
-        <p>OLake benchmarked compaction cost on a TPC-H workload, comparing query spend on a fragmented Iceberg table versus the same table after compaction, plus the one-time cost of the compaction job itself.</p>
+        <p>On this benchmark's EMR cluster, the same 22-query TPC-H run cost about 6x more on the fragmented table than on the compacted one:</p>
         <table>
         <thead>
             <tr>
             <th>Scenario</th>
-            <th>Query cost per run</th>
+            <th>Cost</th>
             <th>Runtime</th>
             </tr>
         </thead>
         <tbody>
             <tr>
             <td>Before compaction (fragmented)</td>
-            <td>[fill from benchmark]</td>
-            <td>[fill from benchmark]</td>
+            <td>~$27.31</td>
+            <td>~9 h 39 min</td>
             </tr>
             <tr>
             <td>After compaction</td>
-            <td>[fill from benchmark]</td>
-            <td>[fill from benchmark]</td>
+            <td>~$4.61</td>
+            <td>~2 h 7 min</td>
+            </tr>
+            <tr>
+            <td>Compaction job (one-time)</td>
+            <td>~$8.37</td>
+            <td>~3 h</td>
             </tr>
         </tbody>
         </table>
-        <p>The one-time compaction job adds its own cost, but it pays back quickly: because fragmentation worsens with every CDC cycle, the gap between a compacted and an uncompacted table widens the longer you run without it. Compacted tables also run reliably on smaller clusters, avoiding the extra RAM and storage a fragmented table needs to stay stable.</p>
+        <p>Even including the one-time compaction cost, the compacted path totals about $13 versus $27.31 for a single fragmented run, and the gap widens with every additional run since fragmentation keeps growing without compaction. Compacted tables also run reliably on smaller clusters, avoiding the extra RAM and storage the fragmented table needed to stay stable.</p>
     </div>
     },
   {
     question: "Q4. How does Apache Iceberg bin-pack compaction work and what file count changes should you expect?",
     answer: <div>
-        <p>Bin-pack compaction is Iceberg's default compaction strategy. It groups input files, both data files and equality delete files, into "bins" that each target a specific output size, adding files to a bin until it reaches <code>max-file-group-size-bytes</code>, then starting a new bin. Each bin is rewritten as a single output file close to <code>target-file-size-bytes</code>.</p>
-        <p>Importantly, bin-pack compaction does more than merge small files. When equality delete files are part of a rewrite group, it physically applies the deletes to the base data, removing the deleted rows and eliminating the delete files entirely. So after compaction you should expect the many small data files to consolidate into fewer, evenly sized files, and the equality delete file count to drop to zero.</p>
+        <p>Bin-pack compaction is Iceberg's default compaction strategy. It groups input files, both data files and delete files (equality and positional), into "bins" that each target a specific output size, adding files to a bin until it reaches <code>max-file-group-size-bytes</code>, then starting a new bin. Each bin is rewritten as a single output file close to <code>target-file-size-bytes</code>.</p>
+        <p>Importantly, bin-pack compaction does more than merge small files. When delete files, whether equality or positional, are part of a rewrite group, it physically applies the deletes to the base data, removing the deleted rows and eliminating the delete files entirely. So after compaction you should expect the many small data files to consolidate into fewer, evenly sized files, and the delete file count to drop to zero.</p>
         <p>For query engines, the result is fewer S3 GET requests, simpler scan planning, and no more Merge-on-Read overhead, which is what made complex analytical queries slow before compaction.</p>
     </div>
     },
