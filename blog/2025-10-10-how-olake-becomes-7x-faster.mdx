@@ -10,7 +10,7 @@ image: /img/blog/cover/how-olake-becomes-7x-faster-cover.webp
 ![How OLake became 7x faster](/img/blog/cover/how-olake-becomes-7x-faster-cover.webp)
 ## Overview
 
-Data ingestion performance is critical when you are writing in Iceberg format to data lake. When your pipeline becomes a bottleneck, it affects everything downstream—from real-time analytics to machine learning workflows. We started with OneStack in Datazip to solve the problem of Data Analytics, but then we were bound to see the problem on Data Ingestion itself. To solve this problem for iceberg native writes we built OLake. At first we created basic Iceberg writer, but then we saw the issues with it (I will be writing about the issues in a new section). Today we have resolved all those bottlenecks.
+Data ingestion performance is critical when you are writing in Iceberg format to data lake. When your pipeline becomes a bottleneck, it affects everything downstream—from real-time analytics to machine learning workflows. We started with OneStack in Datazip to solve the problem of Data Analytics, but then we were bound to see the problem on Data Ingestion itself. To solve this problem for iceberg native writes we built OLake Go. At first we created basic Iceberg writer, but then we saw the issues with it (I will be writing about the issues in a new section). Today we have resolved all those bottlenecks.
 
 The result? A **7× performance improvement** in Apache Iceberg, without the complexity of background deduplication jobs or eventual consistency mechanisms.
 
@@ -24,7 +24,7 @@ If you've worked with JVM-based data processing systems, you're probably familia
 
 Let me share the specific issues we encountered that were creating bottlenecks and preventing us from extending our codebase with new features. You might recognize some of these in your own systems:
 
-1. **RPC Server Format**: In previous implementation we were using Debezium Formats to communicate between OLake and Java Iceberg server, which had large metadata that was mostly unused.
+1. **RPC Server Format**: In previous implementation we were using Debezium Formats to communicate between OLake Go and Java Iceberg server, which had large metadata that was mostly unused.
 
 2. **Serialization And Deserialization using JsonSchema**: At multiple places serialization and deserialization were happening, resulting in less throughput, high memory and CPU consumption.
 
@@ -205,7 +205,7 @@ The commit process handles two scenarios:
 
 #### 2. Atomic Schema Evolution
 
-Now we know how files are being committed atomically, but you might be asking: "What about schema changes? How does OLake handle type promotions and schema evolution in Iceberg tables?" 
+Now we know how files are being committed atomically, but you might be asking: "What about schema changes? How does OLake Go handle type promotions and schema evolution in Iceberg tables?" 
 
 For schema evolution, we reuse the same global table atomic lock, which ensures that for any particular table, only one thread evolves the schema at a time. This prevents race conditions and ensures consistency.
 
@@ -570,8 +570,55 @@ This refactor demonstrates several important principles for building high-perfor
 
 The result is a system that is not only faster but also more reliable, maintainable, and operationally friendly.
 
+*OLake Go is an open-source CDC and data ingestion platform for Apache Iceberg. Built for correctness, designed for speed, optimized for operations.*
 
+## FAQs
 
-*OLake is an open-source CDC and data ingestion platform for Apache Iceberg. Built for correctness, designed for speed, optimized for operations.*
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. How did OLake Go achieve a 7x improvement in Iceberg write performance?",
+    answer: <div>
+      <p>OLake Go's destination refactor raised throughput from about 46,000 to about 320,000 records per second, roughly a 7x gain, by combining several changes: replacing the Debezium message format with a compact typed gRPC contract, removing JSON serialization and type detection overhead, simplifying double buffering into a single configurable batch, and moving concurrency and type handling from Java to Go.</p>
+      <p>No single change delivered the 7x on its own. It came from these optimizations compounding together, while also cutting memory usage from over 80GB to around 40GB.</p>
+    </div>
+  },
+  {
+    question: "Q2. How does OLake Go guarantee atomic commits when writing to Apache Iceberg?",
+    answer: <div>
+      <p>Each writer thread writes to its own data files, then registration into the Iceberg table happens under a single table-level lock. Either the entire batch becomes visible or none of it does, so readers never see partial state, even during concurrent writes or if a commit fails midway.</p>
+      <p>The commit path depends on the operation. Pure inserts use <code>AppendFiles</code> to add new data files. CDC updates and deletes use <code>RowDelta</code> (equality-delete Merge-on-Read), which atomically adds both the data files and the delete files in one operation.</p>
+    </div>
+  },
+  {
+    question: "Q3. Why does OLake Go write fewer, larger files instead of many small ones during full refresh?",
+    answer: <div>
+      <p>This applies to full refresh syncs, where OLake Go controls the entire chunk from source read to commit. Small files hurt query performance, because engines have to read metadata from many files per scan. The previous writer flushed buffers on a memory threshold, which produced inconsistent 30 to 50MB files.</p>
+      <p>The new writer commits after a full chunk (about 4GB in historical snapshots, compressing to roughly 350MB), targeting consistent 300 to 400MB files. This gives query engines fewer, evenly sized files to scan.</p>
+      <p><strong>Note:</strong> During CDC, OLake Go cannot guarantee this same file size consistency. Change events arrive continuously rather than in large historical chunks, so CDC commits produce smaller, more variable file sizes. Compaction is what brings CDC-written files up to optimal size. <a href="https://github.com/datazip-inc/olake-fusion">OLake Fusion</a> is a table maintenance tool that automates this compaction for you.</p>
+    </div>
+  },
+  {
+    question: "Q4. How does OLake Go handle Iceberg schema evolution across concurrent writer threads?",
+    answer: <div>
+      <p>OLake Go keeps a per-thread schema and a global table schema on the Go side. Each thread compares its batch against the global schema and only acquires the table-level lock if it detects a real change, which keeps contention low. The first thread to acquire the lock performs the evolution, then all threads refresh their writers to the new schema.</p>
+      <p>For safe type promotions like <code>int</code> to <code>long</code>, OLake Go avoids closing and refreshing the writer until a record of the larger type actually arrives, saving unnecessary file churn.</p>
+    </div>
+  },
+  {
+    question: "Q5. Why does OLake Go split its Iceberg writer between Go and Java?",
+    answer: <div>
+      <p>The refactor assigns each language the work it does best. OLake Go handles the data plane: concurrency, batching, type detection, and schema coordination. Java handles Iceberg I/O, since the Java Iceberg library is the most mature implementation and tends to get new features first.</p>
+      <p>The two communicate over a typed gRPC contract rather than a JSON envelope, which removes serialization overhead while keeping the Java server as a focused API layer for writing Iceberg files.</p>
+    </div>
+  },
+  {
+    question: "Q6. Is Apache Iceberg suitable for real-time streaming ingestion?",
+    answer: <div>
+      <p>Not for sub-second latency, at least until the small-file problem is solved. Iceberg is designed for batch-oriented writes, and writing tiny files continuously creates the same fragmentation that slows queries. Even tools like Tableflow batch data before writing to Iceberg.</p>
+      <p>OLake Go works within this batch model by buffering into larger chunks and committing them atomically, rather than streaming individual records into the table.</p>
+    </div>
+  }
+]} />
+
 
 <BlogCTA/>
