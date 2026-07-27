@@ -59,7 +59,7 @@ const FIELDS = [
     parameter: 'aws_region',
     sample: 'ap-south-1',
     description:
-      'Specifies the AWS region associated with the S3 bucket where the data is stored.',
+      'Specifies the AWS region associated with the S3 bucket where the data is stored. Optional if added in the lakekeeper warehouse configuration.',
   },
   // {
   //   id: 'aws-access-key',
@@ -187,7 +187,7 @@ export default function LakekeeperIcebergWriterCLIConfigDetails({ authType }) {
       </table>
 
       <Admonition type="note" title="Catalog Name Supported for v0.3.5 and above">
-        For the <strong>catalog name</strong>, OLake only supports lowercase letters and
+        For the <strong>catalog name</strong>, OLake Go only supports lowercase letters and
         underscores. Spaces and special characters are not supported.
       </Admonition>
     </>
