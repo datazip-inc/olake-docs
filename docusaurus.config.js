@@ -1,7 +1,5 @@
 const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriority-rehype-plugin')
 
-const GA_MEASUREMENT_ID = 'G-GTNTGHDNZW'
-
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -54,6 +52,11 @@ const config = {
         },
         blog: false,
 
+        gtag: {
+          trackingID: 'G-GTNTGHDNZW',
+          anonymizeIP: true
+        },
+
         sitemap: {
           lastmod: 'date',
           changefreq: 'weekly',
@@ -94,16 +97,13 @@ const config = {
     }
   ],
 
+  // Site-wide, non-per-page tags only. og:*/twitter:card/twitter:title/twitter:description/
+  // twitter:image are owned per-page by src/theme/DocItem, BlogPostPage, BlogListPage and
+  // src/pages/* — do not duplicate them here.
   headTags: [
-    // metadata (previously an invalid top-level `metadata` field, folded into headTags as meta tags)
-    // { tagName: 'meta', attributes: { name: 'robots', content: 'noindex, nofollow' } },
     {
       tagName: 'meta',
-      attributes: { name: 'OLake', content: 'ETL tool, ELT tool, open source' }
-    },
-    {
-      tagName: 'meta',
-      attributes: { name: 'twitter:card', content: 'summary_large_image' }
+      attributes: { name: 'msvalidate.01', content: 'C36AD97FE1CEDCD4041338A807D6BC4C' }
     },
     {
       tagName: 'meta',
@@ -111,25 +111,10 @@ const config = {
     },
     {
       tagName: 'meta',
-      attributes: { name: 'msvalidate.01', content: 'C36AD97FE1CEDCD4041338A807D6BC4C' }
-    },
-    // Google tag (gtag.js)
-    {
-      tagName: 'script',
       attributes: {
-        async: 'true',
-        src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`
+        name: 'robots',
+        content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large'
       }
-    },
-    {
-      tagName: 'script',
-      attributes: {},
-      innerHTML: `
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', '${GA_MEASUREMENT_ID}');
-      `
     },
     // Critical resource preloads for mobile performance
     {
@@ -152,7 +137,7 @@ const config = {
         fetchpriority: 'high'
       }
     },
-    // Font optimization - preconnect to Google Fonts
+    // Preconnect to Google Fonts
     {
       tagName: 'link',
       attributes: {
@@ -168,15 +153,7 @@ const config = {
         crossorigin: 'anonymous'
       }
     },
-    // Minimal font optimization - only DNS prefetch for performance
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'dns-prefetch',
-        href: 'https://fonts.googleapis.com'
-      }
-    },
-    // DNS prefetch for external resources
+    // DNS prefetch for HubSpot forms
     {
       tagName: 'link',
       attributes: {
@@ -184,32 +161,7 @@ const config = {
         href: 'https://js.hsforms.net'
       }
     },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'dns-prefetch',
-        href: 'https://www.google-analytics.com'
-      }
-    },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'dns-prefetch',
-        href: 'https://www.googletagmanager.com'
-      }
-    },
-    // Preconnect to critical domains
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'preconnect',
-        href: 'https://olake.io',
-        crossorigin: 'anonymous'
-      }
-    },
-    // Canonical URL - Removed hardcoded canonical tag
-    // Docusaurus automatically generates proper canonical URLs for each page
-    // OpenSearch meta tags
+    // OpenSearch
     {
       tagName: 'link',
       attributes: {
@@ -217,149 +169,6 @@ const config = {
         type: 'application/opensearchdescription+xml',
         title: 'OLake Documentation',
         href: '/opensearch.xml'
-      }
-    },
-    // Enhanced Open Graph Meta Tags
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:type',
-        content: 'website'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:title',
-        content: 'OLake - The Open Lakehouse Platform'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:description',
-        content:
-          'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:image',
-        content: 'https://olake.io/img/logo/olake-blue.webp'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:site_name',
-        content: 'OLake'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:locale',
-        content: 'en_US'
-      }
-    },
-    // Enhanced Open Graph Meta Tags
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:image:type',
-        content: 'image/webp'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:image:width',
-        content: '1200'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        property: 'og:image:height',
-        content: '630'
-      }
-    },
-    // Enhanced Twitter Meta Tags
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:creator',
-        content: '@_olake'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:title',
-        content: 'OLake - The Open Lakehouse Platform'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:description',
-        content:
-          'OLake is the fastest data replication platform, built to stream operational databases into Apache Iceberg in real time with full CDC, incremental sync, and zero-lag reliability.'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:image',
-        content: 'https://olake.io/img/logo/olake-blue.webp'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:image:alt',
-        content: 'OLake - The Open Lakehouse Platform'
-      }
-    },
-    // Enhanced Twitter Meta Tags
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:label1',
-        content: 'Written by'
-      }
-    },
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'twitter:data1',
-        content: 'OLake Team'
-      }
-    },
-    // Enhanced Bot Directives
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'robots',
-        content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large'
-      }
-    },
-    // Bing Webmaster Verification
-    {
-      tagName: 'meta',
-      attributes: {
-        name: 'msvalidate.01',
-        content: 'C36AD97FE1CEDCD4041338A807D6BC4C'
-      }
-    },
-    // Enhanced Favicon Support
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'icon',
-        type: 'image/svg+xml',
-        href: '/img/logo/olake-blue.svg'
       }
     }
   ],
