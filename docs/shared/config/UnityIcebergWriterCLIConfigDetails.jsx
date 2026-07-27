@@ -28,14 +28,6 @@ const FIELDS = [
       'Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL.',
   },
   {
-    id: 'catalog-name',
-    authTypes: AUTH_ALL,
-    parameter: 'catalog_name',
-    sample: 'olake_iceberg',
-    description:
-      'Name of the Iceberg catalog OLake Go registers tables under. Defaults to `olake_iceberg` if left empty.',
-  },
-  {
     id: 'iceberg-s3-path',
     authTypes: AUTH_ALL,
     parameter: 'iceberg_s3_path',
@@ -85,6 +77,14 @@ const FIELDS = [
     sample: '<client_id>:<client_secret>',
     description:
       'Specifies the client ID and secret for OAuth2, formatted as `client_id:client_secret`. Used with REST Auth URI when OLake Go requests an access token from the catalog\u2019s auth service. Not needed when using REST Token or other auth types.',
+  },
+  {
+    id: 'catalog-name',
+    authTypes: AUTH_ALL,
+    parameter: 'catalog_name',
+    sample: 'olake_iceberg',
+    description:
+      'Name of the Iceberg catalog OLake Go registers tables under. Defaults to `olake_iceberg` if left empty.',
   },
   {
     id: 'scope',

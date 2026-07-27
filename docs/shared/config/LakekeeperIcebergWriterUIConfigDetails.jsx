@@ -21,14 +21,6 @@ const FIELDS = [
       'Specifies the endpoint URL for the Lakekeeper catalog service that the writer will connect to.',
   },
   {
-    id: 'catalog-name',
-    authTypes: AUTH_COMMON,
-    parameter: 'Catalog Name',
-    sample: 'olake_iceberg',
-    description:
-      'Name of the Iceberg catalog OLake Go registers tables under. Defaults to `olake_iceberg` if left empty.',
-  },
-  {
     id: 's3-path',
     authTypes: AUTH_COMMON,
     parameter: 'Lakekeeper Warehouse',
@@ -37,6 +29,42 @@ const FIELDS = [
     description:
       'Name of the Lakekeeper warehouse to use, OLake Go uses this to look up the storage configuration (eg. S3 bucket) already defined in Lakekeeper.',
   },
+  {
+    id: 'token',
+    authTypes: [AUTH_TOKEN],
+    parameter: 'Token',
+    required: true,
+    sample: 'abc...xyz',
+    description:
+      'Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service.',
+  },
+  {
+    id: 'rest-auth-uri',
+    authTypes: [AUTH_OAUTH2],
+    parameter: 'REST Auth URI',
+    required: true,
+    sample: 'https://auth.server.com/oauth/token',
+    description:
+      'URL of the REST catalog\u2019s OAuth2 token endpoint. OLake Go uses this with REST Credential to request an access token during OAuth2 client-credentials authentication.',
+  },
+  {
+    id: 'rest-credential',
+    authTypes: [AUTH_OAUTH2],
+    parameter: 'REST Credential',
+    required: true,
+    sample: '<client_id>:<client_secret>',
+    description:
+      'Specifies the client ID and secret for OAuth2, formatted as `client_id:client_secret`. Used with REST Auth URI when OLake Go requests an access token from the catalog\u2019s auth service.',
+  },
+  {
+    id: 'catalog-name',
+    authTypes: AUTH_COMMON,
+    parameter: 'Catalog Name',
+    sample: 'olake_iceberg',
+    description:
+      'Name of the Iceberg catalog OLake Go registers tables under. Defaults to `olake_iceberg` if left empty.',
+  },
+ 
   // {
   //   id: 's3-endpoint',
   //   authTypes: AUTH_COMMON,
@@ -74,33 +102,6 @@ const FIELDS = [
     sample: 'false/true',
     description:
       'Writes data and delete files using Apache Arrow based writer and registers them in Iceberg.',
-  },
-  {
-    id: 'token',
-    authTypes: [AUTH_TOKEN],
-    parameter: 'Token',
-    required: true,
-    sample: 'abc...xyz',
-    description:
-      'Specifies the Bearer token sent in the Authorization header for authenticating with the REST catalog service.',
-  },
-  {
-    id: 'rest-auth-uri',
-    authTypes: [AUTH_OAUTH2],
-    parameter: 'REST Auth URI',
-    required: true,
-    sample: 'https://auth.server.com/oauth/token',
-    description:
-      'URL of the REST catalog\u2019s OAuth2 token endpoint. OLake Go uses this with REST Credential to request an access token during OAuth2 client-credentials authentication.',
-  },
-  {
-    id: 'rest-credential',
-    authTypes: [AUTH_OAUTH2],
-    parameter: 'REST Credential',
-    required: true,
-    sample: '<client_id>:<client_secret>',
-    description:
-      'Specifies the client ID and secret for OAuth2, formatted as `client_id:client_secret`. Used with REST Auth URI when OLake Go requests an access token from the catalog\u2019s auth service.',
   },
   {
     id: 'rest-scope',

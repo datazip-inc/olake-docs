@@ -50,27 +50,12 @@ const FIELDS = [
     description: NESSIE_REST_CATALOG_URL_DESCRIPTION,
   },
   {
-    id: 'catalog-name',
-    authTypes: AUTH_COMMON,
-    parameter: 'catalog_name',
-    sample: 'olake_iceberg',
-    description:
-      'Name of the Iceberg catalog OLake Go registers tables under. Defaults to `olake_iceberg` if left empty.',
-  },
-  {
     id: 'iceberg-s3-path',
     authTypes: AUTH_COMMON,
     parameter: 'iceberg_s3_path',
     required: true,
     sample: 's3://<BUCKET_NAME>',
     description: 'S3 bucket path where Iceberg table data and metadata files will be stored.',
-  },
-  {
-    id: 's3-endpoint',
-    authTypes: AUTH_COMMON,
-    parameter: 's3_endpoint',
-    sample: 'http://<YOUR_MACHINE_IP>:9000/',
-    description: NESSIE_S3_ENDPOINT_DESCRIPTION,
   },
   {
     id: 'aws-region',
@@ -80,28 +65,6 @@ const FIELDS = [
     sample: 'ap-south-1',
     description:
       'Specifies the AWS region associated with the S3 bucket where the data is stored.',
-  },
-  {
-    id: 'aws-access-key',
-    authTypes: AUTH_COMMON,
-    parameter: 'aws_access_key',
-    sample: 'XXX',
-    description: <AwsAccessKeyDescription />,
-  },
-  {
-    id: 'aws-secret-key',
-    authTypes: AUTH_COMMON,
-    parameter: 'aws_secret_key',
-    sample: 'XXX',
-    description: <AwsSecretKeyDescription />,
-  },
-  {
-    id: 'arrow-writes',
-    authTypes: AUTH_COMMON,
-    parameter: 'arrow_writes',
-    sample: 'false/true',
-    description:
-      'Writes data and delete files using Apache Arrow based writer and registers them in Iceberg.',
   },
   {
     id: 'token',
@@ -129,6 +92,43 @@ const FIELDS = [
     sample: '<client_id>:<client_secret>',
     description:
       'Specifies the client ID and secret for OAuth2, formatted as `client_id:client_secret`. Used with REST Auth URI when OLake Go requests an access token from the catalog\u2019s auth service.',
+  },
+  {
+    id: 'catalog-name',
+    authTypes: AUTH_COMMON,
+    parameter: 'catalog_name',
+    sample: 'olake_iceberg',
+    description:
+      'Name of the Iceberg catalog OLake Go registers tables under. Defaults to `olake_iceberg` if left empty.',
+  },
+  {
+    id: 's3-endpoint',
+    authTypes: AUTH_COMMON,
+    parameter: 's3_endpoint',
+    sample: 'http://<YOUR_MACHINE_IP>:9000/',
+    description: NESSIE_S3_ENDPOINT_DESCRIPTION,
+  },
+  {
+    id: 'aws-access-key',
+    authTypes: AUTH_COMMON,
+    parameter: 'aws_access_key',
+    sample: 'XXX',
+    description: <AwsAccessKeyDescription />,
+  },
+  {
+    id: 'aws-secret-key',
+    authTypes: AUTH_COMMON,
+    parameter: 'aws_secret_key',
+    sample: 'XXX',
+    description: <AwsSecretKeyDescription />,
+  },
+  {
+    id: 'arrow-writes',
+    authTypes: AUTH_COMMON,
+    parameter: 'arrow_writes',
+    sample: 'false/true',
+    description:
+      'Writes data and delete files using Apache Arrow based writer and registers them in Iceberg.',
   },
   {
     id: 'scope',

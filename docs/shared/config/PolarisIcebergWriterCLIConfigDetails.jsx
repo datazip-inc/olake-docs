@@ -55,6 +55,15 @@ const FIELDS = [
       'Specifies the client ID and secret for OAuth2, formatted as `client_id:client_secret`. Used with REST Auth URI when OLake Go requests an access token from the catalog\u2019s auth service.',
   },
   {
+    id: 'aws-region',
+    authTypes: AUTH_COMMON,
+    parameter: 'aws_region',
+    required: true,
+    sample: 'ap-south-1',
+    description:
+      'AWS Region where your S3 bucket exists. Required so OLake Go calls the correct regional S3 endpoint.',
+  },
+  {
     id: 'scope',
     authTypes: [AUTH_OAUTH2],
     parameter: 'scope',
@@ -83,15 +92,6 @@ const FIELDS = [
     parameter: 'aws_secret_key',
     sample: 'XXX',
     description: <AwsSecretKeyDescription />,
-  },
-  {
-    id: 'aws-region',
-    authTypes: AUTH_COMMON,
-    parameter: 'aws_region',
-    required: true,
-    sample: 'ap-south-1',
-    description:
-      'AWS Region where your S3 bucket exists. Required so OLake Go calls the correct regional S3 endpoint.',
   },
   {
     id: 'arrow-writes',
