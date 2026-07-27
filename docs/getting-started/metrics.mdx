@@ -1,0 +1,84 @@
+---
+title: Metrics
+description: Expose OLake sync and system metrics on a Prometheus-compatible `/metrics` endpoint for monitoring in Grafana and other tools.
+sidebar_position: 4
+---
+
+# Metrics
+
+OLake Go UI exposes a Prometheus compatible `/metrics` endpoint so you can monitor the health and performance of your sync jobs using standard tooling like Grafana, without parsing logs manually.
+
+This is a **pull based** endpoint, point your existing Prometheus scrape config at it and metrics are available immediately. No agents, sidecars, or additional configuration are required on OLake Go's side.
+
+:::info
+Metrics are scoped at the **job level**, reflecting each job's most recent sync run. Table level metric breakdowns are not available in this release.
+:::
+
+## Enabling the Endpoint
+
+The `/metrics` endpoint is served by the OLake Go UI backend on the same port as the UI itself at:
+
+```
+GET http://<your-olake-host>:8000/metrics
+```
+
+It's controlled by an environment variable on the OLake Go UI service:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `METRICS_ENABLED` | `true` | Set to `false` to disable the endpoint. When disabled, `/metrics` returns a `404`. |
+
+The endpoint is **unauthenticated** and sits outside the `/api` route group, so your Prometheus scraper doesn't need OLake Go UI credentials to reach it.
+
+## Metrics Specification
+
+### 1. Sync metrics
+
+These metrics show what's happening with your latest sync for each job. Think of them as a dashboard that updates with fresh numbers every time a new sync starts or completes. When a new sync begins, it replaces the previous sync's numbers.
+
+:::note
+Clear-destination runs are not included in these metrics. Only regular sync operations are tracked.
+:::
+
+| Metric | Description |
+| --- | --- |
+| `olake_sync_status` | Status of the latest sync run: <br/> `0` = running <br/> `1` = succeeded <br/> `2` = failed (a cancelled sync is also reported as failed). |
+| `olake_sync_start_time_seconds` | Unix timestamp of when the latest sync run started. |
+| `olake_sync_duration_seconds` | Duration of the run in seconds. Updates live while the sync is running, and freezes once it completes. |
+| `olake_sync_records_ingested` | Total records ingested during the run. |
+| `olake_sync_bytes_read` | Total bytes read from the source during the run. |
+
+Every sync metric carries the following labels:
+
+| Label | Description |
+| --- | --- |
+| `job_id` | Unique identifier of the job. |
+| `job_name` | Job name configured by the user. |
+| `source_name` | Source name configured by the user. |
+| `destination_name` | Destination name configured by the user. |
+
+### 2. System metrics
+
+| Metric | Description |
+| --- | --- |
+| `olake_process_cpu_usage_ratio` | CPU utilization of the sync process, as a ratio between `0` and `1`. |
+| `olake_process_memory_usage_bytes` | Memory consumed by the sync process, in bytes. |
+
+## How the data is collected
+
+Each scrape derives its response from three sources, refreshed independently:
+
+1. **Job metadata**: job, source, and destination names configured in OLake Go's Postgres database.
+2. **Run status, start time, and duration**: read from Temporal's workflow visibility, refreshed at most every 10 seconds.
+3. **Records, bytes, CPU, and memory**: read from the sync process's `stats.json` on the shared volume, refreshed at most every 2 seconds.
+
+:::info
+If updating metrics fails during a scrape, the endpoint still returns the previous values instead of returning an error.
+:::
+
+## Limitations
+
+- Metrics show only the **latest** sync run for each job. When a new sync starts, it replaces the numbers from the previous run.
+- Metrics are available at the **job level** only. You won't see per-table breakdowns in this release.
+- This endpoint exposes **metrics only**. Logs and traces are not included.
+- You need to run your own Prometheus and Grafana setup. OLake Go does not ship or manage these for you.
