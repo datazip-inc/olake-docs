@@ -107,7 +107,7 @@ const config = {
     },
     {
       tagName: 'meta',
-      attributes: { name: 'twitter:site', content: '@olake.io' }
+      attributes: { name: 'twitter:site', content: '@_olake' }
     },
     {
       tagName: 'meta',
