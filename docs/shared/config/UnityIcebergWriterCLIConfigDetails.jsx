@@ -23,7 +23,7 @@ const FIELDS = [
     authTypes: AUTH_ALL,
     parameter: 'rest_catalog_url',
     required: true,
-    sample: 'https://adb-xxxx.databricks.com/api/2.1/unity-catalog/iceberg-rest',
+    sample: 'https://1234567890123456.1.gcp.databricks.com/',
     description:
       'Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL.',
   },
