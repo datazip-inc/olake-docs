@@ -19,6 +19,23 @@ const FIELDS = [
       'Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL.',
   },
   {
+    id: 'authentication-type',
+    authTypes: AUTH_ALL,
+    parameter: 'Authentication Type',
+    required: true,
+    getDynamicSample: (authType) => {
+      const authTypeLabels = {
+        'personal-access-token': 'Personal Access Token',
+        'oauth2-m2m': 'OAuth2 M2M',
+        'oauth2-u2m': 'OAuth2 U2M',
+        'token-federation': 'Token Federation',
+      };
+      return authTypeLabels[authType] || 'Personal Access Token';
+    },
+    description:
+      'Authentication method OLake Go uses for Unity Catalog REST API requests. Set to match your workspace\'s authentication configuration.',
+  },
+  {
     id: 'unity-catalog-name',
     authTypes: AUTH_ALL,
     parameter: 'Unity Catalog Name',
@@ -153,7 +170,7 @@ export default function UnityIcebergWriterUIConfigDetails({ authType }) {
             <tr key={field.id}>
               <td>{renderParameter(field.parameter, field.required)}</td>
               <td>
-                <code>{field.sample}</code>
+                <code>{field.getDynamicSample ? field.getDynamicSample(authType) : field.sample}</code>
               </td>
               <td>{renderDescription(field.description)}</td>
             </tr>

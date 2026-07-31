@@ -19,6 +19,15 @@ const FIELDS = [
     description: 'Endpoint URL for the Polaris REST catalog service.',
   },
   {
+    id: 'authentication-type',
+    authTypes: AUTH_COMMON,
+    parameter: 'Authentication Type',
+    required: true,
+    getDynamicSample: (authType) => authType || 'token',
+    description:
+      'Authentication method OLake Go uses for Polaris REST catalog requests. Set to match your catalog\'s authentication configuration.',
+  },
+  {
     id: 's3-path',
     authTypes: AUTH_COMMON,
     parameter: 'Polaris Catalog Name',
@@ -169,7 +178,7 @@ export default function PolarisIcebergWriterUIConfigDetails({ authType }) {
             <tr key={field.id}>
               <td>{renderParameter(field.parameter, field.required)}</td>
               <td>
-                <code>{field.sample}</code>
+                <code>{field.getDynamicSample ? field.getDynamicSample(authType) : field.sample}</code>
               </td>
               <td>{renderDescription(field.description)}</td>
             </tr>

@@ -21,6 +21,15 @@ const FIELDS = [
       'Specifies the endpoint URL for the Lakekeeper catalog service that the writer will connect to.',
   },
   {
+    id: 'authentication-type',
+    authTypes: AUTH_COMMON,
+    parameter: 'Authentication Type',
+    required: true,
+    getDynamicSample: (authType) => authType || 'none',
+    description:
+      'Authentication method OLake Go uses for REST catalog requests. Set to match your catalog\'s authentication requirement.',
+  },
+  {
     id: 's3-path',
     authTypes: AUTH_COMMON,
     parameter: 'Lakekeeper Warehouse',
@@ -171,7 +180,7 @@ export default function LakekeeperIcebergWriterUIConfigDetails({ authType }) {
             <tr key={field.id}>
               <td>{renderParameter(field.parameter, field.required)}</td>
               <td>
-                <code>{field.sample}</code>
+                <code>{field.getDynamicSample ? field.getDynamicSample(authType) : field.sample}</code>
               </td>
               <td>{renderDescription(field.description)}</td>
             </tr>
