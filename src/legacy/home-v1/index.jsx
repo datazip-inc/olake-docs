@@ -5,11 +5,11 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
 
 import Faq from '@site/src/components/site/Faq'
-import DataWarehouseToLakes from '../components/site/DataWarehouseToLakes'
-import WorkflowSection from '../components/site/WorkflowSection'
+import DataWarehouseToLakes from '@site/src/components/site/DataWarehouseToLakes'
+import WorkflowSection from '@site/src/components/site/WorkflowSection'
 import Footer from '@theme/DocItem/Footer'
-import LazyComponent from '../components/LazyComponent'
-import LightModeEnforcer from '../components/LightModeEnforcer'
+import LazyComponent from '@site/src/components/LazyComponent'
+import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
 
 export default function New3Page() {
   const { siteConfig } = useDocusaurusContext()
