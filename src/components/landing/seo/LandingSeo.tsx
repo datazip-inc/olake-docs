@@ -27,7 +27,15 @@ interface LandingSeoProps {
  * same issue). Kept for consistency with the rest of the site and so it
  * starts working the moment that separate bug is fixed.
  */
-export default function LandingSeo({ title, description, canonicalUrl, ogImage, twitterTitle, twitterDescription, jsonLdSchemas }: LandingSeoProps) {
+export default function LandingSeo({
+  title,
+  description,
+  canonicalUrl,
+  ogImage,
+  twitterTitle,
+  twitterDescription,
+  jsonLdSchemas
+}: LandingSeoProps) {
   return (
     <Head>
       <title>{title}</title>
@@ -51,7 +59,11 @@ export default function LandingSeo({ title, description, canonicalUrl, ogImage, 
       <meta name='twitter:image' content={ogImage} />
 
       {jsonLdSchemas.map((schema) => (
-        <script key={schema.id} type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(schema.data) }} />
+        <script
+          key={schema.id}
+          type='application/ld+json'
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema.data) }}
+        />
       ))}
     </Head>
   )

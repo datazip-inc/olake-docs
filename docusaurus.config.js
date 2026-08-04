@@ -30,7 +30,9 @@ function getLatestOlakeRelease() {
   const newest = files[files.length - 1]
   let version = newest.version
   try {
-    const title = fs.readFileSync(path.join(dir, `${newest.file}.mdx`), 'utf8').match(/^title:\s*"?([^"\n]+)"?/m)
+    const title = fs
+      .readFileSync(path.join(dir, `${newest.file}.mdx`), 'utf8')
+      .match(/^title:\s*"?([^"\n]+)"?/m)
     const mentioned = title && title[1].match(/v(\d+\.\d+\.\d+)/g)
     if (mentioned && mentioned.length) version = mentioned[mentioned.length - 1].slice(1)
   } catch {
@@ -86,7 +88,10 @@ const config = {
   },
 
   // Client modules for handling client-side functionality
-  clientModules: [require.resolve('./src/clientModules/hashScroll.ts')],
+  clientModules: [
+    require.resolve('./src/clientModules/hashScroll.ts'),
+    require.resolve('./src/clientModules/deferredGtag.ts')
+  ],
 
   presets: [
     [
@@ -100,10 +105,9 @@ const config = {
         },
         blog: false,
 
-        gtag: {
-          trackingID: 'G-GTNTGHDNZW',
-          anonymizeIP: true
-        },
+        // GA is loaded by src/clientModules/deferredGtag.ts instead of the preset, so the
+        // 166KB script stays off the critical path. Re-enabling this would double-load it.
+        gtag: undefined,
 
         sitemap: {
           lastmod: 'date',

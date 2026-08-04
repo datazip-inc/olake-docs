@@ -45,7 +45,9 @@ export function cssToObj(css: string | CSSProperties | undefined | null): CSSPro
     const name = d.slice(0, i).trim()
     const value = d.slice(i + 1).trim()
     if (!name) continue
-    const key = name.startsWith('--') ? name : name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+    const key = name.startsWith('--')
+      ? name
+      : name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
     out[key] = value
   }
   return out as CSSProperties

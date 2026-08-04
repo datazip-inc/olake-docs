@@ -86,14 +86,14 @@ export default function SiteNavbar({ trailing }: SiteNavbarProps) {
 
         <div className='olake-nav-right'>
           <a href={GITHUB_REPO_URL} target='_blank' rel='noopener noreferrer' aria-label='GitHub stars' className='olake-nav-stars'>
-            <img src='/img/landing/shared/github-icon.png' alt='' />
+            <img src='/img/landing/shared/github-icon.webp' alt='' />
             <span>
               <span className='olake-nav-star-mark'>★</span> {stars}
             </span>
           </a>
           <a href={SLACK_URL} aria-label='Slack' className='olake-nav-slack'>
             {/* the design uses the Slack artwork here, not an icon font */}
-            <img src='/img/landing/shared/slack-icon.png' alt='Slack' />
+            <img src='/img/landing/shared/slack-icon.webp' alt='Slack' />
           </a>
           <Link to={CTA.href} className='olake-nav-cta'>
             {CTA.label}
