@@ -179,16 +179,9 @@ const config = {
         fetchpriority: 'high'
       }
     },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'preload',
-        href: '/img/site/hero-section.svg',
-        as: 'image',
-        type: 'image/svg+xml',
-        fetchpriority: 'high'
-      }
-    },
+    // No preload for /img/site/hero-section.svg — it belonged to the v1 homepage and is
+    // no longer rendered by any routed page, so preloading it cost 22KB at high priority
+    // on every page for nothing. It is still referenced by JSON-LD in src/data/landing/seo.ts.
     // Preconnect to Google Fonts
     {
       tagName: 'link',
