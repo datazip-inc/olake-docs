@@ -216,11 +216,7 @@ export function useHomeLogic(props = {}) {
           href: '/olake-fusion',
           title: 'OLake Fusion',
           body: 'Keep your Apache Iceberg tables consistently performant and scalable.',
-          chips: [
-            { label: 'Compaction' },
-            { label: 'Cleanup', soon: true },
-            { label: 'Metadata trim' }
-          ],
+          chips: [{ label: 'Compaction' }, { label: 'Cleanup', soon: true }],
           link: 'Explore OLake Fusion'
         }
       ],
@@ -273,7 +269,7 @@ export function useHomeLogic(props = {}) {
           num: '04',
           kicker: 'MAINTAINED',
           title: 'Keep tables fast as data keeps growing',
-          body: 'Automated compaction, delete-file cleanup, and metadata trimming keep query performance and storage costs in check as you scale.'
+          body: 'Automated compaction and delete-file cleanup keep query performance and storage costs in check as you scale.'
         }
       ],
 

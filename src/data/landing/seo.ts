@@ -137,8 +137,8 @@ export const HOME_SEO = {
 
 export const FUSION_SEO = {
   title: 'OLake Fusion — Automated Apache Iceberg Table Maintenance & Compaction',
-  description: 'Keep Apache Iceberg tables consistently performant and scalable with automated compaction, delete-file cleanup, and metadata trimming.',
-  twitterDescription: 'Automated Iceberg table maintenance — compaction, cleanup, and metadata trimming, up to 2× faster than Apache Spark.',
+  description: 'Keep Apache Iceberg tables consistently performant and scalable with automated compaction and delete-file cleanup.',
+  twitterDescription: 'Automated Iceberg table maintenance — compaction and cleanup, up to 2× faster than Apache Spark.',
   canonicalUrl: `${SITE_URL}/olake-fusion`,
   ogImage: FALLBACK_OG_IMAGE,
   jsonLdSchemas: [
@@ -150,7 +150,7 @@ export const FUSION_SEO = {
         name: 'OLake Fusion',
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Cross-platform',
-        description: 'Automated Apache Iceberg table maintenance: compaction, delete-file cleanup, and metadata trimming.',
+        description: 'Automated Apache Iceberg table maintenance: compaction and delete-file cleanup.',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
         url: `${SITE_URL}/olake-fusion`,
         publisher: { '@type': 'Organization', name: 'Datazip', url: SITE_URL }
