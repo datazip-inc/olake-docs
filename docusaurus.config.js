@@ -90,7 +90,8 @@ const config = {
   // Client modules for handling client-side functionality
   clientModules: [
     require.resolve('./src/clientModules/hashScroll.ts'),
-    require.resolve('./src/clientModules/deferredGtag.ts')
+    require.resolve('./src/clientModules/deferredGtag.ts'),
+    require.resolve('./src/clientModules/deferredReo.ts')
   ],
 
   presets: [
