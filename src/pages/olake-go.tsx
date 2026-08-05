@@ -1,4 +1,3 @@
-/* eslint-disable */
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
@@ -13,16 +12,6 @@ import { GO_SEO } from '@site/src/data/landing/seo'
 import '@site/src/components/landing/pages/olake-go.css'
 import '@site/src/components/landing/pages/overrides.css'
 
-/**
- * /olake-go — literal port of `OLake Go Landing.html`.
- *
- * The markup below is generated from the design's own template (values copied,
- * not re-expressed) and the state/handlers come from `useGoLogic`, which is a
- * verbatim port of the design's DCLogic class. Regenerate both via the scripts
- * in the session scratchpad rather than hand-editing.
- *
- * `data-props` defaults from the design are passed to the hook below.
- */
 export default function OLakeGoPage() {
   const {
     icebergStyle,

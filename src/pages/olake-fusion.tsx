@@ -1,4 +1,3 @@
-/* eslint-disable */
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
@@ -13,12 +12,6 @@ import { FUSION_SEO } from '@site/src/data/landing/seo'
 import '@site/src/components/landing/pages/olake-fusion.css'
 import '@site/src/components/landing/pages/overrides.css'
 
-/**
- * /olake-fusion — literal port of `OLake Fusion Landing - Standalone (1).html`.
- * Markup generated from the design's template; state/handlers are a verbatim
- * port of its DCLogic class (including the scroll-packet cursor-dodge effect).
- * Regenerate via the scratchpad scripts rather than hand-editing.
- */
 export default function OLakeFusionPage() {
   const {
     icebergStyle,

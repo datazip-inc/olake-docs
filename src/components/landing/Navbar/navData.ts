@@ -61,7 +61,7 @@ export const NAV_DROPDOWNS: NavDropdown[] = [
     items: [
       { label: 'OLake Community', href: '/community' },
       { label: 'Top Contributors', href: '/community/contributors' },
-      { label: "Contributor's Program", href: '/community/contributor-program' },
+      { label: 'Contributor Program', href: '/community/contributor-program' },
       { label: 'GSoC', href: '/community/gsoc' }
     ]
   },

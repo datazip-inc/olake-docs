@@ -1,6 +1,15 @@
-import React, { useEffect, useState, type ReactNode } from 'react'
+import React, { useState, type ReactNode } from 'react'
 import Link from '@docusaurus/Link'
-import { NAV_DROPDOWNS, PRICING_LINK, GITHUB_REPO_URL, SLACK_URL, CTA, type NavDropdown } from './navData'
+import { cn } from '@site/src/lib/utils'
+import useGetReleases from '@site/src/hooks/useGetReleases'
+import {
+  NAV_DROPDOWNS,
+  PRICING_LINK,
+  GITHUB_REPO_URL,
+  SLACK_URL,
+  CTA,
+  type NavDropdown
+} from './navData'
 
 /** Formats 4231 -> "4.2k", matching the design's star pill. */
 function formatStars(n: number): string {
@@ -8,40 +17,20 @@ function formatStars(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
 
-/**
- * Live GitHub star count. The designs hardcode this (and disagree — 1.3k on
- * the Go page, 4.2k on the others), so it goes stale. Mirrors the fetch the
- * site already does in src/hooks/useGetReleases.ts.
- */
-function useStarCount(): string {
-  const [stars, setStars] = useState<number>(0)
-  useEffect(() => {
-    let alive = true
-    fetch('https://api.github.com/repos/datazip-inc/olake')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (alive && d?.stargazers_count) setStars(d.stargazers_count)
-      })
-      .catch(() => {
-        /* offline or rate-limited: pill just stays blank rather than lying */
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
-  return formatStars(stars)
-}
-
 function Dropdown({ dropdown }: { dropdown: NavDropdown }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className='olake-nav-item' onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div
+      className='olake-nav-item'
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <div className='olake-nav-trigger'>
         {dropdown.label}
         <span className='olake-nav-caret'>▾</span>
       </div>
       {/* Always rendered so the links are crawlable and work without JS; only visibility toggles. */}
-      <div className={`olake-nav-panel${open ? ' is-open' : ''}`}>
+      <div className={cn('olake-nav-panel', open && 'is-open')}>
         {dropdown.items.map((item) => (
           <Link key={item.href} to={item.href} className='olake-nav-panel-link'>
             {item.label}
@@ -64,7 +53,8 @@ interface SiteNavbarProps {
  * below the 1279px breakpoint.
  */
 export default function SiteNavbar({ trailing }: SiteNavbarProps) {
-  const stars = useStarCount()
+  const { stargazersCount } = useGetReleases()
+  const stars = formatStars(stargazersCount)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -85,7 +75,13 @@ export default function SiteNavbar({ trailing }: SiteNavbarProps) {
         </div>
 
         <div className='olake-nav-right'>
-          <a href={GITHUB_REPO_URL} target='_blank' rel='noopener noreferrer' aria-label='GitHub stars' className='olake-nav-stars'>
+          <a
+            href={GITHUB_REPO_URL}
+            target='_blank'
+            rel='noopener noreferrer'
+            aria-label='GitHub stars'
+            className='olake-nav-stars'
+          >
             <img src='/img/landing/shared/github-icon.webp' alt='' />
             <span>
               <span className='olake-nav-star-mark'>★</span> {stars}
@@ -119,13 +115,22 @@ export default function SiteNavbar({ trailing }: SiteNavbarProps) {
             <div key={d.label} className='olake-nav-mobile-group'>
               <div className='olake-nav-mobile-heading'>{d.label}</div>
               {d.items.map((item) => (
-                <Link key={item.href} to={item.href} className='olake-nav-mobile-link' onClick={() => setMobileOpen(false)}>
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className='olake-nav-mobile-link'
+                  onClick={() => setMobileOpen(false)}
+                >
                   {item.label}
                 </Link>
               ))}
             </div>
           ))}
-          <Link to={PRICING_LINK.href} className='olake-nav-mobile-link' onClick={() => setMobileOpen(false)}>
+          <Link
+            to={PRICING_LINK.href}
+            className='olake-nav-mobile-link'
+            onClick={() => setMobileOpen(false)}
+          >
             {PRICING_LINK.label}
           </Link>
           <Link to={CTA.href} className='olake-nav-mobile-cta' onClick={() => setMobileOpen(false)}>

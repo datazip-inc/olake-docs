@@ -131,56 +131,6 @@ export const HOME_SEO = {
         '@type': 'BreadcrumbList',
         itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` }]
       }
-    },
-    {
-      id: 'faq',
-      data: {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: [
-          { '@type': 'Question', name: 'How to Get Started?', acceptedAnswer: { '@type': 'Answer', text: 'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.' } },
-          {
-            '@type': 'Question',
-            name: 'Is OLake Really Open Source?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. OLake is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1k+ developers) and use it freely without hidden costs.'
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'Is There Any Enterprise Plan?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "We're actively working on providing enterprise support from professional assistance and pilot programs to helping teams scale OLake in production. You can reach out at hello@olake.io to learn more."
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'How Can I Contribute?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Join our slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'Why Should I Use OLake?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'OLake makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'What data platforms and tools does OLake integrate with?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'As of now, we are integrating with Apache Iceberg as a destination. You can query this from most of the big data platform like Snowflake, Databricks, Redshift and BigQuery'
-            }
-          }
-        ]
-      }
     }
   ] as JsonLdSchema[]
 }

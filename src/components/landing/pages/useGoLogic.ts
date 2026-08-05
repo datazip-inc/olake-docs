@@ -1,12 +1,3 @@
-/* AUTO-GENERATED from the design's DCLogic block — method bodies copied verbatim,
-   only `this.*` rewritten. Do not hand-edit; regenerate via scratchpad/logic2hook.js.
-
-   EXCEPTION — `buildBenchmarks` / `benchSources` are hand-maintained. The design
-   shipped its benchmark numbers inline; they now read from
-   `src/data/benchmarkData.ts`, which is the single source of truth shared with
-   `src/components/site/BenchmarkSection.tsx`. Re-running the generator would
-   reintroduce the duplicated tables — port these two functions across by hand. */
-/* eslint-disable */
 // @ts-nocheck
 import { useState, useRef, useEffect, useMemo } from 'react'
 import {
@@ -225,7 +216,7 @@ export function useGoLogic(props = {}) {
       icebergStyle,
       problemSentences: [
         {
-          top: 22,
+          top: 27,
           left: 42,
           rot: -3,
           delay: 0,

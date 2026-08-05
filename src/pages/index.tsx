@@ -1,4 +1,3 @@
-/* eslint-disable */
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
@@ -14,14 +13,6 @@ import { HOME_SEO } from '@site/src/data/landing/seo'
 import '@site/src/components/landing/pages/olake-home.css'
 import '@site/src/components/landing/pages/overrides.css'
 
-/**
- * / — literal port of `OLake Homepage v2 Light (standalone).html`.
- * Markup generated from the design's template; state/handlers are a verbatim
- * port of its DCLogic class (arch-canvas fit + count-up observers included).
- *
- * The design ships no SEO metadata of its own, so HOME_SEO carries the
- * previous homepage's title/OG/canonical and all five JSON-LD objects.
- */
 export default function HomePage() {
   // Derived at build time from docs/release/ingestion — see getLatestOlakeRelease()
   // in docusaurus.config.js. Keeps the BULLETIN release card from going stale.

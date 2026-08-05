@@ -1,6 +1,3 @@
-/* AUTO-GENERATED from the design's DCLogic block — method bodies copied verbatim,
-   only `this.*` rewritten. Do not hand-edit; regenerate via scratchpad/logic2hook.js. */
-/* eslint-disable */
 // @ts-nocheck
 import { useState, useRef, useEffect, useMemo } from 'react'
 
