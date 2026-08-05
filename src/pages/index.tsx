@@ -2362,9 +2362,7 @@ export default function HomePage() {
               >
                 <a
                   className='olakehome-h7'
-                  href='https://youtu.be/IcAJmW72d2A?si=hhKFCgp0Dsl2pRGp'
-                  target='_blank'
-                  rel='noopener noreferrer'
+                  href='/docs/getting-started/quickstart/'
                   style={{
                     position: 'relative',
                     background: '#111319',
