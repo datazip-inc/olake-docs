@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
+import { FaExternalLinkAlt, FaGithub, FaSlack } from 'react-icons/fa';
 
 const FusionBlogCTA = () => {
   return (
@@ -18,8 +18,8 @@ const FusionBlogCTA = () => {
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center text-lg font-medium text-white bg-black dark:bg-white dark:text-black rounded-full px-6 py-3 transition transform hover:-translate-y-1 hover:opacity-90 min-w-[150px]"
         >
-          <FaExternalLinkAlt className="mr-2 text-white dark:text-black" />
-          <span className='text-white text-xs dark:text-black'>Slack</span>
+          <FaSlack className="mr-2 text-white dark:text-black" />
+          <span className='text-white text-xs dark:text-black'>Join Slack</span>
         </a>
 
         <a
