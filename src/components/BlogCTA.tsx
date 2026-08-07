@@ -1,25 +1,25 @@
 import React from 'react';
-import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
+import { FaExternalLinkAlt, FaGithub, FaSlack } from 'react-icons/fa';
 
 const BlogCTA = () => {
   return (
     <div className="bg-white dark:bg-black/70 rounded-2xl p-8 max-w-3xl w-full shadow-lg text-center transition-colors">
       <h2 className="text-4xl font-bold mb-4 text-gray-800 dark:text-white">
-        OLake
+        OLake Go
       </h2>
       <p className="text-lg font-light text-gray-700 dark:text-gray-300 mb-8">
-        Achieve 5x speed data replication to Lakehouse format with OLake, our open source platform for efficient, quick and scalable big data ingestion for real-time analytics.
+        Replicate databases, Kafka, and S3 into Apache Iceberg with OLake Go, an open source EL engine built for Iceberg from the ground up.
       </p>
 
       <div className="flex flex-col md:flex-row justify-center gap-4">
         <a
-          href="https://calendly.com/d/ckr6-g82-p9y/olake_discussion"
+          href="https://olake.io/slack"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center text-lg font-medium text-white bg-black dark:bg-white dark:text-black rounded-full px-6 py-3 transition transform hover:-translate-y-1 hover:opacity-90 min-w-[150px]"
         >
-          <FaExternalLinkAlt className="mr-2 text-white dark:text-black" />
-          <span className='text-white text-xs dark:text-black'>Schedule a meet</span>
+          <FaSlack className="mr-2 text-white dark:text-black" />
+          <span className='text-white text-xs dark:text-black'>Join Slack</span>
         </a>
 
         <a

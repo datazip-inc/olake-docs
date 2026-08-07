@@ -5,18 +5,18 @@ import SectionHeader from '../SectionHeader'
 const BlogList = [
   {
     tag: 'New Release',
-    heading: 'Four Critical Challenges in MongoDB ETL and How to tackle them for your Data Lake',
+    heading: 'MongoDB Connector Overview',
     content:
       'Uncover the key challenges of extracting, transforming, and loading data from MongoDB into a data lakehouse. Learn best practices and common pitfalls to ensure seamless data integration and unlock valuable insights.',
-    link: 'https://olake.io/blog/mongodb-etl-challenges',
+    link: 'https://olake.io/docs/connectors/mongodb#overview',
     image: '/img/olake/blog-image-1.svg'
   },
   {
     tag: 'New Release',
-    heading: 'Troubleshooting Common Issues and Solutions to MongoDB ETL Errors',
+    heading: 'MongoDB Troubleshooting Guide',
     content:
       'Explore practical solutions to common MongoDB ETL errors in our troubleshooting guide. Learn how to address issues like schema mismatches, data type conflicts, and performance bottlenecks to streamline your ETL processes and ensure smooth data integration.',
-    link: 'https://olake.io/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors',
+    link: 'https://olake.io/docs/connectors/mongodb#troubleshooting',
     image: '/img/olake/blog-image-2.svg'
   }
 ]
