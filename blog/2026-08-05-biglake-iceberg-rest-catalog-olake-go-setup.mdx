@@ -1,0 +1,207 @@
+---
+slug: biglake-iceberg-rest-catalog-olake-go-setup
+title: "Ingesting into BigLake with OLake Go: Setup, Config, and the Failure Modes"
+description: A hands-on guide to writing Apache Iceberg tables into Google BigLake with OLake Go — GCP prerequisites, REST catalog configuration field-by-field, and the failure modes to watch for.
+tags: [biglake, iceberg, olake, gcp, lakehouse, rest-catalog]
+authors: [anshika]
+image: /img/blog/cover/biglake-olake-go-cover.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Ingesting into Google BigLake with OLake Go cover image](/img/blog/cover/biglake-olake-go-cover.webp)
+
+:::note
+Google renamed BigLake to Lakehouse for Apache Iceberg in April 2026, and BigLake Metastore to the Lakehouse runtime catalog. The API endpoints, `gcloud` commands, and IAM role names still use `biglake`, so every configuration value in this post works as written. This post says "BigLake" throughout to match what the config fields say.
+:::
+
+For most of Apache Iceberg's history, BigQuery could read Iceberg tables, but it could not own them. The tables themselves were still managed elsewhere — by a Hive Metastore, AWS Glue, or an outside REST catalog. BigQuery was a consumer, not the source of truth.
+
+
+Apache Iceberg 1.10.0 changed that. Google contributed two things to the release. The first is a native BigQuery Metastore Catalog (`BigQueryMetastoreCatalog` and `BigQueryMetastoreClient`), merged through PR #12808, which lets Spark, Flink, Trino, and any other Iceberg-aware engine use BigQuery's own metadata service as the catalog of record. The same catalog was added to the Iceberg Kafka Connect runtime bundle, so streaming pipelines get it too.
+
+![BigLake Iceberg REST catalog architecture: OLake Go writing Iceberg data and metadata to Cloud Storage, registered in the BigLake catalog, and read by BigQuery and other engines](/img/blog/2026/5/bigquery-native-catalog.webp)
+
+The second is `GoogleAuthManager`, which plugs Google credentials into the standard Iceberg REST catalog path. That second piece is what this post relies on. Google now recommends the BigLake Iceberg REST catalog endpoint for new setups and describes the BigQuery Metastore Catalog as the earlier integration, so the destination below points at the REST endpoint and authenticates through `GoogleAuthManager`.
+
+## What BigLake actually does
+
+BigLake is easiest to understand as a governance layer rather than a storage layer. A BigLake Iceberg table is a governed pointer to Iceberg data and metadata sitting in Cloud Storage, not a copy of it inside BigQuery. BigLake applies BigQuery's IAM controls to that external data, and the BigLake Iceberg REST catalog lets engines talk to it directly as a catalog endpoint.
+
+One caveat worth knowing up front: row-level security and column masking are available on BigLake external tables generally, but Google documents fine-grained access control as unsupported for tables managed through the Iceberg REST catalog endpoint. Access control on those tables runs through IAM at the catalog, namespace, and table level instead.
+
+Google has also been building BigLake managed tables, a separate table type that brings BigQuery's usual table upkeep (compaction, clustering, garbage collection) to Iceberg tables, along with full DML: inserts, updates, deletes, and schema evolution. Google reports that streaming writes into managed tables avoid the small-file buildup that normally comes with frequent inserts.
+
+Managed tables are not what this post sets up. Tables registered through the Iceberg REST catalog endpoint cannot be created or modified with BigQuery DDL or DML statements, and writes arrive from the external engine instead. The distinction matters when reading Google's documentation, since both table types sit under the same product name.
+
+The part that matters most here is the serverless metadata service sitting behind all of it, which Google now calls the Lakehouse runtime catalog. It is a shared runtime metadata layer for both BigQuery and open engines like Spark, so a table written from Spark can be read from BigQuery, and vice versa, without a separate metastore or a second copy of the schema. IAM policies on the catalog apply no matter which engine touched the table last. One copy of data, one schema, readable and writable from wherever a job happens to run.
+
+![BigLake architecture: Cloud Storage, the BigLake catalog, and BigQuery/open-engine access](/img/blog/2026/5/biglake-architecture.webp)
+
+
+## The gap this closes
+
+Before native catalog support, connecting BigQuery to an outside engine meant bridging them indirectly — typically by writing Iceberg through BigLake and using change notifications (Pub/Sub events on the GCS bucket, for example) to refresh a table definition somewhere else. It worked, but it meant an extra moving part and a small window where the two sides could disagree about table state.
+
+With the BigQuery Metastore Catalog and the BigLake Iceberg REST catalog, that bridge is no longer necessary. An engine writing Iceberg tables straight into BigLake's catalog means BigQuery reads the same metadata everyone else does. Ingesting directly into BigLake is now a first-class path.
+
+The rest of this post covers what that looks like in practice:
+
+- what to set up on the Google Cloud side before touching OLake
+- how to configure OLake Go's BigLake destination, field by field
+- what a passing connection test actually confirms, and what it does not
+- how to confirm the tables landed, by querying them from BigQuery
+- the failure modes worth knowing about, and how to tell them apart
+
+![Native catalog flow: OLake Go writing Iceberg data through the BigLake catalog to BigQuery and other engines](/img/blog/2026/5/native-catalog-flow.webp)
+
+## Getting BigLake ready
+
+Before touching OLake, the catalog needs to exist on the Google Cloud side.
+
+**Project and API.** A Google Cloud project with billing enabled and the BigLake API turned on.
+
+**Cloud Storage bucket.** A bucket to hold Iceberg table data and metadata. Every storage location used by one catalog must sit in the same geographic region group. A US bucket and a European bucket cannot belong to the same catalog.
+
+**Create the catalog in end-user credentials mode.** Multi-bucket is the type to use. Google calls the single-bucket type highly discouraged for new projects, since it locks the catalog name to the bucket name permanently.
+
+Use end-user credentials mode. OLake Go authenticates as the service account in `gcp_service_account_json` and does not request vended credentials, so the catalog has to pass that identity through to Cloud Storage. This is also why the service account needs Storage Object User directly on the buckets.
+
+```bash
+gcloud biglake iceberg catalogs create CATALOG_ID \
+    --project PROJECT_ID \
+    --catalog-type biglake \
+    --default-location gs://BUCKET_NAME \
+    --credential-mode end-user \
+    [--primary-location LOCATION]
+```
+
+Set `--primary-location` to `US` or `EU` if the tables need to be queryable from the matching BigQuery multi-region. Getting this wrong is expensive: changing the primary location on an existing multi-region catalog means deleting and recreating the catalog.
+
+**Grant roles.** The service account OLake uses needs BigLake Editor (`roles/biglake.editor`) on the project and Storage Object User (`roles/storage.objectUser`) on every bucket the catalog touches. Registering new tables also needs BigLake Admin (`roles/biglake.admin`) on the project. Missing Storage Object User on a bucket is the single most common reason a connection test passes and the first sync fails.
+
+**Know the limits before syncing.** The REST catalog endpoint supports Parquet data files only. Iceberg V1 tables are not supported and have to be upgraded to V2 first. The table properties `write.data.path` and `write.metadata.path` cannot be moved off their defaults. Table locations get a random suffix appended automatically, so a table lands at `gs://bucket/namespace/table/RANDOM` rather than the path you would expect when looking in Cloud Storage.
+
+Google's Lakehouse documentation covers catalog creation and IAM setup in full. Once the catalog exists and the roles are granted, the rest happens on the OLake side.
+
+## Configuring OLake Go to write into BigLake
+
+BigLake catalog support ships in OLake Go 0.9.0 and above, so confirm the version before configuring the destination.
+
+Set up the source as usual first (any of OLake Go's supported databases, Kafka, or S3 work here). Then, when configuring the destination, choose the Iceberg writer with the REST catalog type, and select BigLake as the catalog.
+
+BigLake only supports one authentication path: Google OAuth through a service account. There is no token or generic OAuth2 option here the way there is for other REST catalogs.
+
+The fields that matter:
+
+| Field | Value |
+|-------|-------|
+| `catalog_type` | `rest` |
+| `rest_catalog_url` | `https://biglake.googleapis.com/iceberg/v1/restcatalog` (fixed, same for everyone) |
+| `iceberg_s3_path` | The BigLake catalog path. Two formats, described below. |
+| `rest_auth_type` | `org.apache.iceberg.gcp.auth.GoogleAuthManager` (the only supported value) |
+| `gcp_service_account_json` | The full JSON content of the service account key |
+| `catalog_name` | Defaults to `olake_iceberg` if left blank |
+| `gcp_auth_scopes` | Defaults to `https://www.googleapis.com/auth/cloud-platform` |
+
+`iceberg_s3_path` takes one of two forms, and the choice matters:
+
+- **Single-bucket catalog:** `gs://<BUCKET_NAME>`. This ties the catalog to one bucket and locks the catalog name to that bucket's name.
+- **Multiple-bucket catalog (recommended):** `bl://projects/<PROJECT_ID>/catalogs/<CATALOG_ID>`. This lets one catalog span multiple buckets and keeps the catalog name independent of any single bucket, which holds up better as the number of source tables grows.
+
+A complete destination config looks like this:
+
+```json
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "rest",
+    "rest_catalog_url": "https://biglake.googleapis.com/iceberg/v1/restcatalog",
+    "catalog_name": "olake_iceberg",
+    "iceberg_s3_path": "bl://projects/<PROJECT_ID>/catalogs/<CATALOG_ID>",
+    "rest_auth_type": "org.apache.iceberg.gcp.auth.GoogleAuthManager",
+    "gcp_service_account_json": "{ \"type\": \"service_account\", ... }",
+    "arrow_writes": false
+  }
+}
+```
+
+## What happens when you test the connection
+
+Clicking Create on the destination does not run a sync. It checks two things before letting the destination be used: whether OLake Go can reach the BigLake REST endpoint at all, and whether the service account credentials in `gcp_service_account_json` are valid and carry the right scopes and roles for that endpoint.
+
+A successful test confirms the network path and the authentication are both sound. It does not confirm the service account can actually write to the specific catalog or bucket named in `iceberg_s3_path`, since that permission check happens on the first real write, not at connection time. Keep that distinction in mind — a passing test followed by a failing first sync almost always points at bucket-level permissions rather than at the credentials themselves.
+
+From here, the flow is the same as any other OLake Go destination: configure the streams to sync, run discover, and start the job. Once a sync completes, the tables are queryable straight from BigQuery, since OLake registered them with the same catalog BigQuery reads from. Confirm it with a four-part identifier:
+
+```sql
+SELECT * FROM `PROJECT_ID.CATALOG_ID.NAMESPACE.TABLE_NAME` LIMIT 10;
+```
+
+Rows coming back means the catalog registration and the storage write both worked.
+
+## Troubleshooting
+
+Most setup issues fall into one of three categories.
+
+**Authentication and permission errors.** The connection test passes, but a sync fails partway through, or write operations are rejected. This almost always means a missing storage role. Check Storage Object User on the buckets for the service account in `gcp_service_account_json`, then rule out BigLake Editor on the project. Re-check the roles against the prerequisites rather than assuming the credentials themselves are wrong.
+
+**Catalog path errors.** `iceberg_s3_path` is rejected, or tables register under the wrong catalog. This is usually a mismatch between the path format and the catalog type: a single-bucket catalog expects `gs://<BUCKET_NAME>` and nothing else, while a multi-bucket catalog expects the full `bl://projects/<PROJECT_ID>/catalogs/<CATALOG_ID>` form. Mixing the two formats, or pointing at a catalog ID that has not been created yet in BigLake, produces this class of error. So does a bucket sitting in a different region group from the catalog.
+
+**Connection test fails outright.** Before assuming a credentials problem, confirm the BigLake API is enabled on the project and that the service account key in `gcp_service_account_json` is valid, complete JSON, and has not been rotated or revoked since it was pasted in. Since the REST endpoint is a public Google API rather than something self-hosted, reachability issues are rare — they usually turn out to be a project configuration problem rather than a network one.
+
+## Wrap-up
+
+Native catalog support closes a real gap that used to require a Pub/Sub bridge and a second copy of the metadata. Setting OLake Go up to write directly into BigLake is a matter of the usual source configuration plus a REST catalog destination pointed at Google's endpoint, provided the GCP-side prerequisites (bucket, catalog, and service account roles) are in place first.
+
+If something does not line up on the first attempt, the OLake Slack community is a fast way to get unblocked — most setup issues come down to a missing IAM role or a mismatched catalog path format, both of which are quick fixes once identified.
+
+And once you're happy with your BigLake setup and ready to expand your pipeline to other sources or destinations, check out our [other connector guides here](https://olake.io/docs/connectors/).
+
+## FAQs
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. What Iceberg catalogs does OLake Go support besides BigLake?",
+    answer: <div>
+      <p>AWS Glue, JDBC/SQL, Hive Metastore, Lakekeeper, Nessie, Unity Catalog, Apache Polaris, and AWS S3 Tables, alongside the generic REST catalog implementation.</p>
+    </div>
+  },
+  {
+    question: "Q2. What OLake Go version is required for BigLake support?",
+    answer: <div>
+      <p>Version 0.9.0 and above.</p>
+    </div>
+  },
+  {
+    question: "Q3. Does BigLake support any authentication method besides a service account?",
+    answer: <div>
+      <p>No. Google OAuth through a service account is the only supported authentication path for the BigLake REST catalog in OLake Go.</p>
+    </div>
+  },
+  {
+    question: "Q4. Should I use a single-bucket or multi-bucket catalog path?",
+    answer: <div>
+      <p>Multi-bucket (<code>bl://projects/&lt;PROJECT_ID&gt;/catalogs/&lt;CATALOG_ID&gt;</code>) is the safer default, since it does not lock the catalog name to a single bucket and holds up better if the pipeline grows to cover more source tables later.</p>
+    </div>
+  },
+  {
+    question: "Q5. Does a passing connection test guarantee the sync will succeed?",
+    answer: <div>
+      <p>No. The test confirms network reachability and valid authentication, not that the service account has write access to the specific catalog and bucket used in the destination config. That permission check happens on the first actual write.</p>
+    </div>
+  },
+  {
+    question: "Q6. Do the bucket and the catalog need to be in the same region?",
+    answer: <div>
+      <p>All storage locations attached to one catalog must be in the same geographic region group, so a US bucket and a European bucket cannot share a catalog. If the tables need to be queryable from the BigQuery US or EU multi-region, set the catalog's primary location accordingly at creation time, because changing it later means recreating the catalog.</p>
+    </div>
+  },
+  {
+    question: "Q7. Do row-level security and column masking work on these tables?",
+    answer: <div>
+      <p>No. Google documents fine-grained access control as unsupported for tables managed through the Iceberg REST catalog endpoint. Access control runs through IAM at the catalog, namespace, and table level instead. Row-level and column-level security are available on other BigLake table types, which is a common source of confusion.</p>
+    </div>
+  }
+]} />
+
+<BlogCTA/>
