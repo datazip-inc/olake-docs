@@ -810,7 +810,6 @@ const config = {
             to: '/docs/install/docker-cli',
             from: '/docs/install/docker.mdx'
           },
-
           // recent destination doc re-structuring redirects
 
           {
@@ -1146,6 +1145,79 @@ const config = {
           {
             to: 'https://github.com/datazip-inc/olake',
             from: '/github'
+          },
+
+          // 404 re-directs
+          
+          // OLake Go docs
+          {
+            to: '/docs/install/olake-ui/',
+            from: '/docs/install/'
+          },
+          {
+            to: '/docs/writers/iceberg/catalog/glue/',
+            from: ['/docs/writers/', '/docs/writers/iceberg/catalog']
+          },
+          {
+            to: '/docs/writers/parquet/config/',
+            from: '/docs/writers/parquet/'
+          },
+          {
+            to: '/docs/core/architecture/',
+            from: '/docs/core/'
+          },
+          {
+            to: '/docs/understanding/compatibility-catalogs/',
+            from: '/docs/understanding/'
+          },
+          {
+            to: '/docs/api/olake-ui-api/',
+            from: '/docs/api/'
+          },
+          {
+            to: '/docs/community/contributing/',
+            from: '/docs/community/'
+          },
+          {
+            to: '/docs/release/ingestion/overview/',
+            from: ['/docs/release/ingestion/', '/docs/release/']
+          },
+          {
+            to: '/docs/understanding/terminologies/general/',
+            from: '/docs/understanding/terminologies/'
+          },
+          // OLake Fusion docs
+          {
+            to: '/docs/fusion/getting-started/overview/',
+            from: ['/docs/fusion/getting-started/', '/docs/fusion/']
+          },
+          {
+            to: '/docs/fusion/install/olake-ui/',
+            from: '/docs/fusion/install/'
+          },
+          {
+            to: '/docs/fusion/maintenance/catalogs/',
+            from: '/docs/fusion/maintenance/'
+          },
+          {
+            to: '/docs/fusion/compaction/types-of-compaction/',
+            from: '/docs/fusion/compaction/'
+          },
+          {
+            to: '/docs/fusion/core/architecture/',
+            from: '/docs/fusion/core/'
+          },
+          {
+            to: '/docs/fusion/core/compatibility/query-engines/',
+            from: '/docs/fusion/core/compatibility/'
+          },
+          {
+            to: '/docs/fusion/community/contributing/',
+            from: '/docs/fusion/community/'
+          },
+          {
+            to: '/docs/fusion/release/maintenance/overview/',
+            from: ['/docs/fusion/release/maintenance/', '/docs/fusion/release/']
           }
         ]
       }
