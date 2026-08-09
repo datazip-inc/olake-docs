@@ -93,7 +93,9 @@ For local setup, follow **[MongoDB via Docker Compose](/docs/connectors/mongodb/
 | Retry Count                                            | Number of retry attempts with exponential backoff.                                         | `3`                                                                     |
 | Chunking Strategy                                      | Data chunking strategy: `timestamp`, `splitVector`. Defaults to `splitVector` if empty     | `splitVector`                                                           |
 | IAM Authentication                                     | Turn on to use IAM credentials stored in host machine instead of `Username` and `Password` | `off`                                                                   |
-| Additional Connection Parameters                       | Additional MongoDB connection string parameters (e.g., `authMechanism`).<br/> Each parameter will be added to the connection URI | `authMechanism=SCRAM-SHA-256`     |
+| TLS CA Certificate                                     | CA certificate content in PEM format for verifying the MongoDB server. Use this instead of `tlsCAFile` in Additional Connection Parameters — file paths are not supported in UI/Docker deployments. | `-----BEGIN CERTIFICATE-----\n...` |
+| TLS Client Certificate & Key                           | Client certificate and private key in PEM format (combined in one field). Required for mutual TLS or MONGODB-X509 authentication. Leave empty for SCRAM + TLS. | `-----BEGIN CERTIFICATE-----\n...\n-----BEGIN PRIVATE KEY-----\n...` |
+| Additional Connection Parameters                       | Additional MongoDB connection string parameters (e.g., `tls`, `connectTimeoutMS`). Each parameter will be added to the connection URI. File-path TLS parameters (`tlsCAFile`, `tlsCertificateKeyFile`) are not supported in UI/Docker — use the TLS fields above instead. | `connectTimeoutMS=5000`     |
 | SSH Config                          | Configure OLake Go to connect through an SSH tunnel.  | <ul> <li>`No Tunnel`</li> <li>`SSH Key Authentication`</li> <li>`SSH Password Authentication`</li> </ul> |
 
 **<span className= "text-red-500">^</span> Not required when using IAM Authentication**
@@ -128,7 +130,12 @@ An example `source.json` file will look like this:
   "max_threads": 5,
   "backoff_retry_count": 4,
   "chunking_strategy": "",
-  "use_iam": false
+  "use_iam": false,
+  "tls_ca_cert": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
+  "tls_certificate_key": "",
+  "additional_params": {
+    "connectTimeoutMS": "5000"
+  }
 }
 ```
 
@@ -146,7 +153,9 @@ An example `source.json` file will look like this:
 | backoff_retry_count                               | Number of retry attempts with exponential backoff.                                     | `3`                                              | INTEGER  |
 | chunking_strategy                                 | Data chunking strategy: `timestamp`, `splitVector`. Defaults to `splitVector`          | `"splitVector"`                                  | STRING   |
 | use_iam                                           | Use IAM credentials stored in host machine instead of `username` and `pasword`         | `false`                                          | BOOLEAN  |
-| additional_params                     | Additional MongoDB connection string parameters (e.g., `authMechanism`).<br/> Each parameter will be added to the connection URI | `authMechanism=SCRAM-SHA-256`     | DICTIONARY |
+| tls_ca_cert                                       | CA certificate PEM content for verifying the MongoDB server. Use instead of `tlsCAFile` in `additional_params` — file paths are not supported in UI/Docker deployments. | `"-----BEGIN CERTIFICATE-----\n..."` | STRING |
+| tls_certificate_key                               | Combined client certificate and private key PEM for mutual TLS or MONGODB-X509 authentication. Optional for SCRAM + TLS. | `"-----BEGIN CERTIFICATE-----\n...\n-----BEGIN PRIVATE KEY-----\n..."` | STRING |
+| additional_params                     | Additional MongoDB connection string parameters (e.g., `tls`, `connectTimeoutMS`). File-path TLS parameters (`tlsCAFile`, `tlsCertificateKeyFile`) are not supported in UI/Docker — use `tls_ca_cert` and `tls_certificate_key` instead. | `{"connectTimeoutMS": "5000"}`     | DICTIONARY |
 | ssh_config                           | Configure OLake Go to connect through an SSH tunnel.  | `{"host": "my-tunnel-host", "port": 22 , "username": "my-tunnel-user", "password": "tunnel-password"}` | Object                                                           |
 
 **<span className= "text-red-500">^</span> Not required when `use_iam` is set to `true`**
@@ -171,6 +180,16 @@ check \
 </TabItem>
 
 </Tabs>
+
+### TLS / SSL Configuration
+
+Use the **TLS CA Certificate** and **TLS Client Certificate & Key** fields when connecting to a TLS-enabled MongoDB instance from the UI or Docker. The connector runs in an ephemeral container with only the config file mounted, so certificate file paths such as `tlsCAFile` or `tlsCertificateKeyFile` in `additional_params` will fail with a file-not-found error.
+
+- **`tls_ca_cert`**: Paste the CA certificate PEM to verify the MongoDB server certificate. When set, `tls=true` is added to the connection URI automatically.
+- **`tls_certificate_key`**: Paste the client certificate and private key PEM blocks in one field. Required only for mutual TLS or MONGODB-X509 authentication.
+- **`additional_params`**: Use for other URI options (`connectTimeoutMS`, `readPreference`, etc.). Do not use `tlsCAFile` or `tlsCertificateKeyFile` when inline PEM fields are set.
+
+For CLI usage with locally mounted certificate files, you can still pass `tlsCAFile` in `additional_params` if the inline TLS fields are left empty.
 
 ---
 
@@ -211,13 +230,19 @@ OLake Go always ingests timestamp data in UTC format, independent of the source 
 
 **Solution**: Verify replica set is active by running `rs.status()`
 
-### 3. File not found (CLI):
+### 3. TLS certificate file not found (UI/Docker):
+
+**Cause**: `tlsCAFile` or `tlsCertificateKeyFile` was set in `additional_params`, but the connector container cannot access local filesystem paths.
+
+**Solution**: Paste the certificate content into `tls_ca_cert` and/or `tls_certificate_key` instead of using file-path parameters.
+
+### 4. File not found (CLI):
 
 **Cause**: Not in correct directory while running commands
 
 **Solution**: Make sure both source.json is present in correct directory and the commands are executed while inside the directory
 
-### 4. file name too long & FATAL error occurred while reading records: failed to finish backfill chunk 381: main writer closed:
+### 5. file name too long & FATAL error occurred while reading records: failed to finish backfill chunk 381: main writer closed:
 
 **Cause**: The generated file or directory name exceeded the Linux limit of 255 bytes (often happens when partitioning on very long string values).
 ```bash
