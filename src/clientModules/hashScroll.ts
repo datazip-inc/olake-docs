@@ -112,8 +112,26 @@ export function onClientEntry(): void {
   }
 }
 
-export function onRouteDidUpdate({ location }: { location: { hash: string } }): void {
-  if (location.hash) {
-    handleSpaNavigation()
+export function onRouteDidUpdate({
+  location,
+  previousLocation,
+}: {
+  location: { pathname: string; search: string; hash: string }
+  previousLocation?: { pathname: string; search: string; hash: string } | null
+}): void {
+  if (!location.hash) return
+
+  // Match Docusaurus core: query-string-only updates (e.g. <Tabs queryString>) should not
+  // re-run anchor correction — it would keep jumping back to the hash while the user
+  // interacts with UI further down the page (same pathname + same hash, search changed).
+  if (
+    previousLocation &&
+    location.pathname === previousLocation.pathname &&
+    location.hash === previousLocation.hash &&
+    location.search !== previousLocation.search
+  ) {
+    return
   }
+
+  handleSpaNavigation()
 }

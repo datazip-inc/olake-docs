@@ -950,60 +950,7 @@ Setting up a real-time data streaming pipeline using **Debezium** and **Apache K
     
 
 
-
-## FAQs
-
-### 1. Does Debezium use Kafka Connect?
-
-**Yes, Debezium uses Kafka Connect.**
-
-Debezium operates as a **Kafka Connect connector**. Kafka Connect is a framework that simplifies the integration of Apache Kafka with other data systems like databases, key-value stores, and more. By using Kafka Connect, Debezium can easily capture changes from your databases and stream them into Kafka topics without requiring you to write custom code.
-
-**Example:**
-
-* **Debezium Connector:** Acts as a bridge between your MongoDB database and Kafka.
-    
-* **Kafka Connect Framework:** Manages the connector, handling tasks like starting, stopping, and scaling the Debezium connector as needed.
-    
-
-### 2. Is Kafka and Kafka Connect different?
-
-**Yes, Kafka and Kafka Connect are different components, but they work together.**
-
-* **Apache Kafka:**
-    
-    * **What It Is:** A powerful distributed streaming platform.
-        
-    * **Main Functions:** It handles publishing and subscribing to streams of records, storing them, and processing them in real-time.
-        
-    * **Use Cases:** Messaging system, real-time analytics, log aggregation, event sourcing, and more.
-        
-* **Kafka Connect:**
-    
-    * **What It Is:** A tool within the Kafka ecosystem.
-        
-    * **Main Functions:** Simplifies the process of connecting Kafka with external systems like databases, file systems, or other data sources and sinks.
-        
-    * **Use Cases:** Importing data into Kafka from a database (source connector) or exporting data from Kafka to another system (sink connector).
-        
-
-**How They Work Together:**
-
-* **Kafka:** Manages the data streams.
-    
-* **Kafka Connect:** Facilitates the movement of data between Kafka and other systems using connectors like Debezium.
-    
-
-**Example:**
-
-* **Without Kafka Connect:**
-    
-    * You would need to write custom code to move data from MongoDB to Kafka.
-        
-* **With Kafka Connect:**
-    
-    * Use Debezium as a Kafka Connect connector to automatically capture and stream changes from MongoDB to Kafka without writing additional code.
-        
+       
 
 ## Additional Resources
 
@@ -1023,5 +970,63 @@ To further explore Debezium, Kafka, and their integrations with MongoDB, here ar
     
 * **Monitoring Kafka with Prometheus and Grafana:** https://grafana.com/docs/grafana/latest/datasources/prometheus/
 
-    
+## FAQs
+
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. Does Debezium read directly from MongoDB's oplog?",
+    answer: <div>
+        <p>Only at initialization, not for ongoing change capture. When the connector first detects a replica set, it reads the oplog directly to obtain the last recorded transaction, which it uses as the starting position. It then takes a snapshot of the databases and collections, and opens a change stream beginning from that oplog position.</p>
+        <p>For ongoing change capture after that, the connector does not tail the oplog directly. It delegates capture and decoding to MongoDB's Change Streams feature, which abstracts oplog access into a clean event stream API. This is the recommended approach since MongoDB 4.x and avoids dealing with the raw oplog format for streaming.</p>
+    </div>
+},
+  {
+    question: "Q2. What happens when the MongoDB primary fails and a new primary is elected?",
+    answer: <div>
+      <p>Debezium handles this automatically. When it detects a primary change, it stops streaming from the old primary, connects to the new primary, and resumes from the same oplog position. It uses exponential backoff when reconnecting to avoid overwhelming the replica set during transitions.</p>
+      <p>No manual intervention is typically needed for normal failovers. However, if reconnection attempts exceed the configured maximum (<code>connect.max.attempts</code>), the connector will fail and require a manual restart.</p>
+    </div>
+  },
+  {
+    question: "Q3. Why is Debezium slow at processing changes for multiple collections simultaneously?",
+    answer: <div>
+        <p>Debezium can parallelize the initial snapshot across collections using <code>snapshot.max.threads</code>, so the full-load phase is not strictly single-threaded. The slowness shows up in two other places:</p>
+        <ul>
+        <li><strong>Within a single collection.</strong> A snapshot of one collection is copied by a single thread, so one very large collection becomes a bottleneck even when other collections finish quickly.</li>
+        <li><strong>During streaming.</strong> A connector task consumes the change stream sequentially, so ongoing change capture is processed as a single ordered stream rather than in parallel across collections.</li>
+        </ul>
+    </div>
+    },
+  {
+    question: "Q4. What MongoDB permissions does the Debezium user need?",
+    answer: <div>
+      <p>The MongoDB user needs:</p>
+      <ul>
+        <li><strong>Read access to the <code>admin</code> database</strong>: where the oplog lives</li>
+        <li><strong>Read access to the <code>config</code> database</strong>: required for sharded clusters</li>
+        <li><strong><code>listDatabases</code> privilege</strong>: to enumerate available databases</li>
+        <li><strong>Cluster-wide <code>find</code> and <code>changeStream</code> privilege actions</strong>: required when using Change Streams (the default mode since MongoDB 4.x)</li>
+      </ul>
+      <p>Always create a dedicated, least-privilege user for Debezium rather than using a superuser account.</p>
+    </div>
+  },
+  {
+    question: "Q5. What causes silent ingestion failures in Debezium, and how can I prevent them?",
+    answer: <div>
+      <p>Silent failures often occur from:</p>
+      <ul>
+        <li><strong>Schema evolution:</strong> A new field or renamed collection that the connector isn't configured to handle</li>
+        <li><strong>Oplog overrun:</strong> The cursor position was lost because MongoDB purged the oplog while the connector was inactive, creating an offset mismatch. The connector may appear to be running while actually not processing any changes</li>
+        <li><strong>Kafka topic mismatches:</strong> Events are emitted to unexpected topics, causing downstream consumers to silently miss data</li>
+      </ul>
+      <p>To prevent them:</p>
+      <ul>
+        <li><strong>Enable heartbeat messages:</strong> Debezium will emit periodic heartbeats even when no changes are captured, so you can detect stalled pipelines. This is especially important when only non-captured collections are being written to, which would otherwise allow the oplog to rotate without the connector noticing</li>
+        <li><strong>Use a schema registry:</strong> for schema evolution to handle new fields and type changes without breaking the pipeline</li>
+        <li><strong>Set monitoring alerts:</strong> on connector lag and restart counts to catch issues before they become data gaps</li>
+      </ul>
+    </div>
+  },
+]} />
+
 <BlogCTA/>

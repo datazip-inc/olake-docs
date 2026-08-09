@@ -1,6 +1,6 @@
 ---
-title: "Create OLake Replication Jobs: Postgres to Iceberg Docker CLI"
-description: "Step-by-step guide to creating OLake replication jobs via Docker CLI. Configure Postgres sources, Iceberg destinations, CDC, partitioning, and scheduling."
+title: "Create OLake Go Replication Jobs: Postgres to Iceberg Docker CLI"
+description: "Step-by-step guide to creating OLake Go replication jobs via Docker CLI. Configure Postgres sources, Iceberg destinations, CDC, partitioning, and scheduling."
 slug: creating-job-olake-docker-cli
 authors: [akshay, vishal]
 tags: [iceberg,replication]
@@ -15,9 +15,9 @@ Data replication has become one of the most essential building blocks in modern 
 
 Today, there's no shortage of options—platforms like Fivetran, Airbyte, Debezium, and even custom-built Flink or Spark pipelines are widely used to handle replication. But each of these comes with trade-offs: infrastructure complexity, cost, or lack of flexibility when you want to adapt replication to your specific needs.
 
-That's where OLake comes in. Instead of forcing you into one way of working, OLake focuses on making replication into Apache Iceberg (and other destinations) straightforward, fast, and adaptable. You can choose between a guided UI experience for simplicity or a Docker CLI flow for automation and DevOps-style control.
+That's where OLake Go comes in. Instead of forcing you into one way of working, OLake Go focuses on making replication into Apache Iceberg (and other destinations) straightforward, fast, and adaptable. You can choose between a guided UI experience for simplicity or a Docker CLI flow for automation and DevOps-style control.
 
-In this blog, we'll walk through how to set up a replication job in OLake, step by step. We'll start with the UI wizard for those who prefer a visual setup, then move on to the CLI-based workflow for teams that like to keep things in code. By the end, you'll have a job that continuously replicates from [Postgres to Apache Iceberg (Glue Catalog)](/iceberg/postgres-to-iceberg-using-glue) with CDC, normalization, filters, partitioning, and scheduling—all running seamlessly.
+In this blog, we'll walk through how to set up a replication job in OLake Go, step by step. We'll start with the UI wizard for those who prefer a visual setup, then move on to the CLI-based workflow for teams that like to keep things in code. By the end, you'll have a job that continuously replicates from [Postgres to Apache Iceberg (Glue Catalog)](/iceberg/postgres-to-iceberg-using-glue) with CDC, normalization, filters, partitioning, and scheduling—all running seamlessly.
 
 ## Two Setup Styles (pick what fits you)
 
@@ -344,7 +344,7 @@ Confirm the data in your destination (S3 / Iceberg):
 
 ### 6) About the `state.json` (Resumable & CDC-friendly)
 
-When a sync starts, OLake writes a `state.json` that tracks progress and CDC offsets (e.g., Postgres LSN).
+When a sync starts, OLake Go writes a `state.json` that tracks progress and CDC offsets (e.g., Postgres LSN).
 This lets you **resume without duplicates** and continue CDC seamlessly.
 
 To resume / keep streaming:
@@ -363,22 +363,106 @@ docker run --pull=always \
 More details: Check out our Postgres connector documentation for state file configuration.
 
 
----
 
-## Quick Q&A
 
-**UI or CLI—how should I choose?**
-If you're new to OLake or prefer a guided setup, start with **UI**.
-If you're automating, versioning configs, or scripting in CI, use **CLI**.
+## FAQs
 
-**Why "Full Refresh + CDC"?**
-You get a baseline snapshot *and* continuous changes—ideal for keeping downstream analytics fresh.
-
-**Can I change partitioning later?**
-
-* **UI**: unselect the stream → save → re-add with updated partitioning/filter/normalization.
-* **CLI**: edit `streams.json` and re-run.
-
----
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. UI or CLI, how should I choose?",
+    answer: <div>
+      <p>If you're new to OLake Go or prefer a guided setup, start with <strong>UI</strong>.</p>
+      <p>If you're automating, versioning configs, or scripting in CI, use <strong>CLI</strong>.</p>
+    </div>
+  },
+  {
+    question: "Q2. Why Full Refresh + CDC?",
+    answer: <div>
+      <p>You get a baseline snapshot <em>and</em> continuous changes, ideal for keeping downstream analytics fresh.</p>
+    </div>
+  },
+  {
+    question: "Q3. Can I change partitioning later?",
+    answer: <div>
+      <ul>
+        <li><strong>UI:</strong> Edit the partitioning on the stream directly. You can delete or update a partition without unselecting and re-adding the stream.</li>
+        <li><strong>CLI:</strong> Edit <code>streams.json</code> and re-run.</li>
+      </ul>
+    </div>
+  },
+  {
+    question: "Q4. What prerequisites do I need before creating a Postgres-to-Iceberg replication job in OLake Go?",
+    answer: <div>
+      <p>You need:</p>
+      <ul>
+        <li><strong>Docker</strong> installed and running</li>
+        <li><strong>PostgreSQL 10 or higher</strong> with WAL level set to <code>logical</code> for CDC</li>
+        <li><strong>An Apache Iceberg catalog</strong> - AWS Glue, Hive, REST/Nessie, JDBC, or Polaris</li>
+        <li><strong>An S3-compatible object store</strong> - AWS S3, MinIO, etc. - for data storage</li>
+      </ul>
+      <p>For CDC specifically, a Postgres replication slot must exist before the connector starts.</p>
+      <p><strong>Important:</strong> Each OLake Go job must have its own <strong>dedicated replication slot and publication</strong>. Never share a replication slot across multiple OLake Go jobs - doing so will result in data loss and inconsistencies.</p>
+      <p>If you cannot modify WAL settings (for example, on a read replica), OLake Go also supports JDBC-based Full Refresh and bookmark-based Incremental modes that work with standard credentials and do not require a replication slot.</p>
+    </div>
+  },
+  {
+    question: "Q5. What sync modes does OLake Go support for Postgres replication?",
+    answer: <div>
+      <p>OLake Go supports four modes for Postgres:</p>
+      <ol>
+        <li><strong>Full Refresh</strong> - Re-loads the entire table on every run. Best for small, infrequently changing tables.</li>
+        <li><strong>Full Refresh + Incremental</strong> - Performs an initial full load of the table, then captures new rows using a cursor column. Which changes get captured depends on the cursor you pick: a monotonically increasing column like <code>id</code> captures inserts only, since updated rows keep their old cursor value and are skipped. For updates to be captured, the cursor must be a column that changes when the row changes, such as <code>updated_at</code>. Deletes are never captured in this mode.</li>
+        <li><strong>Full Refresh + CDC</strong> - Performs an initial full backfill, then switches to real-time WAL-based CDC for all subsequent changes (inserts, updates, deletes). This is the most common production mode.</li>
+        <li><strong>Strict CDC</strong> - Streams only changes from the current WAL position with no initial full load. Use when you only want forward changes from a specific point in time.</li>
+      </ol>
+    </div>
+  },
+  {
+    question: "Q6. What does 'Normalization' do in OLake Go, and should I enable it?",
+    answer: <div>
+      <p><strong>Normalization</strong> in OLake Go automatically expands level-0 nested JSON fields, meaning top-level JSON objects, into individual columns for easier querying. It preserves all data while simplifying structure and reduces the need for complex JSON parsing in downstream SQL queries. Flattening stops at that first level; anything nested deeper remains as a stringified value.</p>
+      <p>Normalization only controls JSON flattening. It does not control whether rows are appended or upserted, that is a separate Append/Upsert mode setting.</p>
+      <p>Enable normalization when your source tables contain nested JSON fields that you want to query as flat columns.</p>
+    </div>
+  },
+  {
+    question: "Q7. How do I monitor sync progress when running OLake Go from the CLI?",
+    answer: <div>
+      <p>OLake Go writes a <code>stats.json</code> file alongside your config files during a sync run. It contains real-time metrics:</p>
+      <pre>
+        <code className="language-json">
+{`{
+  "Estimated Remaining Time": "1642.00",
+  "Memory": "2228 mb",
+  "Running Threads": 21,
+  "Seconds Elapsed": "186.00",
+  "Speed": "76542.20 rps",
+  "Synced Records": 14236868
+}`}
+        </code>
+      </pre>
+      <p>The <code>stats.json</code> file remains available after sync completion for post-run inspection.</p>
+      <p>Detailed logs are also written to:</p>
+      <pre>
+        <code>
+{`/path/to/config/logs/sync_[YYYY-MM-DD]_[HH-MM-SS]/olake.log`}
+        </code>
+      </pre>
+      <p>For the UI, per-run logs are accessible via <strong>Jobs → Job Logs &amp; History → View Logs</strong>.</p>
+    </div>
+  },
+  {
+    question: "Q8. How do I change the filter or normalization settings for an existing stream?",
+    answer: <div>
+      <p>Most stream-level settings can be updated directly without removing and re-adding the stream:</p>
+      <ul>
+        <li><strong>Normalization:</strong> A toggle. Turn it on or off for the stream.</li>
+        <li><strong>Filter:</strong> Edit the filter conditions on the stream directly.</li>
+        <li><strong>Partitioning:</strong> See <em>"Can I change partitioning later?" (Q3)</em> above.</li>
+      </ul>
+      <p>For the CLI, update <code>streams.json</code> directly with the new settings and re-run the sync command.</p>
+    </div>
+  },
+]} />
 
 <BlogCTA/>

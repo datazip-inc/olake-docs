@@ -1,0 +1,65 @@
+---
+title: "OLake Go (v0.7.0 - v0.7.8)"
+---
+
+# OLake Go (v0.7.0 - v0.7.8)
+April 21, 2026 – June 29, 2026
+
+## 🎯 What's New
+
+### Sources
+
+1. **MySQL chunking optimisation -** <br/> Replaced repeated database lookups during chunk discovery with mathematical range splitting — arithmetic progression for numeric primary keys and Unicode-encoded range splitting for string keys — significantly reducing chunk generation time for large tables while ensuring correct collation-aware ordering.
+
+2. **SSH tunnel support for DB2 and MSSQL -** <br/> Added SSH tunnel configuration for the DB2 and MSSQL drivers. DB2 uses a local TCP proxy on `localhost:0` forwarded through the SSH client (`since go_ibm_db` has no Go-level dial hook), while MSSQL routes connections via `go-mssqldb's` `Connector.Dialer` and `HostDialer` interfaces with remote-side DNS resolution.
+
+3. **Schema filtering for PostgreSQL discovery -** <br/> Added an optional schemas config field to restrict the discover operation to user-specified PostgreSQL schemas. When omitted, existing behaviour is preserved and all non-system schemas are discovered.
+
+4. **MSSQL read replica support -** <br/> Added optional `jdbc_url_params` to the MSSQL source so you can target Always On read replicas (for example with read-intent), and updated CDC to use replica-safe paths that avoid primary-only agent/msdb and capture-instance management on secondaries. 
+
+5. **MongoDB delete pre-image capture -** <br/> Added support to capture the full document on delete events using `fullDocumentBeforeChange: "whenAvailable"` for MongoDB 6.0+ clusters with pre-images enabled, falling back to `_id`-only `documentKey` when pre-images are unavailable to preserve existing behaviour.
+
+6. **Optimized chunking strategies for MSSQL -** <br/> Adds faster and more efficient chunk planning for MSSQL full-load syncs. Uses page-level metadata to split tables without scanning them (SQL Server 2012+, requires `VIEW DATABASE STATE`; not supported on Azure SQL DB/MI). Falls back to statistical sampling when the primary strategy is unavailable.
+
+7. **Capture instance management on read replicas -** <br/> Adds an optional `primary_config` (host, port, username, password) to the MSSQL driver so CDC capture instance operations run against the Always On primary while ingestion continues from the read-only secondary. Database, SSL, and JDBC params are inherited from the main connection, and the existing `ssh_config` tunnel is reused for both connections.
+
+8. **Kafka consumer migration to Franz-Go -** <br/> Migrates the Kafka consumer from Segment `Kafka-Go` to `Franz-Go` to improve consumer group handling and to exit cleanly on rebalance behavior to avoid duplicate data writes in destination.
+
+9. **Bulk read path for DB2 backfill and incremental sync -** <br/> Adds a fast bulk-read path using a patched `go_ibm_db` driver that fetches 200 rows per ODBC call via block fetch, replacing the previous one-row-at-a-time `database/sql` scan. Column types are resolved once at setup, and a producer-consumer pipeline overlaps I/O and CPU, significantly reducing bottlenecks on large tables.
+
+### Destinations
+
+1. **Skip equality deletes for CDC inserts post-backfill -** <br/> Equality deletes are now skipped for CDC inserts once the backfill→CDC overlap window is complete, reducing unnecessary write overhead. A new `dedup_inserts` flag on the Iceberg `olake_2pc` table property tracks this — Java sets it to `true` on backfill commit, and Go clears it to `false` after the first successful CDC commit. This applies to both the Arrow and legacy gRPC writers.
+
+2. **2PC integration tests -** <br/> Added integration tests for two-phase commit (2PC) to validate end-to-end behavior and improve reliability of 2PC flows.
+
+3. **Configurable destination column naming strategy -** <br/> Adds a `use_source_column_names` flag in CLI or the **Source Naming Convention** toggle in the UI to control how destination columns are named. By default, it is disabled and column names continue to be normalized (e.g. My-Column → my_column). When enabled, original source column names are preserved as is (e.g. My-Column → My-Column).
+
+## 🔧 Bug Fixes & Stability
+
+1. **Upgrade pgx/v5 to v5.9.2 for security fixes -** <br/> Upgraded `github.com/jackc/pgx/v5` from `v5.7.3` to `v5.9.2` to remediate two security vulnerabilities: a critical memory-safety flaw (`CVE-2026-33816`) that could allow memory corruption and a low-severity SQL injection advisory (`GHSA-j88v-2chj-qfwx`). No existing functionality is affected by this upgrade.
+
+2. **Oracle chunk boundary query optimisation -** <br/> Replaced N+1 sequential database round trips in `splitViaTableIteration` with a single `NTILE`-based query to fetch all chunk boundaries at once, with a fallback to the original loop when table stats are unavailable.
+
+3. **Iceberg positional delete file fix for CDC upserts -** <br/> Compaction was failing when multiple changes for the same `_olake_id` arrived in a single batch, caused by a positional delete file referencing multiple data files. Fixed by creating one positional delete file per data file reference.
+
+4. **PostgreSQL primary key discovery fix via pg_catalog -** <br/> `information_schema.key_column_usage` incorrectly included foreign key columns as primary keys, causing wrong `_olake_id` hashes, missed equality deletes, and duplicate rows in Iceberg on CDC upserts. Replaced with a `pg_catalog`-based query that returns only true primary keys and works correctly for read-only roles on managed databases like RDS, Supabase, and Render.
+
+5. **MySQL CDC charset corruption fix for non-UTF8 columns -** <br/> ENUM and string columns using non-UTF8 charsets (`utf16`, `ucs2`, `latin1`) were silently corrupted during CDC due to blind `[]byte` → `string` casts. Fixed by adding collation-aware decoding using `TableMapEvent.CollationMap()` and `EnumSetCollationMap()`.
+
+6. **MongoDB primary key pinning for deterministic deduplication -** <br/> Previously, all indexed fields were treated as primary keys, so updates to non-unique indexed fields changed the `_olake_id` and broke Iceberg equality deletes, creating duplicate rows. The primary key is now pinned strictly to MongoDB’s guaranteed-unique `_id`, ensuring stable hashes and correct deduplicated upserts.
+
+7. **DB2 driver download fix in integration tests -** <br/> DB2 integration tests now reuse the already-installed `clidriver` by copying it into the workspace, so Docker containers find it locally instead of repeatedly hitting the flaky IBM CDN download path.
+
+8. **Upgrade `golang.org/x/crypto` to v0.52.0 for SSH security fixes -** <br/> Upgraded `golang.org/x/crypto` from `v0.50.0` to `v0.52.0` across all Go modules to patch five SSH-related vulnerabilities reported by `govulncheck` (GO-2026-5013, GO-2026-5017, GO-2026-5018, GO-2026-5019, GO-2026-5020), bringing the workspace onto the latest secure SSH implementation.
+
+9. **Graceful shutdown via SIGINT/SIGTERM-aware root context -** <br/> Wired SIGINT/SIGTERM into the Cobra root context using `signal.NotifyContext`, so CDC, backfill, and destination writers now respect `ctx.Done()` and shut down cleanly on pod eviction, `docker stop`, or Ctrl-C instead of being killed mid-read.
+
+10. **Fixed edge cases in `ReformatValue` and `ReformatBool` -** <br/> Corrected two bugs in value reformatting logic, added unit test coverage for `reformat.go`.
+
+11. **Fixed TOAST column values being nulled on update events -** <br/> Unchanged TOAST columns in PostgreSQL update events were incorrectly emitted as `null` when `pgoutput` omitted the column data for unchanged values. For `REPLICA IDENTITY FULL` tables, the fix now preserves the existing value from the old tuple, preventing data loss on updates.
+
+12. **Fixed false LSN mismatch error during Postgres CDC 2PC recovery -** <br/> A crash after slot acknowledgement but before `state.json` was written caused a non-retryable lsn mismatch error on the next run. Fixed by skipping `validateGlobalState` when `confirmed_flush_lsn` already matches the metadata-committed LSN.
+
+13. **Bumped golang.org/x/net to v0.55.0 -** <br/> Upgraded indirect dependency across all driver modules to remediate 6 HIGH severity CVEs flagged by the `trivy-go` security scanner.
+

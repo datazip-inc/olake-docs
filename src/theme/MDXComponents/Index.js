@@ -5,7 +5,9 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
+import FusionBlogCTA from '@site/src/components/FusionBlogCTA'
 import TestimonialCard from '@site/src/components/TestimonialCard'
+import CollapsibleTip from '@site/src/components/CollapsibleTip';
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
@@ -128,6 +130,7 @@ import StreamsConfiguration from '../../../docs/shared/streams/StreamsConfigurat
 
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
 import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
+import Faq from '../../components/olake/Faq';
 
 
 const MDXComponents = {
@@ -142,7 +145,9 @@ const MDXComponents = {
   TabItem,
   Hr,
   BlogCTA,
+  FusionBlogCTA,
   TestimonialCard,
+  CollapsibleTip,
   DocCardList,
 
   DockerDiscoverMongoDB,
@@ -261,7 +266,8 @@ const MDXComponents = {
   StreamsConfiguration,
 
   OLakePathInfo,
-  StreamSelectionExample
+  StreamSelectionExample,
+  Faq
 };
 
 export default MDXComponents;

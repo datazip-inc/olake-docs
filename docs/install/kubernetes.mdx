@@ -1,15 +1,19 @@
 ---
 title: "Deploy OLake on Kubernetes | CronJob Setup & Management Guide"
 description: Learn to deploy OLake sync tasks as Kubernetes CronJobs with ConfigMaps, PVC, and manual control for automated, recurring data pipelines.
-sidebar_label: Kubernetes Installation
 sidebar_position: 2
 ---
 
-# OLake UI Kubernetes Installation with Helm
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+# OLake Go Kubernetes Installation with Helm
 
 This guide details the process for deploying OLake UI on Kubernetes using the official Helm chart.
 
-## Components
+<details>
+<summary><b>Components & Architecture</b></summary>
 
 - **OLake UI**: Main web interface for job management and configuration
 - **OLake Worker**: Background worker for processing data replication jobs
@@ -20,9 +24,12 @@ This guide details the process for deploying OLake UI on Kubernetes using the of
 
 <div style={{textAlign: 'center'}}>
 
-![OLake Platform in Kubernetes connects users to activity pods, shared storage, and external data sources](/img/kubernetes-helm-architecture.webp)
+![OLake Go Platform in Kubernetes connects users to activity pods, shared storage, and external data sources](/img/kubernetes-helm-architecture.webp)
 
 </div>
+
+</details>
+
 
 ## Prerequisites
 
@@ -36,15 +43,31 @@ Ensure the following requirements are met before proceeding:
     # List available StorageClass
     kubectl get storageclass
     ```
-- **System Requirements**: Minimum and recommended node specification for running Sync jobs
-  - Minimum: 8 vCPU, 16 GB RAM
-  - Recommended: 16 vCPU, 32 GB RAM
-- **Node class recommendations**: The following components should be scheduled on on-demand nodes to minimize disruption:
-  - nfs-server (if enabled)
-  - PostgreSQL (if enabled)
-  - Temporal
-  - OLake workers
-  - OLake UI
+- **System Requirements**: Minimum resources per workload (plan cluster capacity for all components that may run concurrently):
+
+  | Component | RAM | vCPU |
+  | --- | --- | --- |
+  | OLake UI | 4 GB | 2 |
+  | Temporal | 4 GB | 2 |
+  | OLake Worker | 4 GB | 2 |
+  | PostgreSQL | 4 GB | 2 |
+  | Sync pod (OLake Go) | 8 GB | 4 |
+
+:::note
+Sync pod sizing depends on the data volume to be synced. Use [JobID-Based Scheduling](#jobid-based-scheduling) to map jobs to nodes with sufficient capacity.
+:::
+
+<CollapsibleTip summary="Node-class suggestions">
+
+OLake Go will run on mixed capacity, but scheduling the components below on stable, non-preemptible (on-demand) nodes lowers the chance of spot or preemptible churn interrupting core services and data replication jobs:
+
+- nfs-server (if enabled)
+- PostgreSQL (if enabled)
+- Temporal
+- OLake workers
+- OLake UI
+
+</CollapsibleTip>
 
 ## Quick Start
 
@@ -78,6 +101,10 @@ helm install olake olake/olake
 
 </Tabs>
 
+:::note
+The install above does not include **Maintenance** ( Fusion ) module. To add it, run a Helm upgrade with `fusion.enabled=true`. See [Maintenance on Kubernetes](/docs/install/kubernetes-compaction/#upgrading-chart-version) for the command.
+:::
+
 ### 3. Access OLake UI
 
 Forward the UI service port to local machine:
@@ -93,8 +120,65 @@ Open browser and navigate to: `http://localhost:8000`
 - Password: `password`
 
 :::tip
-If OLake is installed with **Ingress enabled**, port-forwarding is not necessary. Access the application using the configured Ingress hostname.
+If OLake Go is installed with **Ingress enabled**, port-forwarding is not necessary. Access the application using the configured Ingress hostname.
 :::
+
+## Upgrading Chart Version
+
+<Tabs>
+<TabItem value="new" label="New (after v0.0.11)">
+
+### Upgrade to Latest Version
+
+```bash
+helm repo update
+helm upgrade olake olake/olake
+```
+
+### Upgrade with New Configuration
+
+```bash
+helm upgrade olake olake/olake -f new-values.yaml
+```
+
+</TabItem>
+
+<TabItem value="es" label="Legacy (with ES)">
+
+Starting from version `0.0.11`, the Helm chart disables Elasticsearch by default. OLake Go now uses PostgreSQL for both metadata and Temporal visibility by default.
+
+:::warning
+
+If installation is currently using Elasticsearch and is upgraded without additional configuration, OLake Go will **lose visibility of existing job task logs and history**, although the **overall system will work as expected** and new logs will appear from next schedule.
+
+To keep the existing job task logs or recover the logs if upgraded to `v0.0.11` by mistake, keep using pre-existing Elasticsearch instance, override the default values.
+
+:::
+
+### Upgrade to Latest Version keeping elasticsearch
+
+```bash
+helm repo update
+helm upgrade olake olake/olake --set elasticsearch.enabled=true
+```
+
+OR, set enabled to true in the `values.yaml` for elasticsearch like:
+
+```yaml
+elasticsearch:
+  enabled: true
+```
+
+### Post-Upgrade: Resume Stopped Syncs
+After upgrading, perform a rollout restart of the olake-workers:
+
+```bash
+kubectl rollout restart deployment/olake-workers
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Configuration Options
 
@@ -138,7 +222,7 @@ helm upgrade olake olake/olake -f values.yaml
 
 ### Ingress Configuration
 
-To expose OLake through an ingress controller, create a custom values file:
+To expose OLake Go through an ingress controller, create a custom values file:
 
 ```yaml
 # values.yaml
@@ -202,7 +286,7 @@ global:
 
 ### Cloud IAM Integration
 
-OLake's activity pods (the pods by which the actual data sync is performed) can be allowed to securely access cloud resources(AWS Glue or S3) using IAM roles.
+OLake Go's activity pods (the pods by which the actual data sync is performed) can be allowed to securely access cloud resources(AWS Glue or S3) using IAM roles.
 
 ```yaml
 global:
@@ -244,7 +328,7 @@ global:
 
 ### Persistent Storage Configuration
 
-The OLake application components (UI, Worker, and Activity Pods) require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata.
+The OLake Go application components (UI, Worker, and Activity Pods) require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata.
 
 For production, a robust, highly-available RWX-capable storage solution such as AWS EFS, GKE Filestore, or Azure Files must be used. This is achieved by disabling the built-in NFS server and providing an existing Kubernetes StorageClass that is backed by a managed storage service. An example for using StorageClass is given below:
 
@@ -272,7 +356,7 @@ External PostgreSQL databases can be used instead of the built-in postgresql dep
 **Requirements:**
 - PostgreSQL 12+ with `btree_gin` extension enabled
 - This can be enabled with `CREATE EXTENSION IF NOT EXISTS btree_gin;`, then run `\dx` to verify if its enabled.
-- Both OLake and Temporal databases created on the PostgreSQL instance
+- Both OLake Go and Temporal databases created on the PostgreSQL instance
 - Network connectivity from Kubernetes cluster to PostgreSQL instance
 
 There are two ways to configure an external PostgreSQL database:
@@ -319,6 +403,50 @@ postgresql:
       ssl_mode: "require"
 ```
 
+### External Temporal Configuration
+
+External Temporal server can be used instead of the built-in Temporal deployment. It is the primary tool for workflow orchestration of olake jobs.
+
+#### Option 1: Using `existingSecret`
+
+Reference a pre-existing Kubernetes Secret containing the Temporal credentials. The secret must be created before installing the chart.
+
+**1. Create the secret:**
+```bash
+kubectl create secret generic external-temporal-secret \
+  --from-literal=TEMPORAL_ADDRESS=<region>.<cloud>.api.temporal.io:7233 \
+  --from-literal=TEMPORAL_API_KEY=<temporal-api-key> \
+  --from-literal=TEMPORAL_ENABLE_TLS=true \
+  --from-literal=TEMPORAL_EXTERNAL=true \
+  --from-literal=TEMPORAL_NAMESPACE=<temporal-namespace> \
+  --from-literal=TEMPORAL_TASK_QUEUE=<temporal-task-queue>
+```
+
+**2. Configure `values.yaml`:**
+```yaml
+temporal:
+  enabled: false
+  external:
+    existingSecret: "external-temporal-secret"
+```
+
+#### Option 2: Using `properties` (Recommended for ArgoCD/GitOps)
+
+Specify connection details directly in `values.yaml`. The chart creates the Kubernetes Secret automatically at template time.
+
+```yaml
+temporal:
+  enabled: false
+  external:
+    properties:
+      TEMPORAL_ADDRESS: "<region>.<cloud>.api.temporal.io:7233"
+      TEMPORAL_API_KEY: "<temporal-api-key>"
+      TEMPORAL_ENABLE_TLS: "true"
+      TEMPORAL_EXTERNAL: "true"
+      TEMPORAL_NAMESPACE: "<temporal-namespace>"
+      TEMPORAL_TASK_QUEUE: "<temporal-task-queue>"
+```
+
 ### Global Environment Variables
 
 Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, and Activity Pods:
@@ -333,34 +461,60 @@ global:
 
 ### Private Container Registry
 
-For deployments in air-gapped environments or clusters without access to public registries (Docker Hub, registry.k8s.io), all container images can be pulled from a private registry by setting `CONTAINER_REGISTRY_BASE` in `global.env`:
+OLake supports pulling all images from a private or self-hosted container registry.
+
+#### Step 1 — Point OLake at the registry
+
+Setting `CONTAINER_REGISTRY_BASE` in `global.env` causes every image reference in the chart to be automatically prefixed with that value — no per-image overrides are needed.
 
 ```yaml
 global:
   env:
-    CONTAINER_REGISTRY_BASE: "1234567890123.dkr.ecr.us-east-1.amazonaws.com/dockerhub_mirror"
+    CONTAINER_REGISTRY_BASE: "registry.example.com/myproject"
 ```
 
-When set, all container images are automatically prefixed with this registry base — no additional `image.repository` overrides are needed. If left unset, images are pulled from Docker Hub (`registry-1.docker.io`) by default.
+The following images must be mirrored to the registry before deploying:
+
+| Image | Source |
+|---|---|
+| `library/busybox:latest` | Docker Hub |
+| `curlimages/curl:8.1.2` | Docker Hub |
+| `olakego/ui:latest`, `olakego/ui-worker:latest` | Docker Hub |
+| `olakego/source-*` (e.g. `olakego/source-mongodb:v0.7.0`) | Docker Hub |
+| `temporalio/auto-setup:1.22.3`, `temporalio/ui:2.16.2` | Docker Hub |
+| `library/postgres:14-alpine` | Docker Hub |
+| `olakego/fusion:latest`, `olakego/fusion-spark:latest` | Docker Hub |
+| `sig-storage/nfs-provisioner:v4.0.8` | `registry.k8s.io` (built-in NFS only) |
+
+#### Step 2 — Authenticate with the registry
+
+If the registry requires credentials, a Kubernetes docker-registry secret must be created:
+
+```bash
+kubectl create secret docker-registry my-registry-secret \
+  --docker-server=registry.example.com \
+  --docker-username=<username> \
+  --docker-password=<password>
+```
+
+The secret is then referenced in `values.yaml`:
+
+```yaml
+global:
+  imagePullSecrets:
+    - name: my-registry-secret
+
+  env:
+    CONTAINER_REGISTRY_BASE: "registry.example.com/myproject"
+```
 
 :::note
-Ensure the following images are mirrored to the private registry (`CONTAINER_REGISTRY_BASE/...`) before deploying:
-
-- `library/busybox:latest`
-- `curlimages/curl:8.1.2`
-- `olakego/ui`, `olakego/ui-worker`
-- `olakego/source-*` (connector images, example `1234567890123.dkr.ecr.us-east-1.amazonaws.com/dockerhub_mirror/olakego/source-mysql:v0.4.0`)
-- `temporalio/auto-setup:1.22.3`, `temporalio/ui:2.16.2`
-- `library/postgres:14-alpine`
-- `sig-storage/nfs-provisioner:v4.0.8` (built-in NFS server; sourced from `registry.k8s.io`, not Docker Hub)
-- When using a private container registry (e.g., Amazon ECR, Google Artifact Registry, Azure ACR), the `olake-ui` pod **requires permissions to list repositories and image tags** in order to discover available source connectors. To grant access, either:
-  - Pass registry credentials as environment variables under `olakeUI.env` (e.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` for ECR), or
-  - Attach the required read-only registry permissions to the Cloud Provider's IAM role referenced by `global.jobServiceAccount`.
+- **Cloud registries:** For cloud-managed registries (Amazon ECR, Google Artifact Registry, Azure ACR), IAM-based authentication (IRSA / Workload Identity) is preferred over static credentials. See [Cloud IAM Integration](#cloud-iam-integration).
 :::
 
 ### Security Context Configuration
 
-OLake supports configuring `securityContext` for all its components to comply with restricted Kubernetes environments.
+OLake Go supports configuring `securityContext` for all its components to comply with restricted Kubernetes environments.
 
 #### General Component Configuration
 The `securityContext` can be set for `olakeUI`, `olakeWorker`, `elasticsearch`, `postgresql` and `temporal` in `values.yaml`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
@@ -377,7 +531,7 @@ olakeWorker:
 
 :::note
 - **PostgreSQL (UID 70 Requirement):**
-The default PostgreSQL image (Alpine-based) used by OLake requires a specific UID/GID to function correctly. If enforcing `runAsNonRoot: true`, the UID, GID, and FSGroup  **must** be set to **70**.
+The default PostgreSQL image (Alpine-based) used by OLake Go requires a specific UID/GID to function correctly. If enforcing `runAsNonRoot: true`, the UID, GID, and FSGroup  **must** be set to **70**.
 ```yaml
 postgresql:
   securityContext:
@@ -387,64 +541,21 @@ postgresql:
     runAsNonRoot: true
 ```
 
-- OLake **doesnot support** setting securityContext for `nfsServer`.
+- OLake Go **doesnot support** setting securityContext for `nfsServer`.
 :::
 
-## Upgrading Chart Version
+### Global Pod Annotations
 
-<Tabs>
-<TabItem value="new" label="New (after v0.0.11)">
+Annotations defined in `global.podAnnotations` are applied to every pod managed by this chart — all Deployment pods (OLake UI, OLake Workers, PostgreSQL, Temporal, Elasticsearch), Fusion Spark optimizer pods (if enabled), and connector activity pods (sync, discover, check) spawned by olake-workers.
 
-### Upgrade to Latest Version
-
-```bash
-helm repo update
-helm upgrade olake olake/olake
-```
-
-### Upgrade with New Configuration
-
-```bash
-helm upgrade olake olake/olake -f new-values.yaml
-```
-
-</TabItem>
-
-<TabItem value="es" label="Legacy (with ES)">
-
-Starting from version `0.0.11`, the Helm chart disables Elasticsearch by default. OLake now uses PostgreSQL for both metadata and Temporal visibility by default.
-
-:::warning
-
-If installation is currently using Elasticsearch and is upgraded without additional configuration, OLake will **lose visibility of existing job task logs and history**, although the **overall system will work as expected** and new logs will appear from next schedule.
-
-To keep the existing job task logs or recover the logs if upgraded to `v0.0.11` by mistake, keep using pre-existing Elasticsearch instance, override the default values.
-
-:::
-
-### Upgrade to Latest Version keeping elasticsearch
-
-```bash
-helm repo update
-helm upgrade olake olake/olake --set elasticsearch.enabled=true
-```
-
-OR, set enabled to true in the `values.yaml` for elasticsearch like:
+This is useful for service mesh sidecar injection or any admission-webhook-based tooling that requires pod-level annotations.
 
 ```yaml
-elasticsearch:
-  enabled: true
+global:
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    linkerd.io/inject: enabled
 ```
-
-### Post-Upgrade: Resume Stopped Syncs
-After upgrading, perform a rollout restart of the olake-workers:
-
-```bash
-kubectl rollout restart deployment/olake-workers
-```
-
-</TabItem>
-</Tabs>
 
 ## Troubleshooting
 
@@ -536,7 +647,7 @@ helm upgrade olake olake/olake
 
 ## Uninstallation
 
-### Remove OLake Installation
+### Remove OLake Go Installation
 
 ```bash
 helm uninstall olake

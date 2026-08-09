@@ -54,7 +54,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
           />
           {/* Company Logo/Name Overlay */}
           <div className="absolute bottom-4 left-4 z-10">
-            <span className="text-white font-bold text-xl drop-shadow-lg">
+            <span className="text-[#193AE6] font-bold text-xl drop-shadow-lg">
               {companyName}
             </span>
           </div>

@@ -1,0 +1,325 @@
+---
+slug: exactly-once-delivery-iceberg
+title: "How OLake Guarantees Exactly-Once Delivery to Apache Iceberg"
+description: "How OLake guarantees exactly-once delivery into Apache Iceberg across Full Refresh, Incremental, and CDC syncs using atomic commits and checkpoint recovery. No duplicates, no data loss, no external coordinator."
+date: 2026-07-13
+authors: [vaibhav]
+tags: [iceberg, cdc, exactly-once, olake, lakehouse, postgres, mysql, mongodb, mssql]
+image: /img/blog/cover/exactly-once-delivery-iceberg-cover.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![How OLake Guarantees Exactly-Once Delivery to Apache Iceberg](/img/blog/cover/exactly-once-delivery-iceberg-cover.webp)
+
+[OLake](https://olake.io/) is an open-source tool for replicating databases into Apache Iceberg and S3 compaitable destinations, built for fast, reliable Full Refresh, Incremental, and CDC syncs. To know more about how OLake Go works read, [deep dive into OLake's architecture](/blog/olake-architecture-deep-dive).
+
+## TL;DR
+
+Every OLake sync makes two writes that are not atomic with each other: the data commit into Apache Iceberg and the checkpoint save to `state.json`. A crash between the two leaves the destination ahead of the checkpoint, which historically meant duplicated rows on retry or, worse, a recovery that misread the gap as corruption.
+
+OLake closes this gap by committing data files and a progress marker to Iceberg in a single atomic operation, then comparing that marker against `state.json` on every restart. If the checkpoint matches, the sync runs normally. If Iceberg is ahead, the data already landed, so OLake skips the work and repairs the checkpoint without re-reading the source or re-writing the destination.
+
+The same comparison runs across Full Refresh, Incremental, and CDC on every driver. No coordinator, no transaction log, no locks: whenever a sync dies, the table ends up correct, with nothing duplicated and nothing missing.
+
+## Why Exactly-Once Delivery Matters for Iceberg Pipelines
+
+OLake transfers data from various sources into an Iceberg table that everything downstream treats as ground truth. And long-running syncs might get interrupted at times due to various reasons such as a pod eviction, a dropped connection, an OOM kill, a manual restart. What actually matters is what happens the next time the sync starts up.
+
+The tricky part is that every sync does two writes that aren't atomic with each other. It commits data into the destination, and separately it updates a checkpoint file that records how far it got, so the next run knows where to resume.
+
+If the process dies between those two writes, the destination is ahead of what the checkpoint knows about. Resume blindly from the checkpoint and it re-reads data that already landed, adding duplicate records. Skip ahead without checking and it misses records that never got written. And because nothing actually failed, no error ever warns you it happened, you only find out when you go digging through the data yourself.
+
+This isn't hypothetical, it's what used to happen. Some cases might be: A writer would commit a chunk to Iceberg and then die before the checkpoint was saved, so the retry reprocessed the same chunk and duplicated rows. On the CDC side, a Postgres slot would get acknowledged, the process would crash before the checkpoint caught up, and recovery would misread the gap as corruption and ask the user to wipe the destination and start over.
+
+Exactly-once delivery fixes both. It adds one check that runs across all sync modes, Full Refresh, Incremental, and CDC, and behaves the same on every driver. Here is how it works.
+
+## How OLake's Exactly-Once Delivery Mechanism Works
+
+Every mode and every driver follows the same underlying pattern. Here is the brief idea before we move into the depth of each mode.
+
+Before a writer commits, OLake generates a **deterministic thread ID** for what it's about to write. It's the stream ID combined with something specific to the mode: the chunk bounds for a backfill, the cursor value for an incremental window (CDC doesn't require deterministic thread id).
+
+When the write happens, the data files and a progress marker are committed to Iceberg together, in one operation. The marker sits in the table's `olake_2pc` property and carries the thread ID plus the mode's progress: committed chunk IDs, a WAL or binlog position, a resume token, or a cursor value.
+
+Only after that commit succeeds, OLake saves the same progress to `state.json`.
+
+The commit and the checkpoint aren't atomic with each other, so a crash can land in between, leaving Iceberg with a marker that `state.json` hasn't caught up to. That's what recovery handles. On the next run, before reading anything from the source, OLake reads each stream's marker back from Iceberg and compares it to `state.json`:
+
+- **`state.json` matches or is ahead:** nothing to recover, the sync runs normally.
+- **Iceberg metadata file is ahead:** that data already committed, so OLake skips it and fixes `state.json` to match, without re-reading the source or re-writing the destination.
+- **No marker:** a fresh stream, nothing to compare.
+
+The middle case is the only one where recovery does real work, and every mode comes down to it. The rest just changes what the marker holds (chunk IDs, a cursor value, or a log position or token) and how many run at once: one table split into chunks, one stream with one cursor, or several CDC streams sharing a single log. The sections below walk through each mode with real payloads.
+
+## The Commit Itself: How OLake Writes to Iceberg
+
+OLake writes to Iceberg through a Java process it runs over gRPC, which owns all catalog operations. A finishing writer sends a `COMMIT` carrying its `MetadataState` payload, and Iceberg applies the new Parquet files and the metadata update as a single atomic operation. There's no window where the data exists without its marker, or the reverse, and that guarantee is exactly what lets recovery trust the comparison above, no external coordinator needed.
+
+Closing a writer also takes a per-stream lock on the Go side, so when several backfill chunks for the same stream finish at once, their metadata commits are serialized instead of racing on the same table. Once the commit lands, OLake writes the same progress into `state.json`, the checkpoint.
+
+## Full Refresh
+
+![Full Refresh commit and recovery flow](/img/blog/2026/7/exactly-once-delivery-full-refresh.webp)
+
+### How It Runs
+
+OLake splits large tables into chunks for parallel processing and fast transfer. Each chunk is assigned a deterministic thread ID built from the stream ID and the chunk's min and max bounds. Because the ID is derived from the chunk's content rather than a random value, the same chunk always gets the same thread ID across runs, this is the foundation of Full Refresh recovery.
+
+Chunks are processed concurrently across the configured thread pool. When a chunk finishes:
+
+- **Commit step:** The writer sends a `COMMIT` to the Iceberg Java server. The Java server atomically writes the chunk's Parquet files and updates the metadata file. Inside the `olake_2pc` property, the `full_refresh_committed_ids` array is extended with the current thread's ID. This is the durable record that this chunk's data is in the table.
+- **Checkpoint step:** The chunk is removed from the `chunks` array inside `state.json`.
+
+### What Happens on Failure
+
+If the process crashes after the commit step but before the checkpoint step, `state.json` still lists that chunk as pending. On the next run, OLake starts fresh from `state.json`, queues the same chunks, and creates writer threads for them. But before doing any reading, each thread checks the `full_refresh_committed_ids` list read from the Iceberg table's metadata file. If the current thread's deterministic ID is already present in that list, the chunk is silently skipped as the data is already in the table.
+
+This way, a crash between the commit step and the checkpoint step causes zero data loss and zero duplication. Chunks that fully committed are never re-processed. Chunks where the commit itself failed are re-processed from scratch.
+
+### Example: Postgres Table public.users
+
+Say OLake splits the table into two chunks. After chunk 1 commits (commit succeeds, process crashes before the checkpoint):
+
+Iceberg metadata file `olake_2pc` property:
+
+```json
+{
+  "full_refresh_committed_ids": [
+    "public.users_min[1]-max[10000]"
+  ]
+}
+```
+
+On the next run, OLake finds unprocessed chunks saved in `state.json` and creates writer for these chunks.
+
+When a writer is created for `[1, 10000]`, it generates the same thread ID `public.users_min[1]-max[10000]`, finds it in `full_refresh_committed_ids`, and skips the chunk. As the thread ID created for the second chunk is not present in the `full_refresh_committed_ids`, only `[10001, 20000]` is read and written.
+
+## CDC
+
+### Global LSN Sources: Postgres and MySQL
+
+![Global LSN CDC recovery flow for Postgres and MySQL](/img/blog/2026/7/exactly-once-delivery-cdc-global-lsn.webp)
+
+Postgres and MySQL represent all change events from a single, ordered stream, the WAL replication slot (Postgres) or binlog (MySQL). Every change, regardless of which table it affects, has a position in this global sequence. OLake reads this stream sequentially: one replication connection covers all selected streams in a single pass.
+
+#### The Commit Sequence
+
+A writer thread is created per selected stream at the start of CDC. As the replication stream is consumed, change records are routed to the appropriate writer. When the sync window closes:
+
+- **Commit Step:** Each stream's writer sends a `COMMIT` to the Iceberg Java server. The commit payload carries the final WAL LSN (Postgres) or binlog file-and-position (MySQL) as the `MetadataState`. The Java server atomically writes data files and embeds this position in the stream's `olake_2pc` table property.
+- **Checkpoint Step:** For Postgres, PostCDC first acknowledges the replication slot to inform the server it can reclaim WAL space, then saves the final LSN to `state.json`. For MySQL, PostCDC saves the final binlog position to `state.json`.
+
+#### What Happens on Failure
+
+Consider this scenario: Stream A commits to Iceberg (Commit succeeds), but the process crashes before PostCDC runs Checkpointing. Now `state.json` still holds the old LSN, but Stream A's Iceberg table has metadata that records the newer LSN it committed.
+
+On the next run, before reading a single event from the replication stream, OLake compares each stream's metadata LSN against the global state LSN:
+
+- If a stream's metadata LSN is ahead of the state LSN, that stream has already committed its data and does not need to re-read those WAL events. It is excluded from the replication session.
+- The remaining streams, those whose metadata LSN matches the state LSN, need to catch up. OLake starts a bounded replication sync: reading from the current state LSN up to the metadata LSN, but only emitting events for those remaining streams. Once this bounded sync completes, all streams are at the same LSN and `state.json` is updated normally.
+
+This guarantees that no stream misses events that fell in the gap between the last committed LSN and where the process crashed.
+
+#### Example: Postgres with Two Streams: public.orders and public.users
+
+`state.json` before CDC sync (global position):
+
+```json
+{
+  "type": "GLOBAL",
+  "global": {
+    "state": { "lsn": "0/1A2B3C4D" },
+    "streams": ["public.orders", "public.users"]
+  }
+}
+```
+
+CDC runs. `public.orders` commits first (Commit phase succeeds). Process crashes before Checkpoint phase runs.
+
+`public.orders` Iceberg metadata file `olake_2pc` after Committing:
+
+```json
+{
+  "id": "public.orders_<thread>",
+  "state": "{\"lsn\":\"0/2B3C4D5E\"}"
+}
+```
+
+`public.users` Iceberg metadata file `olake_2pc` (unchanged - crash happened before its commit):
+
+```json
+{
+  "id": "public.users_<thread>",
+  "state": "{\"lsn\":\"0/1A2B3C4D\"}"
+}
+```
+
+On the next run, OLake reads both metadata files:
+
+- orders metadata LSN `0/2B3C4D5E` > state LSN `0/1A2B3C4D` → skip orders, it is already committed
+- users metadata LSN `0/1A2B3C4D` = state LSN → include users in a bounded replay up to `0/2B3C4D5E`
+
+After the bounded sync and Checkpoint step:
+
+`state.json` updated:
+
+```json
+{
+  "type": "GLOBAL",
+  "global": {
+    "state": { "lsn": "0/2B3C4D5E" },
+    "streams": ["public.orders", "public.users"]
+  }
+}
+```
+
+### Per-Stream LSN Sources: MSSQL and MongoDB
+
+![Per-stream LSN CDC recovery flow for MSSQL and MongoDB](/img/blog/2026/7/exactly-once-delivery-cdc-per-stream-lsn.webp)
+
+MSSQL and MongoDB do not share a global change position across tables. Each collection or table has its own independent LSN or resume token. OLake runs a concurrent change stream per selected stream, each stream is processed independently and in parallel.
+
+Because there is no shared global position, recovery is handled per-stream. At the start of `StreamChanges` for a given stream, the code compares the stream's position stored in `state.json` against the position stored in that stream's Iceberg metadata file. If the metadata position is strictly ahead, meaning Commit Step committed but Checkpoint Step (state save) did not, the stream returns immediately with the metadata position as its result. No CDC log reading occurs. PostCDC then saves this position to `state.json`, completing the recovery in Checkpoint Step. The next regular sync picks up from that position onwards.
+
+#### Example: MongoDB Collection mydb.orders
+
+`state.json` before CDC sync:
+
+```json
+{
+  "type": "STREAM",
+  "streams": [
+    {
+      "stream": "orders",
+      "namespace": "mydb",
+      "state": { "_cdc_resume_token": "826A7B3C..." }
+    }
+  ]
+}
+```
+
+CDC runs. `mydb.orders` commits to Iceberg (Commit Step succeeds). Process crashes before Checkpoint Step.
+
+`mydb.orders` Iceberg metadata file `olake_2pc` after Commit Step:
+
+```json
+{
+  "state": "826B8C4D..."
+}
+```
+
+On the next run, OLake compares state token `826A7B3C...` against metadata token `826B8C4D...`. Metadata is ahead, Commit Step committed but Checkpoint Step did not. The stream returns immediately without reading any change events. PostCDC writes the metadata token to `state.json`.
+
+`state.json` after recovery (Checkpoint Step):
+
+```json
+{
+  "type": "STREAM",
+  "streams": [
+    {
+      "stream": "orders",
+      "namespace": "mydb",
+      "state": { "_cdc_resume_token": "826B8C4D..." }
+    }
+  ]
+}
+```
+
+The next sync then reads change events starting after `826B8C4D...`.
+
+## Incremental
+
+![Incremental sync cursor recovery flow](/img/blog/2026/7/exactly-once-delivery-incremental.webp)
+
+Incremental syncs advance a cursor column (such as `updated_at`) forward with each run. OLake records the maximum cursor value seen at the start of the sync, reads all rows up to that value, and then saves the new high bookmark.
+
+### The Commit Sequence
+
+Before reading any data, OLake captures the maximum cursor value currently in the source table. A deterministic thread ID is generated from the stream ID combined with that maximum cursor value. Because the cursor value is baked into the thread ID, the same sync window always produces the same thread ID.
+
+- **Commit Step:** When the sync completes, the writer commits to Iceberg, carrying the cursor values as the `MetadataState`. The Java server atomically writes data files and embeds the cursor values in the `olake_2pc` table property.
+- **Checkpoint Step:** The new cursor value is written to `state.json`.
+
+### What Happens on Failure
+
+If the process crashes after Commit Step but before Checkpoint Step, `state.json` still holds the old cursor value. On the next run, OLake fetches the same maximum cursor value from the source (since nothing has changed), generates the same thread ID, and creates a writer thread.
+
+Before reading data, it reads `prevMetadataState` from the Iceberg table. If the stored metadata ID matches the current thread ID, confirming this is the same sync window that already committed, OLake reads the cursor values out of the metadata, updates `state.json` to reflect the committed position, and exits without re-reading any source data.
+
+The result: the committed data stays in Iceberg exactly once, and `state.json` is corrected to match, ready for the next run to advance the cursor further.
+
+### Example: Postgres Table public.orders with Cursor updated_at
+
+`state.json` before incremental sync:
+
+```json
+{
+  "type": "STREAM",
+  "streams": [
+    {
+      "stream": "orders",
+      "namespace": "public",
+      "state": { "updated_at": "2024-06-01T00:00:00Z" }
+    }
+  ]
+}
+```
+
+Thread ID is generated from this `state.json` cursor value: `public.orders_2024-06-01T00:00:00Z_...`. Incremental reads all rows with `updated_at > 2024-06-01T00:00:00Z`, stores the max seen value of updated at for that sync `2024-06-01T05:00:00Z` and commits to Iceberg. Commit Step succeeds. Process crashes before Checkpoint Step.
+
+`public.orders` Iceberg metadata file `olake_2pc` after Commit Step:
+
+```json
+{
+  "id": "public.orders_2024-06-01T00:00:00Z_...",
+  "state": "{\"updated_at\":\"2024-06-01T05:00:00Z\"}"
+}
+```
+
+On the next run, OLake reads the cursor from `state.json`, fetches `updated_at` still `2024-06-01T00:00:00Z`. The same thread ID is generated. OLake reads the metadata file, sees the ID matches, reads the cursor out of the metadata, and exits without reading the source again and updates the `state.json` value to `2024-06-01T05:00:00Z`. Checkpoint Step confirms `state.json` is consistent.
+
+`state.json` after recovery:
+
+```json
+{
+  "type": "STREAM",
+  "streams": [
+    {
+      "stream": "orders",
+      "namespace": "public",
+      "state": { "updated_at": "2024-06-01T05:00:00Z" }
+    }
+  ]
+}
+```
+
+## Conclusion
+
+Every mode comes down to one comparison: the position saved in `state.json` against the position committed to Iceberg. When they agree, or `state.json` is ahead, OLake just moves forward. When Iceberg is ahead, a crash landed between the commit and the checkpoint, so OLake reads the committed position back out of the metadata and repairs `state.json`, without re-reading or re-writing any data. No coordinator, no transaction log, no locks, just Iceberg's atomic commit and few comparison logics.
+
+Whenever a sync dies, the table always ends up correct, with nothing duplicated and nothing missing. And that is what really counts: you might be running your dashboards, reports, and models straight off this Iceberg table, and with exactly-once delivery you can trust those numbers are right, every single time.
+
+## FAQ
+
+### Q1. Does OLake guarantee exactly-once delivery to Apache Iceberg?
+
+Yes, across all three sync modes: Full Refresh, Incremental, and CDC. OLake commits data files and a progress marker to Iceberg in a single atomic operation, then compares that marker against its `state.json` checkpoint on every restart, so a crashed sync resumes without duplicating or skipping records.
+
+### Q2. What happens if a sync crashes between the Iceberg commit and the checkpoint save?
+
+On the next run, before reading anything from the source, OLake reads the progress marker back from the Iceberg table's metadata and compares it to `state.json`. If the metadata is ahead, that data already committed, so OLake skips re-reading and re-writing it and just repairs `state.json` to match. If they already agree, the sync runs normally.
+
+### Q3. How does OLake make the data write and progress marker atomic?
+
+OLake writes to Iceberg through a Java process that owns all catalog operations. A finishing writer sends a commit carrying its progress payload, and Iceberg applies the new Parquet files and the metadata update as a single atomic operation. There is no window where the data exists without its marker or the marker without its data, which is what lets recovery trust the comparison against `state.json` after a crash.
+
+### Q4. Does OLake need an external coordinator or transaction log for this?
+
+No. The guarantee comes entirely from Iceberg's atomic commit plus the comparison between the committed metadata and `state.json`. No coordinator, no transaction log, no locks.
+
+### Q5. Does exactly-once delivery work the same way across all sources?
+
+Yes, broadly. Every source runs the same core check, comparing the committed marker in metadata file against `state.json` before doing any work. The differences are in how each sync mode saves and recovers that marker, and [CDC](#cdc) in particular parses and stores it a bit differently across drivers. See the [Full Refresh](#full-refresh), [Incremental](#incremental), and [CDC](#cdc) sections above for the exact mechanics per mode.
+
+<BlogCTA/>

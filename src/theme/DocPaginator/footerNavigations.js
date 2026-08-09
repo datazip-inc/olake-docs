@@ -481,19 +481,15 @@ export const paginationConfig = {
     },
     next: {
       title: 'Release Notes',
-      permalink: '/docs/release/overview'
+      permalink: '/docs/release/ingestion/overview'
     }
   },
 
   // Release Notes
-  '/docs/release/overview': {
+  '/docs/release/ingestion/overview': {
     previous: {
       title: 'Channels',
       permalink: '/docs/community/channels'
-    },
-    next: {
-      title: 'OLake v0.2.8',
-      permalink: '/docs/release/v0.2.8'
     }
   }
 }
