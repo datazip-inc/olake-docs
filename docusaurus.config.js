@@ -1,4 +1,47 @@
 const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriority-rehype-plugin')
+const fs = require('fs')
+const path = require('path')
+
+/**
+ * Latest OLake Go release, derived at build time from the release notes in
+ * docs/release/ingestion. Those notes are the page the landing-page bulletin
+ * card links to, so deriving from them keeps the label and the link in sync
+ * automatically instead of hardcoding a version that goes stale.
+ *
+ * A note's title may cover a range ("OLake Go (v0.8.0 - v0.8.2)"), so the
+ * displayed version is the LAST version mentioned in the newest note's title,
+ * falling back to the filename.
+ */
+function getLatestOlakeRelease() {
+  const dir = path.join(__dirname, 'docs/release/ingestion')
+  const toParts = (v) => v.split('.').map(Number)
+  const files = fs
+    .readdirSync(dir)
+    .map((f) => f.match(/^v(\d+\.\d+\.\d+)\.mdx$/))
+    .filter(Boolean)
+    .map((m) => ({ file: `v${m[1]}`, version: m[1] }))
+    .sort((a, b) => {
+      const [A, B] = [toParts(a.version), toParts(b.version)]
+      return A[0] - B[0] || A[1] - B[1] || A[2] - B[2]
+    })
+
+  if (!files.length) return { version: '', label: 'OLake', docPath: '/docs/release/ingestion' }
+
+  const newest = files[files.length - 1]
+  let version = newest.version
+  try {
+    const title = fs
+      .readFileSync(path.join(dir, `${newest.file}.mdx`), 'utf8')
+      .match(/^title:\s*"?([^"\n]+)"?/m)
+    const mentioned = title && title[1].match(/v(\d+\.\d+\.\d+)/g)
+    if (mentioned && mentioned.length) version = mentioned[mentioned.length - 1].slice(1)
+  } catch {
+    /* fall back to the filename version */
+  }
+  return { version, label: `OLake v${version}`, docPath: `/docs/release/ingestion/${newest.file}` }
+}
+
+const latestOlakeRelease = getLatestOlakeRelease()
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 /** @type {import('@docusaurus/types').Config} */
@@ -7,6 +50,13 @@ const config = {
   tagline:
     'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
   favicon: 'img/logo/olake-blue.svg',
+
+  // Exposed to components via useDocusaurusContext().siteConfig.customFields
+  customFields: {
+    latestOlakeVersion: latestOlakeRelease.version,
+    latestOlakeReleaseLabel: latestOlakeRelease.label,
+    latestOlakeReleasePath: latestOlakeRelease.docPath
+  },
 
   // Set the production url of your site here
   url: 'https://olake.io',
@@ -38,7 +88,11 @@ const config = {
   },
 
   // Client modules for handling client-side functionality
-  clientModules: [require.resolve('./src/clientModules/hashScroll.ts')],
+  clientModules: [
+    require.resolve('./src/clientModules/hashScroll.ts'),
+    require.resolve('./src/clientModules/deferredGtag.ts'),
+    require.resolve('./src/clientModules/deferredReo.ts')
+  ],
 
   presets: [
     [
@@ -51,6 +105,10 @@ const config = {
           customCss: './src/css/custom.css'
         },
         blog: false,
+
+        // GA is loaded by src/clientModules/deferredGtag.ts instead of the preset, so the
+        // 166KB script stays off the critical path. Re-enabling this would double-load it.
+        gtag: undefined,
 
         sitemap: {
           lastmod: 'date',
@@ -92,20 +150,80 @@ const config = {
     }
   ],
 
+  // Site-wide, non-per-page tags only. og:*/twitter:card/twitter:title/twitter:description/
+  // twitter:image are owned per-page by src/theme/DocItem, BlogPostPage, BlogListPage and
+  // src/pages/* — do not duplicate them here.
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: { name: 'msvalidate.01', content: 'C36AD97FE1CEDCD4041338A807D6BC4C' }
+    },
+    {
+      tagName: 'meta',
+      attributes: { name: 'twitter:site', content: '@_olake' }
+    },
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'robots',
+        content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large'
+      }
+    },
+    // Critical resource preloads for mobile performance
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/img/logo/olake-blue-with-text.svg',
+        as: 'image',
+        type: 'image/svg+xml',
+        fetchpriority: 'high'
+      }
+    },
+    // No preload for /img/site/hero-section.svg — it belonged to the v1 homepage and is
+    // no longer rendered by any routed page, so preloading it cost 22KB at high priority
+    // on every page for nothing. It is still referenced by JSON-LD in src/data/landing/seo.ts.
+    // Preconnect to Google Fonts
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.googleapis.com'
+      }
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossorigin: 'anonymous'
+      }
+    },
+    // DNS prefetch for HubSpot forms
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'dns-prefetch',
+        href: 'https://js.hsforms.net'
+      }
+    },
+    // OpenSearch
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'search',
+        type: 'application/opensearchdescription+xml',
+        title: 'OLake Documentation',
+        href: '/opensearch.xml'
+      }
+    }
+  ],
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
       image: 'img/logo/olake-blue-with-text.webp',
-
-      announcementBar: {
-        id: 'olake-fusion-launch',
-        content:
-          '<style>.fusion-banner-link:hover { color: #cbd5e1 !important; }</style><span style="letter-spacing: 0.04em;">🚀 <strong>OLake Fusion is now live!</strong> Automate your Iceberg Table Maintenance. <a href="/docs/fusion/getting-started/overview/" class="text-white underline transition-colors duration-200 fusion-banner-link" aria-label="Check out OLake Fusion" title="Check out OLake Fusion">Check it out here<span class="sr-only">Check out OLake Fusion</span></a>. 🎉</span>',
-        backgroundColor: '#193ae6',
-        textColor: 'white',
-        isCloseable: true
-      },
 
       docs: {
         sidebar: {
@@ -132,16 +250,16 @@ const config = {
               {
                 label: 'OLake Go',
                 to: '/docs',
-                activeBaseRegex: '^/docs(?!/fusion)',
+                activeBaseRegex: '^/docs(?!/fusion)'
               },
               {
                 label: 'OLake Fusion',
                 to: '/docs/fusion/getting-started/overview',
-                activeBaseRegex: '^/docs/fusion',
+                activeBaseRegex: '^/docs/fusion'
               }
             ]
           },
-          { to: '/ai-lake', label: 'Pricing', position: 'left' },
+          { to: '/contact', label: 'Pricing', position: 'left' },
           { to: '/blog', label: 'Blogs', position: 'left' },
 
           {
@@ -209,253 +327,12 @@ const config = {
           },
           {
             label: 'Talk to us',
-            href: '/#olake-form-product',
+            href: '/contact',
             position: 'right',
             className: 'dev-portal-signup dev-portal-link'
           }
         ]
       },
-
-      metadata: [
-        // { name: 'robots', content: 'noindex, nofollow' },
-        { name: 'OLake', content: 'ETL tool, ELT tool, open source' },
-        { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:site', content: '@olake.io' },
-        { name: 'msvalidate.01', content: 'C36AD97FE1CEDCD4041338A807D6BC4C' }
-      ],
-      headTags: [
-        // Critical resource preloads for mobile performance
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preload',
-            href: '/img/logo/olake-blue-with-text.svg',
-            as: 'image',
-            type: 'image/svg+xml',
-            fetchpriority: 'high'
-          }
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preload',
-            href: '/img/site/hero-section.svg',
-            as: 'image',
-            type: 'image/svg+xml',
-            fetchpriority: 'high'
-          }
-        },
-        // Font optimization - preconnect to Google Fonts
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preconnect',
-            href: 'https://fonts.googleapis.com'
-          }
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preconnect',
-            href: 'https://fonts.gstatic.com',
-            crossorigin: 'anonymous'
-          }
-        },
-        // Minimal font optimization - only DNS prefetch for performance
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'dns-prefetch',
-            href: 'https://fonts.googleapis.com'
-          }
-        },
-        // DNS prefetch for external resources
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'dns-prefetch',
-            href: 'https://js.hsforms.net'
-          }
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'dns-prefetch',
-            href: 'https://www.google-analytics.com'
-          }
-        },
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'dns-prefetch',
-            href: 'https://www.googletagmanager.com'
-          }
-        },
-        // Preconnect to critical domains
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'preconnect',
-            href: 'https://olake.io',
-            crossorigin: 'anonymous'
-          }
-        },
-        // Canonical URL - Removed hardcoded canonical tag
-        // Docusaurus automatically generates proper canonical URLs for each page
-        // OpenSearch meta tags
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'search',
-            type: 'application/opensearchdescription+xml',
-            title: 'OLake Documentation',
-            href: '/opensearch.xml'
-          }
-        },
-        // Enhanced Open Graph Meta Tags
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:type',
-            content: 'website'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:title',
-            content: 'OLake - The Open Lakehouse Platform'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:description',
-            content:
-              'Fastest way to replicate MongoDB data in Apache Iceberg. Open-source data lakehouse platform for modern data engineering.'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:image',
-            content: 'https://olake.io/img/logo/olake-blue.webp'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:site_name',
-            content: 'OLake'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:locale',
-            content: 'en_US'
-          }
-        },
-        // Enhanced Open Graph Meta Tags
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:image:type',
-            content: 'image/webp'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:image:width',
-            content: '1200'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            property: 'og:image:height',
-            content: '630'
-          }
-        },
-        // Enhanced Twitter Meta Tags
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:creator',
-            content: '@_olake'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:title',
-            content: 'OLake - The Open Lakehouse Platform'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:description',
-            content:
-              'OLake is the fastest data replication platform, built to stream operational databases into Apache Iceberg in real time with full CDC, incremental sync, and zero-lag reliability.'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:image',
-            content: 'https://olake.io/img/logo/olake-blue.webp'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:image:alt',
-            content: 'OLake - The Open Lakehouse Platform'
-          }
-        },
-        // Enhanced Twitter Meta Tags
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:label1',
-            content: 'Written by'
-          }
-        },
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'twitter:data1',
-            content: 'OLake Team'
-          }
-        },
-        // Enhanced Bot Directives
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'robots',
-            content: 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large'
-          }
-        },
-        // Bing Webmaster Verification
-        {
-          tagName: 'meta',
-          attributes: {
-            name: 'msvalidate.01',
-            content: 'C36AD97FE1CEDCD4041338A807D6BC4C'
-          }
-        },
-        // Enhanced Favicon Support
-        {
-          tagName: 'link',
-          attributes: {
-            rel: 'icon',
-            type: 'image/svg+xml',
-            href: '/img/logo/olake-blue.svg'
-          }
-        }
-      ],
 
       colorMode: {
         defaultMode: 'light', // dark or light
@@ -642,29 +519,29 @@ const config = {
           // Features page replaced by intro (intro.mdx has slug: / so it lives at /docs/)
           {
             to: '/docs/',
-            from: '/docs/features',
+            from: '/docs/features'
           },
           // Fusion release notes moved to fusion/release/maintenance
           {
             to: '/docs/fusion/release/maintenance/overview',
-            from: '/docs/release/maintenance/overview',
+            from: '/docs/release/maintenance/overview'
           },
           {
             to: '/docs/fusion/release/maintenance/v0.1.0',
-            from: '/docs/release/maintenance/v0.1.0',
+            from: '/docs/release/maintenance/v0.1.0'
           },
           // Fusion maintenance pages moved from iceberg-maintenance to fusion/maintenance
           {
             to: '/docs/fusion/maintenance/catalogs',
-            from: '/docs/iceberg-maintenance/catalogs',
+            from: '/docs/iceberg-maintenance/catalogs'
           },
           {
             to: '/docs/fusion/maintenance/metrics',
-            from: '/docs/iceberg-maintenance/metrics',
+            from: '/docs/iceberg-maintenance/metrics'
           },
           {
             to: '/docs/fusion/maintenance/runs-and-logs',
-            from: '/docs/iceberg-maintenance/runs-and-logs',
+            from: '/docs/iceberg-maintenance/runs-and-logs'
           },
           // Fusion overview moved from iceberg-maintenance to fusion/getting-started
           {
@@ -673,24 +550,24 @@ const config = {
               '/docs/iceberg-maintenance/overview',
               '/docs/iceberg-maintenance/compaction/overview',
               '/docs/iceberg-maintenance/optimisation/overview',
-              '/docs/iceberg-maintenance/optimization/overview',
-            ],
+              '/docs/iceberg-maintenance/optimization/overview'
+            ]
           },
           {
             to: '/docs/fusion/compaction/configuration',
             from: [
               '/docs/iceberg-maintenance/compaction/configuration',
               '/docs/iceberg-maintenance/optimisation/configuration',
-              '/docs/iceberg-maintenance/optimization/configuration',
-            ],
+              '/docs/iceberg-maintenance/optimization/configuration'
+            ]
           },
           {
             to: '/docs/fusion/getting-started/configure-first-compaction',
             from: [
               '/docs/getting-started/configure-first-compaction',
               '/docs/getting-started/configure-first-optimisation',
-              '/docs/getting-started/configure-first-optimization',
-            ],
+              '/docs/getting-started/configure-first-optimization'
+            ]
           },
           {
             to: '/docs/benchmarks/ingestion',
@@ -698,7 +575,11 @@ const config = {
           },
           {
             to: '/docs/fusion/getting-started/compaction',
-            from: ['/docs/benchmarks/compaction', '/docs/benchmarks/optimisation', '/docs/benchmarks/optimization'],
+            from: [
+              '/docs/benchmarks/compaction',
+              '/docs/benchmarks/optimisation',
+              '/docs/benchmarks/optimization'
+            ]
           },
           {
             to: '/docs/install/kubernetes',
@@ -709,8 +590,8 @@ const config = {
             from: [
               '/docs/install/kubernetes-compaction',
               '/docs/install/kubernetes-optimisation',
-              '/docs/install/kubernetes-optimization',
-            ],
+              '/docs/install/kubernetes-optimization'
+            ]
           },
           // Legacy release-note URLs -> ingestion release notes
           {
