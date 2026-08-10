@@ -65,7 +65,7 @@ const FIELDS = [
     authTypes: [AUTH_M2M],
     parameter: 'oauth2_uri',
     required: true,
-    sample: 'https://auth.server.com/oauth/token',
+    sample: 'https://1234567890123456.1.gcp.databricks.com/oidc/v1/token',
     description:
       'URL of the REST catalog\u2019s OAuth2 token endpoint. OLake Go uses this with REST Credential to request an access token during OAuth2 client-credentials authentication.',
   },
