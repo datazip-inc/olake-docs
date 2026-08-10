@@ -1,10 +1,11 @@
 // data/query-engines/clickhouse.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const clickhouse: QueryEngine = {
+export const clickhouse: QueryEngine = createVersionedEngine({
   id: 'clickhouse',
-  name: 'ClickHouse v25.4',
-  description: 'Rapidly evolving OLAP database with experimental Iceberg read support, time travel, REST catalogs, and comprehensive write capabilities planned for 2025',
+  name: 'ClickHouse v25.9',
+  description: 'Rapidly evolving OLAP database with Iceberg read+write support (v25.7+), time travel (v25.4+), REST catalogs, and basic DML (INSERT/ALTER DELETE/ALTER UPDATE) via LTS v25.8',
   category: 'general-purpose',
   website: 'https://clickhouse.com/',
   documentation: 'https://clickhouse.com/docs/en/engines/table-engines/integrations/iceberg',
@@ -29,25 +30,25 @@ export const clickhouse: QueryEngine = {
     },
     readWrite: {
       support: 'partial',
-      details: 'Read-only: ENGINE=Iceberg tables and icebergS3()/icebergCluster() functions; full SQL on Parquet files. Writes/compaction scheduled Q3 2025',
+      details: 'Full reads via ENGINE=Iceberg and icebergS3()/icebergCluster() functions. Write support added v25.7 (INSERT INTO existing tables), CREATE TABLE and DROP TABLE added v25.8 (LTS). No compaction yet',
       externalLinks: [
         {
-          label: 'ClickHouse Release 25.04',
-          url: 'https://clickhouse.com/blog/clickhouse-release-25-04'
+          label: 'ClickHouse Release 25.08 (LTS)',
+          url: 'https://clickhouse.com/blog/clickhouse-release-25-08'
         },
         {
-          label: 'Iceberg Write Support Tracking',
-          url: 'https://github.com/ClickHouse/ClickHouse/issues/71407'
+          label: 'ClickHouse 2025 Year in Review',
+          url: 'https://clickhouse.com/blog/clickhouse-2025-roundup'
         }
       ]
     },
     dml: {
-      support: 'none',
-      details: 'Reading of position & equality deletes supported since 24.12; queries merge delete files on-the-fly (MoR). No DELETE/UPDATE/MERGE writers until write support lands',
+      support: 'partial',
+      details: 'INSERT INTO existing tables (v25.7+), CREATE TABLE (v25.8+), ALTER TABLE DELETE (positional+equality deletes, v25.8+), ALTER TABLE UPDATE (v25.9+). MERGE not yet supported',
       externalLinks: [
         {
-          label: 'Delete Files Support',
-          url: 'https://clickhouse.com/blog/clickhouse-release-24-12'
+          label: 'ClickHouse Release 25.08',
+          url: 'https://clickhouse.com/blog/clickhouse-release-25-08'
         },
         {
           label: 'DML Write Support Tracking',
@@ -133,6 +134,65 @@ SETTINGS iceberg_timestamp_ms = 1640995200000;
 
 -- Use cluster function for distributed reads
 SELECT * FROM icebergCluster('cluster', 's3://bucket/warehouse/table/');`,
+  versions: {
+    v2: {
+      features: {
+        catalogs: {
+          support: 'full',
+          details: 'REST catalog (icebergS3 function with storage_catalog_type), AWS Glue, Polaris (partial), Unity Catalog (partial) supported via icebergS3/icebergLocal table functions and experimental DataLakeCatalog engine',
+          externalLinks: [{ label: 'Iceberg Engine Documentation', url: 'https://clickhouse.com/docs/en/engines/table-engines/integrations/iceberg' }]
+        },
+        readWrite: {
+          support: 'partial',
+          details: 'Full reads via icebergS3/icebergAzure/icebergLocal table functions and ENGINE=Iceberg. INSERT INTO existing tables (v25.7+), CREATE TABLE and DROP TABLE (v25.8+, LTS). No compaction',
+          externalLinks: [{ label: 'ClickHouse Release 25.08', url: 'https://clickhouse.com/blog/clickhouse-release-25-08' }]
+        },
+        dml: {
+          support: 'partial',
+          details: 'INSERT INTO (v25.7+), ALTER TABLE DELETE with positional and equality deletes (v25.8+), ALTER TABLE UPDATE (v25.9+). No MERGE support. Applies to V2 tables',
+          externalLinks: [{ label: 'ClickHouse Release 25.08', url: 'https://clickhouse.com/blog/clickhouse-release-25-08' }]
+        },
+        morCow: {
+          support: 'partial',
+          details: 'Reads CoW and MoR (position+equality deletes) since v24.12; writes position/equality delete files for ALTER TABLE DELETE (v25.8+); no compaction',
+          externalLinks: [{ label: 'ClickHouse Release 25.08', url: 'https://clickhouse.com/blog/clickhouse-release-25-08' }]
+        },
+        streaming: {
+          support: 'none',
+          details: 'No native streaming ingestion; users poll Iceberg or ingest with ClickHouse Kafka engine'
+        },
+        formatV3: {
+          support: 'none',
+          details: 'Iceberg Format V3 features are not applicable to V2 tables.'
+        },
+        timeTravel: {
+          support: 'full',
+          details: 'Time travel via SET iceberg_timestamp_ms=<epoch> or iceberg_snapshot_id since v25.4; partition pruning via use_iceberg_partition_pruning=1',
+          externalLinks: [{ label: 'Time Travel in 25.4', url: 'https://clickhouse.com/blog/clickhouse-release-25-04' }]
+        },
+        security: {
+          support: 'partial',
+          details: 'Relies on object-store credentials (AWS_ACCESS_KEY_ID, S3 V4 tokens) or catalog credential vending; ClickHouse RBAC controls database/table access; no column-masking yet'
+        }
+      },
+      score: 16,
+      description: 'ClickHouse v25.8+ (LTS) supports Iceberg V2 read+write with INSERT INTO, CREATE/DROP TABLE, ALTER TABLE DELETE/UPDATE, time travel, and REST catalog support; MERGE and V3 not yet available'
+    },
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'ClickHouse only supports reading Iceberg V1 and V2 via table functions; V3 is not yet supported' },
+        readWrite: { support: 'none', details: 'ClickHouse currently supports reading Iceberg V1 and V2 only; V3 support is not yet available' },
+        dml: { support: 'none', details: 'Read-only integration for V2 only; V3 not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not supported; only V1 and V2 tables readable' },
+        streaming: { support: 'none', details: 'No streaming support for any version' },
+        formatV3: { support: 'none', details: 'Iceberg Format V3 is not yet supported in ClickHouse; V3 reader/writer planned for a future release' },
+        timeTravel: { support: 'none', details: 'Time travel only available for V1 and V2 tables; V3 not supported' },
+        security: { support: 'none', details: 'V3 not supported; security features are V2 only' }
+      },
+      score: 0,
+      description: 'ClickHouse does not yet support Iceberg V3 format tables. V3 reader/writer planned for a future release'
+    }
+  },
   bestPractices: [
     'Use ClickHouse v25.4+ for time travel and metadata caching capabilities',
     'Leverage REST catalog support (24.12+) for integration with Nessie, Polaris/Unity, and Glue',
@@ -155,4 +215,4 @@ SELECT * FROM icebergCluster('cluster', 's3://bucket/warehouse/table/');`,
     'Use materialized views for query acceleration on frequently accessed data',
     'Monitor GitHub issues for rapid feature development and breaking changes'
   ]
-};
+});
