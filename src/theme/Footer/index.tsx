@@ -31,7 +31,7 @@ const Footer: React.FC = () => {
     { label: 'Blogs', href: '/blog' },
     { label: 'Docs', href: '/docs' },
     { label: 'Search', href: '/search' },
-    { label: 'Community Slack Archive', href: 'https://datazip-inc.github.io/olake-slack-archive/' }
+    { label: 'Community Slack Archive', href: '/slack-archive' }
   ]
 
   const topReadLinks: LinkItem[] = [
