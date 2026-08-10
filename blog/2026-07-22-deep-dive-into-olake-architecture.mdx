@@ -16,7 +16,7 @@ import BlogCTA from '@site/src/components/BlogCTA';
 ## TL;DR
 
 - **OLake Go** is an open-source, single-binary ingestion engine that replicates PostgreSQL, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka, and S3 into Apache Iceberg (or Parquet on object storage), with no Spark, Flink, Kafka, or Debezium in the pipeline.
-- One **sync engine** drives all eight sources. A source is just a small driver interface; scheduling, retries, state, and exactly-once are written once and shared.
+- One **sync engine** drives all eight sources. A source is just a small driver interface; parallel execution, retries, state tracking, and exactly-once delivery are all built once in the shared engine, not per source.
 - **Full loads are chunked**, which makes them run in parallel and resume after a crash by re-running only the unfinished chunks.
 - **CDC** tails each database's native log (Postgres WAL, MySQL binlog, MongoDB change streams, SQL Server CDC tables) and hands off from the initial load without losing or duplicating rows.
 - **Progress lives in `state.json` and in the Iceberg table itself**, so recovering from a crash means rereading a file, not rebuilding a running server.
@@ -42,34 +42,18 @@ OLake Go's architecture is a set of specific answers to those problems, and this
 At the highest level, a sync is three stages connected by an in-process pipeline:
 
 1. A **driver** reads from the source. There is one driver per source type, and each knows how to discover schemas, split tables into chunks, and tail its database's change log.
-2. The **sync engine** orchestrates: it decides what each stream needs (full load, incremental catch-up, or CDC), schedules chunks across parallel workers, enforces connection limits against the source, retries failures, and tracks state.
+2. The **sync engine** orchestrates: it decides what each stream needs (full load, incremental catch-up, or CDC), fans chunks out across parallel workers, enforces connection limits against the source, retries failures, and tracks state.
 3. **Writers** land the data. Each reader gets a buffered writer thread, and the destination (Iceberg or Parquet) turns batches of records into files and atomic commits.
 
-<div style={{ margin: '2.5rem 0' }}>
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
 
-```mermaid
-flowchart LR
-    SRC["Sources<br/>PostgreSQL · MySQL · MongoDB<br/>Oracle · SQL Server · DB2<br/>Kafka · S3"]
-    SRC -- read --> ENG
-    subgraph ENG["Sync engine"]
-        direction TB
-        E1["classify streams<br/>full load / incremental / CDC"]
-        E2["plan and schedule<br/>split chunks, pin position,<br/>bounded workers + retries"]
-        E3["convert source types<br/>to OLake Go types,<br/>stamp metadata columns"]
-        E4["track state,<br/>skip already-committed work"]
-        E1 --> E2 --> E3 --> E4
-    end
-    ENG -- records --> WRP
-    subgraph WRP["Writers"]
-        direction TB
-        W1["buffer,<br/>flatten / normalize"]
-        W2["evolve schema,<br/>map to destination types"]
-        W3["atomic commit"]
-        W1 --> W2 --> W3
-    end
-    WRP --> ICE["Apache Iceberg<br/>Glue / Hive / JDBC / REST"]
-    WRP --> PQ["Parquet<br/>S3-compatible storage"]
-```
+<img
+  src="/img/blog/2026/8/olake-pipeline-overview.webp"
+  alt="OLake Go pipeline: eight sources read into the sync engine, which classifies, plans, converts types, and tracks state, then hands records to writers that buffer, evolve schema, and commit atomically to Apache Iceberg or Parquet"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '100%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
 
 </div>
 
@@ -87,7 +71,9 @@ docker run -v "$PWD:/mnt/config" olakego/source-postgres:latest sync \
 
 While it runs, OLake Go writes a `stats.json` every two seconds with active writer threads, records synced, throughput, memory usage, and an estimated time remaining.
 
-Nothing persists in the process between runs. A sync loads `state.json`, does its work, writes the updated state back, and exits, so there is no always-on server holding pipeline progress in memory. Everything needed to resume lives in `state.json` and the destination table, which is what makes recovering from a crash a matter of rereading a file rather than rebuilding a server's internal state. The rest of this blog follows a record through the pipeline, starting with the sources.
+Nothing persists in the process between runs. A sync loads `state.json`, does its work, writes the updated state back, and exits, so there is no always-on server holding pipeline progress in memory. Everything needed to resume (chunk lists, cursor bookmarks, log positions) lives in `state.json` and the destination table itself, which is what makes recovering from a crash a matter of rereading a file rather than rebuilding a server's internal state. Exactly what each mode writes into that file is covered in depth in [State management](#state-management).
+
+The rest of this blog follows a record through the pipeline, starting with the sources.
 
 ## The sources
 
@@ -108,7 +94,7 @@ Discovery is the one phase where the differences between sources show up most cl
 - **S3** infers the schema from the first file of each stream, using the configured format parser (CSV, JSON, or Parquet).
 - **Kafka** samples recent messages from every partition of a topic and derives the schema from their decoded payloads.
 
-Discovery is its own phase, run by the `discover` command, not something every sync repeats. Each stream is inspected independently and some inspections are heavy (MongoDB samples thousands of documents per collection), so `discover` schedules the per-stream schema work across a worker group whose size is capped by `--max-discover-threads`, 50 by default:
+Discovery is its own phase, run by the `discover` command, not something every sync repeats. Each stream is inspected independently and some inspections are heavy (MongoDB samples thousands of documents per collection), so `discover` runs the per-stream schema work across a worker group whose size is capped by `--max-discover-threads`, 50 by default:
 
 ```go
 // drivers/abstract/abstract.go (trimmed)
@@ -132,6 +118,18 @@ A thousand tables inspect in seconds rather than serially, and the merged result
 A later `sync` trusts that file for which streams to read and does not repeat the catalog inspection. Schema changes are still picked up, just by a different path: a new column or a widened type arrives in the data during the sync itself, and the Iceberg table is evolved to match on the fly, without anyone re-running `discover` (covered in [schema and type handling](#schema-and-type-handling)).
 
 ### What a source driver actually is
+
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
+
+<img
+  src="/img/blog/2026/8/olake-stream-driver-engine.webp"
+  alt="What a stream is and what a driver implements versus the shared sync engine"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '55%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
+
+</div>
 
 A driver in OLake Go is a deliberately small component. It implements one Go interface, and nothing else:
 
@@ -159,7 +157,7 @@ type DriverInterface interface {
 
 A driver only answers source-specific questions: what streams exist, how to split a table into [chunks](#chunking-and-parallel-full-loads), how to read one chunk, how to tail the change log.
 
-Everything else lives in the shared **sync engine**: scheduling chunks across workers, retrying failures, managing writer lifecycles, tracking state, and coordinating the handoff from full load to CDC. That split is what keeps eight sources maintainable in one codebase, and it is why a new source immediately inherits parallelism, resumability, exactly-once delivery, and every destination the moment its driver compiles.
+Everything else lives in the shared **sync engine**: running chunks across workers, retrying failures, managing writer lifecycles, tracking state, and coordinating the handoff from full load to CDC. That split is what keeps eight sources maintainable in one codebase, and it is why a new source immediately inherits parallelism, resumability, exactly-once delivery, and every destination the moment its driver compiles.
 
 Which of these driver methods the engine actually calls for a given stream depends on one setting: the stream's [sync mode](#sync-modes).
 
@@ -211,6 +209,8 @@ The `_op_type` value tells the destination how to treat each record:
 | `u` | CDC and incremental | New version of an existing row |
 | `d` | CDC | Delete captured from the change log |
 
+Incremental only ever emits `u`, for both new and changed rows; it never distinguishes an insert from an update, and it has no `d` at all. A row deleted from the source doesn't trigger anything, it just stops showing up in future reads and stays in the destination indefinitely. CDC doesn't have this gap: a delete is a real event on its change log.
+
 A sync run therefore starts with a simple classification: every selected stream lands in one of three buckets, full load, incremental, or CDC, and each bucket follows its own execution path through [the orchestrator](#the-orchestrator).
 
 ## The orchestrator
@@ -247,7 +247,9 @@ CDC streams go first, because their initial full loads and the switch to log tai
 
 ### Connection limits and retries
 
-Underneath, two concurrency groups govern everything. A task group fans work out across streams, and a **connection group** bounds how much of that work may touch the source at once. The connection group's limit comes from `max_threads` in the source config, so the pressure OLake Go puts on a production database is a single dial you control. Every source-touching unit of work, whether it is one [chunk](#chunking-and-parallel-full-loads) of a full load or a stream's change-log session, is scheduled into that bounded group.
+Underneath, two separate concurrency groups are at work. The first starts one goroutine per selected stream immediately, with no limit: sync 50 tables on full refresh, and all 50 begin at once. This part is cheap, a goroutine that hasn't touched the database yet costs almost nothing.
+
+Actually reading from the source is gated separately. Every one of those streams feeds its chunks into a single shared **connection group**, capped by `max_threads` in the source config. If `max_threads` is 10, at most 10 chunks, across all 50 streams combined, are ever querying the source at the same time; the rest just wait for a free slot. That's the one dial that controls how hard OLake Go hits a production database, no matter how many tables you've selected. Every unit of work that touches the source, whether it's one [chunk](#chunking-and-parallel-full-loads) of a full load or a stream's change-log session, goes through this same shared, bounded group.
 
 Each unit is also retried on its own. A failed chunk gets a fresh context and a fresh destination writer, then retries with exponential backoff (starting at 60 seconds and doubling per attempt) up to the configured retry count. Errors that retrying cannot fix, like a replication cursor that no longer matches the source, are tagged non-retryable and fail immediately with a message telling you what to do instead.
 
@@ -270,16 +272,15 @@ type Chunk struct {
 
 That small struct is the unit of everything in a full load: the unit of parallelism (chunks run concurrently), the unit of retry (a failed chunk reruns alone), and the unit of resume (finished chunks never run again).
 
-<div style={{ margin: '2.5rem 0' }}>
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
 
-```mermaid
-flowchart LR
-    T[(Source table)] --> S{{Split into chunks}}
-    S --> ST["state.json<br/>remaining chunk list"]
-    ST --> POOL["worker pool<br/>up to max_threads chunks <br/> in paralleleach reads a chunk <br/> and writes it"]
-    POOL --> D[(Destination)]
-    D -. chunk removed<br/>after commit .-> ST
-```
+<img
+  src="/img/blog/2026/8/olake-chunking-pipeline.webp"
+  alt="A source table splits into chunks tracked in state.json, chunks move through a bounded worker pool from pending to in-progress to committed, and are removed from state.json once committed"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '80%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
 
 </div>
 
@@ -334,31 +335,53 @@ Each source has its own CDC prerequisites, and OLake Go validates them when the 
 
 ### One log or many: the execution topologies
 
-How CDC parallelizes depends on the shape of the source's log. Each driver declares one of three topologies, and the orchestrator adapts:
+How CDC parallelizes depends on the shape of the source's log. Each driver declares one of three topologies, and the orchestrator adapts.
 
-- **Sequential** (PostgreSQL, MySQL): the whole database has a single change log, so a single reader tails it and routes each event to the right stream's writer. More readers would not help; the log is one ordered sequence.
-- **Concurrent** (MongoDB, SQL Server): every stream has its own change feed, so each stream's CDC starts the moment its own full load finishes, without waiting for the other streams.
-- **Parallel** (Kafka): topic partitions are independent, so multiple readers consume simultaneously under one consumer group.
+#### Sequential (PostgreSQL, MySQL)
 
-<div style={{ margin: '2.5rem 0' }}>
+The whole database has a single change log, so a single reader tails it and routes each event to the right stream's writer. More readers would not help; the log is one ordered sequence.
 
-```mermaid
-flowchart TB
-    subgraph SEQ["Sequential<br/> (PostgreSQL, MySQL)"]
-        direction LR
-        L1[(single change log)] --> R1[reader] --> W1[stream writers]
-    end
-    subgraph CON["Concurrent<br/> (MongoDB, SQL Server)"]
-        direction LR
-        F1[(per-stream feed)] --> RR1[reader] --> WW1[writer]
-        F2[(per-stream feed)] --> RR2[reader] --> WW2[writer]
-    end
-    subgraph PAR["Parallel (Kafka)"]
-        direction LR
-        P0[topic] --> P1[partition] --> KR1[reader]
-        P0 --> P2[partition] --> KR2[reader]
-    end
-```
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
+
+<img
+  src="/img/blog/2026/8/olake-cdc-sequential.webp"
+  alt="Sequential topology: one change log, one reader, fanning out to each stream's own writer and table"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '80%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
+
+</div>
+
+#### Concurrent (MongoDB, SQL Server)
+
+Every stream has its own change feed, so each stream's CDC starts the moment its own full load finishes, without waiting for the other streams.
+
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
+
+<img
+  src="/img/blog/2026/8/olake-cdc-concurrent.webp"
+  alt="Concurrent topology: each stream has its own change feed, reader, writer, and table, none share or wait on each other"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '80%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
+
+</div>
+
+#### Parallel (Kafka)
+
+Topic partitions are independent, so multiple readers consume simultaneously under one consumer group.
+
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
+
+<img
+  src="/img/blog/2026/8/olake-cdc-parallel.webp"
+  alt="Parallel topology: partitions from every selected topic are distributed across readers in one consumer group, each reader has its own writer per topic, and every topic's writers converge on that topic's table"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '80%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
 
 </div>
 
@@ -388,19 +411,26 @@ The payoff is traceability that survives into the lakehouse: for any row in the 
 
 The dangerous moment in any CDC pipeline is the transition from snapshot to log. Snapshot first and tail afterwards, and you lose everything that changed in between. OLake Go orders it the other way: before any full load begins, `PreCDC` pins the starting position, the slot's current LSN, the current binlog coordinates, or a fresh resume token. The full load runs, and then the log replays from the pinned position, so every change that happened mid-load arrives on top of the loaded data.
 
-<div style={{ margin: '2.5rem 0' }}>
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
 
-```mermaid
-flowchart LR
-    A["PreCDC: pin log position<br/>(LSN / binlog / resume token)"] --> B["Full load<br/>chunked snapshot"]
-    B --> C["Replay change log<br/>from pinned position"]
-    C --> D["Overlap window<br/>inserts tagged 'i' = upsert (dedup)"]
-    D --> E["Steady state<br/>inserts tagged 'c' = append"]
-```
+<img
+  src="/img/blog/2026/8/olake-cdc-handoff-timeline.webp"
+  alt="Handoff from full load to CDC: PreCDC pins the log position, the chunked full load runs, the log replays from the pinned position, an overlap window tags inserts 'i' for upsert dedup, then steady state tags inserts 'c' for plain append"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '85%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
 
 </div>
 
-That replay means overlap: a row inserted during the load shows up twice, once from the chunk scan and once from the log. OLake Go resolves the overlap at the destination instead of trying to coordinate readers:
+That replay means overlap: a row inserted during the load can show up twice, once from the chunk scan, once from the log. Not a rare edge case, just how the timing works out:
+
+- **The pin happens once.** `PreCDC` fixes the log position before the backfill starts.
+- **The backfill takes time.** A chunk only opens its own transaction when its turn comes up on the worker pool, not when the backfill begins, and a big table's backfill can run for hours.
+- **No driver dodges this.** A chunk only sees what's committed at the moment it runs. If a row was inserted after CDC's pin point but before that, the chunk picks it up too.
+- **So:** a row inserted after the pin but before a given chunk's turn lands in that chunk's scan, and CDC already replayed the same row, since it started right at the pinned position.
+
+OLake Go doesn't try to stop this from happening. It just tags every record by what produced it, and the tag decides how the write lands:
 
 ```go
 // drivers/abstract/cdc.go
@@ -419,7 +449,32 @@ func mapChangeKindToOperationType(kind string, dedupInserts bool) string {
 }
 ```
 
-During the overlap window, inserts are tagged `i` and the destination treats them as upserts, so the second copy replaces the first. Once the first CDC round after the load is committed, the destination records that the window is closed, and from then on inserts flow through as plain `c` appends.
+Take row 42, inserted mid-load:
+
+- **Backfill** reads it and writes it as a plain append, op_type `r`.
+- **CDC replay** picks up the same insert. Still inside the overlap window, so it gets tagged `i`.
+- Both hash to the same `_olake_id`. On the `i`-tagged copy, the writer doesn't append a second row, it fires an equality delete for that ID plus a fresh data file.
+- Iceberg commits both in one shot. The equality delete wipes out any existing row with that ID, wherever it came from, so the backfill's copy of row 42 is gone the moment the commit lands.
+- Query the table afterward: one row for id 42, not two. Full delete mechanics are in [Upserts: equality and positional deletes](#upserts-equality-and-positional-deletes).
+
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
+
+<img
+  src="/img/blog/2026/8/olake-overlap-dedup.webp"
+  alt="Row 42 landing through backfill and CDC replay, deduped into one row via an equality delete"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '85%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
+
+</div>
+
+One more piece: how does a stream even know if it's still in the overlap window? It doesn't keep that in memory, it reads it from the same `olake_2pc` ledger the exactly-once guarantee already relies on.
+
+- Every backfill chunk commit writes `dedup_inserts: true`, no conditions attached. Backfill still running anywhere on that stream means the window stays open.
+- The first CDC session to finish writes `dedup_inserts: false` into that same property, right next to the log position it just committed.
+- Every CDC session after that checks `dedup_inserts` before tagging anything. Once it reads `false`, row 42 lands as a plain `c` the next time, no delete needed.
+- Process dies mid-session, before that `false` gets written? Next run reads the ledger, still finds `true` from the backfill, and stays in dedup mode. Nothing to guess.
 
 ### Bounded sessions and careful acknowledgement
 
@@ -713,7 +768,7 @@ if i.config.UseArrowWrites {
 
 With `arrow_writes` enabled, the Go process builds the files itself and the JVM only registers and commits them; the legacy writer keeps the original record-streaming path alive when the flag is off.
 
-<div style={{ margin: '2.5rem 0' }}>
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
 
 ```mermaid
 flowchart LR
@@ -828,19 +883,15 @@ transaction.commitTransaction();
 
 There is no window where the files exist but the bookkeeping does not, or the reverse. That single guarantee is what the rest of the system leans on.
 
-<div style={{ margin: '2.5rem 0' }}>
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
 
-```mermaid
-flowchart LR
-    subgraph TX["One Iceberg transaction (atomic)"]
-        direction TB
-        DF[data files]
-        DEL[equality + positional delete files]
-        PROP["table property olake_2pc<br/>committed thread IDs / last position"]
-    end
-    TX -- single atomic swap --> V["Visible in the table<br/>all-or-nothing"]
-    V -. next run reads olake_2pc first .-> SKIP["skips already-committed"]
-```
+<img
+  src="/img/blog/2026/8/olake-exactly-once-ledger.webp"
+  alt="One atomic Iceberg transaction commits data files, delete files, and the olake_2pc table property together, so the table is visible all-or-nothing, and the next run reads olake_2pc first to skip already-committed work"
+  loading="lazy"
+  decoding="async"
+  style={{ width: '80%', height: 'auto', display: 'block', margin: '0 auto' }}
+/>
 
 </div>
 
@@ -906,23 +957,26 @@ func TypeFromValue(v interface{}) types.DataType {
 
 Because MongoDB and other schemaless sources are sampled during [discovery](#how-discovery-works-per-source), the same field can show up with different types across documents. OLake Go does not pick the first one it sees; it merges them toward the narrowest type that can hold both, so an `id` seen as `Int32` in one document and `Int64` in another resolves to `Int64`.
 
-That merge follows one rule: two types combine into the closest type that can represent both of them. Internally the types are arranged as a tree, and merging two of them is a walk to their lowest common ancestor:
+That merge follows one rule: two types combine into the closest type that can represent both of them. Internally the types are arranged as a tree, and merging two of them is a walk up to their lowest common ancestor. Each arrow below points from a narrower type to the wider type it merges into:
 
-```
-// Tree Representation of TypeWeights
-//
-//                              5 (String)
-//                            /              \
-//             3 (Float64)   /              \ 9 (TimestampNano)
-//                         /  \             /
-//             2 (Int64)  /    \4(Float32) / 8 (TimestampMicro)
-//                       /                /
-//            1 (Int32) /                / 7 (TimestampMilli)
-//                     /                /
-//           0 (Bool) /                / 6 (Timestamp)
+<div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
+
+```mermaid
+flowchart BT
+    Bool["Bool (0)"] --> Int32["Int32 (1)"]
+    Int32 --> Int64["Int64 (2)"]
+    Int64 --> Float64["Float64 (3)"]
+    Float32["Float32 (4)"] --> Float64
+    Timestamp["Timestamp (6)"] --> TimestampMilli["TimestampMilli (7)"]
+    TimestampMilli --> TimestampMicro["TimestampMicro (8)"]
+    TimestampMicro --> TimestampNano["TimestampNano (9)"]
+    Float64 --> String["String (5)"]
+    TimestampNano --> String
 ```
 
-Two integer widths meet at the wider integer, an integer and a float meet at float, and types on different branches meet at `String`, which sits at the root and can hold anything. The same rule governs discovery and, later, what happens when live data disagrees with the table it is being written to.
+</div>
+
+Two integer widths meet at the wider integer (`Int32` + `Int64` → `Int64`), an integer and a float meet at float (`Int64` + `Float32` → `Float64`), and types on different branches meet at `String`, which sits at the root and can hold anything (`Float64` + `Timestamp` → `String`). The same rule governs discovery and, later, what happens when live data disagrees with the table it is being written to.
 
 ### Normalization: columns, or one JSON blob
 
@@ -1001,7 +1055,7 @@ Conflicting types that are not clean promotions, an `int` column that starts rec
 
 For all the moving parts, OLake Go keeps circling back to a few ideas.
 
-A **single engine** sits behind every source. Each driver only answers questions about its own database, and the shared engine owns scheduling, retries, state, and the write path, so eight sources behave identically and a ninth costs almost nothing to add.
+A **single engine** sits behind every source. Each driver only answers questions about its own database, and the shared engine owns parallel execution, retries, state, and the write path, so eight sources behave identically and a ninth costs almost nothing to add.
 
 The **chunk** is the atom of a full load, the unit of parallelism, retry, and resume at once. Change capture reads each database's native log, pins its position before the snapshot so nothing is lost in the handoff, and advances the source only after the destination has the data.
 
