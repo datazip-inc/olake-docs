@@ -111,9 +111,12 @@ const docSidebar = {
         { type: 'doc', id: 'getting-started/job-level-properties', label: 'Job-level Properties' },
         { type: 'doc', id: 'understanding/terminologies/olake', label: 'Stream-level Properties' },
         { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
-        { type: 'doc', id: 'getting-started/metrics', label: 'Metrics' },
       ],
     },
+
+    // MONITORING AND OBSERVABILITY
+    sectionHeader("MONITORING AND OBSERVABILITY"),
+    { type: 'doc', id: 'monitoring-and-observability/metrics', label: 'Prometheus Integration' },
 
     // CORE CONCEPTS
     sectionHeader("CORE CONCEPTS"),
