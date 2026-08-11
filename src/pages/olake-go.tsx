@@ -2423,6 +2423,9 @@ export default function OLakeGoPage() {
                     <a className='olake-footer-link' href='/search' style={{ color: '#8890A8' }}>
                       Search
                     </a>
+                    <a className='olake-footer-link' href='/slack-archive' style={{ color: '#8890A8' }}>
+                      Community Slack Archive
+                    </a>
                   </div>
                 </div>
                 <div>

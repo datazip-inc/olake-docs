@@ -3,7 +3,7 @@ import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
-import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-icons/fa'
+import { FaEnvelope, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-icons/fa'
 
 const stripTrailingSlash = (value?: string) => {
   if (!value) {
@@ -74,7 +74,7 @@ const ContactPage = () => {
     url: canonicalUrl,
     name: 'Contact Us',
     description:
-      'Get in touch with OLake for product questions, community, or support. Email hello@olake.io or call +91 9748485583. Join our Slack for community discussions.',
+      'Get in touch with OLake for product questions, community, or support. Email hello@olake.io. Join our Slack for community discussions.',
     isPartOf: {
       '@type': 'WebSite',
       url: 'https://olake.io/',
@@ -93,7 +93,6 @@ const ContactPage = () => {
     },
     contactPoint: {
       '@type': 'ContactPoint',
-      telephone: '+91-9748485583',
       contactType: 'customer support',
       email: 'hello@olake.io',
       availableLanguage: ['English']
@@ -102,8 +101,7 @@ const ContactPage = () => {
       {
         '@type': 'ContactPoint',
         contactType: 'general inquiries',
-        email: 'hello@olake.io',
-        telephone: '+91-9748485583'
+        email: 'hello@olake.io'
       },
       {
         '@type': 'WebSite',
@@ -180,12 +178,6 @@ const ContactPage = () => {
                       hello@olake.io
                     </a>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <FaPhone className="text-2xl" />
-                    <a href="tel:+919748485583" className="hover:underline">
-                      +91 9748485583
-                    </a>
-                  </div>
                   <div className="flex items-start space-x-4">
                     <FaMapMarkerAlt className="text-2xl mt-1" />
                     <div>
@@ -193,7 +185,7 @@ const ContactPage = () => {
                       <p>Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA</p>
                       <p className="font-semibold mt-2">Working Address</p>
                       <p>
-                        2nd floor, Monte carlo building, 27th Main Rd, Parangi Palaya, Sector 2, HSR Layout,
+                        HustleHub H203, 522, 24th Main Rd, Parangi Palaya, Sector 2, HSR Layout,
                         Bengaluru, Karnataka 560102
                       </p>
                     </div>
@@ -217,17 +209,6 @@ const ContactPage = () => {
             <div className="space-y-8">
               <h2 className="text-2xl font-bold mb-3">Connect with Our Team on LinkedIn</h2>
               <ul className="space-y-4">
-                <li className="flex items-center space-x-4">
-                  <FaLinkedin className="text-2xl" />
-                  <a
-                    href='https://www.linkedin.com/in/sandeepdevarapalli/'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='hover:underline'
-                  >
-                    Sandeep
-                  </a>
-                </li>
                 <li className="flex items-center space-x-4">
                   <FaLinkedin className="text-2xl" />
                   <a
