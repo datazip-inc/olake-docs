@@ -23,7 +23,7 @@ const BlogCTA = () => {
         </a>
 
         <a
-          href="https://olake.io/#olake-form-product"
+          href="https://olake.io/contact/"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center text-lg font-medium text-white bg-black dark:bg-white dark:text-black rounded-full px-6 py-3 transition transform hover:-translate-y-1 hover:opacity-90 min-w-[150px]"
