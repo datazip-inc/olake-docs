@@ -755,9 +755,29 @@ const config = {
             to: '/docs',
             from: '/docs/category/tutorials/'
           },
+          // Post deprecated 2026-08-04; content superseded by the maintained MongoDB
+          // troubleshooting section in the connector docs.
           {
-            to: '/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors',
+            to: '/docs/connectors/mongodb#troubleshooting',
             from: '/blog/troubleshooting-common-issues-and-solutions-to-mongodb-etl-errors/'
+          },
+          // Post deprecated 2026-08-04; superseded by the newer schema-evolution post
+          // covering the same ground (polymorphic/changing types) in more depth.
+          {
+            to: '/blog/schema-evolution-without-breaking-pipelines',
+            from: '/blog/handling-changing-data-type-during-semi-structured-data-ingestion/'
+          },
+          // Post deprecated 2026-08-04; content superseded by the maintained MongoDB
+          // connector overview.
+          {
+            to: '/docs/connectors/mongodb#overview',
+            from: '/blog/mongodb-etl-challenges/'
+          },
+          // Post deprecated 2026-08-04; superseded by the flatten-array post covering
+          // the same flatten/nested-JSON querying ground.
+          {
+            to: '/blog/flatten-array',
+            from: '/blog/querying-json-in-snowflake/'
           },
           {
             to: '/',
