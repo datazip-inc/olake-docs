@@ -1,8 +1,6 @@
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
-import SiteNavbar from '@site/src/components/landing/Navbar/SiteNavbar'
-import '@site/src/components/landing/Navbar/SiteNavbar.css'
 import { PiLinkedinLogo, PiYoutubeLogo, PiSlackLogo, PiXLogo } from 'react-icons/pi'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
@@ -12,6 +10,14 @@ import { cssToObj as __css } from '@site/src/components/landing/pages/cssToObj'
 import { HOME_SEO } from '@site/src/data/landing/seo'
 import '@site/src/components/landing/pages/olake-home.css'
 import '@site/src/components/landing/pages/overrides.css'
+
+/* The dashed connector between stages of the mobile architecture stack. */
+const ArchArrow = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '9px 0' }}>
+    <div style={{ height: '22px', borderLeft: '2px dashed #4F5BFF' }} />
+    <div style={{ color: '#4F5BFF', fontSize: '13px', lineHeight: '1', marginTop: '-3px' }}>▼</div>
+  </div>
+)
 
 export default function HomePage() {
   // Derived at build time from docs/release/ingestion — see getLatestOlakeRelease()
@@ -36,10 +42,16 @@ export default function HomePage() {
     closeResources,
     openContributors,
     closeContributors,
+    mobileMenuOpen,
+    toggleMobileMenu,
     terminalLines,
     tickerLoop,
     engines,
-    logoGroups,
+    logosLoop,
+    archSources,
+    archGoChips,
+    archFusionChips,
+    archDestinations,
     selectGo,
     selectFusion,
     benchmarkHref,
@@ -89,7 +101,6 @@ export default function HomePage() {
             position: 'relative'
           }}
         >
-          <SiteNavbar />
           <div
             style={{
               position: 'relative',
@@ -111,6 +122,7 @@ export default function HomePage() {
               }}
             />{' '}
             <div
+              data-r='stack pad hero'
               style={{
                 position: 'relative',
                 maxWidth: '1360px',
@@ -150,6 +162,7 @@ export default function HomePage() {
                   Apache 2.0 licensed · Open Source
                 </div>{' '}
                 <h1
+                  data-r='herohead'
                   style={{
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontWeight: '500',
@@ -177,7 +190,7 @@ export default function HomePage() {
                   style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '38px' }}
                 >
                   <a
-                    className='olakehome-h3'
+                    className='olakehome-h2'
                     href='/docs/getting-started/quickstart/'
                     style={{
                       color: '#ffffff',
@@ -194,7 +207,7 @@ export default function HomePage() {
                     Try OLake →
                   </a>{' '}
                   <a
-                    className='olakehome-h4'
+                    className='olakehome-h3'
                     href='/contact'
                     style={{
                       color: '#0a0f23',
@@ -763,44 +776,43 @@ export default function HomePage() {
             >
               <div
                 className='olakehome-marquee'
-                style={{ '--marquee-copies': (logoGroups || []).length } as React.CSSProperties}
+                style={{
+                  display: 'flex',
+                  gap: '28px',
+                  width: 'max-content',
+                  animation: 'tickerScroll 26s linear infinite'
+                }}
               >
-                {(logoGroups || []).map((group, groupIdx) => (
+                {/* One copy per pass: the second is a duplicate that makes the scroll seamless. */}
+                {(logosLoop || []).map((logo, logoIdx) => (
                   <div
-                    className='olakehome-marquee-group'
-                    key={groupIdx}
-                    aria-hidden={groupIdx > 0 || undefined}
+                    key={logoIdx}
+                    aria-hidden={logoIdx >= (logosLoop || []).length / 2 || undefined}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '54px',
+                      padding: '0 26px',
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      flexShrink: '0'
+                    }}
                   >
-                    {group.map((logo, logoIdx) => (
-                      <div
-                        key={logoIdx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '54px',
-                          padding: '0 26px',
-                          background: '#ffffff',
-                          borderRadius: '14px',
-                          flexShrink: '0'
-                        }}
-                      >
-                        <img
-                          src={logo.src}
-                          alt={logo.name}
-                          width={logo.w}
-                          height={logo.h}
-                          loading={groupIdx === 0 ? undefined : 'lazy'}
-                          decoding='async'
-                          style={{
-                            maxHeight: '44px',
-                            maxWidth: '170px',
-                            width: 'auto',
-                            objectFit: 'contain'
-                          }}
-                        />
-                      </div>
-                    ))}
+                    <img
+                      src={logo.src}
+                      alt={logo.name}
+                      width={logo.w}
+                      height={logo.h}
+                      loading={logoIdx < (logosLoop || []).length / 2 ? undefined : 'lazy'}
+                      decoding='async'
+                      style={{
+                        maxHeight: logo.maxH,
+                        maxWidth: logo.maxW,
+                        width: 'auto',
+                        objectFit: 'contain'
+                      }}
+                    />
                   </div>
                 ))}
               </div>
@@ -808,6 +820,7 @@ export default function HomePage() {
           </div>
           <div
             id='platform'
+            data-r='pad'
             style={{
               position: 'relative',
               maxWidth: '1360px',
@@ -829,6 +842,7 @@ export default function HomePage() {
               </div>
             </div>
             <div
+              data-r='bighead'
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
                 fontWeight: '500',
@@ -842,11 +856,14 @@ export default function HomePage() {
             >
               One lakehouse. <span style={{ color: '#193AE6' }}>Two engines.</span>
             </div>{' '}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '34px' }}>
+            <div
+              data-r='stack'
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '34px' }}
+            >
               {(engines || []).map((eng, engIdx) => (
                 <React.Fragment key={engIdx}>
                   <a
-                    className='olakehome-h5'
+                    className='olakehome-h4'
                     href={eng.href}
                     target='_blank'
                     rel='noopener noreferrer'
@@ -973,7 +990,7 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-          <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '124px 48px' }}>
+          <div data-r='pad' style={{ maxWidth: '1360px', margin: '0 auto', padding: '124px 48px' }}>
             <div
               style={{ display: 'flex', alignItems: 'baseline', gap: '16px', marginBottom: '44px' }}
             >
@@ -1028,6 +1045,7 @@ export default function HomePage() {
               </div>
             </div>{' '}
             <div
+              data-r='cardpad'
               style={{
                 display: 'block',
                 position: 'relative',
@@ -1056,6 +1074,7 @@ export default function HomePage() {
                 }}
               />{' '}
               <div
+                data-r='statrow'
                 style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '56px' }}
               >
                 {(advantageStats || []).map((stat, statIdx) => (
@@ -1066,6 +1085,7 @@ export default function HomePage() {
                         data-prefix={stat.prefix}
                         data-suffix={stat.suffix}
                         data-decimals={stat.decimals}
+                        data-r='bignum'
                         style={{
                           fontFamily: "'Space Grotesk', sans-serif",
                           fontWeight: '600',
@@ -1101,7 +1121,10 @@ export default function HomePage() {
             </div>
           </div>
           <div style={{ padding: '112px 0 124px' }}>
-            <div style={{ maxWidth: '1360px', margin: '0 auto 34px', padding: '0 48px' }}>
+            <div
+              data-r='pad'
+              style={{ maxWidth: '1360px', margin: '0 auto 34px', padding: '0 48px' }}
+            >
               <div
                 style={{
                   display: 'flex',
@@ -1142,11 +1165,11 @@ export default function HomePage() {
               >
                 OLake Go supports ingestion from 8 different sources into Iceberg and Parquet.{' '}
                 <br />
-                OLake Fusion keeps your Iceberg tables fast, helping you scheduled compaction and
+                OLake Fusion keeps your Iceberg tables fast, through scheduled compaction and
                 maintenance.
               </div>
             </div>{' '}
-            <div style={{ maxWidth: '100%', margin: '0', padding: '0' }}>
+            <div className='arch-desktop' style={{ maxWidth: '100%', margin: '0', padding: '0' }}>
               <div
                 id='archFrame'
                 style={{
@@ -1303,119 +1326,31 @@ export default function HomePage() {
                           gap: '13px'
                         }}
                       >
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          Postgres
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          MySQL
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          MongoDB
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          Oracle
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          Kafka
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          S3
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          DB2 LUW
-                        </span>{' '}
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '15px',
-                            color: '#2a3355',
-                            background: '#eef1fb',
-                            border: '1px solid rgba(16,24,64,0.1)',
-                            borderRadius: '11px',
-                            padding: '10px 16px'
-                          }}
-                        >
-                          MSSQL
-                        </span>
+                        {(archSources || []).map((name) => (
+                          <span
+                            key={name}
+                            style={{
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: '15px',
+                              color: '#2a3355',
+                              background: '#eef1fb',
+                              border: '1px solid rgba(16,24,64,0.1)',
+                              borderRadius: '11px',
+                              padding: '10px 16px'
+                            }}
+                          >
+                            {name}
+                          </span>
+                        ))}
                       </div>
                     </div>
                     <div
                       style={{
                         position: 'absolute',
                         left: '480px',
-                        top: '100px',
+                        top: '70px',
                         width: '304px',
-                        height: '260px',
+                        height: '320px',
                         border: '2px solid #4F5BFF',
                         borderRadius: '26px',
                         padding: '34px 28px',
@@ -1455,11 +1390,25 @@ export default function HomePage() {
                       <div
                         style={{
                           display: 'flex',
+                          flexWrap: 'wrap',
                           justifyContent: 'center',
                           gap: '11px',
                           marginTop: '20px'
                         }}
                       >
+                        <span
+                          style={{
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: '14px',
+                            color: '#FFFFFF',
+                            background: 'rgba(255,255,255,0.06)',
+                            border: '1px solid rgba(120,140,255,0.4)',
+                            borderRadius: '9px',
+                            padding: '7px 13px'
+                          }}
+                        >
+                          Full Load
+                        </span>{' '}
                         <span
                           style={{
                             fontFamily: "'JetBrains Mono', monospace",
@@ -1484,7 +1433,7 @@ export default function HomePage() {
                             padding: '7px 13px'
                           }}
                         >
-                          Chunking
+                          Incremental
                         </span>
                       </div>
                     </div>
@@ -1560,9 +1509,6 @@ export default function HomePage() {
                       <div>
                         <div style={{ fontWeight: '700', fontSize: '22px', color: '#0a0f23' }}>
                           Parquet on S3
-                        </div>{' '}
-                        <div style={{ fontSize: '14px', color: '#5b6486', marginTop: '2px' }}>
-                          Columnar tables
                         </div>
                       </div>
                     </div>
@@ -1680,9 +1626,261 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
+            </div>{' '}
+            <div
+              className='arch-mobile'
+              style={{
+                display: 'none',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: '0',
+                maxWidth: '400px',
+                margin: '0 auto',
+                padding: '0 20px'
+              }}
+            >
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(16,24,64,0.1)',
+                  borderRadius: '20px',
+                  padding: '22px 20px',
+                  boxShadow: '0 16px 40px -30px rgba(16,24,64,0.35)'
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '12px',
+                    letterSpacing: '2px',
+                    color: '#6b7396',
+                    textAlign: 'center',
+                    marginBottom: '16px'
+                  }}
+                >
+                  SOURCES
+                </div>{' '}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    gap: '9px'
+                  }}
+                >
+                  {(archSources || []).map((name) => (
+                    <span
+                      key={name}
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: '13px',
+                        color: '#2a3355',
+                        background: '#eef1fb',
+                        border: '1px solid rgba(16,24,64,0.1)',
+                        borderRadius: '10px',
+                        padding: '8px 13px'
+                      }}
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>{' '}
+              <ArchArrow />{' '}
+              <div
+                style={{
+                  border: '2px solid #4F5BFF',
+                  borderRadius: '22px',
+                  padding: '26px 22px',
+                  textAlign: 'center',
+                  backgroundColor: '#193AE6'
+                }}
+              >
+                <div
+                  style={{
+                    width: '66px',
+                    height: '66px',
+                    margin: '0 auto 14px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(120,140,255,0.4)',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <img
+                    loading='lazy'
+                    decoding='async'
+                    src='/img/landing/shared/olake-mark-small.svg'
+                    alt=''
+                    style={{ width: '38px', height: '38px', objectFit: 'contain' }}
+                  />
+                </div>{' '}
+                <div style={{ fontWeight: '700', fontSize: '24px', color: '#ffffff' }}>
+                  OLake Go
+                </div>{' '}
+                <div style={{ fontSize: '15px', color: '#ffffff', marginTop: '3px' }}>
+                  Ingestion engine
+                </div>{' '}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    gap: '9px',
+                    marginTop: '16px'
+                  }}
+                >
+                  {(archGoChips || []).map((chip) => (
+                    <span
+                      key={chip.label}
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: '13px',
+                        color: '#ffffff',
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(120,140,255,0.4)',
+                        borderRadius: '9px',
+                        padding: '6px 12px'
+                      }}
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              </div>{' '}
+              <ArchArrow />{' '}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {(archDestinations || []).map((dest) => (
+                  <div
+                    key={dest.name}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid rgba(16,24,64,0.1)',
+                      borderRadius: '18px',
+                      boxShadow: '0 16px 40px -30px rgba(16,24,64,0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      padding: '18px 22px'
+                    }}
+                  >
+                    <img
+                      loading='lazy'
+                      decoding='async'
+                      src={dest.src}
+                      alt={dest.name}
+                      style={{
+                        width: '52px',
+                        height: '52px',
+                        objectFit: 'contain',
+                        flexShrink: '0'
+                      }}
+                    />{' '}
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '20px', color: '#0a0f23' }}>
+                        {dest.name}
+                      </div>
+                      {dest.sub && (
+                        <div style={{ fontSize: '13px', color: '#5b6486', marginTop: '2px' }}>
+                          {dest.sub}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>{' '}
+              <ArchArrow />{' '}
+              <div
+                style={{
+                  border: '2px solid #4F5BFF',
+                  borderRadius: '22px',
+                  padding: '26px 22px',
+                  textAlign: 'center',
+                  backgroundColor: '#193AE6'
+                }}
+              >
+                <div
+                  style={{
+                    width: '66px',
+                    height: '66px',
+                    margin: '0 auto 14px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(120,140,255,0.4)',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <img
+                    loading='lazy'
+                    decoding='async'
+                    src='/img/landing/shared/olake-mark-small.svg'
+                    alt=''
+                    style={{ width: '38px', height: '38px', objectFit: 'contain' }}
+                  />
+                </div>{' '}
+                <div style={{ fontWeight: '700', fontSize: '24px', color: '#ffffff' }}>
+                  OLake Fusion
+                </div>{' '}
+                <div style={{ fontSize: '15px', color: '#ffffff', marginTop: '3px' }}>
+                  Maintenance engine
+                </div>{' '}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    gap: '9px',
+                    marginTop: '16px'
+                  }}
+                >
+                  {(archFusionChips || []).map((chip) => (
+                    <span
+                      key={chip.label}
+                      style={{
+                        position: 'relative',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: '13px',
+                        color: '#ffffff',
+                        background: 'rgba(25,58,230,0.32)',
+                        border: '1px solid #6E7CFF',
+                        borderRadius: '9px',
+                        padding: '6px 12px'
+                      }}
+                    >
+                      {chip.label}
+                      {chip.soon && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '-11px',
+                            right: '-13px',
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: '8px',
+                            letterSpacing: '0.3px',
+                            color: '#ffffff',
+                            background: '#14257A',
+                            borderRadius: '6px',
+                            padding: '3px 6px',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          COMING SOON
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-          <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '104px 48px 124px' }}>
+          <div
+            data-r='pad'
+            style={{ maxWidth: '1360px', margin: '0 auto', padding: '104px 48px 124px' }}
+          >
             <div
               style={{ display: 'flex', alignItems: 'baseline', gap: '16px', marginBottom: '56px' }}
             >
@@ -1760,6 +1958,7 @@ export default function HomePage() {
                         </div>
                       </div>{' '}
                       <div
+                        data-r='stack padrow'
                         style={{
                           padding: '8px 48px 44px',
                           display: 'grid',
@@ -1796,8 +1995,14 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-          <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 48px 132px' }}>
-            <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 48px 132px' }}>
+          <div
+            data-r='pad'
+            style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 48px 132px' }}
+          >
+            <div
+              data-r='pad'
+              style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 48px 132px' }}
+            >
               <div
                 style={{
                   display: 'flex',
@@ -1817,9 +2022,10 @@ export default function HomePage() {
                       marginBottom: '20px'
                     }}
                   >
-                    06 / USER STORIES
+                    05 / USER STORIES
                   </div>{' '}
                   <div
+                    data-r='fixedhead'
                     style={{
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontWeight: '700',
@@ -1840,7 +2046,10 @@ export default function HomePage() {
                   style={{ flex: '1', minWidth: '300px', maxWidth: '520px', paddingTop: '44px' }}
                 />
               </div>{' '}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '24px' }}>
+              <div
+                data-r='stack'
+                style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '24px' }}
+              >
                 <a
                   href='/customer-stories/xeno-aws-dms-alternative-mysql-cdc'
                   aria-label='Read the customer story'
@@ -1908,7 +2117,7 @@ export default function HomePage() {
                   <div
                     style={{
                       position: 'relative',
-                      padding: '30px',
+                      padding: '30px 30px 0',
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontWeight: '700',
                       fontSize: '25px',
@@ -1918,6 +2127,24 @@ export default function HomePage() {
                   >
                     <span style={{ color: '#93A6FF' }}>Zero pipeline failure</span>, 50% faster
                     loads.
+                  </div>{' '}
+                  <div style={{ position: 'relative', padding: '16px 30px 30px' }}>
+                    <span
+                      className='olakehome-h5'
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#ffffff',
+                        color: '#193AE6',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        padding: '9px 16px',
+                        borderRadius: '9px'
+                      }}
+                    >
+                      Read more <span style={{ fontSize: '15px' }}>→</span>
+                    </span>
                   </div>
                 </a>{' '}
                 <a
@@ -1987,7 +2214,7 @@ export default function HomePage() {
                   <div
                     style={{
                       position: 'relative',
-                      padding: '30px',
+                      padding: '30px 30px 0',
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontWeight: '700',
                       fontSize: '25px',
@@ -1997,6 +2224,24 @@ export default function HomePage() {
                   >
                     Cordial's path to an{' '}
                     <span style={{ color: '#93A6FF' }}>AI-ready lakehouse</span>.
+                  </div>{' '}
+                  <div style={{ position: 'relative', padding: '16px 30px 30px' }}>
+                    <span
+                      className='olakehome-h5'
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#ffffff',
+                        color: '#193AE6',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        padding: '9px 16px',
+                        borderRadius: '9px'
+                      }}
+                    >
+                      Read more <span style={{ fontSize: '15px' }}>→</span>
+                    </span>
                   </div>
                 </a>{' '}
                 <a
@@ -2066,7 +2311,7 @@ export default function HomePage() {
                   <div
                     style={{
                       position: 'relative',
-                      padding: '30px',
+                      padding: '30px 30px 0',
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontWeight: '700',
                       fontSize: '25px',
@@ -2076,6 +2321,24 @@ export default function HomePage() {
                   >
                     From <span style={{ color: '#93A6FF' }}>40-minute to sub-minute</span>{' '}
                     segmentation queries.
+                  </div>{' '}
+                  <div style={{ position: 'relative', padding: '16px 30px 30px' }}>
+                    <span
+                      className='olakehome-h5'
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#ffffff',
+                        color: '#193AE6',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        padding: '9px 16px',
+                        borderRadius: '9px'
+                      }}
+                    >
+                      Read more <span style={{ fontSize: '15px' }}>→</span>
+                    </span>
                   </div>
                 </a>
               </div>{' '}
@@ -2097,6 +2360,7 @@ export default function HomePage() {
             </div>
             <div
               id='enterprise'
+              data-r='pad'
               style={{
                 maxWidth: '1360px',
                 margin: '0 auto 132px',
@@ -2105,6 +2369,7 @@ export default function HomePage() {
               }}
             >
               <div
+                data-r='ctapad'
                 style={{
                   position: 'relative',
                   border: '1px solid rgba(212, 215, 228, 0.12)',
@@ -2160,7 +2425,7 @@ export default function HomePage() {
                         marginBottom: '16px'
                       }}
                     >
-                      // OLAKE FOR ENTERPRISES
+                      06 / OLAKE FOR ENTERPRISES
                     </div>{' '}
                     <div
                       style={{
@@ -2181,7 +2446,7 @@ export default function HomePage() {
                     </div>
                   </div>{' '}
                   <a
-                    className='olakehome-h3'
+                    className='olakehome-h2'
                     href='/contact'
                     style={{
                       background: '#193AE6',
@@ -2218,7 +2483,7 @@ export default function HomePage() {
                     color: '#193AE6'
                   }}
                 >
-                  05 / BULLETIN
+                  07 / BULLETIN
                 </div>
                 <a
                   href='/blog'
@@ -2233,6 +2498,7 @@ export default function HomePage() {
                 </a>
               </div>{' '}
               <div
+                data-r='stack'
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(3,minmax(0,1fr))',
@@ -2317,7 +2583,10 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
-            <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 48px 132px' }}>
+            <div
+              data-r='pad'
+              style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 48px 132px' }}
+            >
               <div
                 style={{
                   display: 'flex',
@@ -2337,7 +2606,7 @@ export default function HomePage() {
                       marginBottom: '20px'
                     }}
                   >
-                    07 / ADDITIONAL RESOURCES
+                    08 / ADDITIONAL RESOURCES
                   </div>
                 </div>{' '}
                 <a
@@ -2353,6 +2622,7 @@ export default function HomePage() {
                 </a>
               </div>{' '}
               <div
+                data-r='stack'
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
@@ -2362,7 +2632,9 @@ export default function HomePage() {
               >
                 <a
                   className='olakehome-h7'
-                  href='/docs/getting-started/quickstart/'
+                  href='https://youtu.be/IcAJmW72d2A?si=hhKFCgp0Dsl2pRGp'
+                  target='_blank'
+                  rel='noopener noreferrer'
                   style={{
                     position: 'relative',
                     background: '#111319',

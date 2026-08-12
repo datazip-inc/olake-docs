@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   CONNECTORS,
   CONNECTOR_BENCHMARKS,
@@ -43,7 +43,7 @@ export function useGoLogic(props = {}) {
       },
       {
         q: 'What data platforms and tools does OLake integrate with?',
-        a: 'As of now, we integrate with Apache Iceberg as a destination. You can query it from most big data platforms like Snowflake, Databricks, Redshift and BigQuery.'
+        a: 'As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery.'
       }
     ],
     openFaq: -1,
@@ -81,8 +81,25 @@ export function useGoLogic(props = {}) {
     const connector = CONNECTORS[stateRef.current.activeSource] || CONNECTORS[0]
     const dataset =
       stateRef.current.benchmarkMode === 'cdc' ? CONNECTOR_CDC_BENCHMARKS : CONNECTOR_BENCHMARKS
-    const bench = dataset[connector.id]
+    const bench = dataset[connector.id] || {}
     const comps = competitorKeys(bench)
+    const def = {
+      comps: comps.map((key) => TOOLS[key].name),
+      rows: BENCHMARK_METRICS.map((metric) => {
+        const row = bench[metric] || {}
+        const isCmp = metric === 'comparison'
+        return {
+          label: CONNECTOR_METRIC_LABELS[metric],
+          cmp: isCmp,
+          // OLake is the baseline for the comparison row, so it shows a dash
+          // rather than a multiplier against itself.
+          olake: isCmp ? '–' : row.olake,
+          comps: comps.map((key) => row[key] ?? '-')
+        }
+      })
+    }
+    const comingSoon = !bench.hasData
+    const sourceName = connector.name
     const cols = [
       {
         name: 'Metrics',
@@ -102,8 +119,8 @@ export function useGoLogic(props = {}) {
         bg: GB,
         align: 'center'
       },
-      ...comps.map((key) => ({
-        name: TOOLS[key].name,
+      ...def.comps.map((name) => ({
+        name,
         sub: '',
         hasSub: false,
         olake: false,
@@ -118,24 +135,16 @@ export function useGoLogic(props = {}) {
       weight: type === 'olake' || type === 'cmp' ? 700 : 500,
       bg: type === 'olake' ? GB : 'transparent'
     })
-    const table = BENCHMARK_METRICS.map((metric) => {
-      const row = bench[metric]
-      const isCmp = metric === 'comparison'
-      return {
-        label: CONNECTOR_METRIC_LABELS[metric],
-        sub:
-          metric === 'cost'
-            ? 'OLake is OSS and self-hosted — only pay for your infrastructure.'
-            : '',
-        hasSub: metric === 'cost',
-        // OLake is the baseline for the comparison row, so it shows a dash, not a multiplier.
-        cells: [
-          cell(isCmp ? '–' : row.olake, 'olake'),
-          ...comps.map((key) => cell(row[key] ?? '-', isCmp ? 'cmp' : 'normal'))
-        ]
-      }
-    })
-    return { cols, table, comingSoon: !bench.hasData, sourceName: connector.name }
+    const table = def.rows.map((r) => ({
+      label: r.label,
+      sub:
+        r.label === 'Cost'
+          ? 'OLake is OSS and self-hosted — only pay for your infrastructure.'
+          : '',
+      hasSub: r.label === 'Cost',
+      cells: [cell(r.olake, 'olake'), ...r.comps.map((v) => cell(v, r.cmp ? 'cmp' : 'normal'))]
+    }))
+    return { cols, table, comingSoon, sourceName }
   }
 
   const selectBenchmarkMode = (mode) => {
@@ -216,7 +225,7 @@ export function useGoLogic(props = {}) {
       icebergStyle,
       problemSentences: [
         {
-          top: 27,
+          top: 22,
           left: 42,
           rot: -3,
           delay: 0,

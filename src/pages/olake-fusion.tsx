@@ -1,8 +1,6 @@
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
-import SiteNavbar from '@site/src/components/landing/Navbar/SiteNavbar'
-import '@site/src/components/landing/Navbar/SiteNavbar.css'
 import { PiLinkedinLogo, PiYoutubeLogo, PiSlackLogo, PiXLogo } from 'react-icons/pi'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
 import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
@@ -54,7 +52,6 @@ export default function OLakeFusionPage() {
       />
       <LightModeEnforcer />
       <div className='olakefusion-page olake-design-page'>
-        <SiteNavbar />
         <div
           style={{
             position: 'fixed',
@@ -195,8 +192,7 @@ export default function OLakeFusionPage() {
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              justifyContent: 'center'
             }}
           >
             <div
@@ -620,7 +616,6 @@ export default function OLakeFusionPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              scrollSnapAlign: 'start',
               borderTop: '1px solid rgba(27,30,43,0.08)'
             }}
           >
@@ -711,25 +706,16 @@ export default function OLakeFusionPage() {
           </div>{' '}
           <div
             style={{
-              height: '120px',
-              background:
-                'linear-gradient(180deg, #F5F6FA 0%, #EDEFFB 35%, #7385DD 80%, #3C52CC 100%)'
-            }}
-          />{' '}
-          <div
-            style={{
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              marginTop: '-1px',
+              background:
+                'linear-gradient(180deg, #F5F6FA 0%, #EDEFFB 12%, #7385DD 26%, #4F63D1 33%) top/100% 240px no-repeat, linear-gradient(0deg, #F5F6FA 0%, #EDEFFB 12%, #7385DD 26%, #4F63D1 33%) bottom/100% 240px no-repeat, #4F63D1'
             }}
           >
-            <div
-              className='features-wrap'
-              id='features'
-              style={{ padding: '60px 64px 20px', backgroundColor: '#3C52CCE5' }}
-            >
+            <div className='features-wrap' id='features' style={{ padding: '60px 64px 20px' }}>
               <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
                 <div style={{ textAlign: 'center', marginBottom: '64px' }}>
                   <div
@@ -1342,7 +1328,15 @@ export default function OLakeFusionPage() {
                                     <div
                                       style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
-                                      {/* image-slot: Docker logo */}{' '}
+                                      <span
+                                        style={{
+                                          width: '8px',
+                                          height: '8px',
+                                          borderRadius: '50%',
+                                          background: '#3D4FF0',
+                                          flexShrink: '0'
+                                        }}
+                                      />{' '}
                                       <span
                                         style={{
                                           fontSize: '13px',
@@ -1356,7 +1350,15 @@ export default function OLakeFusionPage() {
                                     <div
                                       style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
-                                      {/* image-slot: K8s logo */}{' '}
+                                      <span
+                                        style={{
+                                          width: '8px',
+                                          height: '8px',
+                                          borderRadius: '50%',
+                                          background: '#3D4FF0',
+                                          flexShrink: '0'
+                                        }}
+                                      />{' '}
                                       <span
                                         style={{
                                           fontSize: '13px',
@@ -1383,14 +1385,7 @@ export default function OLakeFusionPage() {
                   </div>
                 </div>
               </div>
-            </div>{' '}
-            <div
-              style={{
-                height: '120px',
-                background:
-                  'linear-gradient(180deg, #3C52CC 0%, #7385DD 20%, #EDEFFB 65%, #F5F6FA 100%)'
-              }}
-            />
+            </div>
           </div>{' '}
           <div
             style={{
@@ -1398,7 +1393,6 @@ export default function OLakeFusionPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              scrollSnapAlign: 'start',
               position: 'relative'
             }}
           >
@@ -1460,8 +1454,8 @@ export default function OLakeFusionPage() {
                   margin: '0 auto 56px'
                 }}
               >
-                OLake Fusion compacted Apache Iceberg tables <b>2.06×</b> faster than Apache Spark
-                and at roughly <b>half the cost</b>.
+                OLake Fusion compacts Apache Iceberg tables <b>2.06× </b>
+                faster than Apache Spark and at roughly <b>half the cost</b>.
               </div>{' '}
               <div
                 style={{
@@ -1707,8 +1701,7 @@ export default function OLakeFusionPage() {
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              justifyContent: 'center'
             }}
           >
             <div
@@ -1792,8 +1785,7 @@ export default function OLakeFusionPage() {
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              justifyContent: 'center'
             }}
           >
             <div
@@ -1840,7 +1832,7 @@ export default function OLakeFusionPage() {
                       maxWidth: '480px'
                     }}
                   >
-                    Fastest <span style={{ fontWeight: '800' }}>Data Replication</span>
+                    Optimized <span style={{ fontWeight: '800' }}>Iceberg Tables</span>
                   </h2>
                   <div
                     style={{

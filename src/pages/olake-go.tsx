@@ -1,8 +1,6 @@
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
-import SiteNavbar from '@site/src/components/landing/Navbar/SiteNavbar'
-import '@site/src/components/landing/Navbar/SiteNavbar.css'
 import { PiLinkedinLogo, PiYoutubeLogo, PiSlackLogo, PiXLogo } from 'react-icons/pi'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
 import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
@@ -18,10 +16,10 @@ export default function OLakeGoPage() {
     problemSentences,
     features,
     benchSources,
-    benchCols,
-    benchTable,
     benchModes,
     benchModeIndicatorLeft,
+    benchCols,
+    benchTable,
     benchComingSoon,
     benchHasData,
     benchSourceName,
@@ -61,7 +59,6 @@ export default function OLakeGoPage() {
       />
       <LightModeEnforcer />
       <div className='olakego-page olake-design-page'>
-        <SiteNavbar />
         <div
           style={{
             position: 'fixed',
@@ -119,7 +116,6 @@ export default function OLakeGoPage() {
         >
           <div
             style={{
-              minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -130,7 +126,7 @@ export default function OLakeGoPage() {
               className='hero-wrap'
               style={{
                 position: 'relative',
-                padding: '88px 64px 60px',
+                padding: '56px 64px 36px',
                 maxWidth: '1120px',
                 margin: '0 auto',
                 textAlign: 'center'
@@ -179,7 +175,7 @@ export default function OLakeGoPage() {
                   fontWeight: '700',
                   letterSpacing: '0.08em',
                   color: '#3D4FF0',
-                  marginBottom: '48px'
+                  marginBottom: '32px'
                 }}
               >
                 <img
@@ -204,56 +200,56 @@ export default function OLakeGoPage() {
                 }}
               >
                 Fastest Replication to Iceberg & S3
-              </h1>
-            </div>{' '}
-            <div
-              className='hero-btns'
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '20px',
-                marginTop: '56px'
-              }}
-            >
-              <a
-                className='olakego-h2'
-                href='/docs/getting-started/quickstart/'
+              </h1>{' '}
+              <div
+                className='hero-btns'
                 style={{
-                  color: '#fff',
-                  background: '#3D4FF0',
-                  padding: '14px 28px',
-                  borderRadius: '9px',
-                  fontWeight: '600',
-                  fontSize: '15px',
-                  border: '2px solid #3D4FF0',
-                  boxShadow: '0 5px 0 #23309E',
-                  transform: 'translateY(-2px)',
-                  textDecoration: 'none',
-                  display: 'inline-block'
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '20px',
+                  marginTop: '36px'
                 }}
               >
-                Get Started
-              </a>{' '}
-              <a
-                className='olakego-h3'
-                href='/contact'
-                style={{
-                  color: '#10173A',
-                  background: '#fff',
-                  padding: '14px 28px',
-                  borderRadius: '9px',
-                  fontWeight: '600',
-                  fontSize: '15px',
-                  border: '2px solid #10173A',
-                  boxShadow: '0 5px 0 #10173A',
-                  transform: 'translateY(-2px)',
-                  textDecoration: 'none',
-                  display: 'inline-block'
-                }}
-              >
-                Talk to us
-              </a>
+                <a
+                  className='olakego-h2'
+                  href='/docs/getting-started/quickstart/'
+                  style={{
+                    color: '#fff',
+                    background: '#3D4FF0',
+                    padding: '14px 28px',
+                    borderRadius: '9px',
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    border: '2px solid #3D4FF0',
+                    boxShadow: '0 5px 0 #23309E',
+                    transform: 'translateY(-2px)',
+                    textDecoration: 'none',
+                    display: 'inline-block'
+                  }}
+                >
+                  Get Started
+                </a>{' '}
+                <a
+                  className='olakego-h3'
+                  href='/contact'
+                  style={{
+                    color: '#10173A',
+                    background: '#fff',
+                    padding: '14px 28px',
+                    borderRadius: '9px',
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    border: '2px solid #10173A',
+                    boxShadow: '0 5px 0 #10173A',
+                    transform: 'translateY(-2px)',
+                    textDecoration: 'none',
+                    display: 'inline-block'
+                  }}
+                >
+                  Talk to us
+                </a>
+              </div>
             </div>
           </div>
           <div
@@ -261,7 +257,7 @@ export default function OLakeGoPage() {
             style={{
               maxWidth: '900px',
               width: '100%',
-              margin: '72px auto 56px',
+              margin: '28px auto 56px',
               padding: '20px 40px',
               position: 'relative',
               zIndex: '10'
@@ -273,7 +269,7 @@ export default function OLakeGoPage() {
                 display: 'grid',
                 gridTemplateColumns: '1fr auto 1fr',
                 alignItems: 'start',
-                height: '210px',
+                height: '326px',
                 position: 'relative'
               }}
             >
@@ -290,6 +286,7 @@ export default function OLakeGoPage() {
                 }}
               />
               <div
+                className='arch-sources'
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -299,6 +296,7 @@ export default function OLakeGoPage() {
                 }}
               >
                 <div
+                  className='arch-src-label'
                   style={{
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontSize: '10px',
@@ -475,14 +473,114 @@ export default function OLakeGoPage() {
                   >
                     S3
                   </span>
+                </div>{' '}
+                <div
+                  className='src-box'
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    background: '#fff',
+                    border: '1.5px solid #E1E4F3',
+                    borderRadius: '9px',
+                    padding: '6px 12px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#C74634',
+                      flexShrink: '0'
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10173A',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Oracle
+                  </span>
+                </div>{' '}
+                <div
+                  className='src-box'
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    background: '#fff',
+                    border: '1.5px solid #E1E4F3',
+                    borderRadius: '9px',
+                    padding: '6px 12px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#A91D22',
+                      flexShrink: '0'
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10173A',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    MSSQL
+                  </span>
+                </div>{' '}
+                <div
+                  className='src-box'
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    background: '#fff',
+                    border: '1.5px solid #E1E4F3',
+                    borderRadius: '9px',
+                    padding: '6px 12px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#1F70C1',
+                      flexShrink: '0'
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10173A',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    DB2 LUW
+                  </span>
                 </div>
               </div>
               <div
+                className='arch-node'
                 style={{
                   textAlign: 'center',
                   flexShrink: '0',
                   justifySelf: 'center',
-                  transform: 'translateY(55px)'
+                  transform: 'translateY(68px)'
                 }}
               >
                 <div
@@ -578,7 +676,7 @@ export default function OLakeGoPage() {
                   gap: '12px',
                   flexShrink: '0',
                   justifySelf: 'end',
-                  transform: 'translateY(36px)'
+                  transform: 'translateY(96px)'
                 }}
               >
                 <div
@@ -788,15 +886,7 @@ export default function OLakeGoPage() {
               'linear-gradient(180deg, #F5F6FA 0%, #EDEFFB 35%, #7385DD 80%, #3C52CC 100%)'
           }}
         />
-        <div
-          style={{
-            minHeight: '65vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            scrollSnapAlign: 'start'
-          }}
-        >
+        <div style={{ scrollSnapAlign: 'start' }}>
           <div
             className='features-wrap'
             id='features'
@@ -1725,7 +1815,7 @@ export default function OLakeGoPage() {
                   </div>
                 ))}
               </div>
-            </div>{' '}
+            </div>
             <div
               style={{
                 display: 'flex',
