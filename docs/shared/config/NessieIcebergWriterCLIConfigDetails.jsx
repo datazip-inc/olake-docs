@@ -37,7 +37,7 @@ const FIELDS = [
     authTypes: AUTH_COMMON,
     parameter: 'catalog_type',
     required: true,
-    sample: 'rest',
+    sample: 'nessie',
     description:
       'Defines the catalog type used by the writer.',
   },

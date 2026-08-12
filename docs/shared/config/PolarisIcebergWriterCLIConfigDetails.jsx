@@ -11,6 +11,15 @@ const AUTH_COMMON = [AUTH_OAUTH2, AUTH_TOKEN];
 
 const FIELDS = [
   {
+    id: 'catalog-type',
+    authTypes: AUTH_COMMON,
+    parameter: 'catalog_type',
+    required: true,
+    sample: 'polaris',
+    description:
+      'Defines the catalog type used by the writer.',
+  },
+  {
     id: 'rest-catalog-url',
     authTypes: AUTH_COMMON,
     parameter: 'rest_catalog_url',

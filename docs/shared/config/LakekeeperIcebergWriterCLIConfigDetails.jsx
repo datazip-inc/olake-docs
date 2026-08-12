@@ -16,7 +16,7 @@ const FIELDS = [
     authTypes: AUTH_COMMON,
     parameter: 'catalog_type',
     required: true,
-    sample: 'rest',
+    sample: 'lakekeeper',
     description:
       'Defines the catalog type used by the writer.',
   },
