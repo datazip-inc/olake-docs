@@ -1,7 +1,6 @@
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
-import { PiLinkedinLogo, PiYoutubeLogo, PiSlackLogo, PiXLogo } from 'react-icons/pi'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
 import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
 import { useGoLogic } from '@site/src/components/landing/pages/useGoLogic'
@@ -47,7 +46,6 @@ export default function OLakeGoPage() {
       title={GO_SEO.title}
       description={GO_SEO.description}
       wrapperClassName='landing-page'
-      noFooter
     >
       <LandingSeo
         title={GO_SEO.title}
@@ -1918,7 +1916,7 @@ export default function OLakeGoPage() {
                       style={{
                         display: 'grid',
                         gridTemplateColumns:
-                          'minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+                          'minmax(0,1.15fr) minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
                         borderBottom: '1px solid #EEF0F8'
                       }}
                     >
@@ -1977,7 +1975,7 @@ export default function OLakeGoPage() {
                           style={{
                             display: 'grid',
                             gridTemplateColumns:
-                              'minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+                              'minmax(0,1.15fr) minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
                             borderTop: '1px solid #EEF0F8'
                           }}
                         >
@@ -2297,295 +2295,6 @@ export default function OLakeGoPage() {
                   </div>
                 </React.Fragment>
               ))}
-            </div>
-          </div>
-        </div>
-        <div
-          style={{
-            minHeight: '65vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            scrollSnapAlign: 'start'
-          }}
-        >
-          <div
-            className='footer-wrap'
-            style={{
-              background: '#F7F8FA',
-              padding: '64px 64px 0',
-              overflow: 'hidden',
-              position: 'relative'
-            }}
-          >
-            <div
-              style={{
-                maxWidth: '1280px',
-                margin: '0 auto',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '40px',
-                flexWrap: 'wrap',
-                position: 'relative',
-                zIndex: '1'
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    fontWeight: '700',
-                    fontSize: '24px',
-                    color: '#3D4FF0',
-                    marginBottom: '20px'
-                  }}
-                >
-                  OLake
-                </div>
-                <h2
-                  className='footer-hero'
-                  style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    fontWeight: '600',
-                    fontSize: '38px',
-                    lineHeight: '1.15',
-                    color: '#10173A',
-                    maxWidth: '480px'
-                  }}
-                >
-                  Fastest <span style={{ fontWeight: '800' }}>Data Replication</span>
-                </h2>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '28px' }}
-                >
-                  <a
-                    className='olake-footer-social'
-                    href='https://www.linkedin.com/company/datazipio/'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='LinkedIn'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiLinkedinLogo size={17} aria-hidden />
-                  </a>
-                  <a
-                    className='olake-footer-social'
-                    href='https://www.youtube.com/@olakeio'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='YouTube'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiYoutubeLogo size={17} aria-hidden />
-                  </a>
-                  <a
-                    className='olake-footer-social'
-                    href='/slack'
-                    aria-label='Slack'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiSlackLogo size={17} aria-hidden />
-                  </a>
-                  <a
-                    className='olake-footer-social'
-                    href='https://x.com/_olake'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='X'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiXLogo size={17} aria-hidden />
-                  </a>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '64px', flexWrap: 'wrap' }}>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      fontWeight: '700',
-                      color: '#10173A',
-                      marginBottom: '18px'
-                    }}
-                  >
-                    COMPANY
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      fontSize: '15px',
-                      color: '#8890A8'
-                    }}
-                  >
-                    <a className='olake-footer-link' href='/about-us' style={{ color: '#8890A8' }}>
-                      About us
-                    </a>
-                    <a className='olake-footer-link' href='/contact' style={{ color: '#8890A8' }}>
-                      Contact us
-                    </a>
-                    <a className='olake-footer-link' href='/branding' style={{ color: '#8890A8' }}>
-                      Branding
-                    </a>
-                    <a
-                      className='olake-footer-link'
-                      href='/terms-of-use'
-                      style={{ color: '#8890A8' }}
-                    >
-                      Terms of Use
-                    </a>
-                    <a
-                      className='olake-footer-link'
-                      href='/privacy-policy'
-                      style={{ color: '#8890A8' }}
-                    >
-                      Privacy Policy
-                    </a>
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      fontWeight: '700',
-                      color: '#10173A',
-                      marginBottom: '18px'
-                    }}
-                  >
-                    RESOURCES
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      fontSize: '15px',
-                      color: '#8890A8'
-                    }}
-                  >
-                    <a className='olake-footer-link' href='/blog' style={{ color: '#8890A8' }}>
-                      Blogs
-                    </a>
-                    <a className='olake-footer-link' href='/docs' style={{ color: '#8890A8' }}>
-                      Docs
-                    </a>
-                    <a className='olake-footer-link' href='/search' style={{ color: '#8890A8' }}>
-                      Search
-                    </a>
-                    <a className='olake-footer-link' href='/slack-archive' style={{ color: '#8890A8' }}>
-                      Community Slack Archive
-                    </a>
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      fontWeight: '700',
-                      color: '#10173A',
-                      marginBottom: '18px'
-                    }}
-                  >
-                    TOP READS
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      fontSize: '15px',
-                      color: '#8890A8',
-                      maxWidth: '180px'
-                    }}
-                  >
-                    <a
-                      className='olake-footer-link'
-                      href='/blog/issues-debezium-kafka'
-                      style={{ color: '#8890A8' }}
-                    >
-                      Issues with Debezium
-                    </a>
-                    <a
-                      className='olake-footer-link'
-                      href='/blog/olake-architecture'
-                      style={{ color: '#8890A8' }}
-                    >
-                      OLake Architecture
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              style={{
-                maxWidth: '1280px',
-                margin: '40px auto 0',
-                position: 'relative',
-                zIndex: '1',
-                fontSize: '13px',
-                color: '#AEB4C4',
-                paddingBottom: '24px'
-              }}
-            >
-              By Datazip
-            </div>
-            <div
-              className='footer-watermark'
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: '700',
-                fontSize: '260px',
-                lineHeight: '1',
-                color: '#EDEFF4',
-                whiteSpace: 'nowrap',
-                textAlign: 'center',
-                userSelect: 'none'
-              }}
-            >
-              OLake
             </div>
           </div>
         </div>
