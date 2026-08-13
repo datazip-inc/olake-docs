@@ -14,7 +14,7 @@ const FIELDS = [
     authTypes: AUTH_ALL,
     parameter: 'catalog_type',
     required: true,
-    sample: 'rest',
+    sample: 'unity',
     description:
       'Defines the catalog type used by the writer.',
   },
