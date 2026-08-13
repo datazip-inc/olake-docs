@@ -46,7 +46,7 @@ export default function HomePage() {
     terminalLines,
     tickerLoop,
     engines,
-    logosLoop,
+    logos,
     archSources,
     archGoChips,
     archFusionChips,
@@ -767,53 +767,61 @@ export default function HomePage() {
               style={{
                 overflow: 'hidden',
                 width: '100%',
+                display: 'flex',
+                gap: '28px',
                 WebkitMaskImage:
                   'linear-gradient(90deg,transparent,#ffffff 12%,#ffffff 88%,transparent)',
                 maskImage: 'linear-gradient(90deg,transparent,#ffffff 12%,#ffffff 88%,transparent)'
               }}
             >
-              <div
-                className='olakehome-marquee'
-                style={{
-                  display: 'flex',
-                  gap: '28px',
-                  width: 'max-content',
-                  animation: 'tickerScroll 26s linear infinite'
-                }}
-              >
-                {/* One copy per pass: the second is a duplicate that makes the scroll seamless. */}
-                {(logosLoop || []).map((logo, logoIdx) => (
-                  <div
-                    key={logoIdx}
-                    aria-hidden={logoIdx >= (logosLoop || []).length / 2 || undefined}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '54px',
-                      padding: '0 26px',
-                      background: '#ffffff',
-                      borderRadius: '14px',
-                      flexShrink: '0'
-                    }}
-                  >
-                    <img
-                      src={logo.src}
-                      alt={logo.name}
-                      width={logo.w}
-                      height={logo.h}
-                      loading={logoIdx < (logosLoop || []).length / 2 ? undefined : 'lazy'}
-                      decoding='async'
+              {/* Two groups, each logos repeated enough to outwidth any screen:
+                  shifting one full group left is then seamless at any width. */}
+              {[0, 1].map((groupIdx) => (
+                <div
+                  key={groupIdx}
+                  className='olakehome-marquee'
+                  aria-hidden={groupIdx === 1 || undefined}
+                  style={{
+                    display: 'flex',
+                    gap: '28px',
+                    width: 'max-content',
+                    flexShrink: 0,
+                    animation: 'tickerScroll 30s linear infinite'
+                  }}
+                >
+                  {/* 3x: group must outwidth any screen or the loop gap shows. */}
+                  {[...(logos || []), ...(logos || []), ...(logos || [])].map((logo, logoIdx) => (
+                    <div
+                      key={logoIdx}
                       style={{
-                        maxHeight: logo.maxH,
-                        maxWidth: logo.maxW,
-                        width: 'auto',
-                        objectFit: 'contain'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '54px',
+                        padding: '0 26px',
+                        background: '#ffffff',
+                        borderRadius: '14px',
+                        flexShrink: '0'
                       }}
-                    />
-                  </div>
-                ))}
-              </div>
+                    >
+                      <img
+                        src={logo.src}
+                        alt={logo.name}
+                        width={logo.w}
+                        height={logo.h}
+                        loading={groupIdx === 0 ? undefined : 'lazy'}
+                        decoding='async'
+                        style={{
+                          maxHeight: logo.maxH,
+                          maxWidth: logo.maxW,
+                          width: 'auto',
+                          objectFit: 'contain'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
           <div

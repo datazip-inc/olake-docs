@@ -1,5 +1,6 @@
 import React, { useState, type ReactNode } from 'react'
 import Link from '@docusaurus/Link'
+import { useLocation } from '@docusaurus/router'
 import { cn } from '@site/src/lib/utils'
 import useGetReleases from '@site/src/hooks/useGetReleases'
 import {
@@ -7,6 +8,7 @@ import {
   MOBILE_LINKS,
   PRICING_LINK,
   GITHUB_REPO_URL,
+  FUSION_GITHUB_REPO_URL,
   SLACK_URL,
   CTA,
   isFlyout,
@@ -39,17 +41,28 @@ const StarMark = () => (
   </svg>
 )
 
-/** Star count. In the bar on desktop; the design moves it into the drawer on mobile. */
-const StarPill = ({ stars }: { stars: string }) => (
+const StarPill = ({
+  stars,
+  repoUrl,
+  showCount
+}: {
+  stars: string
+  repoUrl: string
+  showCount: boolean
+}) => (
   <a
-    href={GITHUB_REPO_URL}
+    href={repoUrl}
     target='_blank'
     rel='noopener noreferrer'
-    aria-label={`GitHub — ${stars} stars`}
-    className='olake-nav-stars'
+    aria-label={showCount ? `GitHub — ${stars} stars` : 'GitHub'}
+    className={cn('olake-nav-stars', !showCount && 'olake-nav-stars--icon-only')}
   >
     <img src='/img/landing/shared/github-icon.webp' alt='' width={28} height={29} />
-    <StarMark /> {stars}
+    {showCount && (
+      <>
+        <StarMark /> {stars}
+      </>
+    )}
   </a>
 )
 
@@ -198,6 +211,8 @@ export default function SiteNavbar({ trailing, mobileSidebar }: SiteNavbarProps)
   const { stargazersCount } = useGetReleases()
   const stars = formatStars(stargazersCount)
   const [ownOpen, setOwnOpen] = useState(false)
+  const isFusion = useLocation().pathname.startsWith('/olake-fusion')
+  const repoUrl = isFusion ? FUSION_GITHUB_REPO_URL : GITHUB_REPO_URL
 
   const mobileOpen = mobileSidebar ? mobileSidebar.shown : ownOpen
   const toggleMobile = mobileSidebar ? mobileSidebar.toggle : () => setOwnOpen((o) => !o)
@@ -227,11 +242,11 @@ export default function SiteNavbar({ trailing, mobileSidebar }: SiteNavbarProps)
         </div>
 
         <div className='olake-nav-right'>
-          <StarPill stars={stars} />
+          <StarPill stars={stars} repoUrl={repoUrl} showCount={!isFusion} />
           {/* Below the breakpoint the design drops the count and shows the mark
               alone; the full pill moves into the drawer. */}
           <a
-            href={GITHUB_REPO_URL}
+            href={repoUrl}
             target='_blank'
             rel='noopener noreferrer'
             aria-label='GitHub'
@@ -277,7 +292,7 @@ export default function SiteNavbar({ trailing, mobileSidebar }: SiteNavbarProps)
             )
           )}
           <div className='olake-nav-mobile-social'>
-            <StarPill stars={stars} />
+            <StarPill stars={stars} repoUrl={repoUrl} showCount={!isFusion} />
             <SlackLink />
           </div>
         </div>

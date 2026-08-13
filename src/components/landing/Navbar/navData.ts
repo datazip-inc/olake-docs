@@ -58,8 +58,7 @@ export const NAV_ENTRIES: NavEntry[] = [
         items: [
           { label: 'OLake Community', href: '/community' },
           { label: 'Top Contributors', href: '/community/contributors' },
-          { label: 'Contributor Program', href: '/community/contributor-program' },
-          { label: 'GSoC', href: '/community/gsoc' }
+          { label: 'Contributor Program', href: '/community/contributor-program' }
         ]
       },
       {
@@ -99,5 +98,6 @@ export const MOBILE_LINKS: MobileNavItem[] = [
 ]
 
 export const GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake'
+export const FUSION_GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake-fusion'
 export const SLACK_URL = '/slack'
 export const CTA = { label: "Try, it's free!", href: '/docs/getting-started/quickstart/' }

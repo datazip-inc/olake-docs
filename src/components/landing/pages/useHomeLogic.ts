@@ -287,7 +287,7 @@ export function useHomeLogic(props = {}) {
         }
       ],
 
-      logosLoop: [...logos, ...logos],
+      logos,
 
       selectGo: () => setState({ advantage: 'go' }),
       selectFusion: () => setState({ advantage: 'fusion' }),
@@ -307,7 +307,7 @@ export function useHomeLogic(props = {}) {
           num: '01',
           kicker: 'FAST',
           title: 'Replicate databases at scale',
-          body: 'Sync MySQL, Postgres, MongoDB, Kafka, and more to Apache Iceberg with parallelised chunking, incremental sync, and CDC.'
+          body: 'Sync MySQL, Postgres, MongoDB, Kafka, and more to Apache Iceberg and Parquet with parallelised chunking, incremental sync, and CDC.'
         },
         {
           stickyTop: 138,

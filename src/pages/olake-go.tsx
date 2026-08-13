@@ -42,11 +42,7 @@ export default function OLakeGoPage() {
   } = useGoLogic({ icebergPosX: 54, icebergPosY: 53, icebergZoom: 100, icebergOpacity: 65 })
 
   return (
-    <Layout
-      title={GO_SEO.title}
-      description={GO_SEO.description}
-      wrapperClassName='landing-page'
-    >
+    <Layout title={GO_SEO.title} description={GO_SEO.description} wrapperClassName='landing-page'>
       <LandingSeo
         title={GO_SEO.title}
         description={GO_SEO.description}
@@ -923,7 +919,7 @@ export default function OLakeGoPage() {
                   display: 'grid',
                   gridTemplateColumns: '0.8fr 1.2fr',
                   gap: '56px',
-                  alignItems: 'start'
+                  alignItems: 'center'
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -967,443 +963,520 @@ export default function OLakeGoPage() {
                     </React.Fragment>
                   ))}
                 </div>{' '}
-                <div style={{ minHeight: '220px' }}>
+                <div
+                  className='features-card-slot'
+                  style={{ display: 'grid', gridTemplateColumns: '1fr', minWidth: 0 }}
+                >
                   {(features || []).map((feat, featIdx) => (
                     <React.Fragment key={featIdx}>
-                      {feat.active ? (
-                        <>
+                      <div
+                        style={{
+                          gridColumn: '1',
+                          gridRow: '1',
+                          minWidth: 0,
+                          visibility: feat.active ? 'visible' : 'hidden',
+                          pointerEvents: feat.active ? 'auto' : 'none'
+                        }}
+                      >
+                        <div
+                          key={feat.active ? `active-${featIdx}` : 'idle'}
+                          className='features-card'
+                          style={{
+                            border: '1px solid #E4E7F2',
+                            borderRadius: '18px',
+                            padding: '40px',
+                            background: '#fff',
+                            boxShadow: '0 24px 50px -30px rgba(10,14,39,0.5)',
+                            animation: 'fadeSlideIn 0.5s ease'
+                          }}
+                        >
                           <div
-                            className='features-card'
                             style={{
-                              border: '1px solid #E4E7F2',
-                              borderRadius: '18px',
-                              padding: '40px',
-                              background: '#fff',
-                              boxShadow: '0 24px 50px -30px rgba(10,14,39,0.5)',
-                              animation: 'fadeSlideIn 0.5s ease'
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg,#3D4FF0,#6E7CFF)',
+                              marginBottom: '22px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                           >
-                            <div
-                              style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '10px',
-                                background: 'linear-gradient(135deg,#3D4FF0,#6E7CFF)',
-                                marginBottom: '22px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              {feat.isTiered ? (
-                                <>
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'flex-end',
-                                      gap: '3px',
-                                      height: '20px'
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '5px',
-                                        height: '8px',
-                                        background: 'rgba(255,255,255,0.55)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '5px',
-                                        height: '14px',
-                                        background: 'rgba(255,255,255,0.8)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '5px',
-                                        height: '20px',
-                                        background: '#fff',
-                                        borderRadius: '2px'
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              ) : null}{' '}
-                              {feat.isDecay ? (
-                                <>
-                                  <div
-                                    style={{ position: 'relative', width: '22px', height: '22px' }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        inset: '0',
-                                        border: '2.5px solid rgba(255,255,255,0.5)',
-                                        borderRadius: '5px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        right: '-3px',
-                                        bottom: '-3px',
-                                        width: '12px',
-                                        height: '12px',
-                                        background: '#fff',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '6px',
-                                          height: '2px',
-                                          background: '#3D4FF0',
-                                          borderRadius: '1px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          width: '2px',
-                                          height: '6px',
-                                          background: '#3D4FF0',
-                                          borderRadius: '1px'
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                </>
-                              ) : null}{' '}
-                              {feat.isChunk ? (
-                                <>
-                                  <div
-                                    style={{ display: 'flex', gap: '3px', alignItems: 'center' }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: '#fff',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: 'rgba(255,255,255,0.75)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: 'rgba(255,255,255,0.55)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: 'rgba(255,255,255,0.4)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              ) : null}{' '}
-                              {feat.isResume ? (
-                                <>
-                                  <div
-                                    style={{
-                                      width: '20px',
-                                      height: '20px',
-                                      border: '2.5px solid #fff',
-                                      borderTopColor: 'transparent',
-                                      borderRadius: '50%',
-                                      position: 'relative'
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: '-3px',
-                                        right: '-1px',
-                                        width: '0',
-                                        height: '0',
-                                        borderLeft: '5px solid #fff',
-                                        borderTop: '3px solid transparent',
-                                        borderBottom: '3px solid transparent',
-                                        transform: 'rotate(20deg)'
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              ) : null}
-                            </div>{' '}
-                            <h3
-                              style={{
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                fontWeight: '700',
-                                fontSize: '20px',
-                                letterSpacing: '0.03em',
-                                color: '#10173A',
-                                margin: '0 0 22px'
-                              }}
-                            >
-                              {feat.title}
-                            </h3>{' '}
                             {feat.isTiered ? (
                               <>
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-end',
+                                    gap: '3px',
+                                    height: '20px'
+                                  }}
+                                >
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      padding: '16px 14px'
+                                      width: '5px',
+                                      height: '8px',
+                                      background: 'rgba(255,255,255,0.55)',
+                                      borderRadius: '2px'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.05em',
-                                        color: '#3D4FF0',
-                                        marginBottom: '12px'
-                                      }}
-                                    >
-                                      FULL
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'flex-end',
-                                        gap: '3px',
-                                        height: '34px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '100%',
-                                          background: '#3D4FF0',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '100%',
-                                          background: '#3D4FF0',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '100%',
-                                          background: '#3D4FF0',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: '#5B6484',
-                                        marginTop: '10px'
-                                      }}
-                                    >
-                                      one-time load
-                                    </div>
-                                  </div>{' '}
+                                  />{' '}
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      padding: '16px 14px'
+                                      width: '5px',
+                                      height: '14px',
+                                      background: 'rgba(255,255,255,0.8)',
+                                      borderRadius: '2px'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.05em',
-                                        color: '#4F5FF5',
-                                        marginBottom: '12px'
-                                      }}
-                                    >
-                                      INCREMENTAL
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'flex-end',
-                                        gap: '3px',
-                                        height: '34px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '38%',
-                                          background: '#4F5FF5',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '60%',
-                                          background: '#4F5FF5',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '48%',
-                                          background: '#4F5FF5',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: '#5B6484',
-                                        marginTop: '10px'
-                                      }}
-                                    >
-                                      on schedule
-                                    </div>
-                                  </div>{' '}
+                                  />{' '}
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      padding: '16px 14px'
+                                      width: '5px',
+                                      height: '20px',
+                                      background: '#fff',
+                                      borderRadius: '2px'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.05em',
-                                        color: '#6E7CFF',
-                                        marginBottom: '12px'
-                                      }}
-                                    >
-                                      CDC
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        height: '34px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '9px',
-                                          height: '9px',
-                                          borderRadius: '50%',
-                                          background: '#6E7CFF',
-                                          animation: 'wordFloat 1.6s ease-in-out infinite'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '2px',
-                                          background: 'linear-gradient(90deg,#6E7CFF,transparent)',
-                                          borderRadius: '2px'
-                                        }}
-                                      />
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: '#5B6484',
-                                        marginTop: '10px'
-                                      }}
-                                    >
-                                      real-time
-                                    </div>
-                                  </div>
+                                  />
                                 </div>
                               </>
                             ) : null}{' '}
                             {feat.isDecay ? (
                               <>
                                 <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '16px',
-                                    marginBottom: '26px'
-                                  }}
+                                  style={{ position: 'relative', width: '22px', height: '22px' }}
                                 >
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      overflow: 'hidden'
+                                      position: 'absolute',
+                                      inset: '0',
+                                      border: '2.5px solid rgba(255,255,255,0.5)',
+                                      borderRadius: '5px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      right: '-3px',
+                                      bottom: '-3px',
+                                      width: '12px',
+                                      height: '12px',
+                                      background: '#fff',
+                                      borderRadius: '50%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
                                     }}
                                   >
                                     <div
                                       style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.04em',
-                                        color: '#8890C4',
-                                        padding: '10px 14px',
-                                        borderBottom: '1px solid #EEF0F8'
+                                        width: '6px',
+                                        height: '2px',
+                                        background: '#3D4FF0',
+                                        borderRadius: '1px'
                                       }}
-                                    >
-                                      SOURCE TABLE
-                                    </div>{' '}
+                                    />
                                     <div
                                       style={{
-                                        padding: '8px 14px',
+                                        position: 'absolute',
+                                        width: '2px',
+                                        height: '6px',
+                                        background: '#3D4FF0',
+                                        borderRadius: '1px'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isChunk ? (
+                              <>
+                                <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: '#fff',
+                                      borderRadius: '2px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.75)',
+                                      borderRadius: '2px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.55)',
+                                      borderRadius: '2px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.4)',
+                                      borderRadius: '2px'
+                                    }}
+                                  />
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isResume ? (
+                              <>
+                                <div
+                                  style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    border: '2.5px solid #fff',
+                                    borderTopColor: 'transparent',
+                                    borderRadius: '50%',
+                                    position: 'relative'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-3px',
+                                      right: '-1px',
+                                      width: '0',
+                                      height: '0',
+                                      borderLeft: '5px solid #fff',
+                                      borderTop: '3px solid transparent',
+                                      borderBottom: '3px solid transparent',
+                                      transform: 'rotate(20deg)'
+                                    }}
+                                  />
+                                </div>
+                              </>
+                            ) : null}
+                          </div>{' '}
+                          <h3
+                            style={{
+                              fontFamily: "'Space Grotesk', sans-serif",
+                              fontWeight: '700',
+                              fontSize: '20px',
+                              letterSpacing: '0.03em',
+                              color: '#10173A',
+                              margin: '0 0 22px'
+                            }}
+                          >
+                            {feat.title}
+                          </h3>{' '}
+                          {feat.isTiered ? (
+                            <>
+                              <div style={{ display: 'flex', gap: '12px', marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    padding: '16px 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.05em',
+                                      color: '#3D4FF0',
+                                      marginBottom: '12px'
+                                    }}
+                                  >
+                                    FULL
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-end',
+                                      gap: '3px',
+                                      height: '34px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '100%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '100%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '100%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#5B6484',
+                                      marginTop: '10px'
+                                    }}
+                                  >
+                                    one-time load
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    padding: '16px 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.05em',
+                                      color: '#4F5FF5',
+                                      marginBottom: '12px'
+                                    }}
+                                  >
+                                    INCREMENTAL
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-end',
+                                      gap: '3px',
+                                      height: '34px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '38%',
+                                        background: '#4F5FF5',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '60%',
+                                        background: '#4F5FF5',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '48%',
+                                        background: '#4F5FF5',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#5B6484',
+                                      marginTop: '10px'
+                                    }}
+                                  >
+                                    on schedule
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    padding: '16px 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.05em',
+                                      color: '#6E7CFF',
+                                      marginBottom: '12px'
+                                    }}
+                                  >
+                                    CDC
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      height: '34px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: '9px',
+                                        height: '9px',
+                                        borderRadius: '50%',
+                                        background: '#6E7CFF',
+                                        animation: 'wordFloat 1.6s ease-in-out infinite'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '2px',
+                                        background: 'linear-gradient(90deg,#6E7CFF,transparent)',
+                                        borderRadius: '2px'
+                                      }}
+                                    />
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#5B6484',
+                                      marginTop: '10px'
+                                    }}
+                                  >
+                                    real-time
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          {feat.isDecay ? (
+                            <>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '16px',
+                                  marginBottom: '26px'
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.04em',
+                                      color: '#8890C4',
+                                      padding: '10px 14px',
+                                      borderBottom: '1px solid #EEF0F8'
+                                    }}
+                                  >
+                                    SOURCE TABLE
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      padding: '8px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '7px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '80%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '65%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '72%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{ fontSize: '22px', color: '#6E7CFF', flexShrink: '0' }}
+                                >
+                                  →
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#fff',
+                                    border: '1.5px solid #3D4FF0',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 8px 20px -12px rgba(61,79,240,0.5)'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.04em',
+                                      color: '#3D4FF0',
+                                      padding: '10px 14px',
+                                      borderBottom: '1px solid #EEF0F8'
+                                    }}
+                                  >
+                                    ICEBERG TABLE
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      padding: '8px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '7px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '80%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '65%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '7px'
+                                        alignItems: 'center',
+                                        gap: '6px'
                                       }}
                                     >
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '80%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '65%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
                                       <div
                                         style={{
                                           height: '7px',
@@ -1412,275 +1485,206 @@ export default function OLakeGoPage() {
                                           borderRadius: '3px'
                                         }}
                                       />
+                                      <span
+                                        style={{
+                                          fontSize: '9px',
+                                          fontWeight: '700',
+                                          color: '#1D8A4C',
+                                          background: '#E4F8EA',
+                                          padding: '1px 6px',
+                                          borderRadius: '6px'
+                                        }}
+                                      >
+                                        + NEW
+                                      </span>
                                     </div>
-                                  </div>{' '}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          {feat.isChunk ? (
+                            <>
+                              <div style={{ marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    height: '14px',
+                                    borderRadius: '5px',
+                                    background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)',
+                                    marginBottom: '14px'
+                                  }}
+                                />{' '}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    marginBottom: '14px'
+                                  }}
+                                >
                                   <div
-                                    style={{ fontSize: '22px', color: '#6E7CFF', flexShrink: '0' }}
+                                    style={{
+                                      width: '1px',
+                                      height: '14px',
+                                      background: '#C7CCE8'
+                                    }}
+                                  />
+                                </div>{' '}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div
+                                    style={{
+                                      flex: '1',
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
+                                    }}
                                   >
-                                    →
+                                    chunk 1
                                   </div>{' '}
                                   <div
                                     style={{
                                       flex: '1',
-                                      background: '#fff',
-                                      border: '1.5px solid #3D4FF0',
-                                      borderRadius: '12px',
-                                      overflow: 'hidden',
-                                      boxShadow: '0 8px 20px -12px rgba(61,79,240,0.5)'
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
                                     }}
                                   >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.04em',
-                                        color: '#3D4FF0',
-                                        padding: '10px 14px',
-                                        borderBottom: '1px solid #EEF0F8'
-                                      }}
-                                    >
-                                      ICEBERG TABLE
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        padding: '8px 14px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '7px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '80%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '65%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '6px'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            height: '7px',
-                                            width: '72%',
-                                            background: '#3D4FF0',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                        <span
-                                          style={{
-                                            fontSize: '9px',
-                                            fontWeight: '700',
-                                            color: '#1D8A4C',
-                                            background: '#E4F8EA',
-                                            padding: '1px 6px',
-                                            borderRadius: '6px'
-                                          }}
-                                        >
-                                          + NEW
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            ) : null}{' '}
-                            {feat.isChunk ? (
-                              <>
-                                <div style={{ marginBottom: '26px' }}>
+                                    chunk 2
+                                  </div>{' '}
                                   <div
                                     style={{
-                                      height: '14px',
-                                      borderRadius: '5px',
-                                      background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)',
-                                      marginBottom: '14px'
+                                      flex: '1',
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
+                                    }}
+                                  >
+                                    chunk 3
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      flex: '1',
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
+                                    }}
+                                  >
+                                    chunk 4
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    textAlign: 'center',
+                                    fontSize: '11px',
+                                    color: '#5B6484',
+                                    marginTop: '12px'
+                                  }}
+                                >
+                                  read in parallel
+                                </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          {feat.isResume ? (
+                            <>
+                              <div style={{ marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    position: 'relative',
+                                    height: '12px',
+                                    borderRadius: '6px',
+                                    background: '#EEF0F8',
+                                    margin: '26px 0 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      left: '0',
+                                      top: '0',
+                                      bottom: '0',
+                                      width: '62%',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)'
                                     }}
                                   />{' '}
                                   <div
                                     style={{
-                                      display: 'flex',
-                                      justifyContent: 'center',
-                                      gap: '6px',
-                                      marginBottom: '14px'
+                                      position: 'absolute',
+                                      left: '62%',
+                                      top: '50%',
+                                      transform: 'translate(-50%,-50%)',
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '50%',
+                                      background: '#fff',
+                                      border: '3px solid #3D4FF0'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '1px',
-                                        height: '14px',
-                                        background: '#C7CCE8'
-                                      }}
-                                    />
-                                  </div>{' '}
-                                  <div style={{ display: 'flex', gap: '8px' }}>
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 1
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 2
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 3
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 4
-                                    </div>
-                                  </div>{' '}
+                                  />{' '}
                                   <div
                                     style={{
-                                      textAlign: 'center',
-                                      fontSize: '11px',
-                                      color: '#5B6484',
-                                      marginTop: '12px'
+                                      position: 'absolute',
+                                      left: '62%',
+                                      top: '-24px',
+                                      transform: 'translateX(-50%)',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0',
+                                      whiteSpace: 'nowrap'
                                     }}
                                   >
-                                    read in parallel
+                                    ✓ checkpoint
                                   </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '11px',
+                                    color: '#5B6484'
+                                  }}
+                                >
+                                  <span>interrupted</span>
+                                  <span style={{ color: '#3D4FF0', fontWeight: '600' }}>
+                                    resumes here →
+                                  </span>
                                 </div>
-                              </>
-                            ) : null}{' '}
-                            {feat.isResume ? (
-                              <>
-                                <div style={{ marginBottom: '26px' }}>
-                                  <div
-                                    style={{
-                                      position: 'relative',
-                                      height: '12px',
-                                      borderRadius: '6px',
-                                      background: '#EEF0F8',
-                                      margin: '26px 0 14px'
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        left: '0',
-                                        top: '0',
-                                        bottom: '0',
-                                        width: '62%',
-                                        borderRadius: '6px',
-                                        background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        left: '62%',
-                                        top: '50%',
-                                        transform: 'translate(-50%,-50%)',
-                                        width: '20px',
-                                        height: '20px',
-                                        borderRadius: '50%',
-                                        background: '#fff',
-                                        border: '3px solid #3D4FF0'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        left: '62%',
-                                        top: '-24px',
-                                        transform: 'translateX(-50%)',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0',
-                                        whiteSpace: 'nowrap'
-                                      }}
-                                    >
-                                      ✓ checkpoint
-                                    </div>
-                                  </div>{' '}
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      fontSize: '11px',
-                                      color: '#5B6484'
-                                    }}
-                                  >
-                                    <span>interrupted</span>
-                                    <span style={{ color: '#3D4FF0', fontWeight: '600' }}>
-                                      resumes here →
-                                    </span>
-                                  </div>
-                                </div>
-                              </>
-                            ) : null}{' '}
-                            <div style={{ fontSize: '15px', lineHeight: '1.7', color: '#5B6484' }}>
-                              {feat.body}
-                            </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          <div style={{ fontSize: '15px', lineHeight: '1.7', color: '#5B6484' }}>
+                            {feat.body}
                           </div>
-                        </>
-                      ) : null}
+                        </div>
+                      </div>
                     </React.Fragment>
                   ))}
                 </div>

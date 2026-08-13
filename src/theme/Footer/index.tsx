@@ -73,7 +73,7 @@ const SOCIALS = [
 ]
 
 const Footer: React.FC = () => (
-  <div
+  <footer
     className='olake-footer footer-wrap'
     style={{
       background: '#F7F8FA',
@@ -194,7 +194,7 @@ const Footer: React.FC = () => (
     >
       OLake
     </div>
-  </div>
+  </footer>
 )
 
 export default Footer
