@@ -159,14 +159,26 @@ function Dropdown({ entry }: { entry: NavEntry }) {
   )
 }
 
-/** A drawer row that expands in place instead of navigating — the drawer's Docs entry. */
-function MobileAccordion({ entry, onNavigate }: { entry: NavEntry; onNavigate: () => void }) {
+/** A drawer row that expands in place instead of navigating — the drawer's
+ * Docs entry, and any nested group inside it (e.g. Resources > Community). */
+function MobileAccordion({
+  entry,
+  onNavigate,
+  nested
+}: {
+  entry: NavEntry | NavFlyout
+  onNavigate: () => void
+  nested?: boolean
+}) {
   const [open, setOpen] = useState(false)
   return (
     <div className='olake-nav-mobile-accordion'>
       <button
         type='button'
-        className='olake-nav-mobile-link olake-nav-mobile-accordion-trigger'
+        className={cn(
+          'olake-nav-mobile-link olake-nav-mobile-accordion-trigger',
+          nested && 'olake-nav-mobile-accordion-trigger--nested'
+        )}
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
@@ -175,16 +187,20 @@ function MobileAccordion({ entry, onNavigate }: { entry: NavEntry; onNavigate: (
       </button>
       {open && (
         <div className='olake-nav-mobile-accordion-panel'>
-          {entry.items!.map((item) => (
-            <Link
-              key={(item as NavLinkType).href}
-              to={(item as NavLinkType).href}
-              className='olake-nav-mobile-sublink'
-              onClick={onNavigate}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {entry.items!.map((item) =>
+            isFlyout(item) ? (
+              <MobileAccordion key={item.label} entry={item} onNavigate={onNavigate} nested />
+            ) : (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn('olake-nav-mobile-sublink', nested && 'olake-nav-mobile-sublink--nested')}
+                onClick={onNavigate}
+              >
+                {item.label}
+              </Link>
+            )
+          )}
         </div>
       )}
     </div>

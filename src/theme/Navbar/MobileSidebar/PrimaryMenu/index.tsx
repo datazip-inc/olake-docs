@@ -5,13 +5,21 @@ import { cn } from '@site/src/lib/utils'
 import {
   MOBILE_LINKS,
   isMobileGroup,
+  isFlyout,
   type NavEntry,
-  type NavLink as NavLinkType
+  type NavFlyout
 } from '@site/src/components/landing/Navbar/navData'
 
 // A row that expands in place, mirroring the desktop Docs dropdown. Uses
 // Infima's own collapsible classes, so it picks up dark mode for free.
-function MenuGroupItem({ entry, onNavigate }: { entry: NavEntry; onNavigate: () => void }) {
+// Recurses for nested groups (e.g. Resources > Community).
+function MenuGroupItem({
+  entry,
+  onNavigate
+}: {
+  entry: NavEntry | NavFlyout
+  onNavigate: () => void
+}) {
   const [collapsed, setCollapsed] = useState(true)
   return (
     <li className={cn('menu__list-item', collapsed && 'menu__list-item--collapsed')}>
@@ -30,17 +38,21 @@ function MenuGroupItem({ entry, onNavigate }: { entry: NavEntry; onNavigate: () 
         </a>
       </div>
       <ul className='menu__list' style={{ display: collapsed ? 'none' : 'block' }}>
-        {entry.items!.map((item) => (
-          <li key={(item as NavLinkType).href} className='menu__list-item'>
-            <Link
-              className='menu__link olake-nav-sidebar-link'
-              to={(item as NavLinkType).href}
-              onClick={onNavigate}
-            >
-              {item.label}
-            </Link>
-          </li>
-        ))}
+        {entry.items!.map((item) =>
+          isFlyout(item) ? (
+            <MenuGroupItem key={item.label} entry={item} onNavigate={onNavigate} />
+          ) : (
+            <li key={item.href} className='menu__list-item'>
+              <Link
+                className='menu__link olake-nav-sidebar-link'
+                to={item.href}
+                onClick={onNavigate}
+              >
+                {item.label}
+              </Link>
+            </li>
+          )
+        )}
       </ul>
     </li>
   )

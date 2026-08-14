@@ -95,8 +95,21 @@ export const MOBILE_LINKS: MobileNavItem[] = [
       { label: 'Blog', href: '/blog' },
       { label: 'Customer Stories', href: '/customer-stories' },
       { label: 'Webinars & Events', href: '/webinar' },
-      { label: 'Community', href: '/community' },
-      { label: 'Iceberg', href: '/iceberg' }
+      {
+        label: 'Community',
+        items: [
+          { label: 'OLake Community', href: '/community' },
+          { label: 'Top Contributors', href: '/community/contributors' },
+          { label: 'Contributor Program', href: '/community/contributor-program' }
+        ]
+      },
+      {
+        label: 'Iceberg',
+        items: [
+          { label: 'Iceberg Blogs', href: '/iceberg' },
+          { label: 'Query Engine', href: '/iceberg/query-engine' }
+        ]
+      }
     ]
   },
   PRICING_LINK
