@@ -6,10 +6,18 @@ import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
 import { useFusionLogic } from '@site/src/components/landing/pages/useFusionLogic'
 import { cssToObj as __css } from '@site/src/components/landing/pages/cssToObj'
 import { FUSION_SEO } from '@site/src/data/landing/seo'
+import { useFeatureFlagVariant } from '@site/src/lib/posthog/useFeatureFlagVariant'
 import '@site/src/components/landing/pages/olake-fusion.css'
 import '@site/src/components/landing/pages/overrides.css'
 
+const HERO_HEADLINE_FLAG = 'fusion-hero-headline'
+const HERO_HEADLINES = {
+  performance: 'Keep your Iceberg tables fast with less compute',
+  simplicity: 'Simplify your Iceberg table maintenance'
+}
+
 export default function OLakeFusionPage() {
+  const heroHeadline = useFeatureFlagVariant(HERO_HEADLINE_FLAG, HERO_HEADLINES, 'performance')
   const {
     icebergStyle,
     problemCards,
@@ -269,7 +277,7 @@ export default function OLakeFusionPage() {
                   color: '#0D1230'
                 }}
               >
-                Keep your Iceberg tables fast with less compute
+                {heroHeadline}
               </h1>{' '}
               <div
                 className='hero-btns'

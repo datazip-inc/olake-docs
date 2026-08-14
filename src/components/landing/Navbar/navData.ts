@@ -80,8 +80,13 @@ export const PRICING_LINK: NavLink = { label: 'Pricing', href: '/contact' }
  * expanding in place to mirror the desktop dropdown.
  */
 export const MOBILE_LINKS: MobileNavItem[] = [
-  { label: 'OLake Go', href: '/olake-go' },
-  { label: 'OLake Fusion', href: '/olake-fusion' },
+  {
+    label: 'Product',
+    items: [
+      { label: 'OLake Go', href: '/olake-go' },
+      { label: 'OLake Fusion', href: '/olake-fusion' }
+    ]
+  },
   {
     label: 'Docs',
     items: [
