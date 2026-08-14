@@ -89,11 +89,16 @@ export const MOBILE_LINKS: MobileNavItem[] = [
       { label: 'OLake Fusion', href: '/docs/fusion/getting-started/overview' }
     ]
   },
-  { label: 'Blog', href: '/blog' },
-  { label: 'Customer Stories', href: '/customer-stories' },
-  { label: 'Webinars & Events', href: '/webinar' },
-  { label: 'Community', href: '/community' },
-  { label: 'Iceberg', href: '/iceberg' },
+  {
+    label: 'Resources',
+    items: [
+      { label: 'Blog', href: '/blog' },
+      { label: 'Customer Stories', href: '/customer-stories' },
+      { label: 'Webinars & Events', href: '/webinar' },
+      { label: 'Community', href: '/community' },
+      { label: 'Iceberg', href: '/iceberg' }
+    ]
+  },
   PRICING_LINK
 ]
 

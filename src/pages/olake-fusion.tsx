@@ -269,7 +269,7 @@ export default function OLakeFusionPage() {
                   color: '#0D1230'
                 }}
               >
-                Simplify your Iceberg table maintenance
+                Keep your Iceberg tables fast with less compute
               </h1>{' '}
               <div
                 className='hero-btns'
