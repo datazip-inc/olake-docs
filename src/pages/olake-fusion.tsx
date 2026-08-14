@@ -1,18 +1,23 @@
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
-import SiteNavbar from '@site/src/components/landing/Navbar/SiteNavbar'
-import '@site/src/components/landing/Navbar/SiteNavbar.css'
-import { PiLinkedinLogo, PiYoutubeLogo, PiSlackLogo, PiXLogo } from 'react-icons/pi'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
 import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
 import { useFusionLogic } from '@site/src/components/landing/pages/useFusionLogic'
 import { cssToObj as __css } from '@site/src/components/landing/pages/cssToObj'
 import { FUSION_SEO } from '@site/src/data/landing/seo'
+import { useFeatureFlagVariant } from '@site/src/lib/posthog/useFeatureFlagVariant'
 import '@site/src/components/landing/pages/olake-fusion.css'
 import '@site/src/components/landing/pages/overrides.css'
 
+const HERO_HEADLINE_FLAG = 'fusion-hero-headline'
+const HERO_HEADLINES = {
+  performance: 'Keep your Iceberg tables fast with less compute',
+  simplicity: 'Simplify your Iceberg table maintenance'
+}
+
 export default function OLakeFusionPage() {
+  const heroHeadline = useFeatureFlagVariant(HERO_HEADLINE_FLAG, HERO_HEADLINES, 'performance')
   const {
     icebergStyle,
     problemCards,
@@ -42,7 +47,6 @@ export default function OLakeFusionPage() {
       title={FUSION_SEO.title}
       description={FUSION_SEO.description}
       wrapperClassName='landing-page'
-      noFooter
     >
       <LandingSeo
         title={FUSION_SEO.title}
@@ -54,7 +58,6 @@ export default function OLakeFusionPage() {
       />
       <LightModeEnforcer />
       <div className='olakefusion-page olake-design-page'>
-        <SiteNavbar />
         <div
           style={{
             position: 'fixed',
@@ -195,8 +198,7 @@ export default function OLakeFusionPage() {
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              justifyContent: 'center'
             }}
           >
             <div
@@ -275,7 +277,7 @@ export default function OLakeFusionPage() {
                   color: '#0D1230'
                 }}
               >
-                Simplify your Iceberg table maintenance
+                {heroHeadline}
               </h1>{' '}
               <div
                 className='hero-btns'
@@ -620,7 +622,6 @@ export default function OLakeFusionPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              scrollSnapAlign: 'start',
               borderTop: '1px solid rgba(27,30,43,0.08)'
             }}
           >
@@ -711,25 +712,16 @@ export default function OLakeFusionPage() {
           </div>{' '}
           <div
             style={{
-              height: '120px',
-              background:
-                'linear-gradient(180deg, #F5F6FA 0%, #EDEFFB 35%, #7385DD 80%, #3C52CC 100%)'
-            }}
-          />{' '}
-          <div
-            style={{
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              marginTop: '-1px',
+              background:
+                'linear-gradient(180deg, #F5F6FA 0%, #EDEFFB 12%, #7385DD 26%, #4F63D1 33%) top/100% 240px no-repeat, linear-gradient(0deg, #F5F6FA 0%, #EDEFFB 12%, #7385DD 26%, #4F63D1 33%) bottom/100% 240px no-repeat, #4F63D1'
             }}
           >
-            <div
-              className='features-wrap'
-              id='features'
-              style={{ padding: '60px 64px 20px', backgroundColor: '#3C52CCE5' }}
-            >
+            <div className='features-wrap' id='features' style={{ padding: '60px 64px 100px' }}>
               <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
                 <div style={{ textAlign: 'center', marginBottom: '64px' }}>
                   <div
@@ -762,7 +754,7 @@ export default function OLakeFusionPage() {
                     display: 'grid',
                     gridTemplateColumns: '0.8fr 1.2fr',
                     gap: '56px',
-                    alignItems: 'start'
+                    alignItems: 'center'
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -806,324 +798,79 @@ export default function OLakeFusionPage() {
                       </React.Fragment>
                     ))}
                   </div>{' '}
-                  <div style={{ minHeight: '220px' }}>
+                  <div
+                    className='features-card-slot'
+                    style={{ display: 'grid', gridTemplateColumns: '1fr', minWidth: 0 }}
+                  >
                     {(features || []).map((feat, featIdx) => (
                       <React.Fragment key={featIdx}>
-                        {feat.active ? (
-                          <>
+                        <div
+                          style={{
+                            gridColumn: '1',
+                            gridRow: '1',
+                            minWidth: 0,
+                            visibility: feat.active ? 'visible' : 'hidden',
+                            pointerEvents: feat.active ? 'auto' : 'none'
+                          }}
+                        >
+                          <div
+                            key={feat.active ? `active-${featIdx}` : 'idle'}
+                            className='features-card'
+                            style={{
+                              border: '1px solid #E4E7F2',
+                              borderRadius: '18px',
+                              padding: '40px',
+                              background: '#fff',
+                              boxShadow: '0 24px 50px -30px rgba(10,14,39,0.5)',
+                              animation: 'fadeSlideIn 0.5s ease'
+                            }}
+                          >
                             <div
-                              className='features-card'
                               style={{
-                                border: '1px solid #E4E7F2',
-                                borderRadius: '18px',
-                                padding: '40px',
-                                background: '#fff',
-                                boxShadow: '0 24px 50px -30px rgba(10,14,39,0.5)',
-                                animation: 'fadeSlideIn 0.5s ease'
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '10px',
+                                background: 'linear-gradient(135deg,#3D4FF0,#6E7CFF)',
+                                marginBottom: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                               }}
                             >
-                              <div
-                                style={{
-                                  width: '44px',
-                                  height: '44px',
-                                  borderRadius: '10px',
-                                  background: 'linear-gradient(135deg,#3D4FF0,#6E7CFF)',
-                                  marginBottom: '22px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                              >
-                                {feat.isTiered ? (
-                                  <>
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '3px',
-                                        width: '22px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          height: '3px',
-                                          width: '100%',
-                                          background: '#fff',
-                                          borderRadius: '2px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          height: '3px',
-                                          width: '75%',
-                                          background: '#fff',
-                                          borderRadius: '2px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          height: '3px',
-                                          width: '50%',
-                                          background: '#fff',
-                                          borderRadius: '2px'
-                                        }}
-                                      />
-                                    </div>
-                                  </>
-                                ) : null}{' '}
-                                {feat.isDecay ? (
-                                  <>
-                                    <div
-                                      style={{
-                                        width: '20px',
-                                        height: '20px',
-                                        border: '2.5px solid #fff',
-                                        borderRadius: '5px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '8px',
-                                          height: '8px',
-                                          background: '#fff',
-                                          borderRadius: '2px'
-                                        }}
-                                      />
-                                    </div>
-                                  </>
-                                ) : null}{' '}
-                                {feat.isConfig ? (
-                                  <>
-                                    <div
-                                      style={{
-                                        width: '24px',
-                                        height: '4px',
-                                        background: 'rgba(255,255,255,0.4)',
-                                        borderRadius: '2px',
-                                        position: 'relative'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          left: '14px',
-                                          top: '-4px',
-                                          width: '12px',
-                                          height: '12px',
-                                          background: '#fff',
-                                          borderRadius: '50%'
-                                        }}
-                                      />
-                                    </div>
-                                  </>
-                                ) : null}{' '}
-                                {feat.isHosted ? (
-                                  <>
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '3px',
-                                        width: '20px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          height: '6px',
-                                          width: '100%',
-                                          background: '#fff',
-                                          borderRadius: '2px',
-                                          position: 'relative'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            position: 'absolute',
-                                            right: '2px',
-                                            top: '2px',
-                                            width: '2px',
-                                            height: '2px',
-                                            background: '#3D4FF0',
-                                            borderRadius: '50%'
-                                          }}
-                                        />
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          height: '6px',
-                                          width: '100%',
-                                          background: '#fff',
-                                          borderRadius: '2px',
-                                          position: 'relative'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            position: 'absolute',
-                                            right: '2px',
-                                            top: '2px',
-                                            width: '2px',
-                                            height: '2px',
-                                            background: '#3D4FF0',
-                                            borderRadius: '50%'
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                  </>
-                                ) : null}
-                              </div>{' '}
-                              <h3
-                                style={{
-                                  fontFamily: "'Space Grotesk', sans-serif",
-                                  fontWeight: '700',
-                                  fontSize: '18px',
-                                  letterSpacing: '0.03em',
-                                  color: '#10173A',
-                                  marginBottom: '22px'
-                                }}
-                              >
-                                {feat.title}
-                              </h3>{' '}
                               {feat.isTiered ? (
                                 <>
                                   <div
                                     style={{
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '10px',
-                                      marginBottom: '26px'
+                                      gap: '3px',
+                                      width: '22px'
                                     }}
                                   >
                                     <div
-                                      style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '64px',
-                                          fontSize: '11px',
-                                          fontWeight: '700',
-                                          letterSpacing: '0.04em',
-                                          color: '#3D4FF0',
-                                          flexShrink: '0'
-                                        }}
-                                      >
-                                        LITE
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '8px',
-                                          borderRadius: '4px',
-                                          background: '#EEF0F8'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            width: '30%',
-                                            height: '100%',
-                                            borderRadius: '4px',
-                                            background: '#6E7CFF'
-                                          }}
-                                        />
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          fontSize: '12px',
-                                          color: '#5B6484',
-                                          flexShrink: '0'
-                                        }}
-                                      >
-                                        every 20 min
-                                      </div>
-                                    </div>{' '}
+                                      style={{
+                                        height: '3px',
+                                        width: '100%',
+                                        background: '#fff',
+                                        borderRadius: '2px'
+                                      }}
+                                    />{' '}
                                     <div
-                                      style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '64px',
-                                          fontSize: '11px',
-                                          fontWeight: '700',
-                                          letterSpacing: '0.04em',
-                                          color: '#3D4FF0',
-                                          flexShrink: '0'
-                                        }}
-                                      >
-                                        MEDIUM
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '8px',
-                                          borderRadius: '4px',
-                                          background: '#EEF0F8'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            width: '60%',
-                                            height: '100%',
-                                            borderRadius: '4px',
-                                            background: '#4F5FF5'
-                                          }}
-                                        />
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          fontSize: '12px',
-                                          color: '#5B6484',
-                                          flexShrink: '0'
-                                        }}
-                                      >
-                                        every 40 min
-                                      </div>
-                                    </div>{' '}
+                                      style={{
+                                        height: '3px',
+                                        width: '75%',
+                                        background: '#fff',
+                                        borderRadius: '2px'
+                                      }}
+                                    />{' '}
                                     <div
-                                      style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '64px',
-                                          fontSize: '11px',
-                                          fontWeight: '700',
-                                          letterSpacing: '0.04em',
-                                          color: '#3D4FF0',
-                                          flexShrink: '0'
-                                        }}
-                                      >
-                                        FULL
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '8px',
-                                          borderRadius: '4px',
-                                          background: '#EEF0F8'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            borderRadius: '4px',
-                                            background: '#3D4FF0'
-                                          }}
-                                        />
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          fontSize: '12px',
-                                          color: '#5B6484',
-                                          flexShrink: '0'
-                                        }}
-                                      >
-                                        deep-clean
-                                      </div>
-                                    </div>
+                                      style={{
+                                        height: '3px',
+                                        width: '50%',
+                                        background: '#fff',
+                                        borderRadius: '2px'
+                                      }}
+                                    />
                                   </div>
                                 </>
                               ) : null}{' '}
@@ -1131,125 +878,23 @@ export default function OLakeFusionPage() {
                                 <>
                                   <div
                                     style={{
+                                      width: '20px',
+                                      height: '20px',
+                                      border: '2.5px solid #fff',
+                                      borderRadius: '5px',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '20px',
-                                      marginBottom: '26px'
+                                      justifyContent: 'center'
                                     }}
                                   >
-                                    <div style={{ textAlign: 'center' }}>
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          gap: '4px',
-                                          flexWrap: 'wrap',
-                                          width: '110px',
-                                          justifyContent: 'center',
-                                          marginBottom: '10px'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            width: '14px',
-                                            height: '14px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            width: '10px',
-                                            height: '10px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px',
-                                            marginTop: '4px'
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            width: '16px',
-                                            height: '16px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />{' '}
-                                        <div
-                                          style={{
-                                            width: '9px',
-                                            height: '9px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            width: '13px',
-                                            height: '13px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            width: '11px',
-                                            height: '11px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />{' '}
-                                        <div
-                                          style={{
-                                            width: '15px',
-                                            height: '15px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            width: '8px',
-                                            height: '8px',
-                                            background: '#D5D9EC',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                      </div>{' '}
-                                      <div style={{ fontSize: '11px', color: '#5B6484' }}>
-                                        fragmented files
-                                      </div>
-                                    </div>{' '}
-                                    <div style={{ fontSize: '20px', color: '#6E7CFF' }}>→</div>{' '}
-                                    <div style={{ textAlign: 'center' }}>
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          gap: '6px',
-                                          justifyContent: 'center',
-                                          marginBottom: '10px'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            width: '26px',
-                                            height: '26px',
-                                            background: '#3D4FF0',
-                                            borderRadius: '5px'
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            width: '26px',
-                                            height: '26px',
-                                            background: '#3D4FF0',
-                                            borderRadius: '5px'
-                                          }}
-                                        />
-                                      </div>{' '}
-                                      <div style={{ fontSize: '11px', color: '#5B6484' }}>
-                                        compacted
-                                      </div>
-                                    </div>
+                                    <div
+                                      style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        background: '#fff',
+                                        borderRadius: '2px'
+                                      }}
+                                    />
                                   </div>
                                 </>
                               ) : null}{' '}
@@ -1257,73 +902,24 @@ export default function OLakeFusionPage() {
                                 <>
                                   <div
                                     style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '20px',
-                                      marginBottom: '26px'
+                                      width: '24px',
+                                      height: '4px',
+                                      background: 'rgba(255,255,255,0.4)',
+                                      borderRadius: '2px',
+                                      position: 'relative'
                                     }}
                                   >
                                     <div
                                       style={{
-                                        flex: '1',
-                                        textAlign: 'center',
-                                        padding: '18px 0',
-                                        background: '#F6F7FC',
-                                        border: '1px solid #EEF0F8',
-                                        borderRadius: '12px'
+                                        position: 'absolute',
+                                        left: '14px',
+                                        top: '-4px',
+                                        width: '12px',
+                                        height: '12px',
+                                        background: '#fff',
+                                        borderRadius: '50%'
                                       }}
-                                    >
-                                      <div
-                                        style={{
-                                          fontFamily: "'Space Grotesk', sans-serif",
-                                          fontSize: '34px',
-                                          fontWeight: '700',
-                                          color: '#10173A'
-                                        }}
-                                      >
-                                        1
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          fontSize: '11px',
-                                          color: '#5B6484',
-                                          marginTop: '4px'
-                                        }}
-                                      >
-                                        Fusion parameter
-                                      </div>
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        textAlign: 'center',
-                                        padding: '18px 0',
-                                        background: '#F6F7FC',
-                                        border: '1px solid #EEF0F8',
-                                        borderRadius: '12px',
-                                        opacity: '0.6'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          fontFamily: "'Space Grotesk', sans-serif",
-                                          fontSize: '34px',
-                                          fontWeight: '700',
-                                          color: '#A6ABC5'
-                                        }}
-                                      >
-                                        10+
-                                      </div>{' '}
-                                      <div
-                                        style={{
-                                          fontSize: '11px',
-                                          color: '#8890C4',
-                                          marginTop: '4px'
-                                        }}
-                                      >
-                                        Spark parameters
-                                      </div>
-                                    </div>
+                                    />
                                   </div>
                                 </>
                               ) : null}{' '}
@@ -1332,65 +928,478 @@ export default function OLakeFusionPage() {
                                   <div
                                     style={{
                                       display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '24px',
-                                      marginBottom: '26px',
-                                      paddingBottom: '22px',
-                                      borderBottom: '1px solid #EDEFF6'
+                                      flexDirection: 'column',
+                                      gap: '3px',
+                                      width: '20px'
                                     }}
                                   >
                                     <div
-                                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                      style={{
+                                        height: '6px',
+                                        width: '100%',
+                                        background: '#fff',
+                                        borderRadius: '2px',
+                                        position: 'relative'
+                                      }}
                                     >
-                                      {/* image-slot: Docker logo */}{' '}
-                                      <span
+                                      <div
                                         style={{
-                                          fontSize: '13px',
-                                          fontWeight: '600',
-                                          color: '#10173A'
+                                          position: 'absolute',
+                                          right: '2px',
+                                          top: '2px',
+                                          width: '2px',
+                                          height: '2px',
+                                          background: '#3D4FF0',
+                                          borderRadius: '50%'
                                         }}
-                                      >
-                                        Docker
-                                      </span>
+                                      />
                                     </div>{' '}
                                     <div
-                                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                      style={{
+                                        height: '6px',
+                                        width: '100%',
+                                        background: '#fff',
+                                        borderRadius: '2px',
+                                        position: 'relative'
+                                      }}
                                     >
-                                      {/* image-slot: K8s logo */}{' '}
-                                      <span
+                                      <div
                                         style={{
-                                          fontSize: '13px',
-                                          fontWeight: '600',
-                                          color: '#10173A'
+                                          position: 'absolute',
+                                          right: '2px',
+                                          top: '2px',
+                                          width: '2px',
+                                          height: '2px',
+                                          background: '#3D4FF0',
+                                          borderRadius: '50%'
                                         }}
-                                      >
-                                        Kubernetes
-                                      </span>
+                                      />
                                     </div>
                                   </div>
                                 </>
-                              ) : null}{' '}
-                              <div
-                                style={{ fontSize: '15px', lineHeight: '1.7', color: '#5B6484' }}
-                              >
-                                {feat.body}
-                              </div>
+                              ) : null}
+                            </div>{' '}
+                            <h3
+                              style={{
+                                fontFamily: "'Space Grotesk', sans-serif",
+                                fontWeight: '700',
+                                fontSize: '18px',
+                                letterSpacing: '0.03em',
+                                color: '#10173A',
+                                marginBottom: '22px'
+                              }}
+                            >
+                              {feat.title}
+                            </h3>{' '}
+                            {feat.isTiered ? (
+                              <>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '10px',
+                                    marginBottom: '26px'
+                                  }}
+                                >
+                                  <div
+                                    style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: '64px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        letterSpacing: '0.04em',
+                                        color: '#3D4FF0',
+                                        flexShrink: '0'
+                                      }}
+                                    >
+                                      LITE
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '8px',
+                                        borderRadius: '4px',
+                                        background: '#EEF0F8'
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: '30%',
+                                          height: '100%',
+                                          borderRadius: '4px',
+                                          background: '#6E7CFF'
+                                        }}
+                                      />
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        fontSize: '12px',
+                                        color: '#5B6484',
+                                        flexShrink: '0'
+                                      }}
+                                    >
+                                      every 20 min
+                                    </div>
+                                  </div>{' '}
+                                  <div
+                                    style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: '64px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        letterSpacing: '0.04em',
+                                        color: '#3D4FF0',
+                                        flexShrink: '0'
+                                      }}
+                                    >
+                                      MEDIUM
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '8px',
+                                        borderRadius: '4px',
+                                        background: '#EEF0F8'
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: '60%',
+                                          height: '100%',
+                                          borderRadius: '4px',
+                                          background: '#4F5FF5'
+                                        }}
+                                      />
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        fontSize: '12px',
+                                        color: '#5B6484',
+                                        flexShrink: '0'
+                                      }}
+                                    >
+                                      every 40 min
+                                    </div>
+                                  </div>{' '}
+                                  <div
+                                    style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: '64px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        letterSpacing: '0.04em',
+                                        color: '#3D4FF0',
+                                        flexShrink: '0'
+                                      }}
+                                    >
+                                      FULL
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '8px',
+                                        borderRadius: '4px',
+                                        background: '#EEF0F8'
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: '100%',
+                                          height: '100%',
+                                          borderRadius: '4px',
+                                          background: '#3D4FF0'
+                                        }}
+                                      />
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        fontSize: '12px',
+                                        color: '#5B6484',
+                                        flexShrink: '0'
+                                      }}
+                                    >
+                                      deep-clean
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isDecay ? (
+                              <>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '20px',
+                                    marginBottom: '26px'
+                                  }}
+                                >
+                                  <div style={{ textAlign: 'center' }}>
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        gap: '4px',
+                                        flexWrap: 'wrap',
+                                        width: '110px',
+                                        justifyContent: 'center',
+                                        marginBottom: '10px'
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: '14px',
+                                          height: '14px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          width: '10px',
+                                          height: '10px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px',
+                                          marginTop: '4px'
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          width: '16px',
+                                          height: '16px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />{' '}
+                                      <div
+                                        style={{
+                                          width: '9px',
+                                          height: '9px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          width: '13px',
+                                          height: '13px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          width: '11px',
+                                          height: '11px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />{' '}
+                                      <div
+                                        style={{
+                                          width: '15px',
+                                          height: '15px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          width: '8px',
+                                          height: '8px',
+                                          background: '#D5D9EC',
+                                          borderRadius: '3px'
+                                        }}
+                                      />
+                                    </div>{' '}
+                                    <div style={{ fontSize: '11px', color: '#5B6484' }}>
+                                      fragmented files
+                                    </div>
+                                  </div>{' '}
+                                  <div style={{ fontSize: '20px', color: '#6E7CFF' }}>→</div>{' '}
+                                  <div style={{ textAlign: 'center' }}>
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        gap: '6px',
+                                        justifyContent: 'center',
+                                        marginBottom: '10px'
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: '26px',
+                                          height: '26px',
+                                          background: '#3D4FF0',
+                                          borderRadius: '5px'
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          width: '26px',
+                                          height: '26px',
+                                          background: '#3D4FF0',
+                                          borderRadius: '5px'
+                                        }}
+                                      />
+                                    </div>{' '}
+                                    <div style={{ fontSize: '11px', color: '#5B6484' }}>
+                                      compacted
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isConfig ? (
+                              <>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '20px',
+                                    marginBottom: '26px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      flex: '1',
+                                      textAlign: 'center',
+                                      padding: '18px 0',
+                                      background: '#F6F7FC',
+                                      border: '1px solid #EEF0F8',
+                                      borderRadius: '12px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontFamily: "'Space Grotesk', sans-serif",
+                                        fontSize: '34px',
+                                        fontWeight: '700',
+                                        color: '#10173A'
+                                      }}
+                                    >
+                                      1
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: '#5B6484',
+                                        marginTop: '4px'
+                                      }}
+                                    >
+                                      Fusion parameter
+                                    </div>
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      flex: '1',
+                                      textAlign: 'center',
+                                      padding: '18px 0',
+                                      background: '#F6F7FC',
+                                      border: '1px solid #EEF0F8',
+                                      borderRadius: '12px',
+                                      opacity: '0.6'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontFamily: "'Space Grotesk', sans-serif",
+                                        fontSize: '34px',
+                                        fontWeight: '700',
+                                        color: '#A6ABC5'
+                                      }}
+                                    >
+                                      10+
+                                    </div>{' '}
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: '#8890C4',
+                                        marginTop: '4px'
+                                      }}
+                                    >
+                                      Spark parameters
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isHosted ? (
+                              <>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '24px',
+                                    marginBottom: '26px',
+                                    paddingBottom: '22px',
+                                    borderBottom: '1px solid #EDEFF6'
+                                  }}
+                                >
+                                  <div
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#3D4FF0',
+                                        flexShrink: '0'
+                                      }}
+                                    />{' '}
+                                    <span
+                                      style={{
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: '#10173A'
+                                      }}
+                                    >
+                                      Docker
+                                    </span>
+                                  </div>{' '}
+                                  <div
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#3D4FF0',
+                                        flexShrink: '0'
+                                      }}
+                                    />{' '}
+                                    <span
+                                      style={{
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: '#10173A'
+                                      }}
+                                    >
+                                      Kubernetes
+                                    </span>
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            <div style={{ fontSize: '15px', lineHeight: '1.7', color: '#5B6484' }}>
+                              {feat.body}
                             </div>
-                          </>
-                        ) : null}
+                          </div>
+                        </div>
                       </React.Fragment>
                     ))}
                   </div>
                 </div>
               </div>
-            </div>{' '}
-            <div
-              style={{
-                height: '120px',
-                background:
-                  'linear-gradient(180deg, #3C52CC 0%, #7385DD 20%, #EDEFFB 65%, #F5F6FA 100%)'
-              }}
-            />
+            </div>
           </div>{' '}
           <div
             style={{
@@ -1398,7 +1407,6 @@ export default function OLakeFusionPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              scrollSnapAlign: 'start',
               position: 'relative'
             }}
           >
@@ -1460,8 +1468,8 @@ export default function OLakeFusionPage() {
                   margin: '0 auto 56px'
                 }}
               >
-                OLake Fusion compacted Apache Iceberg tables <b>2.06×</b> faster than Apache Spark
-                and at roughly <b>half the cost</b>.
+                OLake Fusion compacts Apache Iceberg tables <b>2.06× </b>
+                faster than Apache Spark and at roughly <b>half the cost</b>.
               </div>{' '}
               <div
                 style={{
@@ -1707,8 +1715,7 @@ export default function OLakeFusionPage() {
               minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              scrollSnapAlign: 'start'
+              justifyContent: 'center'
             }}
           >
             <div
@@ -1787,308 +1794,6 @@ export default function OLakeFusionPage() {
               </div>
             </div>
           </div>{' '}
-          <div
-            style={{
-              minHeight: '65vh',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              scrollSnapAlign: 'start'
-            }}
-          >
-            <div
-              className='footer-wrap'
-              style={{
-                background: '#F7F8FA',
-                padding: '64px 64px 0',
-                overflow: 'hidden',
-                position: 'relative'
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: '1280px',
-                  margin: '0 auto',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: '40px',
-                  flexWrap: 'wrap',
-                  position: 'relative',
-                  zIndex: '1'
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: '700',
-                      fontSize: '24px',
-                      color: '#3D4FF0',
-                      marginBottom: '20px'
-                    }}
-                  >
-                    OLake
-                  </div>
-                  <h2
-                    className='footer-hero'
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: '600',
-                      fontSize: '38px',
-                      lineHeight: '1.15',
-                      color: '#10173A',
-                      maxWidth: '480px'
-                    }}
-                  >
-                    Fastest <span style={{ fontWeight: '800' }}>Data Replication</span>
-                  </h2>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      marginTop: '28px'
-                    }}
-                  >
-                    <a
-                      className='olake-footer-social'
-                      href='https://www.linkedin.com/company/datazipio/'
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      aria-label='LinkedIn'
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: '8px',
-                        border: '1px solid #DADEEA',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#5B6484'
-                      }}
-                    >
-                      <PiLinkedinLogo size={17} aria-hidden />
-                    </a>
-                    <a
-                      className='olake-footer-social'
-                      href='https://www.youtube.com/@olakeio'
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      aria-label='YouTube'
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: '8px',
-                        border: '1px solid #DADEEA',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#5B6484'
-                      }}
-                    >
-                      <PiYoutubeLogo size={17} aria-hidden />
-                    </a>
-                    <a
-                      className='olake-footer-social'
-                      href='/slack'
-                      aria-label='Slack'
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: '8px',
-                        border: '1px solid #DADEEA',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#5B6484'
-                      }}
-                    >
-                      <PiSlackLogo size={17} aria-hidden />
-                    </a>
-                    <a
-                      className='olake-footer-social'
-                      href='https://x.com/_olake'
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      aria-label='X'
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: '8px',
-                        border: '1px solid #DADEEA',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#5B6484'
-                      }}
-                    >
-                      <PiXLogo size={17} aria-hidden />
-                    </a>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '64px', flexWrap: 'wrap' }}>
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        fontSize: '12px',
-                        letterSpacing: '0.08em',
-                        fontWeight: '700',
-                        color: '#10173A',
-                        marginBottom: '18px'
-                      }}
-                    >
-                      COMPANY
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px',
-                        fontSize: '15px',
-                        color: '#8890A8'
-                      }}
-                    >
-                      <a
-                        className='olake-footer-link'
-                        href='/about-us'
-                        style={{ color: '#8890A8' }}
-                      >
-                        About us
-                      </a>
-                      <a className='olake-footer-link' href='/contact' style={{ color: '#8890A8' }}>
-                        Contact us
-                      </a>
-                      <a
-                        className='olake-footer-link'
-                        href='/branding'
-                        style={{ color: '#8890A8' }}
-                      >
-                        Branding
-                      </a>
-                      <a
-                        className='olake-footer-link'
-                        href='/terms-of-use'
-                        style={{ color: '#8890A8' }}
-                      >
-                        Terms of Use
-                      </a>
-                      <a
-                        className='olake-footer-link'
-                        href='/privacy-policy'
-                        style={{ color: '#8890A8' }}
-                      >
-                        Privacy Policy
-                      </a>
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        fontSize: '12px',
-                        letterSpacing: '0.08em',
-                        fontWeight: '700',
-                        color: '#10173A',
-                        marginBottom: '18px'
-                      }}
-                    >
-                      RESOURCES
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px',
-                        fontSize: '15px',
-                        color: '#8890A8'
-                      }}
-                    >
-                      <a className='olake-footer-link' href='/blog' style={{ color: '#8890A8' }}>
-                        Blogs
-                      </a>
-                      <a className='olake-footer-link' href='/docs' style={{ color: '#8890A8' }}>
-                        Docs
-                      </a>
-                      <a className='olake-footer-link' href='/search' style={{ color: '#8890A8' }}>
-                        Search
-                      </a>
-                      <a className='olake-footer-link' href='/slack-archive' style={{ color: '#8890A8' }}>
-                        Community Slack Archive
-                      </a>
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        fontSize: '12px',
-                        letterSpacing: '0.08em',
-                        fontWeight: '700',
-                        color: '#10173A',
-                        marginBottom: '18px'
-                      }}
-                    >
-                      TOP READS
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px',
-                        fontSize: '15px',
-                        color: '#8890A8',
-                        maxWidth: '180px'
-                      }}
-                    >
-                      <a
-                        className='olake-footer-link'
-                        href='/blog/issues-debezium-kafka'
-                        style={{ color: '#8890A8' }}
-                      >
-                        Issues with Debezium
-                      </a>
-                      <a
-                        className='olake-footer-link'
-                        href='/blog/olake-architecture'
-                        style={{ color: '#8890A8' }}
-                      >
-                        OLake Architecture
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                style={{
-                  maxWidth: '1280px',
-                  margin: '40px auto 0',
-                  position: 'relative',
-                  zIndex: '1',
-                  fontSize: '13px',
-                  color: '#AEB4C4',
-                  paddingBottom: '24px'
-                }}
-              >
-                By Datazip
-              </div>
-              <div
-                className='footer-watermark'
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontWeight: '700',
-                  fontSize: '260px',
-                  lineHeight: '1',
-                  color: '#EDEFF4',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'center',
-                  userSelect: 'none'
-                }}
-              >
-                OLake
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </Layout>

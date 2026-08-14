@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export function useFusionLogic(props = {}) {
   const [state, setStateRaw] = useState({
@@ -182,7 +182,7 @@ export function useFusionLogic(props = {}) {
         const list = [
           {
             title: 'TIERED COMPACTION',
-            body: 'Trigger-based tiers instead of one blunt job, so light cleanup runs constantly and deep rewrites only run when they\u2019re actually needed.',
+            body: 'Trigger-based tiers instead of one blunt job, so lightweight compaction can run constantly and deep rewrites only run when they’re actually needed.',
             tag: 'tiered'
           },
           {

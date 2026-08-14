@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export function useHomeLogic(props = {}) {
   const [state, setStateRaw] = useState({
@@ -7,6 +7,7 @@ export function useHomeLogic(props = {}) {
     contributorsOpen: false,
     productOpen: false,
     docsOpen: false,
+    mobileMenuOpen: false,
     advantage: 'go'
   })
   const stateRef = useRef(state)
@@ -48,6 +49,10 @@ export function useHomeLogic(props = {}) {
 
   const closeContributors = () => {
     setState({ contributorsOpen: false })
+  }
+
+  const toggleMobileMenu = () => {
+    setState((s) => ({ mobileMenuOpen: !s.mobileMenuOpen }))
   }
 
   const renderVals = () => {
@@ -94,15 +99,57 @@ export function useHomeLogic(props = {}) {
       ")), url('" +
       advImg +
       "')"
-    // w/h are the files' intrinsic sizes, set on the <img> so the marquee reserves
-    // space before the logos load.
+    // w/h are intrinsic sizes, so the marquee row reserves space before decode.
+    // maxH/maxW are the design's per-tile boxes; Lending Kart's is larger.
     const logos = [
-      { src: '/img/landing/v2/logo-bitespeed.webp', name: 'Bitespeed', w: 340, h: 65 },
-      { src: '/img/landing/v2/logo-xeno.webp', name: 'Xeno', w: 176, h: 88 },
-      { src: '/img/landing/v2/logo-cordial.webp', name: 'Cordial', w: 244, h: 88 },
-      { src: '/img/landing/v2/logo-lendingkart.webp', name: 'Lending Kart', w: 168, h: 88 },
-      { src: '/img/landing/v2/logo-astrotalk.webp', name: 'Astro Talk', w: 246, h: 88 },
-      { src: '/img/landing/v2/logo-physicswallah.webp', name: 'Physics Wallah', w: 246, h: 88 }
+      {
+        src: '/img/landing/v2/logo-bitespeed.webp',
+        name: 'Bitespeed',
+        w: 340,
+        h: 65,
+        maxH: '44px',
+        maxW: '170px'
+      },
+      {
+        src: '/img/landing/v2/logo-xeno.webp',
+        name: 'Xeno',
+        w: 176,
+        h: 88,
+        maxH: '44px',
+        maxW: '170px'
+      },
+      {
+        src: '/img/landing/v2/logo-cordial.webp',
+        name: 'Cordial',
+        w: 244,
+        h: 88,
+        maxH: '44px',
+        maxW: '170px'
+      },
+      {
+        src: '/img/landing/v2/logo-lendingkart.webp',
+        name: 'Lending Kart',
+        w: 168,
+        h: 88,
+        maxH: '62px',
+        maxW: '230px'
+      },
+      {
+        src: '/img/landing/v2/logo-astrotalk.webp',
+        name: 'Astro Talk',
+        w: 246,
+        h: 88,
+        maxH: '44px',
+        maxW: '170px'
+      },
+      {
+        src: '/img/landing/v2/logo-physicswallah.webp',
+        name: 'Physics Wallah',
+        w: 246,
+        h: 88,
+        maxH: '44px',
+        maxW: '170px'
+      }
     ]
     const ticker = [
       'Postgres',
@@ -133,6 +180,8 @@ export function useHomeLogic(props = {}) {
       closeResources: () => closeResources(),
       openContributors: () => openContributors(),
       closeContributors: () => closeContributors(),
+      mobileMenuOpen: stateRef.current.mobileMenuOpen,
+      toggleMobileMenu: () => toggleMobileMenu(),
 
       terminalLines: [
         {
@@ -188,6 +237,23 @@ export function useHomeLogic(props = {}) {
 
       tickerLoop: [...ticker, ...ticker],
 
+      // Shared by the desktop canvas and the `.arch-mobile` stack below 860px.
+      archSources: ticker.slice(0, 8),
+      archGoChips: [{ label: 'Full Load' }, { label: 'CDC' }, { label: 'Incremental' }],
+      archFusionChips: [
+        { label: 'Compaction' },
+        { label: 'Cleanup', soon: true },
+        { label: 'Logs & metrics' }
+      ],
+      archDestinations: [
+        {
+          src: '/img/landing/v2/connector-iceberg.webp',
+          name: 'Iceberg',
+          sub: 'Tables & metadata'
+        },
+        { src: '/img/landing/shared/parquet-icon.webp', name: 'Parquet on S3', sub: '' }
+      ],
+
       engines: [
         {
           tag: '// OLAKE GO',
@@ -221,8 +287,7 @@ export function useHomeLogic(props = {}) {
         }
       ],
 
-      // Copies of the logo set; enough to keep the marquee covered on wide screens.
-      logoGroups: Array.from({ length: 4 }, () => logos),
+      logos,
 
       selectGo: () => setState({ advantage: 'go' }),
       selectFusion: () => setState({ advantage: 'fusion' }),
@@ -242,7 +307,7 @@ export function useHomeLogic(props = {}) {
           num: '01',
           kicker: 'FAST',
           title: 'Replicate databases at scale',
-          body: 'Sync MySQL, Postgres, MongoDB, Kafka, and more to Apache Iceberg with parallelised chunking, incremental sync, and CDC.'
+          body: 'Sync MySQL, Postgres, MongoDB, Kafka, and more to Apache Iceberg and Parquet with parallelised chunking, incremental sync, and CDC.'
         },
         {
           stickyTop: 138,
@@ -251,7 +316,7 @@ export function useHomeLogic(props = {}) {
           num: '02',
           kicker: 'OPEN',
           title: 'Built on open standards',
-          body: 'Write directly to Apache Iceberg or Parquet, with support for AWS Glue, Hive Metastore, and REST catalogs like Nessie, Polaris, and Unity. '
+          body: 'Write directly to Apache Iceberg or Parquet, with support for AWS Glue, Hive Metastore, JDBC/SQL and REST catalogs like Nessie, Polaris, and Unity.'
         },
         {
           stickyTop: 180,
@@ -269,7 +334,7 @@ export function useHomeLogic(props = {}) {
           num: '04',
           kicker: 'MAINTAINED',
           title: 'Keep tables fast as data keeps growing',
-          body: 'Automated compaction and delete-file cleanup keep query performance and storage costs in check as you scale.'
+          body: 'Schedule and automate compaction and delete-file cleanup to keep query performance and storage costs in check as you scale.'
         }
       ],
 

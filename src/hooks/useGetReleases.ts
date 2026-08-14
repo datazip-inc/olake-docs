@@ -4,19 +4,22 @@ import { IGlobalData } from '@site/src/types/download'
 
 const STARS_API_URL = 'https://api.github.com/repos/datazip-inc/olake'
 const STARS_CACHE_KEY = 'olake:gh-stars'
-const STARS_TTL_MS = 6 * 60 * 60 * 1000
+const STARS_TTL_MS = 24 * 60 * 60 * 1000
 
 let starsRequest: Promise<number | null> | null = null
 
-const readCachedStars = (): number | null => {
+const readStoredStars = (): { value: number; at: number } | null => {
   try {
-    const raw = window.sessionStorage.getItem(STARS_CACHE_KEY)
-    if (!raw) return null
-    const { value, at } = JSON.parse(raw) as { value: number; at: number }
-    return Date.now() - at < STARS_TTL_MS ? value : null
+    const raw = window.localStorage.getItem(STARS_CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
   } catch {
-    return null
+    return null // private mode, storage disabled, or corrupt entry
   }
+}
+
+const readCachedStars = (): number | null => {
+  const stored = readStoredStars()
+  return stored && Date.now() - stored.at < STARS_TTL_MS ? stored.value : null
 }
 
 const fetchStars = (): Promise<number | null> => {
@@ -27,14 +30,14 @@ const fetchStars = (): Promise<number | null> => {
       const value: number | null = data?.stargazers_count ?? null
       if (value) {
         try {
-          window.sessionStorage.setItem(STARS_CACHE_KEY, JSON.stringify({ value, at: Date.now() }))
+          window.localStorage.setItem(STARS_CACHE_KEY, JSON.stringify({ value, at: Date.now() }))
         } catch {
           /* private mode or storage disabled — just skip caching */
         }
       }
       return value
     })
-    .catch(() => null) // offline or rate-limited: callers keep their fallback
+    .catch(() => null) // offline or rate-limited: fall back to the stale value
   return starsRequest
 }
 
@@ -58,6 +61,10 @@ const useGetReleases = () => {
       setStargazersCount(cached)
       return
     }
+    // Expired: show the stale count rather than a dash while refreshing.
+    const stale = readStoredStars()
+    if (stale?.value) setStargazersCount(stale.value)
+
     fetchStars().then((value) => {
       if (alive && value) setStargazersCount(value)
     })

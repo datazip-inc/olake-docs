@@ -1,9 +1,6 @@
 // @ts-nocheck
 import React from 'react'
 import Layout from '@theme/Layout'
-import SiteNavbar from '@site/src/components/landing/Navbar/SiteNavbar'
-import '@site/src/components/landing/Navbar/SiteNavbar.css'
-import { PiLinkedinLogo, PiYoutubeLogo, PiSlackLogo, PiXLogo } from 'react-icons/pi'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
 import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
 import { useGoLogic } from '@site/src/components/landing/pages/useGoLogic'
@@ -18,10 +15,10 @@ export default function OLakeGoPage() {
     problemSentences,
     features,
     benchSources,
-    benchCols,
-    benchTable,
     benchModes,
     benchModeIndicatorLeft,
+    benchCols,
+    benchTable,
     benchComingSoon,
     benchHasData,
     benchSourceName,
@@ -45,12 +42,7 @@ export default function OLakeGoPage() {
   } = useGoLogic({ icebergPosX: 54, icebergPosY: 53, icebergZoom: 100, icebergOpacity: 65 })
 
   return (
-    <Layout
-      title={GO_SEO.title}
-      description={GO_SEO.description}
-      wrapperClassName='landing-page'
-      noFooter
-    >
+    <Layout title={GO_SEO.title} description={GO_SEO.description} wrapperClassName='landing-page'>
       <LandingSeo
         title={GO_SEO.title}
         description={GO_SEO.description}
@@ -61,7 +53,6 @@ export default function OLakeGoPage() {
       />
       <LightModeEnforcer />
       <div className='olakego-page olake-design-page'>
-        <SiteNavbar />
         <div
           style={{
             position: 'fixed',
@@ -119,7 +110,6 @@ export default function OLakeGoPage() {
         >
           <div
             style={{
-              minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -130,7 +120,7 @@ export default function OLakeGoPage() {
               className='hero-wrap'
               style={{
                 position: 'relative',
-                padding: '88px 64px 60px',
+                padding: '56px 64px 36px',
                 maxWidth: '1120px',
                 margin: '0 auto',
                 textAlign: 'center'
@@ -179,7 +169,7 @@ export default function OLakeGoPage() {
                   fontWeight: '700',
                   letterSpacing: '0.08em',
                   color: '#3D4FF0',
-                  marginBottom: '48px'
+                  marginBottom: '32px'
                 }}
               >
                 <img
@@ -204,56 +194,56 @@ export default function OLakeGoPage() {
                 }}
               >
                 Fastest Replication to Iceberg & S3
-              </h1>
-            </div>{' '}
-            <div
-              className='hero-btns'
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '20px',
-                marginTop: '56px'
-              }}
-            >
-              <a
-                className='olakego-h2'
-                href='/docs/getting-started/quickstart/'
+              </h1>{' '}
+              <div
+                className='hero-btns'
                 style={{
-                  color: '#fff',
-                  background: '#3D4FF0',
-                  padding: '14px 28px',
-                  borderRadius: '9px',
-                  fontWeight: '600',
-                  fontSize: '15px',
-                  border: '2px solid #3D4FF0',
-                  boxShadow: '0 5px 0 #23309E',
-                  transform: 'translateY(-2px)',
-                  textDecoration: 'none',
-                  display: 'inline-block'
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '20px',
+                  marginTop: '36px'
                 }}
               >
-                Get Started
-              </a>{' '}
-              <a
-                className='olakego-h3'
-                href='/contact'
-                style={{
-                  color: '#10173A',
-                  background: '#fff',
-                  padding: '14px 28px',
-                  borderRadius: '9px',
-                  fontWeight: '600',
-                  fontSize: '15px',
-                  border: '2px solid #10173A',
-                  boxShadow: '0 5px 0 #10173A',
-                  transform: 'translateY(-2px)',
-                  textDecoration: 'none',
-                  display: 'inline-block'
-                }}
-              >
-                Talk to us
-              </a>
+                <a
+                  className='olakego-h2'
+                  href='/docs/getting-started/quickstart/'
+                  style={{
+                    color: '#fff',
+                    background: '#3D4FF0',
+                    padding: '14px 28px',
+                    borderRadius: '9px',
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    border: '2px solid #3D4FF0',
+                    boxShadow: '0 5px 0 #23309E',
+                    transform: 'translateY(-2px)',
+                    textDecoration: 'none',
+                    display: 'inline-block'
+                  }}
+                >
+                  Get Started
+                </a>{' '}
+                <a
+                  className='olakego-h3'
+                  href='/contact'
+                  style={{
+                    color: '#10173A',
+                    background: '#fff',
+                    padding: '14px 28px',
+                    borderRadius: '9px',
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    border: '2px solid #10173A',
+                    boxShadow: '0 5px 0 #10173A',
+                    transform: 'translateY(-2px)',
+                    textDecoration: 'none',
+                    display: 'inline-block'
+                  }}
+                >
+                  Talk to us
+                </a>
+              </div>
             </div>
           </div>
           <div
@@ -261,7 +251,7 @@ export default function OLakeGoPage() {
             style={{
               maxWidth: '900px',
               width: '100%',
-              margin: '72px auto 56px',
+              margin: '28px auto 56px',
               padding: '20px 40px',
               position: 'relative',
               zIndex: '10'
@@ -273,7 +263,7 @@ export default function OLakeGoPage() {
                 display: 'grid',
                 gridTemplateColumns: '1fr auto 1fr',
                 alignItems: 'start',
-                height: '210px',
+                height: '326px',
                 position: 'relative'
               }}
             >
@@ -290,6 +280,7 @@ export default function OLakeGoPage() {
                 }}
               />
               <div
+                className='arch-sources'
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -299,6 +290,7 @@ export default function OLakeGoPage() {
                 }}
               >
                 <div
+                  className='arch-src-label'
                   style={{
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontSize: '10px',
@@ -475,14 +467,114 @@ export default function OLakeGoPage() {
                   >
                     S3
                   </span>
+                </div>{' '}
+                <div
+                  className='src-box'
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    background: '#fff',
+                    border: '1.5px solid #E1E4F3',
+                    borderRadius: '9px',
+                    padding: '6px 12px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#C74634',
+                      flexShrink: '0'
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10173A',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Oracle
+                  </span>
+                </div>{' '}
+                <div
+                  className='src-box'
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    background: '#fff',
+                    border: '1.5px solid #E1E4F3',
+                    borderRadius: '9px',
+                    padding: '6px 12px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#A91D22',
+                      flexShrink: '0'
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10173A',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    MSSQL
+                  </span>
+                </div>{' '}
+                <div
+                  className='src-box'
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    background: '#fff',
+                    border: '1.5px solid #E1E4F3',
+                    borderRadius: '9px',
+                    padding: '6px 12px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#1F70C1',
+                      flexShrink: '0'
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#10173A',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    DB2 LUW
+                  </span>
                 </div>
               </div>
               <div
+                className='arch-node'
                 style={{
                   textAlign: 'center',
                   flexShrink: '0',
                   justifySelf: 'center',
-                  transform: 'translateY(55px)'
+                  transform: 'translateY(68px)'
                 }}
               >
                 <div
@@ -578,7 +670,7 @@ export default function OLakeGoPage() {
                   gap: '12px',
                   flexShrink: '0',
                   justifySelf: 'end',
-                  transform: 'translateY(36px)'
+                  transform: 'translateY(96px)'
                 }}
               >
                 <div
@@ -788,15 +880,7 @@ export default function OLakeGoPage() {
               'linear-gradient(180deg, #F5F6FA 0%, #EDEFFB 35%, #7385DD 80%, #3C52CC 100%)'
           }}
         />
-        <div
-          style={{
-            minHeight: '65vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            scrollSnapAlign: 'start'
-          }}
-        >
+        <div style={{ scrollSnapAlign: 'start' }}>
           <div
             className='features-wrap'
             id='features'
@@ -835,7 +919,7 @@ export default function OLakeGoPage() {
                   display: 'grid',
                   gridTemplateColumns: '0.8fr 1.2fr',
                   gap: '56px',
-                  alignItems: 'start'
+                  alignItems: 'center'
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -879,443 +963,520 @@ export default function OLakeGoPage() {
                     </React.Fragment>
                   ))}
                 </div>{' '}
-                <div style={{ minHeight: '220px' }}>
+                <div
+                  className='features-card-slot'
+                  style={{ display: 'grid', gridTemplateColumns: '1fr', minWidth: 0 }}
+                >
                   {(features || []).map((feat, featIdx) => (
                     <React.Fragment key={featIdx}>
-                      {feat.active ? (
-                        <>
+                      <div
+                        style={{
+                          gridColumn: '1',
+                          gridRow: '1',
+                          minWidth: 0,
+                          visibility: feat.active ? 'visible' : 'hidden',
+                          pointerEvents: feat.active ? 'auto' : 'none'
+                        }}
+                      >
+                        <div
+                          key={feat.active ? `active-${featIdx}` : 'idle'}
+                          className='features-card'
+                          style={{
+                            border: '1px solid #E4E7F2',
+                            borderRadius: '18px',
+                            padding: '40px',
+                            background: '#fff',
+                            boxShadow: '0 24px 50px -30px rgba(10,14,39,0.5)',
+                            animation: 'fadeSlideIn 0.5s ease'
+                          }}
+                        >
                           <div
-                            className='features-card'
                             style={{
-                              border: '1px solid #E4E7F2',
-                              borderRadius: '18px',
-                              padding: '40px',
-                              background: '#fff',
-                              boxShadow: '0 24px 50px -30px rgba(10,14,39,0.5)',
-                              animation: 'fadeSlideIn 0.5s ease'
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg,#3D4FF0,#6E7CFF)',
+                              marginBottom: '22px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                           >
-                            <div
-                              style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '10px',
-                                background: 'linear-gradient(135deg,#3D4FF0,#6E7CFF)',
-                                marginBottom: '22px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              {feat.isTiered ? (
-                                <>
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'flex-end',
-                                      gap: '3px',
-                                      height: '20px'
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '5px',
-                                        height: '8px',
-                                        background: 'rgba(255,255,255,0.55)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '5px',
-                                        height: '14px',
-                                        background: 'rgba(255,255,255,0.8)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '5px',
-                                        height: '20px',
-                                        background: '#fff',
-                                        borderRadius: '2px'
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              ) : null}{' '}
-                              {feat.isDecay ? (
-                                <>
-                                  <div
-                                    style={{ position: 'relative', width: '22px', height: '22px' }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        inset: '0',
-                                        border: '2.5px solid rgba(255,255,255,0.5)',
-                                        borderRadius: '5px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        right: '-3px',
-                                        bottom: '-3px',
-                                        width: '12px',
-                                        height: '12px',
-                                        background: '#fff',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '6px',
-                                          height: '2px',
-                                          background: '#3D4FF0',
-                                          borderRadius: '1px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          width: '2px',
-                                          height: '6px',
-                                          background: '#3D4FF0',
-                                          borderRadius: '1px'
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                </>
-                              ) : null}{' '}
-                              {feat.isChunk ? (
-                                <>
-                                  <div
-                                    style={{ display: 'flex', gap: '3px', alignItems: 'center' }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: '#fff',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: 'rgba(255,255,255,0.75)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: 'rgba(255,255,255,0.55)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        width: '4px',
-                                        height: '20px',
-                                        background: 'rgba(255,255,255,0.4)',
-                                        borderRadius: '2px'
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              ) : null}{' '}
-                              {feat.isResume ? (
-                                <>
-                                  <div
-                                    style={{
-                                      width: '20px',
-                                      height: '20px',
-                                      border: '2.5px solid #fff',
-                                      borderTopColor: 'transparent',
-                                      borderRadius: '50%',
-                                      position: 'relative'
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: '-3px',
-                                        right: '-1px',
-                                        width: '0',
-                                        height: '0',
-                                        borderLeft: '5px solid #fff',
-                                        borderTop: '3px solid transparent',
-                                        borderBottom: '3px solid transparent',
-                                        transform: 'rotate(20deg)'
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              ) : null}
-                            </div>{' '}
-                            <h3
-                              style={{
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                fontWeight: '700',
-                                fontSize: '20px',
-                                letterSpacing: '0.03em',
-                                color: '#10173A',
-                                margin: '0 0 22px'
-                              }}
-                            >
-                              {feat.title}
-                            </h3>{' '}
                             {feat.isTiered ? (
                               <>
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-end',
+                                    gap: '3px',
+                                    height: '20px'
+                                  }}
+                                >
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      padding: '16px 14px'
+                                      width: '5px',
+                                      height: '8px',
+                                      background: 'rgba(255,255,255,0.55)',
+                                      borderRadius: '2px'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.05em',
-                                        color: '#3D4FF0',
-                                        marginBottom: '12px'
-                                      }}
-                                    >
-                                      FULL
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'flex-end',
-                                        gap: '3px',
-                                        height: '34px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '100%',
-                                          background: '#3D4FF0',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '100%',
-                                          background: '#3D4FF0',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '100%',
-                                          background: '#3D4FF0',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: '#5B6484',
-                                        marginTop: '10px'
-                                      }}
-                                    >
-                                      one-time load
-                                    </div>
-                                  </div>{' '}
+                                  />{' '}
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      padding: '16px 14px'
+                                      width: '5px',
+                                      height: '14px',
+                                      background: 'rgba(255,255,255,0.8)',
+                                      borderRadius: '2px'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.05em',
-                                        color: '#4F5FF5',
-                                        marginBottom: '12px'
-                                      }}
-                                    >
-                                      INCREMENTAL
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'flex-end',
-                                        gap: '3px',
-                                        height: '34px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '38%',
-                                          background: '#4F5FF5',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '60%',
-                                          background: '#4F5FF5',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '48%',
-                                          background: '#4F5FF5',
-                                          borderRadius: '3px'
-                                        }}
-                                      />
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: '#5B6484',
-                                        marginTop: '10px'
-                                      }}
-                                    >
-                                      on schedule
-                                    </div>
-                                  </div>{' '}
+                                  />{' '}
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      padding: '16px 14px'
+                                      width: '5px',
+                                      height: '20px',
+                                      background: '#fff',
+                                      borderRadius: '2px'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.05em',
-                                        color: '#6E7CFF',
-                                        marginBottom: '12px'
-                                      }}
-                                    >
-                                      CDC
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        height: '34px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: '9px',
-                                          height: '9px',
-                                          borderRadius: '50%',
-                                          background: '#6E7CFF',
-                                          animation: 'wordFloat 1.6s ease-in-out infinite'
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          flex: '1',
-                                          height: '2px',
-                                          background: 'linear-gradient(90deg,#6E7CFF,transparent)',
-                                          borderRadius: '2px'
-                                        }}
-                                      />
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: '#5B6484',
-                                        marginTop: '10px'
-                                      }}
-                                    >
-                                      real-time
-                                    </div>
-                                  </div>
+                                  />
                                 </div>
                               </>
                             ) : null}{' '}
                             {feat.isDecay ? (
                               <>
                                 <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '16px',
-                                    marginBottom: '26px'
-                                  }}
+                                  style={{ position: 'relative', width: '22px', height: '22px' }}
                                 >
                                   <div
                                     style={{
-                                      flex: '1',
-                                      background: '#F6F7FC',
-                                      border: '1px solid #EEF0F8',
-                                      borderRadius: '12px',
-                                      overflow: 'hidden'
+                                      position: 'absolute',
+                                      inset: '0',
+                                      border: '2.5px solid rgba(255,255,255,0.5)',
+                                      borderRadius: '5px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      right: '-3px',
+                                      bottom: '-3px',
+                                      width: '12px',
+                                      height: '12px',
+                                      background: '#fff',
+                                      borderRadius: '50%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
                                     }}
                                   >
                                     <div
                                       style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.04em',
-                                        color: '#8890C4',
-                                        padding: '10px 14px',
-                                        borderBottom: '1px solid #EEF0F8'
+                                        width: '6px',
+                                        height: '2px',
+                                        background: '#3D4FF0',
+                                        borderRadius: '1px'
                                       }}
-                                    >
-                                      SOURCE TABLE
-                                    </div>{' '}
+                                    />
                                     <div
                                       style={{
-                                        padding: '8px 14px',
+                                        position: 'absolute',
+                                        width: '2px',
+                                        height: '6px',
+                                        background: '#3D4FF0',
+                                        borderRadius: '1px'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isChunk ? (
+                              <>
+                                <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: '#fff',
+                                      borderRadius: '2px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.75)',
+                                      borderRadius: '2px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.55)',
+                                      borderRadius: '2px'
+                                    }}
+                                  />{' '}
+                                  <div
+                                    style={{
+                                      width: '4px',
+                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.4)',
+                                      borderRadius: '2px'
+                                    }}
+                                  />
+                                </div>
+                              </>
+                            ) : null}{' '}
+                            {feat.isResume ? (
+                              <>
+                                <div
+                                  style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    border: '2.5px solid #fff',
+                                    borderTopColor: 'transparent',
+                                    borderRadius: '50%',
+                                    position: 'relative'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-3px',
+                                      right: '-1px',
+                                      width: '0',
+                                      height: '0',
+                                      borderLeft: '5px solid #fff',
+                                      borderTop: '3px solid transparent',
+                                      borderBottom: '3px solid transparent',
+                                      transform: 'rotate(20deg)'
+                                    }}
+                                  />
+                                </div>
+                              </>
+                            ) : null}
+                          </div>{' '}
+                          <h3
+                            style={{
+                              fontFamily: "'Space Grotesk', sans-serif",
+                              fontWeight: '700',
+                              fontSize: '20px',
+                              letterSpacing: '0.03em',
+                              color: '#10173A',
+                              margin: '0 0 22px'
+                            }}
+                          >
+                            {feat.title}
+                          </h3>{' '}
+                          {feat.isTiered ? (
+                            <>
+                              <div style={{ display: 'flex', gap: '12px', marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    padding: '16px 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.05em',
+                                      color: '#3D4FF0',
+                                      marginBottom: '12px'
+                                    }}
+                                  >
+                                    FULL
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-end',
+                                      gap: '3px',
+                                      height: '34px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '100%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '100%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '100%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#5B6484',
+                                      marginTop: '10px'
+                                    }}
+                                  >
+                                    one-time load
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    padding: '16px 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.05em',
+                                      color: '#4F5FF5',
+                                      marginBottom: '12px'
+                                    }}
+                                  >
+                                    INCREMENTAL
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-end',
+                                      gap: '3px',
+                                      height: '34px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '38%',
+                                        background: '#4F5FF5',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '60%',
+                                        background: '#4F5FF5',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '48%',
+                                        background: '#4F5FF5',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#5B6484',
+                                      marginTop: '10px'
+                                    }}
+                                  >
+                                    on schedule
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    padding: '16px 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.05em',
+                                      color: '#6E7CFF',
+                                      marginBottom: '12px'
+                                    }}
+                                  >
+                                    CDC
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      height: '34px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: '9px',
+                                        height: '9px',
+                                        borderRadius: '50%',
+                                        background: '#6E7CFF',
+                                        animation: 'wordFloat 1.6s ease-in-out infinite'
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        flex: '1',
+                                        height: '2px',
+                                        background: 'linear-gradient(90deg,#6E7CFF,transparent)',
+                                        borderRadius: '2px'
+                                      }}
+                                    />
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#5B6484',
+                                      marginTop: '10px'
+                                    }}
+                                  >
+                                    real-time
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          {feat.isDecay ? (
+                            <>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '16px',
+                                  marginBottom: '26px'
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#F6F7FC',
+                                    border: '1px solid #EEF0F8',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.04em',
+                                      color: '#8890C4',
+                                      padding: '10px 14px',
+                                      borderBottom: '1px solid #EEF0F8'
+                                    }}
+                                  >
+                                    SOURCE TABLE
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      padding: '8px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '7px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '80%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '65%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '72%',
+                                        background: '#3D4FF0',
+                                        borderRadius: '3px'
+                                      }}
+                                    />
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{ fontSize: '22px', color: '#6E7CFF', flexShrink: '0' }}
+                                >
+                                  →
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    flex: '1',
+                                    background: '#fff',
+                                    border: '1.5px solid #3D4FF0',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 8px 20px -12px rgba(61,79,240,0.5)'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      letterSpacing: '0.04em',
+                                      color: '#3D4FF0',
+                                      padding: '10px 14px',
+                                      borderBottom: '1px solid #EEF0F8'
+                                    }}
+                                  >
+                                    ICEBERG TABLE
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      padding: '8px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '7px'
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '80%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
+                                        height: '7px',
+                                        width: '65%',
+                                        background: '#D5D9EC',
+                                        borderRadius: '3px'
+                                      }}
+                                    />{' '}
+                                    <div
+                                      style={{
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '7px'
+                                        alignItems: 'center',
+                                        gap: '6px'
                                       }}
                                     >
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '80%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '65%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
                                       <div
                                         style={{
                                           height: '7px',
@@ -1324,275 +1485,206 @@ export default function OLakeGoPage() {
                                           borderRadius: '3px'
                                         }}
                                       />
+                                      <span
+                                        style={{
+                                          fontSize: '9px',
+                                          fontWeight: '700',
+                                          color: '#1D8A4C',
+                                          background: '#E4F8EA',
+                                          padding: '1px 6px',
+                                          borderRadius: '6px'
+                                        }}
+                                      >
+                                        + NEW
+                                      </span>
                                     </div>
-                                  </div>{' '}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          {feat.isChunk ? (
+                            <>
+                              <div style={{ marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    height: '14px',
+                                    borderRadius: '5px',
+                                    background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)',
+                                    marginBottom: '14px'
+                                  }}
+                                />{' '}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    marginBottom: '14px'
+                                  }}
+                                >
                                   <div
-                                    style={{ fontSize: '22px', color: '#6E7CFF', flexShrink: '0' }}
+                                    style={{
+                                      width: '1px',
+                                      height: '14px',
+                                      background: '#C7CCE8'
+                                    }}
+                                  />
+                                </div>{' '}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div
+                                    style={{
+                                      flex: '1',
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
+                                    }}
                                   >
-                                    →
+                                    chunk 1
                                   </div>{' '}
                                   <div
                                     style={{
                                       flex: '1',
-                                      background: '#fff',
-                                      border: '1.5px solid #3D4FF0',
-                                      borderRadius: '12px',
-                                      overflow: 'hidden',
-                                      boxShadow: '0 8px 20px -12px rgba(61,79,240,0.5)'
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
                                     }}
                                   >
-                                    <div
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        letterSpacing: '0.04em',
-                                        color: '#3D4FF0',
-                                        padding: '10px 14px',
-                                        borderBottom: '1px solid #EEF0F8'
-                                      }}
-                                    >
-                                      ICEBERG TABLE
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        padding: '8px 14px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '7px'
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '80%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          height: '7px',
-                                          width: '65%',
-                                          background: '#D5D9EC',
-                                          borderRadius: '3px'
-                                        }}
-                                      />{' '}
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '6px'
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            height: '7px',
-                                            width: '72%',
-                                            background: '#3D4FF0',
-                                            borderRadius: '3px'
-                                          }}
-                                        />
-                                        <span
-                                          style={{
-                                            fontSize: '9px',
-                                            fontWeight: '700',
-                                            color: '#1D8A4C',
-                                            background: '#E4F8EA',
-                                            padding: '1px 6px',
-                                            borderRadius: '6px'
-                                          }}
-                                        >
-                                          + NEW
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            ) : null}{' '}
-                            {feat.isChunk ? (
-                              <>
-                                <div style={{ marginBottom: '26px' }}>
+                                    chunk 2
+                                  </div>{' '}
                                   <div
                                     style={{
-                                      height: '14px',
-                                      borderRadius: '5px',
-                                      background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)',
-                                      marginBottom: '14px'
+                                      flex: '1',
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
+                                    }}
+                                  >
+                                    chunk 3
+                                  </div>{' '}
+                                  <div
+                                    style={{
+                                      flex: '1',
+                                      height: '38px',
+                                      background: '#EEF0FE',
+                                      border: '1px solid #D9DEFB',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0'
+                                    }}
+                                  >
+                                    chunk 4
+                                  </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    textAlign: 'center',
+                                    fontSize: '11px',
+                                    color: '#5B6484',
+                                    marginTop: '12px'
+                                  }}
+                                >
+                                  read in parallel
+                                </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          {feat.isResume ? (
+                            <>
+                              <div style={{ marginBottom: '26px' }}>
+                                <div
+                                  style={{
+                                    position: 'relative',
+                                    height: '12px',
+                                    borderRadius: '6px',
+                                    background: '#EEF0F8',
+                                    margin: '26px 0 14px'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      left: '0',
+                                      top: '0',
+                                      bottom: '0',
+                                      width: '62%',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)'
                                     }}
                                   />{' '}
                                   <div
                                     style={{
-                                      display: 'flex',
-                                      justifyContent: 'center',
-                                      gap: '6px',
-                                      marginBottom: '14px'
+                                      position: 'absolute',
+                                      left: '62%',
+                                      top: '50%',
+                                      transform: 'translate(-50%,-50%)',
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '50%',
+                                      background: '#fff',
+                                      border: '3px solid #3D4FF0'
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '1px',
-                                        height: '14px',
-                                        background: '#C7CCE8'
-                                      }}
-                                    />
-                                  </div>{' '}
-                                  <div style={{ display: 'flex', gap: '8px' }}>
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 1
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 2
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 3
-                                    </div>{' '}
-                                    <div
-                                      style={{
-                                        flex: '1',
-                                        height: '38px',
-                                        background: '#EEF0FE',
-                                        border: '1px solid #D9DEFB',
-                                        borderRadius: '8px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0'
-                                      }}
-                                    >
-                                      chunk 4
-                                    </div>
-                                  </div>{' '}
+                                  />{' '}
                                   <div
                                     style={{
-                                      textAlign: 'center',
-                                      fontSize: '11px',
-                                      color: '#5B6484',
-                                      marginTop: '12px'
+                                      position: 'absolute',
+                                      left: '62%',
+                                      top: '-24px',
+                                      transform: 'translateX(-50%)',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                      color: '#3D4FF0',
+                                      whiteSpace: 'nowrap'
                                     }}
                                   >
-                                    read in parallel
+                                    ✓ checkpoint
                                   </div>
+                                </div>{' '}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '11px',
+                                    color: '#5B6484'
+                                  }}
+                                >
+                                  <span>interrupted</span>
+                                  <span style={{ color: '#3D4FF0', fontWeight: '600' }}>
+                                    resumes here →
+                                  </span>
                                 </div>
-                              </>
-                            ) : null}{' '}
-                            {feat.isResume ? (
-                              <>
-                                <div style={{ marginBottom: '26px' }}>
-                                  <div
-                                    style={{
-                                      position: 'relative',
-                                      height: '12px',
-                                      borderRadius: '6px',
-                                      background: '#EEF0F8',
-                                      margin: '26px 0 14px'
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        left: '0',
-                                        top: '0',
-                                        bottom: '0',
-                                        width: '62%',
-                                        borderRadius: '6px',
-                                        background: 'linear-gradient(90deg,#3D4FF0,#6E7CFF)'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        left: '62%',
-                                        top: '50%',
-                                        transform: 'translate(-50%,-50%)',
-                                        width: '20px',
-                                        height: '20px',
-                                        borderRadius: '50%',
-                                        background: '#fff',
-                                        border: '3px solid #3D4FF0'
-                                      }}
-                                    />{' '}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        left: '62%',
-                                        top: '-24px',
-                                        transform: 'translateX(-50%)',
-                                        fontSize: '10px',
-                                        fontWeight: '700',
-                                        color: '#3D4FF0',
-                                        whiteSpace: 'nowrap'
-                                      }}
-                                    >
-                                      ✓ checkpoint
-                                    </div>
-                                  </div>{' '}
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      fontSize: '11px',
-                                      color: '#5B6484'
-                                    }}
-                                  >
-                                    <span>interrupted</span>
-                                    <span style={{ color: '#3D4FF0', fontWeight: '600' }}>
-                                      resumes here →
-                                    </span>
-                                  </div>
-                                </div>
-                              </>
-                            ) : null}{' '}
-                            <div style={{ fontSize: '15px', lineHeight: '1.7', color: '#5B6484' }}>
-                              {feat.body}
-                            </div>
+                              </div>
+                            </>
+                          ) : null}{' '}
+                          <div style={{ fontSize: '15px', lineHeight: '1.7', color: '#5B6484' }}>
+                            {feat.body}
                           </div>
-                        </>
-                      ) : null}
+                        </div>
+                      </div>
                     </React.Fragment>
                   ))}
                 </div>
@@ -1725,7 +1817,7 @@ export default function OLakeGoPage() {
                   </div>
                 ))}
               </div>
-            </div>{' '}
+            </div>
             <div
               style={{
                 display: 'flex',
@@ -1828,7 +1920,7 @@ export default function OLakeGoPage() {
                       style={{
                         display: 'grid',
                         gridTemplateColumns:
-                          'minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+                          'minmax(0,1.15fr) minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
                         borderBottom: '1px solid #EEF0F8'
                       }}
                     >
@@ -1887,7 +1979,7 @@ export default function OLakeGoPage() {
                           style={{
                             display: 'grid',
                             gridTemplateColumns:
-                              'minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+                              'minmax(0,1.15fr) minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
                             borderTop: '1px solid #EEF0F8'
                           }}
                         >
@@ -2207,295 +2299,6 @@ export default function OLakeGoPage() {
                   </div>
                 </React.Fragment>
               ))}
-            </div>
-          </div>
-        </div>
-        <div
-          style={{
-            minHeight: '65vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            scrollSnapAlign: 'start'
-          }}
-        >
-          <div
-            className='footer-wrap'
-            style={{
-              background: '#F7F8FA',
-              padding: '64px 64px 0',
-              overflow: 'hidden',
-              position: 'relative'
-            }}
-          >
-            <div
-              style={{
-                maxWidth: '1280px',
-                margin: '0 auto',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '40px',
-                flexWrap: 'wrap',
-                position: 'relative',
-                zIndex: '1'
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    fontWeight: '700',
-                    fontSize: '24px',
-                    color: '#3D4FF0',
-                    marginBottom: '20px'
-                  }}
-                >
-                  OLake
-                </div>
-                <h2
-                  className='footer-hero'
-                  style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    fontWeight: '600',
-                    fontSize: '38px',
-                    lineHeight: '1.15',
-                    color: '#10173A',
-                    maxWidth: '480px'
-                  }}
-                >
-                  Fastest <span style={{ fontWeight: '800' }}>Data Replication</span>
-                </h2>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '28px' }}
-                >
-                  <a
-                    className='olake-footer-social'
-                    href='https://www.linkedin.com/company/datazipio/'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='LinkedIn'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiLinkedinLogo size={17} aria-hidden />
-                  </a>
-                  <a
-                    className='olake-footer-social'
-                    href='https://www.youtube.com/@olakeio'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='YouTube'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiYoutubeLogo size={17} aria-hidden />
-                  </a>
-                  <a
-                    className='olake-footer-social'
-                    href='/slack'
-                    aria-label='Slack'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiSlackLogo size={17} aria-hidden />
-                  </a>
-                  <a
-                    className='olake-footer-social'
-                    href='https://x.com/_olake'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    aria-label='X'
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #DADEEA',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5B6484'
-                    }}
-                  >
-                    <PiXLogo size={17} aria-hidden />
-                  </a>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '64px', flexWrap: 'wrap' }}>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      fontWeight: '700',
-                      color: '#10173A',
-                      marginBottom: '18px'
-                    }}
-                  >
-                    COMPANY
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      fontSize: '15px',
-                      color: '#8890A8'
-                    }}
-                  >
-                    <a className='olake-footer-link' href='/about-us' style={{ color: '#8890A8' }}>
-                      About us
-                    </a>
-                    <a className='olake-footer-link' href='/contact' style={{ color: '#8890A8' }}>
-                      Contact us
-                    </a>
-                    <a className='olake-footer-link' href='/branding' style={{ color: '#8890A8' }}>
-                      Branding
-                    </a>
-                    <a
-                      className='olake-footer-link'
-                      href='/terms-of-use'
-                      style={{ color: '#8890A8' }}
-                    >
-                      Terms of Use
-                    </a>
-                    <a
-                      className='olake-footer-link'
-                      href='/privacy-policy'
-                      style={{ color: '#8890A8' }}
-                    >
-                      Privacy Policy
-                    </a>
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      fontWeight: '700',
-                      color: '#10173A',
-                      marginBottom: '18px'
-                    }}
-                  >
-                    RESOURCES
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      fontSize: '15px',
-                      color: '#8890A8'
-                    }}
-                  >
-                    <a className='olake-footer-link' href='/blog' style={{ color: '#8890A8' }}>
-                      Blogs
-                    </a>
-                    <a className='olake-footer-link' href='/docs' style={{ color: '#8890A8' }}>
-                      Docs
-                    </a>
-                    <a className='olake-footer-link' href='/search' style={{ color: '#8890A8' }}>
-                      Search
-                    </a>
-                    <a className='olake-footer-link' href='/slack-archive' style={{ color: '#8890A8' }}>
-                      Community Slack Archive
-                    </a>
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      fontWeight: '700',
-                      color: '#10173A',
-                      marginBottom: '18px'
-                    }}
-                  >
-                    TOP READS
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      fontSize: '15px',
-                      color: '#8890A8',
-                      maxWidth: '180px'
-                    }}
-                  >
-                    <a
-                      className='olake-footer-link'
-                      href='/blog/issues-debezium-kafka'
-                      style={{ color: '#8890A8' }}
-                    >
-                      Issues with Debezium
-                    </a>
-                    <a
-                      className='olake-footer-link'
-                      href='/blog/olake-architecture'
-                      style={{ color: '#8890A8' }}
-                    >
-                      OLake Architecture
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              style={{
-                maxWidth: '1280px',
-                margin: '40px auto 0',
-                position: 'relative',
-                zIndex: '1',
-                fontSize: '13px',
-                color: '#AEB4C4',
-                paddingBottom: '24px'
-              }}
-            >
-              By Datazip
-            </div>
-            <div
-              className='footer-watermark'
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: '700',
-                fontSize: '260px',
-                lineHeight: '1',
-                color: '#EDEFF4',
-                whiteSpace: 'nowrap',
-                textAlign: 'center',
-                userSelect: 'none'
-              }}
-            >
-              OLake
             </div>
           </div>
         </div>

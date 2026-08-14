@@ -3,7 +3,9 @@ import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
-import { FaEnvelope, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-icons/fa'
+import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-icons/fa'
+import LazyComponent from '@site/src/components/LazyComponent'
+import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
 
 const stripTrailingSlash = (value?: string) => {
   if (!value) {
@@ -30,40 +32,40 @@ const ContactPage = () => {
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: 'OLake',
-    alternateName: 'Datazip, Inc. (OLake project)',
-    url: 'https://olake.io/',
-    logo: 'https://olake.io/img/logo/olake-blue.svg',
-    sameAs: [
+    'name': 'OLake',
+    'alternateName': 'Datazip, Inc. (OLake project)',
+    'url': 'https://olake.io/',
+    'logo': 'https://olake.io/img/logo/olake-blue.svg',
+    'sameAs': [
       'https://github.com/datazip-inc/olake',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
     ],
-    address: {
+    'address': {
       '@type': 'PostalAddress',
-      streetAddress: '16192 COASTAL HWY',
-      addressLocality: 'LEWES',
-      addressRegion: 'DE',
-      postalCode: '19958',
-      addressCountry: 'US'
+      'streetAddress': '16192 COASTAL HWY',
+      'addressLocality': 'LEWES',
+      'addressRegion': 'DE',
+      'postalCode': '19958',
+      'addressCountry': 'US'
     }
   }
 
   const websiteSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    url: 'https://olake.io/',
-    name: 'Fastest Open Source Data Replication Tool',
-    description:
+    'url': 'https://olake.io/',
+    'name': 'Fastest Open Source Data Replication Tool',
+    'description':
       'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
-    publisher: {
+    'publisher': {
       '@type': 'Organization',
-      name: 'OLake'
+      'name': 'OLake'
     },
-    potentialAction: {
+    'potentialAction': {
       '@type': 'SearchAction',
-      target: 'https://olake.io/search?q={search_term_string}',
+      'target': 'https://olake.io/search?q={search_term_string}',
       'query-input': 'required name=search_term_string'
     }
   }
@@ -71,42 +73,42 @@ const ContactPage = () => {
   const contactPageSchema = {
     '@context': 'https://schema.org',
     '@type': 'ContactPage',
-    url: canonicalUrl,
-    name: 'Contact Us',
-    description:
+    'url': canonicalUrl,
+    'name': 'Contact Us',
+    'description':
       'Get in touch with OLake for product questions, community, or support. Email hello@olake.io. Join our Slack for community discussions.',
-    isPartOf: {
+    'isPartOf': {
       '@type': 'WebSite',
-      url: 'https://olake.io/',
-      name: 'OLake'
+      'url': 'https://olake.io/',
+      'name': 'OLake'
     },
-    publisher: {
+    'publisher': {
       '@type': 'Organization',
-      name: 'OLake',
-      url: 'https://olake.io/',
-      logo: {
+      'name': 'OLake',
+      'url': 'https://olake.io/',
+      'logo': {
         '@type': 'ImageObject',
-        url: 'https://olake.io/img/logo/olake-blue.svg',
-        width: 32,
-        height: 32
+        'url': 'https://olake.io/img/logo/olake-blue.svg',
+        'width': 32,
+        'height': 32
       }
     },
-    contactPoint: {
+    'contactPoint': {
       '@type': 'ContactPoint',
-      contactType: 'customer support',
-      email: 'hello@olake.io',
-      availableLanguage: ['English']
+      'contactType': 'customer support',
+      'email': 'hello@olake.io',
+      'availableLanguage': ['English']
     },
-    mainEntity: [
+    'mainEntity': [
       {
         '@type': 'ContactPoint',
-        contactType: 'general inquiries',
-        email: 'hello@olake.io'
+        'contactType': 'general inquiries',
+        'email': 'hello@olake.io'
       },
       {
         '@type': 'WebSite',
-        name: 'Join Slack',
-        url: 'https://olake.io/slack/'
+        'name': 'Join Slack',
+        'url': 'https://olake.io/slack/'
       }
     ]
   }
@@ -114,18 +116,18 @@ const ContactPage = () => {
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: [
+    'itemListElement': [
       {
         '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: 'https://olake.io/'
+        'position': 1,
+        'name': 'Home',
+        'item': 'https://olake.io/'
       },
       {
         '@type': 'ListItem',
-        position: 2,
-        name: 'Contact Us',
-        item: canonicalUrl
+        'position': 2,
+        'name': 'Contact Us',
+        'item': canonicalUrl
       }
     ]
   }
@@ -139,9 +141,11 @@ const ContactPage = () => {
 
   return (
     <Layout
-      title="Contact Us - OLake"
-      description="Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool."
+      title='Contact Us - OLake'
+      description='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool.'
+      wrapperClassName='landing-page'
     >
+      <LightModeEnforcer />
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content='Contact Us - OLake' />
@@ -163,40 +167,42 @@ const ContactPage = () => {
           />
         ))}
       </Head>
-      <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-extrabold text-center mb-10">Contact Us</h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* Contact Info Section */}
-            <div className="space-y-8">
+      <div id='olake-form-product' className='min-h-[80vh]'>
+        <LazyComponent component='RegistrationSection' />
+      </div>
+      <div className='bg-white px-4 py-12 text-gray-800 dark:bg-gray-900 dark:text-gray-200 sm:px-6 lg:px-8'>
+        <div className='mx-auto max-w-4xl'>
+          <h1 className='mb-10 text-center text-4xl font-extrabold'>Contact Us</h1>
+          <div className='grid grid-cols-1 gap-10 md:grid-cols-2'>
+            <div className='space-y-8'>
               <div>
-                <h2 className="text-2xl font-bold mb-3">Get in Touch</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <FaEnvelope className="text-2xl" />
-                    <a href="mailto:hello@olake.io" className="hover:underline">
+                <h2 className='mb-3 text-2xl font-bold'>Other ways to reach us</h2>
+                <div className='space-y-4'>
+                  <div className='flex items-center space-x-4'>
+                    <FaEnvelope className='text-2xl' />
+                    <a href='mailto:hello@olake.io' className='hover:underline'>
                       hello@olake.io
                     </a>
                   </div>
-                  <div className="flex items-start space-x-4">
-                    <FaMapMarkerAlt className="text-2xl mt-1" />
+                  <div className='flex items-start space-x-4'>
+                    <FaMapMarkerAlt className='mt-1 text-2xl' />
                     <div>
-                      <p className="font-semibold">Headquarters</p>
+                      <p className='font-semibold'>Headquarters</p>
                       <p>Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA</p>
-                      <p className="font-semibold mt-2">Working Address</p>
+                      <p className='mt-2 font-semibold'>Working Address</p>
                       <p>
                         HustleHub H203, 522, 24th Main Rd, Parangi Palaya, Sector 2, HSR Layout,
                         Bengaluru, Karnataka 560102
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <FaSlack className="text-2xl" />
+                  <div className='flex items-center space-x-4'>
+                    <FaSlack className='text-2xl' />
                     <a
-                      href="https://olake.io/slack"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline"
+                      href='https://olake.io/slack'
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='hover:underline'
                     >
                       Join our Slack
                     </a>
@@ -205,12 +211,11 @@ const ContactPage = () => {
               </div>
             </div>
 
-            {/* Team Links Section */}
-            <div className="space-y-8">
-              <h2 className="text-2xl font-bold mb-3">Connect with Our Team on LinkedIn</h2>
-              <ul className="space-y-4">
-                <li className="flex items-center space-x-4">
-                  <FaLinkedin className="text-2xl" />
+            <div className='space-y-8'>
+              <h2 className='mb-3 text-2xl font-bold'>Connect with Our Team on LinkedIn</h2>
+              <ul className='space-y-4'>
+                <li className='flex items-center space-x-4'>
+                  <FaLinkedin className='text-2xl' />
                   <a
                     href='https://www.linkedin.com/in/rohan-khameshra/'
                     target='_blank'
@@ -220,8 +225,8 @@ const ContactPage = () => {
                     Rohan
                   </a>
                 </li>
-                <li className="flex items-center space-x-4">
-                  <FaLinkedin className="text-2xl" />
+                <li className='flex items-center space-x-4'>
+                  <FaLinkedin className='text-2xl' />
                   <a
                     href='https://www.linkedin.com/in/shubham-baldava/'
                     target='_blank'
@@ -241,4 +246,3 @@ const ContactPage = () => {
 }
 
 export default ContactPage
-

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   CONNECTORS,
   CONNECTOR_BENCHMARKS,
@@ -23,27 +23,27 @@ export function useGoLogic(props = {}) {
     faqs: [
       {
         q: 'How to get started?',
-        a: 'Check the Quickstart Guide. With a single Docker command you can spin up OLake and access the UI.'
+        a: 'Check the Quickstart Guide. With a single Docker command you can spin up OLake Go and access the UI.'
       },
       {
-        q: 'Is OLake really open source?',
-        a: 'Yes. OLake is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1K+ developers) and use it freely without hidden costs.'
+        q: 'Is OLake Go really open source?',
+        a: 'Yes. OLake Go is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1K+ developers) and use it freely without hidden costs.'
       },
       {
         q: 'Is there any enterprise plan?',
-        a: "We're actively working on providing enterprise support, from professional assistance and pilot programs to helping teams scale OLake in production. You can reach out at hello@olake.io to learn more."
+        a: "We're actively working on providing enterprise support, from professional assistance and pilot programs to helping teams scale OLake Go in production. You can reach out at hello@olake.io to learn more."
       },
       {
         q: 'How can I contribute?',
         a: 'Join our Slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
       },
       {
-        q: 'Why should I use OLake?',
-        a: 'OLake makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction, all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
+        q: 'Why should I use OLake Go?',
+        a: 'OLake Go makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction, all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
       },
       {
-        q: 'What data platforms and tools does OLake integrate with?',
-        a: 'As of now, we integrate with Apache Iceberg as a destination. You can query it from most big data platforms like Snowflake, Databricks, Redshift and BigQuery.'
+        q: 'What data platforms and tools does OLake Go integrate with?',
+        a: 'As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery.'
       }
     ],
     openFaq: -1,
@@ -81,8 +81,25 @@ export function useGoLogic(props = {}) {
     const connector = CONNECTORS[stateRef.current.activeSource] || CONNECTORS[0]
     const dataset =
       stateRef.current.benchmarkMode === 'cdc' ? CONNECTOR_CDC_BENCHMARKS : CONNECTOR_BENCHMARKS
-    const bench = dataset[connector.id]
+    const bench = dataset[connector.id] || {}
     const comps = competitorKeys(bench)
+    const def = {
+      comps: comps.map((key) => TOOLS[key].name),
+      rows: BENCHMARK_METRICS.map((metric) => {
+        const row = bench[metric] || {}
+        const isCmp = metric === 'comparison'
+        return {
+          label: CONNECTOR_METRIC_LABELS[metric],
+          cmp: isCmp,
+          // OLake is the baseline for the comparison row, so it shows a dash
+          // rather than a multiplier against itself.
+          olake: isCmp ? '–' : row.olake,
+          comps: comps.map((key) => row[key] ?? '-')
+        }
+      })
+    }
+    const comingSoon = !bench.hasData
+    const sourceName = connector.name
     const cols = [
       {
         name: 'Metrics',
@@ -102,8 +119,8 @@ export function useGoLogic(props = {}) {
         bg: GB,
         align: 'center'
       },
-      ...comps.map((key) => ({
-        name: TOOLS[key].name,
+      ...def.comps.map((name) => ({
+        name,
         sub: '',
         hasSub: false,
         olake: false,
@@ -118,24 +135,16 @@ export function useGoLogic(props = {}) {
       weight: type === 'olake' || type === 'cmp' ? 700 : 500,
       bg: type === 'olake' ? GB : 'transparent'
     })
-    const table = BENCHMARK_METRICS.map((metric) => {
-      const row = bench[metric]
-      const isCmp = metric === 'comparison'
-      return {
-        label: CONNECTOR_METRIC_LABELS[metric],
-        sub:
-          metric === 'cost'
-            ? 'OLake is OSS and self-hosted — only pay for your infrastructure.'
-            : '',
-        hasSub: metric === 'cost',
-        // OLake is the baseline for the comparison row, so it shows a dash, not a multiplier.
-        cells: [
-          cell(isCmp ? '–' : row.olake, 'olake'),
-          ...comps.map((key) => cell(row[key] ?? '-', isCmp ? 'cmp' : 'normal'))
-        ]
-      }
-    })
-    return { cols, table, comingSoon: !bench.hasData, sourceName: connector.name }
+    const table = def.rows.map((r) => ({
+      label: r.label,
+      sub:
+        r.label === 'Cost'
+          ? 'OLake is OSS and self-hosted — only pay for your infrastructure.'
+          : '',
+      hasSub: r.label === 'Cost',
+      cells: [cell(r.olake, 'olake'), ...r.comps.map((v) => cell(v, r.cmp ? 'cmp' : 'normal'))]
+    }))
+    return { cols, table, comingSoon, sourceName }
   }
 
   const selectBenchmarkMode = (mode) => {
@@ -216,7 +225,7 @@ export function useGoLogic(props = {}) {
       icebergStyle,
       problemSentences: [
         {
-          top: 27,
+          top: 22,
           left: 42,
           rot: -3,
           delay: 0,
@@ -272,7 +281,7 @@ export function useGoLogic(props = {}) {
           },
           {
             title: 'STATEFUL, RESUMABLE SYNCS',
-            body: 'Syncs checkpoint their progress and resume automatically after crashes, network failures, or pauses, never from scratch.',
+            body: 'Syncs checkpoint their progress and resume automatically after crashes or network failures; never from scratch.',
             tag: 'resume',
             stats: ['Checkpointed', 'Auto-resume', 'Fault-tolerant']
           }
