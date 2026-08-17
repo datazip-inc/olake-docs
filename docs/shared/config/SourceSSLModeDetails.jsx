@@ -1,10 +1,11 @@
 import React from 'react';
+import CodeBlock from '@theme/CodeBlock';
 
 const SSL_MODES = {
   disable: {
     title: 'Disable',
     description:
-      'No TLS/SSL encryption. Suitable for local development or databases that allow plain-text connections.',
+      'No TLS/SSL encryption. Suitable for databases that allow plain-text connections.',
     sslMode: 'disable',
     example: {
       mode: 'disable',
@@ -116,9 +117,7 @@ function SslModeSection({ index, mode }) {
       <p>
         <strong>Example Configuration:</strong>
       </p>
-      <pre>
-        <code>{formatSslExample(mode.example)}</code>
-      </pre>
+      <CodeBlock language="json">{formatSslExample(mode.example)}</CodeBlock>
     </>
   );
 }
