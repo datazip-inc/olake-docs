@@ -13,7 +13,7 @@ The OLake Go S3 Source connector ingests data from Amazon S3 or S3-compatible st
 
 ## Key Features
 
-- **Multi-Format Support**: CSV files (`.csv`, `.csv.gz`), JSON files in JSONL and Array formats (`.json`, `.jsonl`, `.json.gz`), and Parquet files
+- **Multi-Format Support**: CSV files (`.csv`, `.csv.gz`), JSON files in JSONL and Array formats (`.json`, `.jsonl`, `.json.gz`), XML files (`.xml`) and Parquet files
 - **Automatic Compression Handling**: Transparent gzip decompression (`.gz` files)
 - **Folder-Based Streams**: Groups files by top-level folder into logical streams. Files are automatically grouped into streams based on folder structure. An example of bucket structure is provided below:
 
@@ -112,6 +112,107 @@ The OLake Go S3 Source connector ingests data from Amazon S3 or S3-compatible st
 
 ---
 
+## XML File Handling {#xml-properties}
+
+The following behavior applies when **XML** is selected as the file format. 
+
+### 1. Normalization OFF
+
+When normalization is set to **OFF** in the Streams section, OLake Go parses the XML into a JSON tree and stores it as a JSON string in a column.
+
+**Example input:**
+
+```xml
+<orders>
+  <order id="1001" status="NEW">
+    <order_date>2024-08-01</order_date>
+    <customer>
+      <id>CUST_55</id>
+      <name>Alice</name>
+    </customer>
+  </order>
+</orders>
+```
+
+**Output:**
+
+```json
+{"orders":{"order":[{"id":"1001","status":"NEW","order_date":"2024-08-01","customer":{"id":"CUST_55","name":"Alice"}}]}}
+```
+
+### 2. Normalization ON
+
+When normalization is set to **ON** in the Streams section, OLake Go performs level 0 flattening and stores the data as a table. You must also set **Row Identifier** in the source configuration to the tag that encloses each record.
+
+**Example input** (with `row_identifier = order`):
+
+```xml
+<orders>
+  <order id="1001" status="NEW">
+    <order_date>2024-08-01</order_date>
+    <customer>
+      <id>CUST_55</id>
+      <name>Alice</name>
+    </customer>
+  </order>
+</orders>
+```
+
+**Output table:**
+
+| _id | _status | order_date | customer |
+|-----|---------|------------|----------|
+| 1001 | NEW | 2024-08-01 | `{"id":"CUST_55","name":"Alice"}` |
+
+### 3. Level 0 Flattening Rules
+
+When normalization is **ON**, OLake Go applies level 0 flattening only. Using the example above:
+
+- **Attributes** on the row identifier element become columns prefixed with `_`. For `<order id="1001" status="NEW">`, `id` and `status` become columns `_id` and `_status`.
+- **Direct child elements** become columns using their tag name as-is. For example, `order_date` becomes column `order_date`.
+- **Nested child elements** become columns using their tag name, but their contents are **not** flattened further. The value is stored as a JSON string. For example, `customer` becomes column `customer` with value `{"id":"CUST_55","name":"Alice"}`.
+
+### 4. Repeated Elements and Row Identifier
+
+Choosing the correct **Row Identifier** matters when XML contains repeated elements.
+
+**Example input:**
+
+```xml
+<items>
+  <item>Apple</item>
+  <item>Banana</item>
+</items>
+```
+
+| Row Identifier | Result |
+|----------------|--------|
+| `item` | Table with column `item` and two rows: Apple, Banana |
+| `items` | Table with column `data` and one row: Banana (Apple gets overwritten)  |
+
+:::warning Row Identifier Selection
+Always set **Row Identifier** to the tag that encloses each individual record, not the parent wrapper element. An incorrect value can cause data loss from overwrites.
+:::
+
+### 5. Namespaced Elements
+
+When XML elements use namespaces, column names include the namespace prefix.
+
+**Example input** (with normalization **ON**):
+
+```xml
+<h:order id="1">
+  <h:price>10</h:price>
+  <f:price xmlns:f="http://f.ns">20</f:price>
+</h:order>
+```
+
+**Output table columns:** `_id`, `h_price`, `f_price`
+
+The namespace prefix is included in the column name to avoid collisions between elements that share the same local name (for example, `h:price` and `f:price`).
+
+---
+
 ## Configuration {#configuration}
 
 <TOCTabLinker
@@ -143,14 +244,17 @@ The OLake Go S3 Source connector ingests data from Amazon S3 or S3-compatible st
 
 | Field | Description | Example Value |
 |-------|-------------|---------------|
-| Bucket Name `required` | S3 bucket name (without `s3://` prefix) | `my-data-warehouse` |
-| Region `required` | AWS region where bucket is hosted | `us-east-1` |
+| Bucket Name `required` | S3 bucket name where Iceberg table data and metadata files will be stored. | `my-data-warehouse` |
+| Region `required` | AWS Region where your S3 bucket exists. Required so OLake Go calls the correct regional S3 endpoint. | `us-east-1` |
 | Path Prefix | Optional path prefix to filter files | `data/` |
-| Access Key ID | AWS access key for authentication (optional - see note) | `<YOUR_KEY>` |
-| Secret Access Key | AWS secret key for authentication (optional - see note) | `<YOUR_SECRET>` |
-| File Format `required` | Format of files to sync | `parquet` (CSV/JSON/Parquet) |
-| Max Threads | Number of concurrent file processors | `10` |
-| Retry Count | Number of retry attempts for failures | `3` |
+| Access Key ID | AWS access key ID for authentication. Optional if using IAM roles or instance profiles. | `<YOUR_KEY>` |
+| Secret Access Key | AWS secret access key for authentication. Optional if using IAM roles or instance profiles. | `<YOUR_SECRET>` |
+| File Format `required` | Select the format of files in the bucket to sync. OLake Go uses this to determine how to read and process files during sync. | <ul> <li>`Parquet`</li> <li>`XML`</li> <li>`JSON`</li> <li>`CSV`</li> </ul> |
+| Compression Type | Compression format of the files. | <ul> <li>`none`</li> <li>`gzip`</li> <li>`zip`</li> </ul> |
+| File Pattern | Regular expression to filter files by name.  | `.*\.csv$` |
+| Custom Endpoint | S3 API endpoint for writing Iceberg data files. Optional for AWS S3 but required for S3-compatible storage like MinIO. | `https://glue.ap-south-1.amazonaws.com` |
+| Max Threads | Maximum number of worker threads the connector can spin up for parallel tasks. | `10` |
+| Retry Count | Number of retry attempts for failures. | `3` |
 
 :::info AWS Authentication
 - **Access Key ID** and **Secret Access Key** are optional for AWS S3. If omitted, the driver uses AWS default credential chain (IAM roles, environment variables, instance profiles, ECS task roles). This is the **recommended approach** for production deployments. If you provide one credential, you must provide both.
@@ -165,12 +269,12 @@ The OLake Go S3 Source connector ingests data from Amazon S3 or S3-compatible st
 
 Additional fields for CSV files:
 
-| Field | Description | Default | Example |
-|-------|-------------|---------|---------|
-| Delimiter | Field separator character | `,` | `;` or `\t` |
-| Has Header | Whether first row contains column names | `true` | `true` |
-| Skip Rows | Number of rows to skip at beginning | `0` | `2` |
-| Quote Character | Character for quoting fields | `"` | `'` |
+| Field | Description | Default | 
+|-------|-------------|---------|
+| Delimiter | Field separator character | `,` |
+| Has Header | Whether CSV files contain a header row | `true` |
+| Skip Rows | Number of rows to skip at the beginning of CSV files | `0` |
+| Quote Character | Quote character for CSV files | `"` |
 
 **Compression**: Automatically detected from file extension (`.csv.gz` = gzipped)
 
@@ -182,7 +286,7 @@ Additional fields for JSON files:
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| Line Delimited | Whether JSON is JSONL format | `true` |
+| Line Delimited | Use line-delimited JSON (JSONL) format instead of JSON array. | `true` |
 
 **Supported Formats**:
 - JSONL (newline-delimited): `{"id": 1}\n{"id": 2}`
@@ -195,13 +299,27 @@ Additional fields for JSON files:
 
 <TabItem value="parquet-format" label="Parquet Configuration">
 
-No additional configuration required for Parquet files.
+Additional fields for Parquet files:
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| Streaming Enabled | Use S3 range requests for memory-efficient streaming (recommended for large files). | `true` |
 
 **Features**:
 - Schema read from Parquet metadata
 - Efficient columnar reading
 - Streaming support for large files
 - Native type preservation
+
+</TabItem>
+
+<TabItem value="xml-format" label="XML Configuration">
+
+Additional fields for XML files:
+
+| Field | Description | Example Value |
+|-------|-------------|---------|
+| Row Identifier | XML tag that encloses each record  | `record` |
 
 </TabItem>
 
@@ -268,6 +386,12 @@ An example `source.json` file will look like this:
 <TabItem value="parquet-cli" label="Parquet Format">
 
 <S3SourceConfigParquet />
+
+</TabItem>
+
+<TabItem value="xml-cli" label="XML Format">
+
+<S3SourceConfigXML />
 
 </TabItem>
 
