@@ -87,6 +87,7 @@ import S3SourceConfigDetails from '../../../docs/shared/config/S3SourceConfigDet
 import S3SourceConfigCSV from '../../../docs/shared/config/S3SourceConfigCSV.mdx'
 import S3SourceConfigJSON from '../../../docs/shared/config/S3SourceConfigJSON.mdx'
 import S3SourceConfigParquet from '../../../docs/shared/config/S3SourceConfigParquet.mdx'
+import S3SourceConfigXML from '../../../docs/shared/config/S3SourceConfigXML.mdx'
 import S3ToIcebergDatatypes from '../../../docs/shared/config/S3ToIcebergDatatypes.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
@@ -223,6 +224,7 @@ const MDXComponents = {
   S3SourceConfigCSV,
   S3SourceConfigJSON,
   S3SourceConfigParquet,
+  S3SourceConfigXML,
   S3ToIcebergDatatypes,
 
   S3Config,
