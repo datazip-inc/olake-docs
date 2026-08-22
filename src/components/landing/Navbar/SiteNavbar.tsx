@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from 'react'
+import React, { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from '@docusaurus/Link'
 import { useLocation } from '@docusaurus/router'
 import { cn } from '@site/src/lib/utils'
@@ -233,8 +233,21 @@ export default function SiteNavbar({ trailing, mobileSidebar }: SiteNavbarProps)
   const mobileOpen = mobileSidebar ? mobileSidebar.shown : ownOpen
   const toggleMobile = mobileSidebar ? mobileSidebar.toggle : () => setOwnOpen((o) => !o)
 
+  // Measures real height for --ifm-navbar-height (sticky tabs-bar offset, custom.css) instead of guessing per breakpoint.
+  const navRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    const setVar = () =>
+      document.documentElement.style.setProperty('--ifm-navbar-height', `${el.offsetHeight}px`)
+    setVar()
+    const observer = new ResizeObserver(setVar)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className='olake-nav'>
+    <div className='olake-nav' ref={navRef}>
       <div className='olake-nav-inner'>
         <div className='olake-nav-left'>
           <Link to='/' className='olake-nav-logo'>
