@@ -1,7 +1,8 @@
 // data/query-engines/bigquery.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const bigquery: QueryEngine = {
+export const bigquery: QueryEngine = createVersionedEngine({
   id: 'bigquery',
   name: 'Google BigQuery',
   description: 'Serverless Google Cloud data warehouse with managed Iceberg tables, automatic optimization, Storage Write API streaming, and deep GCP ecosystem integration',
@@ -10,7 +11,7 @@ export const bigquery: QueryEngine = {
   documentation: 'https://cloud.google.com/bigquery/docs/iceberg-tables',
   features: {
     catalogs: {
-      support: 'partial',
+      support: 'none',
       details: 'BigQuery-managed Iceberg (internal catalog) and BigLake external Iceberg (Dataplex, HMS, AWS Glue via GCS). No direct REST/Nessie support',
       externalLinks: [
         {
@@ -63,7 +64,7 @@ export const bigquery: QueryEngine = {
     },
     streaming: {
       support: 'partial',
-      details: 'High-throughput streaming via Storage Write API (Preview) - Dataflow, Beam, Spark. No built-in CDC apply; use Datastream + Dataflow patterns',
+      details: 'High-throughput streaming via Storage Write API; CDC ingestion available (preview) via Datastream BigLake Iceberg destination and Storage Write API UPSERT mode (_CHANGE_SEQUENCE_NUMBER)',
       externalLinks: [
         {
           label: 'Storage Write API Streaming',
@@ -137,6 +138,67 @@ WHEN NOT MATCHED THEN
 -- Time travel query
 SELECT * FROM iceberg_dataset.sales_data 
 FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR);`,
+  versions: {
+    v2: {
+      features: {
+        catalogs: {
+          support: 'none',
+          details: 'No native support for external Iceberg catalogs like Hive Metastore, AWS Glue, REST, Nessie, Polaris, Unity Catalog, Hadoop, or JDBC. BigQuery relies on BigLake Metastore and managed catalog abstractions instead',
+          externalLinks: [{ label: 'BigQuery Managed Iceberg Tables', url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg' }]
+        },
+        readWrite: {
+          support: 'full',
+          details: 'Full read and write support for BigLake Iceberg tables including INSERT, MERGE, UPDATE, and DELETE via GoogleSQL',
+          externalLinks: [{ label: 'BigQuery Iceberg DML Operations', url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#dml' }]
+        },
+        dml: {
+          support: 'full',
+          details: 'MERGE, UPDATE, DELETE fully supported through GoogleSQL with transactional guarantees',
+          externalLinks: [{ label: 'Data Manipulation Language DML', url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#dml' }]
+        },
+        morCow: {
+          support: 'partial',
+          details: 'Copy-on-write is fully supported, while merge-on-read, position deletes, and equality deletes are only partially supported and abstracted from the user',
+          externalLinks: [{ label: 'Automatic Storage Optimization', url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg' }]
+        },
+        streaming: {
+          support: 'partial',
+          details: 'Streaming ingestion via Storage Write API (GA); CDC available in preview via Datastream BigLake Iceberg destination and Storage Write API UPSERT (_CHANGE_SEQUENCE_NUMBER)',
+          externalLinks: [{ label: 'Storage Write API Streaming', url: 'https://cloud.google.com/blog/products/data-analytics/announcing-bigquery-tables-for-apache-iceberg' }]
+        },
+        formatV3: {
+          support: 'none',
+          details: 'Streaming ingestion supported via Storage Write API, but CDC-style updates are limited.'
+        },
+        timeTravel: {
+          support: 'full',
+          details: 'Full snapshot-based time travel support for querying historical versions of data.',
+          externalLinks: [{ label: 'Time Travel for Historical Data', url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#time_travel' }]
+        },
+        security: {
+          support: 'full',
+          details: 'IAM permissions like native BigQuery tables. Column-level security & masking on managed Iceberg. External via BigLake/Dataplex policy tags',
+          externalLinks: [{ label: 'Column-level Security and Data Masking', url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#security' }]
+        }
+      },
+      score: 20,
+      description: 'BigQuery supports full Iceberg V2 operations with managed tables, automatic optimization, and deep GCP ecosystem integration — V3 format is not supported'
+    },
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'BigQuery only supports Iceberg V2 snapshot export; V3 is not supported' },
+        readWrite: { support: 'none', details: 'BigQuery only exports Iceberg V2 snapshots; V3 read/write support is not available' },
+        dml: { support: 'none', details: 'BigQuery only supports Iceberg V2 snapshot export; V3 is not supported' },
+        morCow: { support: 'none', details: 'BigQuery only supports Iceberg V2 snapshot export; V3 is not supported' },
+        streaming: { support: 'none', details: 'BigQuery only supports Iceberg V2; V3 streaming not supported' },
+        formatV3: { support: 'none', details: 'BigQuery only supports Iceberg V2 snapshot export; V3 format is not supported. Only Iceberg V2 format is supported for snapshot export' },
+        timeTravel: { support: 'none', details: 'BigQuery only supports Iceberg V2 snapshot export; V3 time travel is not available' },
+        security: { support: 'none', details: 'BigQuery only supports Iceberg V2 snapshot export; V3 is not supported' }
+      },
+      score: 0,
+      description: 'BigQuery does not support Iceberg V3 format tables. All BigQuery Iceberg operations are limited to spec V2'
+    }
+  },
   bestPractices: [
     'Enable Iceberg Tables Preview or BigLake Iceberg in your GCP project for access',
     'Use managed Iceberg tables for full DML capabilities and automatic optimization',
@@ -159,4 +221,4 @@ FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR);`,
     'Leverage end-to-end lineage through Dataplex integration',
     'Use external table writes via Dataflow/Spark when BigQuery-native DML is insufficient'
   ]
-};
+});

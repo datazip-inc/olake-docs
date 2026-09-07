@@ -1,7 +1,8 @@
 // data/query-engines/impala.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const impala: QueryEngine = {
+export const impala: QueryEngine = createVersionedEngine({
   id: 'impala',
   name: 'Apache Impala v4.4+',
   description: 'High-performance analytics engine with Iceberg v2 support, row-level operations via position deletes, and deep HMS integration for enterprise environments',
@@ -31,7 +32,7 @@ export const impala: QueryEngine = {
     },
     dml: {
       support: 'partial',
-      details: 'INSERT INTO & INSERT OVERWRITE, DELETE (v2 position-delete files), UPDATE (v2 position deletes); MERGE planned/preview in CDW 1.5.5',
+      details: 'INSERT INTO & INSERT OVERWRITE, DELETE (v2 position-delete files), UPDATE (v2 position deletes); MERGE added in Impala 4.5 (previously CDW-only preview); equality-delete MERGE planned for 5.0.0+',
       externalLinks: [
         {
           label: 'Iceberg V2 Tables - Impala',
@@ -138,5 +139,21 @@ WHERE id = 123;`,
     'Consider schema evolution limitations on complex types when designing table schemas',
     'Monitor manifest cache effectiveness and tune cache settings appropriately',
     'Use snapshot isolation guarantees for consistent read operations'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'Impala supports only HiveCatalog and HadoopCatalog with V1/V2 tables; V3 format not supported' },
+        readWrite: { support: 'none', details: 'Cannot read or write Iceberg V3 format tables; spec v1/v2 only' },
+        dml: { support: 'none', details: 'DML (DELETE, UPDATE, MERGE preview) produces V2 position-delete files only; V3 not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not supported; only V2 position-delete files via MoR; equality deletes not supported in any version' },
+        streaming: { support: 'none', details: 'No built-in streaming ingestion for any format version' },
+        formatV3: { support: 'none', details: 'Supports spec v1 and v2 only; spec v3 features like deletion vectors, row lineage, and new catalog RPCs not supported' },
+        timeTravel: { support: 'none', details: 'Time travel (FOR SYSTEM_TIME/VERSION AS OF) only for V1/V2 format tables' },
+        security: { support: 'none', details: 'V3 format not supported; Ranger/HMS security applies to V1/V2 tables only' }
+      },
+      score: 0,
+      description: 'Apache Impala v4.4+ supports Iceberg spec V1/V2 only; Format V3 (deletion vectors, row lineage, new data types) not yet supported'
+    }
+  }
+});

@@ -1,7 +1,8 @@
 // data/query-engines/flink.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const flink: QueryEngine = {
+export const flink: QueryEngine = createVersionedEngine({
   id: 'flink',
   name: 'Apache Flink 1.18+',
   description: 'The reference implementation for CDC to Iceberg with comprehensive streaming support, exactly-once semantics, and advanced FLIP-27 incremental reads',
@@ -184,5 +185,21 @@ CREATE TABLE iceberg_catalog.db.events (
     'Run maintenance actions (rewrite_data_files) as separate Flink batch jobs',
     'Monitor Flink job IDs in Iceberg snapshot summaries for troubleshooting',
     'Use external tools for schema changes (ADD/RENAME columns) due to Flink DDL limitations'
-  ]
-};
+  ],
+  versions: {
+    v2: {
+      features: {
+        catalogs: { support: 'full', details: 'Hive Metastore, Hadoop catalog, REST catalog (incl. Nessie), AWS Glue, JDBC, plus any custom implementation via catalog-impl' },
+        readWrite: { support: 'full', details: 'Batch and streaming jobs read V2 snapshots or incremental DataStreams; Iceberg Sink commits on each Flink checkpoint with exactly-once semantics' },
+        dml: { support: 'partial', details: 'INSERT append always available; row-level upserts via write.upsert.enabled=true on V2 tables, emitting V2 equality-delete files; MERGE INTO not supported in Flink SQL' },
+        morCow: { support: 'full', details: 'Copy-on-Write for batch rewrites; Merge-on-Read for streaming/upsert with V2 position/equality delete files instead of partition rewrites' },
+        streaming: { support: 'full', details: 'Reference engine for CDC → Iceberg V2: consume Debezium/Kafka changelogs, upsert with exactly-once semantics, FLIP-27 incremental reads' },
+        formatV3: { support: 'none', details: 'Iceberg Format V3 features are not applicable to V2 tables.' },
+        timeTravel: { support: 'full', details: 'Point-in-time reads via source options: start-snapshot-id, start-snapshot-timestamp, branch, tag; filter push-down and partition pruning automatic' },
+        security: { support: 'full', details: 'Inherits ACLs from underlying catalog (Hive Ranger, AWS IAM, Nessie authorization); REST catalog secured with credential/token properties' }
+      },
+      score: 26,
+      description: 'Flink provides the reference CDC→Iceberg V2 implementation with exactly-once streaming semantics, full MoR/CoW via delete files, and comprehensive catalog support'
+    }
+  }
+});

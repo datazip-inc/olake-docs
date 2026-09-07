@@ -1,8 +1,11 @@
 // src/components/Iceberg/QueryEngineLayout.tsx
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { useLocation } from '@docusaurus/router';
+import { engines } from '../../data/query-engines';
+import { VersionMode } from '../../types/iceberg';
+import { getPersistedVersion, getVersionFromUrl, persistVersion } from './versionState';
 import { FeatureCard, FeatureCardProps } from './FeatureCard';
 import { InteractiveTable, InteractiveTableProps } from './InteractiveTable';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -100,6 +103,21 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
   const location = useLocation();
   const siteUrl = siteConfig?.url?.replace(/\/$/, '') || SITE_URL;
   const canonicalUrl = `${siteUrl}${location.pathname}`.replace(/\/$/, '') || `${siteUrl}${location.pathname}`;
+  const engineId = location.pathname.split('/').filter(Boolean).pop() || '';
+  const engineData = useMemo(() => engines.find((engine) => engine.id === engineId), [engineId]);
+  const [versionMode, setVersionMode] = useState<VersionMode>(
+    getVersionFromUrl(location.search) ?? getPersistedVersion() ?? 'v3'
+  );
+  const selectedVersionData = versionMode === 'v2' ? engineData?.versions?.v2 : engineData?.versions?.v3;
+
+  useEffect(() => {
+    persistVersion(versionMode);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('version', versionMode);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }, [versionMode]);
   const pageTitleStr = schemaTitle ?? (typeof title === 'string' ? title : 'Query Engine');
   const pageDescriptionStr = schemaDescription ?? (typeof description === 'string' ? description : 'Apache Iceberg query engine documentation.');
 
@@ -204,22 +222,47 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         ))}
       </Head>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Header with gradient background */}
-        <div className="relative mb-16 overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-12 text-white shadow-2xl">
+        <div className="relative mb-12 overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-10 text-white shadow-2xl">
           <div className="absolute inset-0 bg-black/10"></div>
           <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
           <div className="absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
           
           <div className="relative z-10">
-            <h1 className="text-5xl font-bold mb-4 animate-fade-in">
+            <h1 className="text-4xl font-bold mb-3 animate-fade-in">
               {title}
             </h1>
-            <p className="text-xl text-white/90 max-w-3xl leading-relaxed">
-              {description}
+            <p className="text-lg text-white/90 max-w-3xl leading-relaxed">
+              {selectedVersionData?.description || description}
             </p>
+            <div className="mt-4 inline-flex rounded-lg border border-white/40 overflow-hidden">
+              {(['v2', 'v3'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setVersionMode(mode)}
+                  className={`px-3 py-1.5 text-sm font-semibold border-none cursor-pointer ${versionMode === mode ? 'bg-white text-blue-700' : 'bg-transparent text-white/90 hover:bg-white/10'}`}
+                >
+                  {mode.toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+
+        {engineData && (
+          <section className="mb-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">Version Snapshot ({versionMode.toUpperCase()})</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+              {Object.entries(selectedVersionData?.features ?? {}).slice(0, 8).map(([key, feature]) => (
+                <div key={key} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">{key}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{feature?.support ?? 'N/A'}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Feature Cards Section */}
         <section className="mb-20">

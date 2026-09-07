@@ -12,6 +12,14 @@ export interface Feature {
   externalLinks?: ExternalLink[];
 }
 
+export type EngineVersion = 'v2' | 'v3';
+
+export interface EngineVersionData {
+  features: QueryEngine['features'];
+  score?: number | null;
+  description?: string | null;
+}
+
 export interface QueryEngine {
   id: string;
   name: string;
@@ -29,6 +37,10 @@ export interface QueryEngine {
     timeTravel: Feature;
     security: Feature;
   };
+  versions: {
+    v2?: EngineVersionData | null;
+    v3?: EngineVersionData | null;
+  };
   quickStart: string;
   bestPractices: string[];
 }
@@ -39,3 +51,10 @@ export interface FilterOptions {
 }
 
 export type ViewType = 'table' | 'cards' | 'features';
+
+export interface EngineVersionSelection {
+  engine: string;
+  version: EngineVersion;
+}
+
+export type VersionMode = 'v2' | 'v3';

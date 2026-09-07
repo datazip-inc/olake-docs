@@ -1,7 +1,8 @@
 // data/query-engines/athena.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const athena: QueryEngine = {
+export const athena: QueryEngine = createVersionedEngine({
   id: 'athena',
   name: 'Amazon Athena (Engine v3)',
   description: 'Serverless AWS-native query engine with complete DML operations, Lake Formation governance, time travel, and deep AWS ecosystem integration for Iceberg tables',
@@ -73,7 +74,7 @@ export const athena: QueryEngine = {
     },
     formatV3: {
       support: 'none',
-      details: 'Not yet supported; Athena uses Iceberg 1.2.x libraries, spec v3 features (DV, lineage) not available. Creates/writes only spec v2 tables',
+      details: 'Not yet supported; Athena uses Iceberg 1.4.2 libraries; spec v3 features (deletion vectors, row lineage) not available. Creates/writes only spec v2 tables',
       externalLinks: [
         {
           label: 'Query Apache Iceberg Tables',
@@ -151,5 +152,65 @@ OPTIMIZE iceberg_sales_data REWRITE DATA;`,
     'Consider millisecond timestamp precision limitations when designing schemas',
     'Use schema evolution (ADD/DROP/RENAME COLUMNS) for metadata-only table changes',
     'Plan external ingestion strategy as Athena provides no streaming or CDC capabilities'
-  ]
-};
+  ],
+  versions: {
+    v2: {
+      features: {
+        catalogs: {
+          support: 'partial',
+          details: 'Only AWS Glue Data Catalog supported for Iceberg. Hive, REST, Nessie, or JDBC catalogs not recognized. Polaris and Unity Catalog accessible via Glue Catalog Federation (read-only)',
+          externalLinks: [{ label: 'AWS Glue Data Catalog', url: 'https://docs.aws.amazon.com/athena/latest/ug/data-sources-glue.html' }]
+        },
+        readWrite: {
+          support: 'full',
+          details: 'SELECT, CREATE TABLE STORED AS ICEBERG, CTAS, INSERT INTO. All writes create new snapshots and become immediately queryable',
+          externalLinks: [{ label: 'Create Iceberg Tables', url: 'https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html' }]
+        },
+        dml: {
+          support: 'full',
+          details: 'INSERT INTO, UPDATE, DELETE, and MERGE INTO supported via Athena Engine v3. UPDATE/DELETE/MERGE write position-delete files (MoR) for row-level changes',
+          externalLinks: [{ label: 'MERGE INTO Operations', url: 'https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-merge-into.html' }]
+        },
+        morCow: {
+          support: 'full',
+          details: 'Supports merge-on-read for both position and equality deletes. Copy-on-write is the default write mode; however MERGE and DELETE always use MoR regardless of table properties',
+          externalLinks: [{ label: 'Apache Iceberg on AWS Guide', url: 'https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/iceberg-athena.html' }]
+        },
+        streaming: {
+          support: 'none',
+          details: 'No built-in streaming ingestion or CDC APIs. External tools (Glue ETL, Flink) must land data in Iceberg; Athena queries latest committed snapshot'
+        },
+        formatV3: {
+          support: 'none',
+          details: 'Iceberg Format V3 features are not applicable to V2 tables.'
+        },
+        timeTravel: {
+          support: 'full',
+          details: 'FOR TIMESTAMP AS OF and FOR VERSION AS OF clauses let you query historical snapshots with millisecond precision',
+          externalLinks: [{ label: 'Athena Iceberg Tutorial', url: 'https://aws-sdk-pandas.readthedocs.io/en/3.3.0/tutorials/039%20-%20Athena%20Iceberg.html' }]
+        },
+        security: {
+          support: 'full',
+          details: 'Access enforced through IAM plus AWS Lake Formation policies (column-, row-, and cell-level). Lake Formation filters govern metadata table visibility',
+          externalLinks: [{ label: 'Lake Formation Fine-grained Access', url: 'https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-table-data.html' }]
+        }
+      },
+      score: 22,
+      description: 'Athena Engine v3 provides full Iceberg V2 support with complete DML operations, time travel, and deep AWS ecosystem integration — V3 format is not supported'
+    },
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' },
+        readWrite: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' },
+        dml: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' },
+        morCow: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' },
+        streaming: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' },
+        formatV3: { support: 'none', details: 'Athena uses Iceberg 1.2.x libraries; spec V3 features (deletion vectors, row lineage) are not available. Tables are created as spec V2 only' },
+        timeTravel: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' },
+        security: { support: 'none', details: 'Athena does not support Iceberg V3 format tables' }
+      },
+      score: 0,
+      description: 'Athena does not support Iceberg V3 format tables. All Athena Iceberg operations are limited to spec V2'
+    }
+  }
+});

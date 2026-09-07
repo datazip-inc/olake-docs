@@ -124,7 +124,7 @@ function validateAllEngines(engines: QueryEngine[]): void {
  * All available query engines
  * Add new engines here after creating their data files
  */
-export const QUERY_ENGINES: QueryEngine[] = [
+export const engines: QueryEngine[] = [
   spark,
   flink,
   hive,
@@ -145,8 +145,11 @@ export const QUERY_ENGINES: QueryEngine[] = [
 
 // Validate all engines in development
 if (process.env.NODE_ENV === 'development') {
-  validateAllEngines(QUERY_ENGINES);
+  validateAllEngines(engines);
 }
+
+// Backward-compatible alias
+export const QUERY_ENGINES = engines;
 
 // Export individual engines for direct access
 export {
@@ -173,18 +176,18 @@ export {
  */
 
 export const getEngineById = (id: string): QueryEngine | undefined => {
-  return QUERY_ENGINES.find(engine => engine.id === id);
+  return engines.find(engine => engine.id === id);
 };
 
 export const getEnginesByCategory = (category: QueryEngine['category']): QueryEngine[] => {
-  return QUERY_ENGINES.filter(engine => engine.category === category);
+  return engines.filter(engine => engine.category === category);
 };
 
 export const getEnginesBySupportLevel = (
   feature: keyof QueryEngine['features'],
   level: QueryEngine['features'][keyof QueryEngine['features']]['support']
 ): QueryEngine[] => {
-  return QUERY_ENGINES.filter(engine => engine.features[feature].support === level);
+  return engines.filter(engine => engine.features[feature].support === level);
 };
 
 export const getEnginesByFeatureSupport = (
@@ -200,7 +203,7 @@ export const getEnginesByFeatureSupport = (
 
 export const searchEngines = (query: string): QueryEngine[] => {
   const searchTerm = query.toLowerCase();
-  return QUERY_ENGINES.filter(engine =>
+  return engines.filter(engine =>
     engine.name.toLowerCase().includes(searchTerm) ||
     engine.description.toLowerCase().includes(searchTerm) ||
     engine.id.toLowerCase().includes(searchTerm)
@@ -209,20 +212,20 @@ export const searchEngines = (query: string): QueryEngine[] => {
 
 export const getEngineStats = () => {
   const stats = {
-    total: QUERY_ENGINES.length,
+    total: engines.length,
     byCategory: {} as Record<QueryEngine['category'], number>,
     bySupport: {} as Record<string, Record<string, number>>
   };
 
   // Count by category
-  QUERY_ENGINES.forEach(engine => {
+  engines.forEach(engine => {
     stats.byCategory[engine.category] = (stats.byCategory[engine.category] || 0) + 1;
   });
 
   // Count by feature support
-  Object.keys(QUERY_ENGINES[0]?.features || {}).forEach(feature => {
+  Object.keys(engines[0]?.features || {}).forEach(feature => {
     stats.bySupport[feature] = { full: 0, partial: 0, preview: 0, none: 0 };
-    QUERY_ENGINES.forEach(engine => {
+    engines.forEach(engine => {
       const support = engine.features[feature as keyof QueryEngine['features']].support;
       stats.bySupport[feature][support]++;
     });
