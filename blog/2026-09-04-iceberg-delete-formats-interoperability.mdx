@@ -1,0 +1,397 @@
+---
+slug: iceberg-interoperability-myth-row-level-deletes
+title: "The Iceberg Interoperability Myth: Why Open Table Format Doesn't Mean Write Once, Read Anywhere"
+description: "See how row-level delete support can make an Iceberg table readable in Spark but incompatible with Snowflake, even when both engines use the same catalog and data."
+date: 2026-09-08
+tags: [iceberg, delete-formats, interoperability, spark, snowflake, catalogs]
+authors: [siddharth]
+image: /img/blog/cover/cover_interop.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![The Iceberg Interoperability Myth: Spark and Snowflake reading the same Iceberg table with different delete-format support](/img/blog/cover/cover_interop.webp)
+
+"Apache Iceberg is open, so any Iceberg engine can read an Iceberg table."
+
+It sounds reasonable but it is incomplete.
+
+Iceberg gives engines a shared specification for describing a table. That is a major step toward interoperability, but a specification is a menu of capabilities, not proof that every engine implements every item on that menu.
+
+Row-level deletes make this gap easy to see. A writer can create a valid Iceberg table with **equality delete files**. Apache Spark can understand those files and return the current rows. Another engine may not support equality deletes. It can reach the catalog, load the metadata, and read the Parquet files, yet still be unable to produce the correct result.
+
+The table is valid. The reader is valid. The combination is incompatible.
+
+This blog follows one small customer table from its first write to the moment two engines disagree about whether they can read it. Along the way, we will separate four layers that are often bundled together under the word *open*:
+
+1. the data files,
+2. the Iceberg table metadata,
+3. the catalog,
+4. the query engine.
+
+By the end, you will have a practical way to evaluate Iceberg compatibility before a production query discovers the mismatch for you.
+
+## First, What Does "Open Table Format" Actually Promise?
+
+Imagine object storage as a warehouse full of sealed boxes. Each box is a Parquet data file. Parquet defines how the rows inside a box are encoded, but it does not tell you:
+
+- which boxes belong to a table,
+- which snapshot is current,
+- how the table is partitioned,
+- how its schema has changed, or
+- which rows have since been updated or deleted.
+
+Iceberg adds that table-level instruction set. Its metadata tree connects snapshots, manifest lists, manifests, data files, and delete files. Because the specification is open, different systems can implement the same rules without relying on a proprietary storage layout.
+
+That promise is real. The common mistake is stretching it too far.
+
+An open specification means:
+
+> "An engine is allowed to implement these structures and semantics."
+
+It does **not** mean:
+
+> "Every product, version, connector, and catalog integration has implemented all of them."
+
+Web browsers offer a familiar parallel. HTML is an open standard, but a browser that supports HTML does not automatically support every new web API. In the same way, an "Iceberg-compatible" engine may support basic scans while lacking a newer format version, a data type, a write operation, or one of Iceberg's delete encodings.
+
+![Four-layer Iceberg stack: query engine, catalog, Iceberg metadata, and Parquet data plus delete files](/img/blog/2026/9/the-four-layer-stack.webp)
+
+## Next, Meet the Table Before Anything Is Deleted
+
+Suppose a company keeps this small `customers` table in Iceberg:
+
+| customer_id | name | plan |
+|---:|---|---|
+| 101 | Ana | Pro |
+| 102 | Ben | Free |
+| 103 | Chen | Pro |
+
+For simplicity, assume all three rows live in one Parquet file:
+
+```text
+s3://warehouse/customers/data-0001.parquet
+```
+
+The catalog stores, or helps an engine locate, the current Iceberg metadata file. That metadata eventually points to `data-0001.parquet`.
+
+At this moment, interoperability looks effortless. Spark and Snowflake can both:
+
+1. ask the catalog for the table,
+2. follow the Iceberg metadata,
+3. open the Parquet file,
+4. return three rows.
+
+This happy path is where the phrase "write once, read anywhere" feels true. The table contains only data files and broadly supported metadata. No reader has yet been asked to interpret a row-level change.
+
+## Then a Delete Arrives
+
+Now Ben asks for his account to be removed. The source database emits a CDC event equivalent to:
+
+```sql
+DELETE FROM customers
+WHERE customer_id = 102;
+```
+
+Parquet files are immutable. A writer cannot simply open `data-0001.parquet`, erase its second row, and save the file in place. It must represent the change another way.
+
+At a high level, an Iceberg writer has two strategies, [copy-on-write and merge-on-read](/iceberg/mor-vs-cow):
+
+- **Copy-on-write:** rewrite the affected data file without Ben's row.
+- **Merge-on-read:** keep the data file and add delete information that readers apply later.
+
+Copy-on-write leaves a simple read path, but rewriting a large file for a small change can be expensive. Merge-on-read makes the write lighter, which is attractive for frequent CDC updates, but it moves work, and a compatibility requirement, to every reader.
+
+Our writer chooses merge-on-read and emits an **equality delete**.
+
+## What an Equality Delete Says
+
+An equality delete identifies rows by one or more field values. In this example, the delete file effectively says:
+
+```text
+For the applicable older data: hide rows where customer_id = 102
+```
+
+The real Iceberg rules also use field IDs, partitions, and sequence numbers to determine which data files and rows the delete applies to. Those details prevent an old delete from incorrectly removing a newer row that happens to reuse the same key. For understanding interoperability, however, the value match is the important part.
+
+After the commit, the table contains:
+
+```text
+data-0001.parquet          # still contains 101, 102, and 103
+delete-0002.parquet        # contains equality value customer_id = 102
+```
+
+The new Iceberg snapshot references both files. Reading the data file alone is no longer enough. A correct reader must plan the data file together with the applicable equality delete, compare the equality fields, and filter Ben's row from the result.
+
+![Equality delete timeline: Parquet data file, CDC delete event, and resulting data plus equality-delete file](/img/blog/2026/9/equality-delete-timeline.webp)
+
+## Spark Reads the New Snapshot
+
+Spark loads the same table again. Its Iceberg integration recognizes the content type of the delete file and supports equality-delete semantics.
+
+Conceptually, Spark performs this operation:
+
+```sql
+SELECT data.*
+FROM data_file AS data
+LEFT ANTI JOIN equality_delete AS deleted
+  ON data.customer_id = deleted.customer_id;
+```
+
+That is not the literal physical plan, but it is a useful mental model. Spark returns:
+
+| customer_id | name | plan |
+|---:|---|---|
+| 101 | Ana | Pro |
+| 103 | Chen | Pro |
+
+Nothing surprising happens because Spark and the writer share the required capability: both understand Iceberg v2 equality deletes.
+
+## Snowflake Reaches the Same Table, Then Stops
+
+Now consider a Snowflake access path that can discover this externally managed Iceberg table but does **not** support reading equality delete files.
+
+Snowflake can still reach the catalog, resolve the current metadata file, and understand the table schema. But that does not mean it can execute a query against the current snapshot.
+
+When the scan planner encounters `delete-0002.parquet`, Snowflake cannot interpret the equality-delete semantics. It therefore throws an unsupported-feature error and the query fails.
+
+So the same snapshot produces two outcomes:
+
+| Read path | Can discover table? | Can read Parquet? | Can apply equality delete? | Outcome |
+|---|---:|---:|---:|---|
+| Spark | Yes | Yes | Yes | Returns 101 and 103 |
+| Snowflake | Yes | Yes | No | Query fails with an unsupported equality-delete error |
+
+This is the interoperability myth in one line:
+
+> **Access to the same catalog and files does not guarantee support for the same table semantics.**
+
+Product capabilities change over time and often differ between native-managed tables, externally managed tables, and catalog-linked tables.
+
+![Same Iceberg table, different outcomes: Spark applies the equality delete while Snowflake fails with an unsupported delete error](/img/blog/2026/9/same-table-different-outcomes.webp)
+
+## Why the Catalog Cannot Fix the Problem
+
+The word *catalog* sometimes suggests a smart translation layer. Usually, that is not its job.
+
+An Iceberg catalog primarily helps with operations such as:
+
+- mapping a table name to its current metadata,
+- coordinating atomic commits,
+- storing table properties,
+- managing namespaces, credentials, and access controls.
+
+The catalog tells a reader **where the current table state is**. It does not normally open equality delete files, convert them into position deletes, or rewrite data files for each engine.
+
+Think of a library catalog. It can tell two readers where a book is located. It does not translate the book into a language one reader understands. A REST catalog such as [Apache Polaris](/blog/apache-polaris-lakehouse) still only locates metadata; it does not apply or rewrite equality deletes for engines that lack that capability.
+
+Catalog choice still matters because products expose different features through different catalog integrations. A query engine may offer full read/write behavior for its native catalog, partial reads through a REST catalog, and a different subset through Glue or another integration. The key is to test the pair:
+
+```text
+query engine × catalog × table feature
+```
+
+Checking only "Does this engine support Iceberg?" is too coarse. For OLake-written tables, start with the [engine and catalog pairing table](/docs/understanding/compatibility-engines/).
+
+## The Other Row-Level Delete Encodings
+
+Equality deletes are only one way to record a row-level change. Understanding the alternatives, [position deletes, deletion vectors, and copy-on-write](/blog/iceberg-delta-lake-delete-methods-comparison), shows why a writer's decision affects every future reader.
+
+### 1. Position deletes: name the exact row location
+
+A position delete records a data-file path and row position. In simplified form:
+
+```text
+s3://warehouse/customers/data-0001.parquet, row 1
+```
+
+The reader does not have to match `customer_id` values across the scan. It skips a known row position. The trade-off is on the write side: the writer first needs to find the file and position containing the target record.
+
+Position deletes may improve compatibility when all target readers support them, but converting from equality deletes is not a metadata rename. Someone must resolve keys to physical file positions or rewrite the affected data.
+
+### 2. Deletion vectors: keep a compact bitmap
+
+Iceberg v3 adds deletion vectors: compact bitmaps that identify deleted row positions for a data file. They reduce the proliferation and scan overhead of separate positional delete records.
+
+They also raise the compatibility bar. An engine that supports Iceberg v2 but not v3 cannot automatically read a v3 table using deletion vectors. Newer is not universally safer; it is safer only when every required reader supports it.
+
+v3 also adds [row lineage](/blog/apache-iceberg-row-lineage): a stable `_row_id` on each row so engines can track which records changed.
+
+### 3. Copy-on-write: remove outstanding delete semantics
+
+With copy-on-write, the writer creates a replacement data file:
+
+```text
+data-0003.parquet          # contains only 101 and 103
+```
+
+The new snapshot no longer needs an outstanding row-level delete for this change. Readers only need to scan the rewritten data file. This often gives the broadest read compatibility, at the cost of more write I/O.
+
+| Strategy | What is written | Writer cost | Reader requirement |
+|---|---|---|---|
+| Equality delete | Key values to match | low | Equality-delete support |
+| Position delete | File path + row position | high | Position-delete support |
+| Deletion vector | Compact position bitmap | high | Iceberg v3 + DV support |
+| Copy-on-write | Replacement data files | very high | Basic scan support |
+
+The "best" method is therefore not just the fastest one for a single engine. It is the method supported by the full set of readers while meeting the workload's write and read requirements.
+
+## The Compatibility Rule: Use the Intersection, Not the Union
+
+Suppose a platform has three consumers:
+
+- Spark for data engineering,
+- Snowflake for BI,
+- another engine for ad hoc SQL.
+
+If Spark supports equality deletes and position deletes, while the other engines support only position deletes, the shared capability is **position deletes**.
+
+Formally:
+
+```text
+safe table features =
+writer capabilities
+∩ Spark read capabilities
+∩ Snowflake read capabilities
+∩ every other required reader's capabilities
+```
+
+The union answers, "What can at least one engine use?" The intersection answers the operationally useful question: "What can every required engine use?"
+
+This rule applies beyond deletes. Format version, timestamp precision, variant or geospatial types, partition transforms, encryption, and branch/tag behavior can all create similar gaps.
+
+## How to Prevent the Failure
+
+A reliable design starts before the first CDC delete is committed.
+
+### Step 1: List every required read and write path
+
+Do not list only products. Be specific:
+
+```text
+Spark 3.x + Iceberg library version + REST catalog
+Snowflake external Iceberg table + catalog integration type
+Trino version + Glue catalog
+```
+
+A native table and an externally managed table in the same product may have different capabilities. Engine pages such as [Trino](/iceberg/query-engine/trino/) and [ClickHouse](/iceberg/query-engine/clickhouse/) document those gaps at feature granularity.
+
+### Step 2: Build a feature-level matrix
+
+For row-level changes, check at least:
+
+- Iceberg format version,
+- equality-delete reads,
+- position-delete reads,
+- deletion-vector reads,
+- `UPDATE`, `DELETE`, and `MERGE` writes,
+- streaming or incremental-read behavior after delete snapshots,
+- maintenance operations that rewrite delete files.
+
+Record whether each capability is generally available, in preview, read-only, or unsupported. Include the date and versions because this matrix will change. The [Iceberg query engine matrix](/iceberg/query-engine/) is this artifact for engines we already track; copy its structure and fill in the versions you actually run.
+
+### Step 3: Make the writer compatibility-aware
+
+The writer should choose a strategy from the intersection of downstream capabilities. That may mean:
+
+- using equality deletes in a Spark-only path,
+- resolving keys to position deletes for a mixed-engine path,
+- using deletion vectors only when all required readers support Iceberg v3,
+- falling back to copy-on-write for maximum compatibility.
+
+For CDC, this choice is part of the table contract. It should not be an accidental default hidden in one writer configuration.
+
+### Step 4: Test an actual changed snapshot
+
+An initial `SELECT COUNT(*)` proves very little. A meaningful interoperability test should:
+
+1. insert a few known rows,
+2. update one row,
+3. delete one row,
+4. commit the changes,
+5. query the latest snapshot from every required engine,
+6. compare both counts and row values.
+
+### Step 5: Recheck compatibility when the stack changes
+
+Adding an engine, changing a catalog integration, upgrading to Iceberg v3, or enabling merge-on-read can change the safe intersection. Treat each as a compatibility review, not a routine connection change.
+
+## What If Equality Deletes Are Already in Table?
+
+If one of your required readers cannot process the current snapshots, you have several options.
+
+### Rewrite the affected data
+
+Apply the equality deletes and create clean replacement data files. This copy-on-write style migration removes the outstanding equality-delete requirement from the resulting snapshot. We documented one such path: a [MOR-to-COW rewrite that makes equality-delete tables readable in Databricks](/blog/olake-mor-cow-databricks) and other engines that cannot apply those files.
+
+### Convert to a supported positional representation
+
+Resolve each deleted key to its data file and row position, then write a representation supported by the target readers. This can avoid a full source reload, but it requires an index or a scan to find physical positions. It also needs careful handling of Iceberg sequence semantics.
+
+### Put a compatible serving table in front of the reader
+
+Maintain one canonical table and materialize a second table for a constrained engine. This restores access but introduces additional storage, synchronization, and governance work. It is a deliberate trade-off, not interoperability for free.
+
+### Temporarily use append-only ingestion
+
+Some teams append every version and deduplicate at query time:
+
+```sql
+SELECT *
+FROM (
+  SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY customer_id
+           ORDER BY source_updated_at DESC
+         ) AS row_number
+  FROM customers_history
+)
+WHERE row_number = 1
+  AND operation != 'DELETE';
+```
+
+This avoids Iceberg delete-file compatibility, but pushes correctness and compute cost into every consumer. Late events and ordering ties make the logic harder than the short query suggests. It is usually a bridge, not the desired end state.
+
+## A Practical Pre-Production Checklist
+
+Before calling an Iceberg table multi-engine, verify all of the following:
+
+- Every required engine can access the chosen catalog integration.
+- Every required engine supports the table's Iceberg format version.
+- Every required engine reads the delete encoding the writer will produce.
+- Update and delete tests return identical rows across engines.
+- Incremental readers behave correctly after delete and overwrite snapshots.
+- Compaction does not produce a representation that drops reader compatibility.
+- The matrix is reviewed when an engine or table feature changes.
+
+If any of this is unknown, the table is not yet proven interoperable.
+
+## Open Does Not Mean Identical
+
+Apache Iceberg removes a large class of lock-in by standardizing how analytical tables are described and evolved. That is valuable precisely because many engines can implement the same format.
+
+But *can implement* is not the same as *has implemented*.
+
+Our example began with one Parquet file that Spark and Snowflake could both read. One equality delete later, the metadata was still valid, but only Spark could interpret the complete current state through the access paths we chose. Snowflake did not return the deleted row; it failed the query because it could not interpret the equality delete.
+
+That is why "write once, read anywhere" needs one extra clause:
+
+> **Write once using the feature set shared by every reader, then read anywhere in that tested compatibility boundary.**
+
+Open table formats create the possibility of interoperability. Capability-aware writes, versioned compatibility matrices, and real row-level tests are what make it true.
+
+**OLake Go** is being built to simplify that whole process. You will not have to run the engine-by-engine checks yourself, or configure the writer to match each reader's delete support. Tell it which engines need to query the table, and it will choose a write strategy they can all read. We will cover how that works, and how to use it, in an upcoming blog.
+
+## Further Reading
+
+- [Merge-on-Read vs Copy-on-Write in Apache Iceberg](/iceberg/mor-vs-cow)
+- [Comparing Delete Methods in Apache Iceberg and Delta Lake](/blog/iceberg-delta-lake-delete-methods-comparison)
+- [Making MOR Iceberg Tables Compatible with Databricks](/blog/olake-mor-cow-databricks)
+- [Apache Iceberg Row Lineage](/blog/apache-iceberg-row-lineage)
+- [Apache Iceberg Metadata Explained: Snapshots and Manifests](/blog/apache-iceberg-metadata-explained)
+- [Apache Iceberg vs Delta Lake](/blog/apache-iceberg-vs-delta-lake-guide)
+- [Building a Lakehouse with Iceberg, Lakekeeper, and Trino](/blog/building-modern-data-lakehouse-with-olake-iceberg-lakekeeper-trino)
+- [Apache Polaris Lakehouse](/blog/apache-polaris-lakehouse)
+- [OLake Architecture Deep Dive](/blog/olake-architecture-deep-dive)
+
+<BlogCTA/>
