@@ -459,6 +459,47 @@ global:
     linkerd.io/inject: enabled
 ```
 
+### Index Storage for Positional Delete Writes
+
+When writing Iceberg positional deletes or (deletion vectors coming soon), OLake Go maintains a Pebble index during the write operation. Without persistent storage, this index is lost when the sync pod terminates and must be rebuilt from scratch on the next run. To avoid this rebuild cost, the chart provisions a dedicated PersistentVolumeClaim for each job that needs it.
+
+Each job receives its own PVC named `olake-index-<JobID>`. The worker never deletes this claim, allowing the index to persist across multiple sync runs. Both the `sync` and `clear-destination` pods mount the same volume.
+
+Volumes are only provisioned for jobs where the `index_required` advanced setting is enabled. This setting is automatically turned on when any stream in the job uses positional deletes or deletion vectors. Jobs without these features receive no storage.
+
+```yaml
+jobIndexes:
+  default: # inherited by every job
+    size: 50Gi
+    storageClass: "gp3"
+  jobs:
+    123: # JobID — deep-merged over `default`
+      size: 200Gi
+```
+
+| Field | Default | Notes |
+|-------|---------|-------|
+| `size` | `20Gi` | Grow-only. |
+| `storageClass` | `global.storageClass`, then the cluster default | Block storage. |
+| `accessModes` | `[ReadWriteOnce]` | |
+| `mountPath` | `/var/lib/olake/index` | Where the connector opens the index. |
+| `cacheSizeMB` | `512` | Pebble block cache, per stream. |
+| `maxOpenFiles` | `1000` | SSTable file descriptors, per stream. |
+| `labels` / `annotations` | none | Written once, when the claim is created. Merge per key with `default`. |
+| `existingClaim` | none | Mount a PVC you created instead of provisioning one. |
+
+:::warning
+Use block storage. The index needs POSIX locking and reliable `fsync`, so a shared RWX filesystem (NFS, EFS, Azure Files) is not a supported backing store for it.
+:::
+
+Configuration changes apply through `helm upgrade`. The worker automatically picks up ConfigMap updates without requiring a restart, and applies them in each jobs next run.
+
+Different fields behave differently when modified:
+
+- **Size increases**: When you increase the `size` field, the PersistentVolumeClaim automatically expands on the next job run. This requires `allowVolumeExpansion: true` to be set on your StorageClass.
+- **Size decreases**: You cannot decrease the `size` field. Kubernetes does not support shrinking volumes, so any attempt to reduce the size will be rejected.
+- **Other configuration fields**: Changes to fields like `storageClass`, `accessModes`, or `mountPath` only apply when creating new PersistentVolumeClaims. These fields cannot modify claims that already exist.
+
 ## Upgrading Chart Version
 
 :::info
