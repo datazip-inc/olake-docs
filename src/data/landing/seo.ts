@@ -78,7 +78,7 @@ export const GO_SEO = {
 // five JSON-LD objects from the legacy homepage (src/legacy/home-v1/index.jsx)
 // rather than shipping the site root with no structured data.
 export const HOME_SEO = {
-  title: 'Fastest Open Source Iceberg Ingestion & Maintenance',
+  title: 'Fastest Open Source Iceberg Ingestion & Maintenance Platform',
   description:
     "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
   canonicalUrl: `${SITE_URL}/`,
@@ -103,7 +103,7 @@ export const HOME_SEO = {
         '@context': 'https://schema.org',
         '@type': 'WebSite',
         url: `${SITE_URL}/`,
-        name: 'Fastest Open Source Iceberg Ingestion & Maintenance',
+        name: 'Fastest Open Source Iceberg Ingestion & Maintenance Platform',
         description:
           'Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion\'s automated compaction and maintenance.',
         publisher: { '@type': 'Organization', name: 'OLake' },
@@ -116,7 +116,7 @@ export const HOME_SEO = {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
         url: `${SITE_URL}/`,
-        name: 'OLake - Fastest Open Source Iceberg Ingestion & Maintenance',
+        name: 'OLake - Fastest Open Source Iceberg Ingestion & Maintenance Platform',
         isPartOf: { '@type': 'WebSite', name: 'OLake' },
         description:
           "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
