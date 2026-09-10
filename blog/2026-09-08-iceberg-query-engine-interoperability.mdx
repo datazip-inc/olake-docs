@@ -34,33 +34,33 @@ To see why, it helps to look at what ingestion pipeline is actually doing under 
 
 When a row is deleted in the source, it is represented in destination (i.e. Iceberg table) without rewriting the data file the row lives in. Rewriting a data file on every single CDC event would mean every delete or update triggers a full file rewrite, which is expensive, slow, and enough to kill the throughput a CDC pipeline needs. That's why most high-throughput ingestion engines use the Iceberg's merge-on-read approach: they append a small equality or positional delete file next to the data file to keep writes fast. Combining the data file with its delete files to produce the current rows is then left to the query engine at read time.
 
-This is exactly what the Iceberg V2 spec expects a merge-on-read writer to do. It's not a bug or a misconfiguration. It's just the standard, performant way to handle high-volume CDC deletes.
+This is exactly what the Iceberg V2 spec expects a merge-on-read writer to do. It's not a bug or a misconfiguration, it's just the standard, performant way to handle high-volume CDC deletes.
 
 ## Why Spark Handles the Table Correctly
 
-![Why Spark Handles the Table Correctly](/img/blog/2026/9/queried-by-spark.webp)
+![Why Spark handles the table correctly](/img/blog/2026/9/queried-by-spark.webp)
 
-Spark's Iceberg reader was built alongside this part of the spec. When Spark plans a scan of the table, it sees the delete file, recognizes its content type, and handles the reconciliation itself. For each row in the data file, it checks whether that row matches an applicable equality or positional delete and drops it if so.
+When Spark plans a scan of the table, it sees the delete file, recognizes its content type, and handles the reconciliation itself. For each row in the data file, it checks whether that row matches an applicable equality or positional delete and drops it if so.
 
-Take a concrete example. A customer cancels `order_id = 4821` in Postgres, which appends an equality delete file for that order. When the data engineering team runs a Spark query against the `orders` table, Spark reads the data file, applies the delete file, and `order_id = 4821` simply doesn't show up. The query looks correct because it is correct. Spark is doing exactly what a V2-compliant reader is supposed to do.
+Lets take a concrete example here: A customer cancels `order_id = 4821` in Postgres, which appends an equality delete file for that order. When the data engineering team runs a Spark query against the `orders` table, Spark reads the data file, applies the delete file, and `order_id = 4821` simply doesn't show up. The query looks correct because it is correct. Spark is doing exactly what a V2-compliant reader is supposed to do.
 
 This is the part that makes the eventual Databricks failure so confusing. The table already passed every check Spark ran against it, so the natural assumption is that any Iceberg-compatible engine should read it the same way. That assumption is where the trouble starts.
 
 ## Why Databricks Cannot Read the Same Table
 
-![Why Spark Handles the Table Correctly](/img/blog/2026/9/not-queryable-by-databricks.webp)
+![Why Datarbciks does not handle the table correctly](/img/blog/2026/9/not-queryable-by-databricks.webp)
 
 Databricks supports Apache Iceberg through Unity Catalog, for both Databricks-managed and externally cataloged ("foreign") Iceberg tables. That support covers schema evolution, time travel, and ACID commits. What it does not cover, on Iceberg V2, is reconciling row-level delete files. Per Databricks' own documentation, Iceberg V2 position deletes and equality deletes are unsupported for both managed and foreign Iceberg tables in Unity Catalog.
 
 So when Databricks scans a snapshot that references `delete-00001.parquet`, it does not reconcile Iceberg V2 row-level delete files. Databricks documents that position deletes and equality-based deletes are unsupported on Iceberg V2 tables. The query often still runs, but the delete files are not applied. Rows that should have been removed, like `order_id = 4821`, can still show up in the result set.
 
-Notice what still works. Databricks resolves the table through Unity Catalog, reads the Iceberg metadata, and opens the Parquet data files without a problem. What it can't handle is the delete file sitting next to them. That's the file type your pipeline writes on every CDC delete and update. In Iceberg, an update is a delete plus a new insert, so a live CDC pipeline produces these files constantly.
+Nothing about the setup looks broken from Databricks' side. It finds the table through Unity Catalog, reads the Iceberg metadata, and opens the Parquet data files without a problem. The only point of failure is it does not apply the delete file sitting next to those data files. That is the file type your pipeline writes on every CDC delete and update. In Iceberg, an update is a delete plus a new insert, so a live CDC pipeline produces these files constantly.
 
 ## The Catalog Is Not the Query Engine
 
 When something breaks across Spark and Databricks, people often blame the catalog first. That's understandable, but it's usually the wrong place to look.
 
-A catalog (REST, Glue, Hive Metastore, Unity Catalog, whatever you're running) does one job: tell an engine where to find the table's current metadata. It maps a table name to a metadata file. That's it. It doesn't open delete files for you. It doesn't convert delete files into something Databricks understands.
+A catalog (REST, Glue, Hive Metastore, Unity Catalog, whatever you're running) does one job: tell an engine where to find the table's current metadata. It doesn't open delete files for you, it doesn't convert delete files into something Databricks understands.
 
 Once the catalog returns the current snapshot, the query engine takes over. Can it read the delete files? Will it apply them? Does it even support that format version? Those questions are entirely on the engine.
 
@@ -70,7 +70,7 @@ So when someone says "Spark and Databricks use the same catalog," that only mean
 
 The next reasonable question is whether the ingestion pipeline could write position deletes instead of equality deletes. Position deletes are often considered the more broadly compatible V2 format, since a reader just skips a known row offset instead of evaluating a value match.
 
-It wouldn't help here. Databricks' V2 limitation isn't specific to one delete encoding. It covers both position and equality deletes for managed and foreign Iceberg tables. Changing which kind of delete file the pipeline writes doesn't fix what's missing on the Databricks side: the reconciliation logic itself, for either format.
+It wouldn't help here, Databricks' V2 limitation isn't specific to one delete encoding. It covers both position and equality deletes for managed and foreign Iceberg tables. Changing which kind of delete file the pipeline writes doesn't fix what's missing on the Databricks side: the reconciliation logic itself, for either format.
 
 The only v2-era way around it is to remove the delete file from the equation entirely. Write copy-on-write instead of merge-on-read, so every CDC delete triggers a rewrite of the affected data file rather than an appended delete file. That works, and Databricks can read the result without a problem, because there's nothing left to reconcile. But it brings back the exact write-amplification cost merge-on-read was chosen to avoid in the first place. That's a real problem for a pipeline built around high-throughput CDC.
 
