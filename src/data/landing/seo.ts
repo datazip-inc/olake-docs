@@ -78,9 +78,9 @@ export const GO_SEO = {
 // five JSON-LD objects from the legacy homepage (src/legacy/home-v1/index.jsx)
 // rather than shipping the site root with no structured data.
 export const HOME_SEO = {
-  title: 'Fastest Open Source Data Replication Tool',
+  title: 'Fastest Open Source Iceberg Ingestion & Maintenance',
   description:
-    'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
   canonicalUrl: `${SITE_URL}/`,
   ogImage: `${SITE_URL}/img/logo/olake-blue.webp`,
   jsonLdSchemas: [
@@ -103,9 +103,9 @@ export const HOME_SEO = {
         '@context': 'https://schema.org',
         '@type': 'WebSite',
         url: `${SITE_URL}/`,
-        name: 'Fastest Open Source Data Replication Tool',
+        name: 'Fastest Open Source Iceberg Ingestion & Maintenance',
         description:
-          'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+          'Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion\'s automated compaction and maintenance.',
         publisher: { '@type': 'Organization', name: 'OLake' },
         potentialAction: { '@type': 'SearchAction', target: 'https://olake.io/search?q={search_term_string}', 'query-input': 'required name=search_term_string' }
       }
@@ -116,10 +116,10 @@ export const HOME_SEO = {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
         url: `${SITE_URL}/`,
-        name: 'OLake - Fastest Open Source Data Replication Tool',
+        name: 'OLake - Fastest Open Source Iceberg Ingestion & Maintenance',
         isPartOf: { '@type': 'WebSite', name: 'OLake' },
         description:
-          'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+          "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
         publisher: { '@type': 'Organization', name: 'OLake', logo: { '@type': 'ImageObject', url: 'https://olake.io/img/site/hero-section.svg' } },
         primaryImageOfPage: { '@type': 'ImageObject', url: 'https://olake.io/img/site/hero-section.svg', width: 516, height: 605 }
       }
