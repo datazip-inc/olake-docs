@@ -1,0 +1,202 @@
+---
+slug: iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors
+title: "Apache Iceberg Delete Formats for CDC: Equality vs Positional Deletes vs Deletion Vectors"
+description: "Equality deletes, position deletes, and deletion vectors compared for CDC pipelines: what each stores, which query engines can read them, what compaction fixes, and the table properties to set explicitly."
+tags: [apache-iceberg, cdc, delete-files, deletion-vectors, data-engineering]
+authors: [anshika]
+image: /img/blog/cover/apache-iceberg-delete-formats-for-cdc-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Apache Iceberg delete formats for CDC: equality deletes, positional deletes, and deletion vectors compared](/img/blog/cover/apache-iceberg-delete-formats-for-cdc-cover.webp)
+
+Deleting a row in Apache Iceberg is not as direct as it sounds. You would assume that a row deleted upstream gets picked up by the [CDC pipeline](https://olake.io/blog/architect-guide-cdc-apache-iceberg/) and disappears from every Spark query against the table. But that's not true. On merge on read, which is what pipelines almost always run, the writer records the delete in a separate file and leaves the original row exactly where it was. Then, an engine that understands that file filters the row out at read time and returns the correct answer. An engine that does not understand it returns the row, and nothing about the query looks wrong. This is what choosing the wrong delete format and engine combination looks like.
+
+![Iceberg delete format compatibility across query engines](/img/blog/2026/10/iceberg-delete-format-compatibility.webp)
+
+Apache Iceberg offers [three ways to record a deleted row](https://olake.io/blog/iceberg-delta-lake-delete-methods-comparison/); the ingestion writer picks one at write time, and every downstream engine has to interpret whatever it picked. Not every engine supports all three. So the choice is not only about write cost and query latency; it is about whether a delete is honored at all.
+ 
+Most CDC/upsert writers default to equality deletes, because it is the only delete format a writer can produce without having to find the row.
+
+## What the three delete formats actually store
+ 
+All three delete formats answer the same question, that is, whether a given row should be returned by a query engine or not; the only difference is how much the writer has to know at the moment of recording the answer. That difference affects everything downstream, so let's start with setting up the context of all three delete formats side by side.
+ 
+### Equality deletes
+ 
+An equality delete file stores the value and not the location.
+ 
+The file records which columns identify a row uniquely, usually the primary key, along with the values of the rows that were deleted. It simply says, "The row where ID is 1234 is gone; if you come across it while reading, ignore it." This is why streaming writers pick it.
+ 
+The CDC event already carries the key, so the writer just copies the key into a delete file and commits, with no need for reading the table, and the reader pays for that. Since the delete file doesn't name the location, the engine has to check the values against the data files in the partition written before the delete. There is no file path to narrow the search with, only column metrics to rule a file out. There is nothing to limit how many of these files accumulate between compactions, and every one of them adds to what the engine checks on each query. They cost more than read time too, since equality deletes also cannot maintain strict [row lineage](https://olake.io/blog/apache-iceberg-row-lineage/) continuity on v3 tables.
+
+![Iceberg equality delete performance](/img/blog/2026/10/iceberg-equality-delete-performance.webp)
+
+Equality deletes are available in v2 and v3.
+
+### Position deletes
+ 
+A position delete file stores a data file path and a row position within the file and may optionally carry the deleted row itself.
+ 
+In order to create a position delete file, the writer must know the physical location of the row, which a CDC event does not carry. So, it has to find the row first, either by reading the table or by keeping its own index of which key lives in which file. Both add work at commit time that equality deletes skip.
+ 
+The reader gets the better end of it. The path and offset need no evaluation, so the engine skips exactly the rows named and nothing else. Position delete files still pile up with every batch of deletes. Each file is cheap to apply, but there is no limit on how many of them accumulate between compactions.
+
+![Iceberg position delete file scan](/img/blog/2026/10/iceberg-position-delete-file-scan.webp)
+
+
+These are available in v2 but are deprecated in v3. So don't add them on your v3 tables, and existing position deletes must be written into deletion vectors when the deletes for a data file are updated, but the files written before the upgrade stay valid.
+ 
+### Deletion vectors
+ 
+A deletion vector records which rows in a single data file are deleted and stores them as a bitmap. This bitmap exists inside the [Puffin file](https://iceberg.apache.org/puffin-spec/). The manifest records which data file the bitmap belongs to along with where in the Puffin file to find it.
+ 
+The writer still has to find the row first, similarly to position deletes, so writes cost the same.
+ 
+Reading is faster since the manifest points straight at the bytes for that specific data file, and the engine loads one bitmap.
+
+![Iceberg deletion vector bitmap](/img/blog/2026/10/iceberg-deletion-vector-bitmap.webp)
+
+The real difference is in the pile-up. A data file is allowed only one deletion vector per snapshot, so when another set of rows gets deleted from a file that already has a deletion vector, the writer reads the existing bitmap, adds the new positions, and writes a new one that the next snapshot references in its place. Nothing piles up. The amount of delete metadata stays flat no matter how often the table is updated, and query cost stops creeping between compactions. Engines can ignore any older position delete files for a data file where a deletion vector exists.
+
+## Why CDC ends up on equality deletes by default
+ 
+A CDC event carries the key, the column values, and the operation type. It does not carry the location of the row in storage. Position deletes and deletion vectors both need that location before anything can be written, so a writer producing either one has to find the row first.
+ 
+This can be resolved in two ways. The writer can read the table to locate the key, which means reading data on every commit. Or it can maintain its own index mapping keys to file locations, which means holding state across commits and rebuilding it after a restart. Both approaches add work at commit time. Equality deletes require neither, since the key that arrives in the change event is the entire contents of the delete file.
+ 
+Update volume changes the size of that difference. In CDC, an update is modeled as a delete followed by an insert, so a table taking a thousand updates a minute generates a thousand deletes a minute, each requiring its own location lookup under the other two formats.
+ 
+So equality deletes are often what streaming writers produce by default, even where the format is configurable. The cost of the other two formats appears at commit time on the write path. The cost of equality deletes appears later, on the read path, in a different system.
+ 
+Equality deletes also have a hard requirement. They depend on identifier fields, so the writer has to designate a set of columns that uniquely identifies a row. That is usually the primary key, but any combination that is genuinely unique works, and a writer can synthesize one where the source has none. What it cannot do is point the equality field IDs at columns that are not unique, since the delete then matches every row that shares those values.
+
+
+## What each engine can actually read
+ 
+The Apache Iceberg spec includes delete formats, but it does not guarantee engine support. An engine can be current on the format version and still handle only one of the three, so the delete format a writer produces has to be checked against the engines that will read the table.
+ 
+| Query engine | Equality deletes | Position deletes | Deletion vectors |
+| --- | --- | --- | --- |
+| Apache Spark | Yes | Yes | Yes |
+| Snowflake | No | Yes | Yes |
+| Databricks | No | No | Yes (DBR 18.0+) |
+| Athena | Yes | Yes | No |
+| Trino | Yes | Yes | Experimental |
+ 
+Verified September 2026 against Spark with Iceberg runtime 1.10.x, Trino 483, and current Snowflake and Databricks documentation.
+ 
+Three rows need context.
+ 
+- **Snowflake** supports position deletes for read and write on S3, Azure, and Google Cloud and does not support equality delete files at all for managed or externally managed tables.
+- **Databricks** supports neither position nor equality deletes on v2 and reads row-level deletes only as v3 deletion vectors. That requires a Unity Catalog-enabled workspace and Databricks Runtime 18.0 or above, and every new Iceberg v3 table gets deletion vectors by default.
+- **Trino** supports spec versions 1 and 2, with v3 marked experimental and row-level updates, deletes, and OPTIMIZE unsupported there, which makes it the engine most likely to block a move to deletion vectors. Athena goes further and rejects a v3 table on the format version field alone, before any delete file is read.
+
+Equality deletes have the narrowest support of the three, and the engines that reject them are warehouses. Deletion vectors are where support is heading rather than where it is, since they need every reader on v3. So equality deletes are now the compatibility risk rather than the safe choice.
+
+## Where compaction rescues you, and where it does not
+ 
+Compaction applies pending deletes while doing data file rewrites. The rows that are marked deleted are gone from the rewritten file, and the delete files that pointed at them are no longer being referenced. And the pileup problem that equality deletes and position deletes both have resets every time a compaction job runs
+
+
+This matters because it puts a limit on file pile-up. Delete files pile up continuously as the pipeline commits, and each one adds another thing the engine has to check. If left alone, the cost grows without any limit. With the compaction job running, say every hour, it grows for an hour and then resets. So the question shifts from whether the read cost climbs to how high the accumulation gets before the next compaction job runs and resets everything, and whether that peak still meets the latency the table is expected to hold.
+ 
+Deletion vectors don't rely on this much, since each new vector supersedes the last one, and delete metadata does not grow between runs. Compaction is still useful with data file fragmentation, but that is a file-size problem, not a delete-file problem.
+ 
+It's important to note that compaction does not change which engines can read the table. An engine that cannot read equality deletes still cannot read them, no matter how often the table is compacted. All a tighter schedule does is shorten the window in which that engine returns wrong results. Compaction changes what an engine has to read, not what it supports.
+ 
+Compaction is also not free. Data file rewrites mean rewriting every row in it, including the rows that never changed, so the higher the update rate, the more often the same untouched row gets written again. Compacting more often to keep read cost down means paying more to write, which is why [what runs the compaction matters](https://olake.io/blog/iceberg-compaction-spark-vs-fusion-benchmark/) as much as how often it runs.
+ 
+Whichever delete format a table ends up on, the delete files and small files problem still has to be cleared on a schedule. [OLake Fusion](https://olake.io/docs/fusion/getting-started/overview) handles that as automated Iceberg table maintenance, covering the small files, delete files, and metadata growth that build up as tables take on ingestion, updates, and deletes. It runs on a schedule against the destination tables, so the accumulation described above gets cleared without anyone remembering to trigger it.
+
+
+## Which format fits which situation
+ 
+The tradeoff comes to two things. On the write path, equality deletes cost the least, whereas position deletes and deletion vectors both cost you a lookup. On the read path, the order flips: deletion vectors cost the least and stay flat as CDC updates pile up, position deletes cost slightly more, and lastly, equality deletes cost the most and grow until compaction runs.
+ 
+Which is why the choice is rarely settled by cost alone. Let's take a look at some scenarios where one delete format might be a better call over the others.
+ 
+### Every engine in the read path supports v3
+ 
+Deletion vectors might be the best call. Delete metadata stays flat no matter how many CDC updates land; each read looks up one bitmap, and both Snowflake and Databricks can read them. You just have to set `format-version` to 3 and the delete mode to [merge-on-read](https://olake.io/iceberg/mor-vs-cow/#merge-on-read-mor). Just confirm every reader before upgrading, since the format version does not go back down.
+ 
+### Trino or Athena is in the read path
+ 
+Use position deletes on v2. Trino marks v3 as experimental and does not support row-level updates, deletes, or OPTIMIZE there, so deletion vectors are not an option yet. Position deletes read cleanly on both engines. The cost is a location lookup on every write and a compaction schedule to stop delete files from accumulating.
+ 
+### Snowflake or Databricks is in the read path
+ 
+Neither of them reads equality deletes. Databricks does not read v2 position deletes either, so that leaves deletion vectors on v3 or copy-on-write. In this case the wrong choice produces wrong answers instead of slow ones.
+ 
+### Low update volume, mixed or unknown readers
+ 
+[Copy-on-write](https://olake.io/iceberg/mor-vs-cow/). There are no delete files at all, so there is nothing to fail to read, and the compatibility question is gone. The cost is writing out whole data files on every change. This is the simplest correct answer for a table that is updated a few times per hour. For a table that is getting a thousand updates a minute that is not an option.
+ 
+### Spark or Flink only
+ 
+Equality deletes can be justified here, and this is the situation for which the default was created. Both engines read them, the write path is cheap, and compaction bounds the accumulated read cost. The risk is not technical but organizational, because a table that today is only readable by Spark becomes a problem the first time someone points a warehouse at it.
+ 
+## What to set explicitly
+ 
+Every property here has a default, and none of the defaults were chosen with a CDC write pattern in mind. Setting them explicitly costs nothing and makes the table's behavior legible to whoever inherits it.
+ 
+### Deletion vectors on v3
+ 
+```sql
+ALTER TABLE catalog.db.orders SET TBLPROPERTIES (
+  'format-version' = '3',
+  'write.delete.mode' = 'merge-on-read',
+  'write.update.mode' = 'merge-on-read',
+  'write.merge.mode' = 'merge-on-read'
+);
+```
+ 
+All three mode properties default to copy-on-write, and `format-version` defaults to 2. So a table created without these rewrites entire data files on every change rather than writing deletion vectors. On a v3 table, merge-on-read deletes are written as deletion vectors, so these two settings are usually all that is needed.
+ 
+### Position deletes on v2
+ 
+```sql
+ALTER TABLE catalog.db.orders SET TBLPROPERTIES (
+  'format-version' = '2',
+  'write.delete.mode' = 'merge-on-read',
+  'write.update.mode' = 'merge-on-read',
+  'write.merge.mode' = 'merge-on-read'
+);
+```
+ 
+Same three modes, one format version lower. Merge-on-read on v2 writes position delete files, which means a compaction schedule has to run alongside it. Without one, delete files accumulate, and read performance degrades over time.
+ 
+### Copy-on-write
+ 
+```sql
+ALTER TABLE catalog.db.orders SET TBLPROPERTIES (
+  'write.delete.mode' = 'copy-on-write',
+  'write.update.mode' = 'copy-on-write',
+  'write.merge.mode' = 'copy-on-write'
+);
+```
+ 
+This is already the default, so the block changes nothing and states the intent instead. Worth setting anyway, since a table with no explicit modes cannot be distinguished from one where somebody chose copy-on-write deliberately.
+ 
+### Equality deletes
+ 
+Equality deletes are not a table setting. They come from the writer, so what matters is the writer's upsert mode and its equality field IDs.
+ 
+```sql
+ALTER TABLE catalog.db.orders SET TBLPROPERTIES (
+  'format-version' = '2',
+  'write.delete.mode' = 'merge-on-read',
+  'write.update.mode' = 'merge-on-read',
+  'write.merge.mode' = 'merge-on-read'
+);
+```
+ 
+The table side looks identical to position deletes, since merge-on-read on v2 is what allows delete files at all. Which of the two formats actually lands depends on the writer.
+ 
+The equality field IDs are the part worth checking. Iceberg does not enforce uniqueness on them and leaves that to the writing engine, so nothing stops a writer from pointing them at a column that is not unique. The delete then matches every row carrying those values, which is why they are worth verifying against the table's real primary key rather than assuming the writer picked correctly.
+ 
+### Format version is one-way
+ 
+Format version only goes up. A table upgraded to v3 cannot go back to v2, and any engine that cannot read v3 loses access the moment the upgrade commits rather than degrading gradually. Confirm every engine in the read path before running it.
+
+<BlogCTA/>
