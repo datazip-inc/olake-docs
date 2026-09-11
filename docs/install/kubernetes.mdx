@@ -286,47 +286,56 @@ global:
 
 ### Index Storage for Positional Delete Writes
 
-When writing Iceberg positional deletes, OLake Go maintains a Pebble index during the write operation. Without persistent storage, this index is lost when the sync pod terminates and must be rebuilt from scratch on the next run. To avoid this rebuild cost, the chart provisions a dedicated PersistentVolumeClaim for each job that needs it.
+When writing Iceberg positional deletes, OLake Go maintains a Pebble index during the write operation. Without persistent storage, this index is lost when the sync pod terminates and must be rebuilt from scratch on the next run. To avoid this rebuild cost, the helm chart provisions a dedicated PersistentVolumeClaim for each job that needs it.
 
 Each job receives its own PVC named `olake-index-<JobID>`. The worker never deletes this claim, allowing the index to persist across multiple sync runs. Both the `sync` and `clear-destination` pods mount the same volume.
 
-Volumes are only provisioned for jobs where the `index_required` advanced setting is enabled. This setting is automatically turned on when any stream in the job uses positional deletes. Jobs without these features receive no storage.
+Volumes are only provisioned when any stream in the job uses positional deletes.
 
 ```yaml
 jobIndexes:
   default: # inherited by every job
-    size: 50Gi
-    storageClass: "gp3"
+    size: 20Gi                       # Default size is 20Gi
+    storageClass: "gp3"              # Overrides the storage class for Index PVC
+    accessModes: [ReadWriteOnce]     # Access mode for the Index PVC which is supported by the specified storage class
+    mountPath: /var/lib/olake/index  # Where the connector opens the index.
+    cacheSizeMB: 512                 # Pebble block cache size per stream.
+    maxOpenFiles: 1000               # Meximum number of SSTable file descriptors that pebble db keeps open per stream.
+    labels: {}                       # Custom labels for the Index PVC.
+    annotations: {}                  # Custom annotations for the Index PVC.
   jobs:
     123: # JobID — deep-merged over `default`
       size: 200Gi
+      existingClaim: ""              # Use an existing PVC instead of provisioning one.
 ```
 
 | Field | Default | Notes |
 |-------|---------|-------|
-| `size` | `20Gi` | Increasing Only. |
-| `storageClass` | `global.storageClass`, then the cluster default | Block storage. |
-| `accessModes` | `[ReadWriteOnce]` | Block storage is single-attach |
+| `size` | `20Gi` | Size of the Index PVC. It can only be increased, not decreased. |
+| `storageClass` | `global.storageClass`, then the cluster default | Overrides the storage class for Index PVC. Make sure `allowVolumeExpansion: true` is set on the storage class to be able to expand the size of the PVC. |
+| `accessModes` | `[ReadWriteOnce]` |  Access mode for the Index PVC which is supported by the specified storage class |
 | `mountPath` | `/var/lib/olake/index` | Where the connector opens the index. |
-| `cacheSizeMB` | `512` | Pebble block cache, per stream. |
-| `maxOpenFiles` | `1000` | SSTable file descriptors, per stream. |
-| `labels` / `annotations` | none | Written once, when the claim is created. Merge per key with `default`. |
-| `existingClaim` | none | Mount a PVC you created instead of provisioning one. |
+| `cacheSizeMB` | `512` | Pebble block cache size per stream. |
+| `maxOpenFiles` | `1000` | Meximum number of SSTable file descriptors that pebble db keeps open per stream. |
+| `labels` / `annotations` | `{}` | Custom labels and annotations for the Index PVC. |
+| `existingClaim` | `""` | Mount a PVC you created instead of provisioning one. |
 
 Configuration changes apply through `helm upgrade`. The worker automatically picks up ConfigMap updates without requiring a restart, and applies them in each jobs next run.
 
-Different fields behave differently when modified:
+:::caution Index PVCs and availability zones
+If the worker node is in a different availability zone than the zone the index PVC exists in, the pod goes into Pending state. After about 10 minutes, an error appears in the worker logs.
 
-- **Size increases**: When you increase the `size` field, the PersistentVolumeClaim automatically expands on the next job run. This requires `allowVolumeExpansion: true` to be set on your StorageClass. Expanding of storage happens without deleteing the older indexes.
-- **Size decreases**: You cannot decrease the `size` field. Kubernetes does not support shrinking volumes, so any attempt to reduce the size will be rejected.
-- **Other configuration fields**: Changes to fields like `storageClass`, `accessModes`, or `mountPath` only apply when creating new PersistentVolumeClaims. These fields cannot modify claims that already exist.
+In this situation, manual effort is required: delete the older PVC. On the next sync, OLake Go automatically creates the index in the PVC for the zone where the pod is starting up.
+
+An alternate to this is to set node affinity using job profiles so the job pod does not go to a different availability zone. The best way is to use a single availability zone.
+:::
 
 :::warning
 Per-job index storage (for positional delete writes) requires the versions below. Upgrade every component, missing an update on single component can cause job failures:
 - OLake UI **0.5.2 and above**.
 - Helm chart **0.0.28 and above**.
 - OLake worker **0.3.11 and above**.
-- OLake CLI **0.10.0 and above**.
+- OLake Version **0.10.0 and above**.
 :::
 
 ### Cloud IAM Integration
