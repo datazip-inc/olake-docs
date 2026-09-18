@@ -46,7 +46,7 @@ const FIELDS = [
   {
     id: 'horizon-rest-catalog-url-pat-oauth',
     authTypes: [AUTH_PAT, AUTH_EXTERNAL_OAUTH],
-    parameter: 'Horizon Iceberg REST Catalog URL',
+    parameter: 'Horizon Iceberg REST Catalog URI',
     required: true,
     sample: REST_URL_SAMPLE,
     description: 'Snowflake Horizon Catalog REST API endpoint.',
@@ -96,7 +96,7 @@ const FIELDS = [
     authTypes: AUTH_ALL,
     parameter: 'Session Role Scope',
     required: true,
-    sample: 'session:role:HORIZON_ROLE',
+    sample: 'session:role:<HORIZON_ROLE>',
     description: SESSION_ROLE_SCOPE_DESCRIPTION,
   },
   {

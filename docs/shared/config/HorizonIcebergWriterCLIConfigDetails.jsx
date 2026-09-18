@@ -102,7 +102,7 @@ const FIELDS = [
     authTypes: AUTH_ALL,
     parameter: 'scope',
     required: true,
-    sample: 'session:role:HORIZON_ROLE',
+    sample: 'session:role:<HORIZON_ROLE>',
     description: SESSION_ROLE_SCOPE_DESCRIPTION,
   },
   {
