@@ -161,17 +161,22 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
         aria-label='Main'
         className='mx-auto flex h-[52px] w-full max-w-[1016px] items-center justify-between rounded-[16px] bg-white px-[16px] shadow-[0_8px_24px_-16px_rgba(16,24,64,0.35)] lg:h-[56px] lg:px-[24px]'
       >
-        <div className='flex items-center gap-[16px] lg:gap-[28px]'>
+        <div className='flex items-center gap-2 lg:gap-7'>
           <button
             type='button'
             aria-label={drawerOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={drawerOpen}
             onClick={() => setDrawerOpen((v) => !v)}
             className='flex cursor-pointer items-center border-none bg-transparent p-0 text-[#202020] lg:hidden'
+            style={{ margin: 0, padding: 0, minWidth: '20px', width: '20px', height: '20px' }}
           >
             <Burger open={drawerOpen} />
           </button>
-          <Link to='/' className='text-[16px] font-medium text-[#0029ce]'>
+          <Link 
+            to='/' 
+            className='text-[16px] font-medium text-[#0029ce] leading-none'
+            style={{ margin: 0, padding: 0 }}
+          >
             OLake
           </Link>
           <div className='hidden items-center gap-[24px] lg:flex'>
