@@ -70,7 +70,7 @@ const FIELDS = [
   {
     id: 'horizon-rest-catalog-url-keypair-wif',
     authTypes: [AUTH_KEY_PAIR, AUTH_WIF],
-    parameter: 'Horizon Iceberg REST Catalog URL',
+    parameter: 'Horizon Iceberg REST Catalog URI',
     required: true,
     sample: REST_URL_SAMPLE,
     description: 'Snowflake Horizon Catalog REST API endpoint.',
