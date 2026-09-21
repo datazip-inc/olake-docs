@@ -35,7 +35,8 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
     <section className='bg-[#141414] px-[32px] lg:px-[24px]'>
       <div className='mx-auto w-full max-w-[1016px] text-[#e7e7e0]'>
         <div className='flex flex-col'>
-          {latestReleaseLabel && (
+          <div className='border border-solid border-[#2b2b2b]'>
+            {latestReleaseLabel && (
             <div className='flex flex-col gap-[6px] rounded-b-[12px] bg-[#1c1c1c] px-[18px] py-[14px] lg:flex-row lg:items-center lg:gap-[18px] lg:px-[24px]'>
               <span className='text-[12px] text-[#8a8a8a] lg:text-[13px]'>Latest Release</span>
               <span className='text-[14px] lg:text-[15px]'>
@@ -50,21 +51,23 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
             </div>
           )}
 
-          <div className='pb-[56px] pt-[32px] lg:pb-[96px] lg:pt-[48px]'>
-            <div className='px-[20px] lg:px-[24px]'>
-              <p className='text-[13px] text-[#8a8a8a] lg:text-[14px]'>
-                Latest News
-              </p>
-              <h2 className='mt-[6px] text-[26px] font-normal tracking-[-0.01em] lg:text-[38px]'>
-                OLake Bulletin
-              </h2>
+            <div className='pt-[32px] lg:pt-[48px]'>
+              <div className='px-[20px] lg:px-[24px]'>
+                <p className='text-[13px] text-[#8a8a8a] lg:text-[14px]'>
+                  Latest News
+                </p>
+                <h2 className='mt-[6px] text-[26px] font-normal tracking-[-0.01em] lg:text-[38px]'>
+                  OLake Bulletin
+                </h2>
+              </div>
             </div>
 
-          <div className='mt-[24px] flex flex-col lg:mt-[36px] lg:flex-row border border-solid border-[#2b2b2b]'>
-            <div
-              role='tablist'
+            <div className='mt-[24px] lg:mt-[36px] border-0 border-t border-solid border-[#2b2b2b]'>
+              <div className='flex flex-col pb-[56px] lg:flex-row lg:pb-[96px]'>
+                <div
+                role='tablist'
               aria-label='Bulletin categories'
-              className='flex gap-[8px] overflow-x-auto border-0 border-solid border-[#2b2b2b] lg:w-[260px] lg:shrink-0 lg:flex-col lg:gap-0 lg:border-r'
+              className='flex overflow-x-auto border-0 border-b border-solid border-[#2b2b2b] lg:w-[260px] lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r'
             >
               {BULLETIN_TABS.map((t) => (
                 <button
@@ -74,7 +77,7 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
                   aria-selected={t.id === tab.id}
                   onClick={() => setActiveTab(t.id)}
                   className={cn(
-                    'flex items-center cursor-pointer whitespace-nowrap border-0 lg:border-b border-solid border-[#2b2b2b] px-[14px] py-[10px] text-left text-[14px] transition-colors lg:w-full lg:px-[24px] lg:py-[18px]',
+                    'flex items-center justify-center cursor-pointer whitespace-nowrap border-0 border-r last:border-r-0 lg:border-r-0 lg:border-b border-solid border-[#2b2b2b] px-[20px] py-[14px] text-left text-[14px] transition-colors lg:w-full lg:px-[24px] lg:py-[18px]',
                     t.id === tab.id
                       ? 'bg-[#1a1a1a] text-[#6b8afd]'
                       : 'bg-transparent text-[#8a8a8a] hover:text-[#e7e7e0]'
@@ -86,15 +89,15 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
               ))}
             </div>
 
-            <div className='flex-1 lg:pt-[24px]'>
-              <h3 className='text-[18px] font-normal lg:text-[22px] lg:px-[36px]'>{tab.heading}</h3>
+            <div className='flex-1 pt-[24px] lg:pt-[24px]'>
+              <h3 className='text-[18px] font-normal px-[20px] lg:text-[22px] lg:px-[36px]'>{tab.heading}</h3>
               <ul className='m-0 flex flex-col list-none p-0 mt-[16px]'>
                 {tab.items.map((item) => (
                   <li
                     key={item.href}
                     className='border-0 border-b border-solid border-[#2b2b2b] py-[16px] first:pt-0 last:border-b-0'
                   >
-                    <ItemLink item={item} className='flex items-start gap-[16px] text-[#e7e7e0] lg:px-[36px] w-full'>
+                    <ItemLink item={item} className='flex items-start gap-[16px] text-[#e7e7e0] px-[20px] lg:px-[36px] w-full'>
                       <img
                         src={item.img}
                         alt=''
@@ -116,10 +119,11 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
                 ))}
               </ul>
             </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
     </section>
   )
 }
