@@ -8,9 +8,9 @@ const GithubMark = () => <PiGithubLogo size={17} aria-hidden='true' />
 
 export default function Hero() {
   return (
-    <section className='relative px-[32px] pb-[64px] pt-[56px] lg:px-[24px] lg:pb-[150px] lg:pt-[190px]'>
+    <section className='relative px-[32px] pb-[64px] pt-[160px] lg:px-[24px] lg:pb-[150px] lg:pt-[190px]'>
       <div className='mx-auto w-full max-w-[1016px] lg:text-center'>
-        <h1 className='max-w-[313px] text-[28px] font-normal leading-[1.28] text-[#202020] lg:mx-auto lg:max-w-[820px] lg:text-[46px] lg:leading-[1.24] lg:tracking-[-0.01em]'>
+        <h1 className='mx-auto max-w-[313px] text-[28px] font-normal leading-[1.28] text-[#202020] lg:max-w-[820px] lg:text-[46px] lg:leading-[1.24] lg:tracking-[-0.01em]'>
           {HERO.headline}
           <span className='text-[#7a7a7a]'>{HERO.headlineTail}</span>
         </h1>

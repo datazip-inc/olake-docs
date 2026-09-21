@@ -83,7 +83,7 @@ export default function LakesideFooter() {
         className='pointer-events-none absolute inset-x-0 bottom-0 h-[280px] lg:h-[360px]'
         style={{
           background:
-            'radial-gradient(120% 100% at 50% 100%, rgba(30,58,224,0.85) 0%, rgba(86,110,236,0.55) 32%, rgba(174,187,247,0.28) 58%, rgba(255,255,255,0) 82%)'
+            'linear-gradient(to top, rgba(30,58,224,0.85) 0%, rgba(86,110,236,0.55) 32%, rgba(174,187,247,0.28) 65%, rgba(255,255,255,0) 100%)'
         }}
       />
     </footer>
