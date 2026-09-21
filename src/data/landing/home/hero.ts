@@ -5,7 +5,7 @@ export const HERO = {
   /** Rendered as one heading; `tail` picks up the design's grey clause. */
   headline: 'Open Source Ingestion & Maintenance Tool for ',
   headlineTail: 'Apache Iceberg',
-  body: 'Open-source replication from Postgres, MySQL, MongoDB, Oracle and Kafka into Apache Iceberg, and the maintenance engine that keeps those tables fast as they grow. Runs entirely in your own cloud. Apache 2.0.',
+  body: 'Achieve zero-effort Apache Iceberg table maintenance and the fastest ingestion into Iceberg and Parquet on S3 with OLake',
   primary: { label: 'Try OLake', href: '/docs/getting-started/quickstart/' },
   secondary: { label: 'Github', href: GITHUB_REPO_URL, external: true }
 }

@@ -27,7 +27,7 @@ export default function GoBenchmark() {
   const modeLabel = t.mode === 'cdc' ? 'CDC' : 'full load'
 
   return (
-    <section className='lakeside-benchmark-section px-0 pb-[56px] pt-[56px] lg:pb-[72px] lg:pt-[96px]'>
+    <section className='lakeside-benchmark-section px-0 pb-[56px] pt-[24px] lg:pb-[72px] lg:pt-[40px]'>
       <div className='mx-auto w-full max-w-[1016px]'>
         <div className='px-[20px] lg:px-[34px]'>
           <SectionHeading
@@ -44,13 +44,13 @@ export default function GoBenchmark() {
         <div className='lakeside-benchmark-panel mt-[24px] p-[12px] lg:mt-[32px] lg:p-[14px]'>
           <div className='border-0 overflow-hidden rounded-[16px] bg-[#1a1a1a]'>
           <div className='flex flex-col gap-[12px] px-[20px] pb-[16px] pt-[22px] lg:flex-row lg:items-start lg:justify-between lg:px-[28px] lg:pt-[26px]'>
-            <p className='text-[14px] leading-[1.45] text-[#e7e7e0] lg:text-[16px]'>
+            <p className='text-[15px] leading-[1.45] text-[#e7e7e0] lg:text-[17px]'>
               Time to move {rowsSynced} rows,
               <br className='hidden lg:block' /> {t.sourceName} to Apache Iceberg, {modeLabel}
             </p>
             <Link
               to='/docs/benchmarks/ingestion/'
-              className='inline-flex items-center gap-[6px] text-[13px] text-[#6b8afd] transition-colors hover:text-[#9ab0ff] lg:text-[14px]'
+              className='inline-flex items-center gap-[6px] text-[14px] text-[#6b8afd] transition-colors hover:text-[#9ab0ff] lg:text-[15px]'
             >
               View OLake Go benchmarks
               <ExternalMark />
@@ -66,7 +66,7 @@ export default function GoBenchmark() {
                   onClick={() => t.setMode(m.id)}
                   aria-pressed={t.mode === m.id}
                   className={cn(
-                    'cursor-pointer border-none bg-transparent p-0 text-[13px] transition-colors',
+                    'cursor-pointer border-none bg-transparent p-0 text-[14px] transition-colors lg:text-[15px]',
                     t.mode === m.id ? 'text-[#e7e7e0]' : 'text-[#6f6f6f] hover:text-[#b5b5b5]'
                   )}
                 >
@@ -82,7 +82,7 @@ export default function GoBenchmark() {
                   onClick={() => t.setActiveConnector(c.id)}
                   aria-pressed={t.activeConnector === c.id}
                   className={cn(
-                    'shrink-0 cursor-pointer border-none bg-transparent p-0 text-[13px] transition-colors',
+                    'shrink-0 cursor-pointer border-none bg-transparent p-0 text-[14px] transition-colors lg:text-[15px]',
                     t.activeConnector === c.id
                       ? 'text-[#e7e7e0]'
                       : 'text-[#6f6f6f] hover:text-[#b5b5b5]'
@@ -98,17 +98,17 @@ export default function GoBenchmark() {
             <table className='w-full min-w-[720px] border-0 border-collapse border-none text-left'>
               <thead>
                 <tr className='border-0 border-y border-solid border-[#2b2b2b] bg-transparent'>
-                  <th className='w-[210px] border-0 border-r border-solid border-[#2b2b2b] bg-transparent px-[20px] py-[16px] text-[13px] font-normal text-[#8a8a8a] lg:px-[28px]'>
+                  <th className='w-[210px] border-0 border-r border-solid border-[#2b2b2b] bg-transparent px-[20px] py-[16px] text-[14px] font-normal text-[#8a8a8a] lg:px-[28px] lg:text-[15px]'>
                     Metrics
                   </th>
                   <th className='border-0 border-x border-solid border-[#2b2b2b] bg-transparent px-[16px] py-[14px] text-center font-normal'>
-                    <span className='block text-[13px] text-[#6b8afd]'>{t.olakeLabel}</span>
-                    <span className='block text-[11px] text-[#8a8a8a]'>{t.olakeSub}</span>
+                    <span className='block text-[14px] text-[#6b8afd] lg:text-[15px]'>{t.olakeLabel}</span>
+                    <span className='block text-[12px] text-[#8a8a8a] lg:text-[13px]'>{t.olakeSub}</span>
                   </th>
                   {t.competitors.map((name) => (
                     <th
                       key={name}
-                      className='border-0 border-r border-solid border-[#2b2b2b] bg-transparent px-[16px] py-[16px] text-center text-[13px] font-normal text-[#8a8a8a]'
+                      className='border-0 border-r border-solid border-[#2b2b2b] bg-transparent px-[16px] py-[16px] text-center text-[14px] font-normal text-[#8a8a8a] lg:text-[15px]'
                     >
                       {name}
                     </th>
@@ -122,21 +122,21 @@ export default function GoBenchmark() {
                     className='border-0 border-b border-solid border-[#2b2b2b] bg-transparent'
                   >
                     <th className='border-0 border-r border-solid border-[#2b2b2b] bg-transparent px-[20px] py-[18px] text-left align-top font-normal lg:px-[28px]'>
-                      <span className='block text-[13px] text-[#d4d4d4]'>{row.label}</span>
+                      <span className='block text-[14px] text-[#d4d4d4] lg:text-[15px]'>{row.label}</span>
                       {row.note && (
-                        <span className='mt-[6px] block max-w-[170px] text-[11px] leading-[1.45] text-[#6f6f6f]'>
+                        <span className='mt-[6px] block max-w-[170px] text-[12px] leading-[1.45] text-[#6f6f6f] lg:text-[13px]'>
                           {row.note}
                         </span>
                       )}
                     </th>
-                    <td className='border-0 border-x border-solid border-[#2b2b2b] px-[16px] py-[18px] text-center align-top text-[13px] text-[#e7e7e0]'>
+                    <td className='border-0 border-x border-solid border-[#2b2b2b] px-[16px] py-[18px] text-center align-top text-[14px] text-[#e7e7e0] lg:text-[15px]'>
                       {row.olake}
                     </td>
                     {row.competitors.map((value, i) => (
                       <td
                         key={`${row.label}-${t.competitors[i]}`}
                         className={cn(
-                          'border-0 border-r border-solid border-[#2b2b2b] px-[16px] py-[18px] text-center align-top text-[13px]',
+                          'border-0 border-r border-solid border-[#2b2b2b] px-[16px] py-[18px] text-center align-top text-[14px] lg:text-[15px]',
                           row.highlight ? 'text-[#6b8afd]' : 'text-[#9b9b9b]'
                         )}
                       >
@@ -148,12 +148,6 @@ export default function GoBenchmark() {
               </tbody>
             </table>
           </div>
-
-            {t.comingSoon && (
-              <p className='px-[20px] py-[18px] text-[12px] text-[#8a8a8a] lg:px-[28px]'>
-                {t.sourceName} {t.mode === 'cdc' ? 'CDC' : 'full load'} benchmarks are in progress.
-              </p>
-            )}
           </div>
         </div>
       </div>

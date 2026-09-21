@@ -58,12 +58,21 @@ export interface GoBenchmarkTable {
  * come through as '-'.
  */
 export function useGoBenchmarkTable(): GoBenchmarkTable {
-  const [activeConnector, setActiveConnector] = useState<ConnectorId>(CONNECTORS[0].id)
+  const [activeConnectorState, setActiveConnector] = useState<ConnectorId>(CONNECTORS[0].id)
   const [mode, setMode] = useState<BenchmarkMode>('full_load')
 
   return useMemo(() => {
-    const connector = CONNECTORS.find((c) => c.id === activeConnector) ?? CONNECTORS[0]
     const dataset = mode === 'cdc' ? CONNECTOR_CDC_BENCHMARKS : CONNECTOR_BENCHMARKS
+    
+    // Only show tabs for connectors that have benchmark data
+    const validConnectors = CONNECTORS.filter((c) => dataset[c.id]?.hasData)
+    
+    // If the currently active connector doesn't have data in the new mode, fallback to the first one that does
+    const activeConnector = validConnectors.some((c) => c.id === activeConnectorState)
+      ? activeConnectorState
+      : (validConnectors[0]?.id ?? CONNECTORS[0].id)
+
+    const connector = CONNECTORS.find((c) => c.id === activeConnector) ?? CONNECTORS[0]
     const bench = (dataset[connector.id] ?? {}) as Partial<ConnectorBenchmark>
     const comps = competitorKeys(bench)
 
@@ -80,8 +89,8 @@ export function useGoBenchmarkTable(): GoBenchmarkTable {
     })
 
     return {
-      connectors: CONNECTORS.map(({ id, name }) => ({ id, name })),
-      activeConnector: connector.id,
+      connectors: validConnectors.map(({ id, name }) => ({ id, name })),
+      activeConnector,
       setActiveConnector,
       mode,
       setMode,
@@ -92,5 +101,5 @@ export function useGoBenchmarkTable(): GoBenchmarkTable {
       comingSoon: !bench.hasData,
       sourceName: connector.name
     }
-  }, [activeConnector, mode])
+  }, [activeConnectorState, mode])
 }
