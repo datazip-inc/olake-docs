@@ -33,7 +33,7 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
 
   return (
     <section className='bg-[#141414] px-[32px] lg:px-[24px]'>
-      <div className='mx-auto w-full max-w-[1016px] border-0 border-x border-solid border-[#2b2b2b] text-[#e7e7e0]'>
+      <div className='mx-auto w-full max-w-[1016px] text-[#e7e7e0]'>
         <div className='flex flex-col'>
           {latestReleaseLabel && (
             <div className='flex flex-col gap-[6px] rounded-b-[12px] bg-[#1c1c1c] px-[18px] py-[14px] lg:flex-row lg:items-center lg:gap-[18px] lg:px-[24px]'>
@@ -50,15 +50,17 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
             </div>
           )}
 
-          <div className='p-[20px] pb-[56px] pt-[32px] lg:p-[32px] lg:pb-[96px] lg:pt-[48px]'>
-            <p className='text-[13px] text-[#8a8a8a] lg:text-[14px]'>
-              Latest News
-            </p>
-            <h2 className='mt-[6px] text-[26px] font-normal tracking-[-0.01em] lg:text-[38px]'>
-              OLake Bulletin
-            </h2>
+          <div className='pb-[56px] pt-[32px] lg:pb-[96px] lg:pt-[48px]'>
+            <div className='px-[20px] lg:px-[24px]'>
+              <p className='text-[13px] text-[#8a8a8a] lg:text-[14px]'>
+                Latest News
+              </p>
+              <h2 className='mt-[6px] text-[26px] font-normal tracking-[-0.01em] lg:text-[38px]'>
+                OLake Bulletin
+              </h2>
+            </div>
 
-          <div className='mt-[24px] flex flex-col gap-[20px] lg:mt-[36px] lg:flex-row lg:gap-0'>
+          <div className='mt-[24px] flex flex-col lg:mt-[36px] lg:flex-row border border-solid border-[#2b2b2b]'>
             <div
               role='tablist'
               aria-label='Bulletin categories'
@@ -72,26 +74,27 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
                   aria-selected={t.id === tab.id}
                   onClick={() => setActiveTab(t.id)}
                   className={cn(
-                    'cursor-pointer whitespace-nowrap rounded-[8px] border-none px-[14px] py-[10px] text-left text-[14px] transition-colors lg:rounded-none',
+                    'flex items-center cursor-pointer whitespace-nowrap border-0 lg:border-b border-solid border-[#2b2b2b] px-[14px] py-[10px] text-left text-[14px] transition-colors lg:w-full lg:px-[24px] lg:py-[18px]',
                     t.id === tab.id
-                      ? 'bg-[#1f1f1f] text-[#6b8afd]'
-                      : 'bg-transparent text-[#b5b5b5] hover:text-[#e7e7e0]'
+                      ? 'bg-[#1a1a1a] text-[#6b8afd]'
+                      : 'bg-transparent text-[#8a8a8a] hover:text-[#e7e7e0]'
                   )}
                 >
+                  <span className={cn('mr-[8px] text-[16px]', t.id === tab.id ? 'opacity-100' : 'hidden lg:inline-block lg:opacity-0')}>&bull;</span>
                   {t.label}
                 </button>
               ))}
             </div>
 
-            <div className='flex-1 lg:pl-[36px]'>
-              <h3 className='text-[18px] font-normal lg:text-[22px]'>{tab.heading}</h3>
-              <ul className='mt-[16px] flex flex-col'>
+            <div className='flex-1 lg:pt-[24px]'>
+              <h3 className='text-[18px] font-normal lg:text-[22px] lg:px-[36px]'>{tab.heading}</h3>
+              <ul className='m-0 flex flex-col list-none p-0 mt-[16px]'>
                 {tab.items.map((item) => (
                   <li
                     key={item.href}
-                    className='border-0 border-b border-solid border-[#2b2b2b] py-[16px] first:pt-0'
+                    className='border-0 border-b border-solid border-[#2b2b2b] py-[16px] first:pt-0 last:border-b-0'
                   >
-                    <ItemLink item={item} className='flex items-start gap-[16px] text-[#e7e7e0]'>
+                    <ItemLink item={item} className='flex items-start gap-[16px] text-[#e7e7e0] lg:px-[36px] w-full'>
                       <img
                         src={item.img}
                         alt=''

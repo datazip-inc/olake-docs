@@ -27,8 +27,8 @@ export const TRUSTED_LOGOS: TrustedLogo[] = [
     name: 'Xeno',
     w: 176,
     h: 88,
-    maxH: '24px',
-    maxW: '120px'
+    maxH: '32px',
+    maxW: '140px'
   },
   {
     src: '/img/landing/v2/logo-cordial.webp',
@@ -51,15 +51,15 @@ export const TRUSTED_LOGOS: TrustedLogo[] = [
     name: 'Astro Talk',
     w: 246,
     h: 88,
-    maxH: '26px',
-    maxW: '140px'
+    maxH: '34px',
+    maxW: '160px'
   },
   {
     src: '/img/landing/v2/logo-lendingkart.webp',
     name: 'Lending Kart',
     w: 168,
     h: 88,
-    maxH: '34px',
-    maxW: '160px'
+    maxH: '42px',
+    maxW: '180px'
   }
 ]
