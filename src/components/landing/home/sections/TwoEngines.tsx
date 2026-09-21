@@ -10,11 +10,11 @@ export default function TwoEngines() {
         <SectionHeading eyebrow='Two Engines' title='Move data fast, keep it fast' align='center' />
 
         <div className='mt-[28px] lg:mt-[44px]'>
-          <div className='mx-auto flex w-full max-w-[1016px] flex-col gap-[20px] lg:flex-row lg:gap-[24px]'>
+          <div className='mx-auto grid w-full max-w-[1016px] grid-cols-1 gap-[20px] lg:grid-cols-2 lg:gap-[24px]'>
             {ENGINES.map((engine) => (
               <article
                 key={engine.name}
-                className='flex w-full shrink-0 flex-col overflow-hidden rounded-[14px] border border-solid border-[#ececec] bg-white lg:w-[calc((1016px-24px)/2)]'
+                className='flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-solid border-[#ececec] bg-white'
               >
                 <img
                   src={engine.art}

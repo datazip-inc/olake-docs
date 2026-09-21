@@ -26,22 +26,56 @@ export const ARCHITECTURE_GROUPS: ChipGroup[] = [
     chips: ['Postgres', 'MySQL', 'MongoDB', 'Oracle', 'Kafka', 'S3', 'DB2 LUW', 'MSSQL']
   },
   {
+    // Everything under docs/writers/iceberg/catalog: the four catalog types,
+    // plus the REST implementations that page documents as its own tabs.
     title: 'Catalogs',
-    chips: ['AWS Glue', 'Hive Store', 'JDBC SQL', 'REST', 'Nessie']
+    chips: [
+      'AWS Glue',
+      'Hive',
+      'JDBC',
+      'REST',
+      'Lakekeeper',
+      'Nessie',
+      'S3 Tables',
+      'Unity',
+      'Apache Polaris',
+      'BigLake'
+    ]
   },
   {
     title: 'Destinations',
     chips: ['Apache Iceberg', 'Parquet on S3']
   },
   {
+    // The engines docs/understanding/compatibility-engines.mdx certifies
+    // against OLake Go's Iceberg tables, in the order that table lists them.
     title: 'Query Engines that read results',
-    chips: ['Snowflake', 'Trino', 'Athena', 'DuckDB', 'Flink', 'Spark']
+    chips: [
+      'Amazon Athena',
+      'Apache Spark',
+      'Apache Flink',
+      'Trino',
+      'Starburst',
+      'Presto',
+      'Apache Hive',
+      'Apache Impala',
+      'Dremio',
+      'DuckDB',
+      'ClickHouse',
+      'StarRocks',
+      'Apache Doris',
+      'BigQuery',
+      'Snowflake',
+      'Databricks',
+      'AWS Redshift',
+      'Azure Synapse'
+    ]
   }
 ]
 
 export const ARCHITECTURE_GRAPH = {
-  src: '/img/landing/lakeside/architecture-graph.png',
-  width: 962,
-  height: 427,
+  src: '/img/landing/lakeside/architecture-graph.svg',
+  width: 960,
+  height: 480,
   alt: 'Eight sources flow into OLake Go, which writes Iceberg tables and Parquet on S3; OLake Fusion optimises those tables.'
 }
