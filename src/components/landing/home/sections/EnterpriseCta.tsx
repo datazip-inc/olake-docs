@@ -23,7 +23,7 @@ export default function EnterpriseCta() {
           </p>
           <Link
             to={ENTERPRISE.cta.href}
-            className='mt-[22px] inline-flex h-[38px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[18px] text-[14px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-opacity hover:opacity-90 lg:mt-[28px]'
+            className='mt-[22px] inline-flex h-[38px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[18px] text-[14px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-all hover:bg-[#0021a3] hover:text-white lg:mt-[28px]'
           >
             {ENTERPRISE.cta.label}
           </Link>

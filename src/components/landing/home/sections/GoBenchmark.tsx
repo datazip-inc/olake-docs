@@ -5,14 +5,10 @@ import { useGoBenchmarkTable } from '../useGoBenchmarkTable'
 import SectionHeading from '../ui/SectionHeading'
 
 const ExternalMark = () => (
-  <svg width='12' height='12' viewBox='0 0 12 12' fill='none' aria-hidden='true'>
-    <path
-      d='M4 2h6v6M10 2 3 9'
-      stroke='currentColor'
-      strokeWidth='1.2'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-    />
+  <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+    <path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' />
+    <polyline points='15 3 21 3 21 9' />
+    <line x1='10' y1='14' x2='21' y2='3' />
   </svg>
 )
 
@@ -42,23 +38,23 @@ export default function GoBenchmark() {
         </div>
 
         <div className='lakeside-benchmark-panel mt-[24px] p-[12px] lg:mt-[32px] lg:p-[14px]'>
-          <div className='border-0 overflow-hidden rounded-[16px] bg-[#1a1a1a]'>
+          <div className='border-0 overflow-hidden rounded-[16px] bg-[#222222]'>
           <div className='flex flex-col gap-[12px] px-[20px] pb-[16px] pt-[22px] lg:flex-row lg:items-start lg:justify-between lg:px-[28px] lg:pt-[26px]'>
-            <p className='text-[15px] leading-[1.45] text-[#e7e7e0] lg:text-[17px]'>
+            <p className='text-[16px] leading-[1.45] text-[#e7e7e0] lg:text-[20px]'>
               Time to move {rowsSynced} rows,
               <br className='hidden lg:block' /> {t.sourceName} to Apache Iceberg, {modeLabel}
             </p>
             <Link
               to='/docs/benchmarks/ingestion/'
-              className='inline-flex items-center gap-[6px] text-[14px] text-[#6b8afd] transition-colors hover:text-[#9ab0ff] lg:text-[15px]'
+              className='hidden lg:inline-flex items-center gap-[6px] text-[14px] text-[#6b8afd] transition-colors hover:text-[#9ab0ff] lg:text-[15px]'
             >
               View OLake Go benchmarks
               <ExternalMark />
             </Link>
           </div>
 
-          <div className='flex flex-col gap-[10px] px-[20px] pb-[14px] lg:flex-row lg:items-center lg:justify-between lg:px-[28px]'>
-            <div className='flex items-center gap-[16px]'>
+          <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between lg:px-[28px] lg:pb-[14px]'>
+            <div className='flex items-center gap-[16px] px-[20px] pb-[14px] lg:px-0 lg:pb-0'>
               {MODES.map((m) => (
                 <button
                   key={m.id}
@@ -74,7 +70,7 @@ export default function GoBenchmark() {
                 </button>
               ))}
             </div>
-            <div className='-mx-[4px] flex items-center gap-[14px] overflow-x-auto px-[4px]'>
+            <div className='flex items-center gap-[14px] overflow-x-auto border-0 border-t border-solid border-[#2b2b2b] px-[20px] py-[14px] lg:-mx-[4px] lg:border-t-0 lg:px-[4px] lg:py-0'>
               {t.connectors.map((c) => (
                 <button
                   key={c.id}
@@ -147,6 +143,15 @@ export default function GoBenchmark() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className='flex items-center justify-center border-0 border-t border-solid border-[#2b2b2b] py-[20px] lg:hidden'>
+            <Link
+              to='/docs/benchmarks/ingestion/'
+              className='inline-flex items-center gap-[6px] text-[14px] text-[#6b8afd] transition-colors hover:text-[#9ab0ff]'
+            >
+              View OLake Go benchmarks
+              <ExternalMark />
+            </Link>
           </div>
           </div>
         </div>

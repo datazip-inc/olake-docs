@@ -32,13 +32,13 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
   const tab = BULLETIN_TABS.find((t) => t.id === activeTab) ?? BULLETIN_TABS[0]
 
   return (
-    <section className='bg-[#141414] px-[32px] lg:px-[24px]'>
+    <section className='bg-[#171717] px-[32px] lg:px-[24px]'>
       <div className='mx-auto w-full max-w-[1016px] text-[#e7e7e0]'>
         <div className='flex flex-col'>
           <div className='border border-solid border-[#2b2b2b]'>
             {latestReleaseLabel && (
-            <div className='flex flex-col gap-[6px] rounded-b-[12px] bg-[#1c1c1c] px-[18px] py-[14px] lg:flex-row lg:items-center lg:gap-[18px] lg:px-[24px]'>
-              <span className='text-[12px] text-[#8a8a8a] lg:text-[13px]'>Latest Release</span>
+            <div className='flex flex-col gap-[6px] rounded-b-[12px] bg-[#202020] px-[18px] py-[14px] lg:flex-row lg:items-center lg:gap-[18px] lg:px-[24px]'>
+              <span className='whitespace-nowrap text-[13px] font-medium text-[#7a7a7a]'>Latest Release</span>
               <span className='text-[14px] lg:text-[15px]'>
                 We just released our {latestReleaseLabel}
               </span>
@@ -83,13 +83,13 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
                       : 'bg-transparent text-[#8a8a8a] hover:text-[#e7e7e0]'
                   )}
                 >
-                  <span className={cn('mr-[8px] text-[16px]', t.id === tab.id ? 'opacity-100' : 'hidden lg:inline-block lg:opacity-0')}>&bull;</span>
+                  <span className={cn('mr-[8px] text-[16px] hidden lg:inline-block', t.id === tab.id ? 'opacity-100' : 'opacity-0')}>&bull;</span>
                   {t.label}
                 </button>
               ))}
             </div>
 
-            <div className='flex-1 pt-[24px] lg:pt-[24px]'>
+            <div className='flex-1 pt-[24px] lg:pt-[24px] min-h-[480px] lg:min-h-[520px]'>
               <h3 className='text-[18px] font-normal px-[20px] lg:text-[22px] lg:px-[36px]'>{tab.heading}</h3>
               <ul className='m-0 flex flex-col list-none p-0 mt-[16px]'>
                 {tab.items.map((item) => (

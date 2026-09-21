@@ -98,6 +98,7 @@ module.exports = {
 
       fontFamily: {
         sans: [
+          'Geist',
           'IBM Plex Sans',
           'Space Grotesk',
           'Segoe UI',

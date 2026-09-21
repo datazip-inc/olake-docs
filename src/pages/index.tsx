@@ -1,6 +1,5 @@
 import React from 'react'
 import Layout from '@theme/Layout'
-import Head from '@docusaurus/Head'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import LandingSeo from '@site/src/components/landing/seo/LandingSeo'
 import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
@@ -21,13 +20,7 @@ export default function Home() {
       wrapperClassName='landing-page'
       noFooter
     >
-      <Head>
-        {/* The lakeside design is set in Geist. */}
-        <link
-          rel='stylesheet'
-          href='https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap'
-        />
-      </Head>
+      {/* The lakeside design uses Geist (loaded async via font-loading-optimizer.js) */}
       <LandingSeo
         title={HOME_SEO.title}
         description={HOME_SEO.description}

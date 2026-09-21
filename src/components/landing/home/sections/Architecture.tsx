@@ -12,15 +12,16 @@ export default function Architecture() {
       <div className='mx-auto w-full max-w-[1016px] overflow-hidden rounded-[16px] border border-solid border-[#ececec] bg-white'>
         <div className='px-[20px] pb-[26px] pt-[24px] lg:px-[64px] lg:pb-[34px] lg:pt-[44px]'>
           <p className='text-[13px] text-[#8a8a8a] lg:text-[14px]'>{ARCHITECTURE_INTRO.eyebrow}</p>
-          <h2 className='mt-[6px] text-[24px] font-normal leading-[1.15] tracking-[-0.01em] text-[#202020] lg:text-[38px]'>
-            {ARCHITECTURE_INTRO.title}
+          <h2 className='mt-[6px] text-[38px] lg:text-[44px] font-normal leading-[1.2] tracking-[-0.01em] text-[#202020]'>
+            Works with what
+            <br className='lg:hidden' /> you run
           </h2>
           <p className='mt-[12px] max-w-[660px] text-[13px] leading-[1.6] text-[#5d5d5d] lg:text-[15px]'>
             {ARCHITECTURE_INTRO.body}
           </p>
           <Link
             to={ARCHITECTURE_INTRO.cta.href}
-            className='mt-[18px] inline-flex h-[34px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-opacity hover:opacity-90 lg:mt-[24px]'
+            className='mt-[18px] inline-flex h-[34px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-all hover:bg-[#0021a3] hover:text-white lg:mt-[24px]'
           >
             {ARCHITECTURE_INTRO.cta.label}
           </Link>

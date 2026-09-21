@@ -7,7 +7,16 @@ export default function TwoEngines() {
   return (
     <section className='px-[32px] py-[56px] lg:px-[24px] lg:py-[96px]'>
       <div className='mx-auto w-full max-w-[1016px]'>
-        <SectionHeading eyebrow='Two Engines' title='Move data fast, keep it fast' align='center' />
+        <SectionHeading
+          eyebrow='Two Engines'
+          title={
+            <span className='text-[38px] lg:text-[44px] leading-[1.2]'>
+              Move data fast,
+              <br className='lg:hidden' /> keep it fast
+            </span>
+          }
+          align='center'
+        />
 
         <div className='mt-[28px] lg:mt-[44px]'>
           <div className='mx-auto grid w-full max-w-[1016px] grid-cols-1 gap-[20px] lg:grid-cols-2 lg:gap-[24px]'>
@@ -48,7 +57,7 @@ export default function TwoEngines() {
                   <div className='flex items-center gap-[10px] pt-[18px]'>
                     <Link
                       to={engine.href}
-                      className='inline-flex h-[32px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-colors transition-opacity hover:text-[#000000] hover:opacity-90'
+                      className='inline-flex h-[32px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-all hover:bg-[#0021a3] hover:text-white'
                     >
                       {engine.linkLabel}
                     </Link>

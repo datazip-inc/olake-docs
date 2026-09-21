@@ -211,7 +211,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
           </a>
           <Link
             to={LAKESIDE_CTA.href}
-            className='inline-flex h-[34px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] font-medium text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(16,24,64,0.14)] transition-colors transition-opacity hover:text-[#000000] hover:opacity-90'
+            className='inline-flex h-[34px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] font-medium text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(16,24,64,0.14)] transition-all hover:bg-[#0021a3] hover:text-white'
           >
             {LAKESIDE_CTA.label}
           </Link>
@@ -257,7 +257,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
           <div className='mt-[6px] flex items-center gap-[10px] border-0 border-t border-solid border-[#ececec] px-[12px] pt-[12px]'>
             <Link
               to={LAKESIDE_CTA.href}
-              className='inline-flex h-[34px] flex-1 items-center justify-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] text-[13px] font-medium text-[#e7e7e0]'
+              className='inline-flex h-[34px] flex-1 items-center justify-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] text-[13px] font-medium text-[#e7e7e0] transition-all hover:bg-[#0021a3] hover:text-white'
             >
               {LAKESIDE_CTA.label}
             </Link>

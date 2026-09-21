@@ -82,7 +82,7 @@ export const BULLETIN_TABS: BulletinTab[] = [
       {
         tag: 'Release notes',
         title: 'OLake Go release notes',
-        href: '/docs/release/ingestion',
+        href: '/docs/release/ingestion/overview',
         img: '/img/landing/v2/bull-release.webp'
       },
       {

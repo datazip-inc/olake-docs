@@ -28,7 +28,10 @@ export default function Features() {
   return (
     <section className='py-[56px] lg:py-[96px]'>
       <div className='mx-auto w-full max-w-[1016px] px-[32px] lg:px-[24px]'>
-        <SectionHeading eyebrow='Features' title='Why teams pick OLake.' />
+        <SectionHeading 
+          eyebrow='Features' 
+          title={<span className='text-[38px] lg:text-[44px] leading-[1.2]'>Why teams pick OLake.</span>} 
+        />
       </div>
 
       <div className='olakehome-feature-marquee mt-[24px] lg:mt-[36px]'>
