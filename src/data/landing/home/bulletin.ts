@@ -29,22 +29,17 @@ export const BULLETIN_TABS: BulletinTab[] = [
     items: [
       {
         tag: 'Blog',
-        title: 'Issues with Debezium & how OLake solved them',
-        href: '/blog/issues-debezium-kafka/',
-        img: '/img/landing/v2/bull-engineering.webp'
+        title: 'DLTHub Alternatives: 8 Best Competitors in 2026',
+        href: '/blog/dlthub-alternatives/',
+        img: '/img/landing/v2/bull-debezium-blue.png'
       },
       {
         tag: 'Benchmark',
-        title: 'Iceberg compaction: Spark vs OLake Fusion',
-        href: '/blog/iceberg-compaction-spark-vs-fusion-benchmark/',
-        img: '/img/landing/v2/bull-benchmark.webp'
+        title: 'The Iceberg Interoperability Myth',
+        href: '/blog/iceberg-interoperability-myth-row-level-deletes/',
+        img: '/img/landing/v2/bull-debezium-green.png'
       },
-      {
-        tag: 'Blog',
-        title: 'Schema evolution without breaking pipelines',
-        href: '/blog/schema-evolution-without-breaking-pipelines/',
-        img: '/img/landing/v2/bull-release.webp'
-      }
+
     ]
   },
   {
@@ -54,22 +49,16 @@ export const BULLETIN_TABS: BulletinTab[] = [
     items: [
       {
         tag: 'Webinar',
-        title: 'Iceberg for Agents',
-        href: '/webinar/w-14-iceberg-for-agents',
-        img: '/img/landing/v2/bull-engineering.webp'
+        title: 'Building High-Performance Iceberg Data Platforms, Anywhere',
+        href: 'https://app.livestorm.co/datazip-inc-1/building-high-performance-iceberg-data-platforms-anywhere/live?s=5d46d287-8240-4c95-9016-e18428c82f3c#/',
+        img: '/img/landing/v2/brenna-buuck.png',
+        external: true
       },
       {
         tag: 'Webinar',
         title: 'Apache Arrow + ADBC & Apache Iceberg',
         href: 'https://www.youtube.com/watch?v=shrS0qdOPis&list=PL0H6rlkVhiiGSaO_xr1xBJ16dQKI-jvF_&index=14',
-        img: '/img/landing/v2/bull-benchmark.webp',
-        external: true
-      },
-      {
-        tag: 'Demo',
-        title: 'OLake quickstart: your first ingestion pipeline',
-        href: 'https://youtu.be/IcAJmW72d2A?si=bAmaDOdEDy6vbKt8',
-        img: '/img/landing/v2/bull-release.webp',
+        img: '/img/landing/v2/matt-topol.png',
         external: true
       }
     ]

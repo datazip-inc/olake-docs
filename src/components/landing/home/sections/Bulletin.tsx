@@ -112,7 +112,7 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
                         <span className='mt-[4px] block text-[14px] leading-[1.4] lg:text-[16px]'>
                           {item.title}
                         </span>
-                        <span className='mt-[6px] block text-[13px] text-[#6b8afd]'>Read More</span>
+                        <span className='mt-[6px] block text-[13px] text-[#6b8afd]'>{tab.id === 'webinars' ? 'Watch Now' : 'Read More'}</span>
                       </span>
                     </ItemLink>
                   </li>
