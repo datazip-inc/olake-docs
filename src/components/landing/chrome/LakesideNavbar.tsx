@@ -255,12 +255,6 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
             )
           )}
           <div className='mt-[6px] flex items-center gap-[10px] border-0 border-t border-solid border-[#ececec] px-[12px] pt-[12px]'>
-            <Link
-              to={LAKESIDE_CTA.href}
-              className='inline-flex h-[34px] flex-1 items-center justify-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] text-[13px] font-medium text-[#e7e7e0] transition-all hover:bg-[#0021a3] hover:text-white'
-            >
-              {LAKESIDE_CTA.label}
-            </Link>
             <a
               href={LAKESIDE_GITHUB.href}
               target='_blank'
