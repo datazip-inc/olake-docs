@@ -19,6 +19,7 @@ export default function FusionBenchmark() {
       <div className='mx-auto w-full max-w-[1016px]'>
         <div className='px-[20px] lg:px-[34px]'>
           <SectionHeading
+            className='[&_h2]:text-[28px]'
             title={
               <>
                 1 Parameter, 1.8 billion rows compacted

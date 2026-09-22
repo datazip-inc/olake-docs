@@ -5,7 +5,7 @@ import {
   ARCHITECTURE_GRAPH,
   ARCHITECTURE_INTRO
 } from '@site/src/data/landing/home/architecture'
-
+//TODO: Fix image for mobile view
 export default function Architecture() {
   return (
     <section className='px-[32px] py-[56px] lg:px-[24px] lg:py-[96px]'>

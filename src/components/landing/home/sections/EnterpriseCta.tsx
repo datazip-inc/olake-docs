@@ -13,12 +13,12 @@ export default function EnterpriseCta() {
   return (
     <section className='px-[32px] pb-[56px] lg:px-[24px] lg:pb-[96px]'>
       <div className='mx-auto w-full max-w-[1016px] overflow-hidden rounded-[16px] border border-solid border-[#ececec] bg-white'>
-        <div className='px-[24px] pt-[36px] text-center lg:px-[64px] lg:pt-[56px]'>
+        <div className='px-[24px] pt-[36px] text-left lg:px-[64px] lg:pt-[56px]'>
           <p className='text-[13px] text-[#8a8a8a] lg:text-[14px]'>{ENTERPRISE.eyebrow}</p>
-          <h2 className='mx-auto mt-[8px] max-w-[520px] text-[26px] font-normal leading-[1.15] tracking-[-0.01em] text-[#202020] lg:text-[40px]'>
+          <h2 className='mt-[8px] max-w-[520px] text-[26px] font-normal leading-[1.15] tracking-[-0.01em] text-[#202020] lg:text-[40px]'>
             {ENTERPRISE.title}
           </h2>
-          <p className='mx-auto mt-[14px] max-w-[640px] text-[13px] leading-[1.6] text-[#5d5d5d] lg:text-[15px]'>
+          <p className='mt-[14px] max-w-[640px] text-[13px] leading-[1.6] text-[#5d5d5d] lg:text-[15px]'>
             {ENTERPRISE.body}
           </p>
           <Link

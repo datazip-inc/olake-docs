@@ -22,8 +22,8 @@ export interface HomePageProps {
 export default function HomePage({ latestReleaseLabel, latestReleasePath }: HomePageProps) {
   return (
     <div className='lakeside-page'>
-      <div className='lakeside-hero-bg'>
-        <LakesideNavbar activePath='/' />
+      <LakesideNavbar activePath='/' />
+      <div className='lakeside-hero-bg -mt-[68px] lg:-mt-[82px]'>
         <Hero />
       </div>
       <TrustedBy />
