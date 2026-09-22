@@ -18,7 +18,7 @@ export default function Hero() {
         <div className='mt-[24px] flex items-center gap-[8px] lg:mt-[34px] lg:justify-center lg:gap-[12px]'>
           <Link
             to={HERO.primary.href}
-            className='inline-flex h-[32px] items-center justify-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[14px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-colors transition-opacity hover:text-[#000000] hover:opacity-90 lg:h-[40px] lg:px-[20px] lg:text-[15px]'
+            className='inline-flex h-[32px] items-center justify-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[14px] text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] transition-all hover:bg-[#0021a3] hover:text-white lg:h-[40px] lg:px-[20px] lg:text-[15px]'
           >
             {HERO.primary.label}
           </Link>
