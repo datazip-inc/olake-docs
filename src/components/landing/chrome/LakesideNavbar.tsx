@@ -159,7 +159,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
     <header className='sticky top-0 z-40 w-full px-[16px] pt-[16px] lg:px-[24px] lg:pt-[26px]'>
       <nav
         aria-label='Main'
-        className='mx-auto flex h-[52px] w-full max-w-[1016px] items-center justify-between rounded-[16px] bg-white px-[16px] shadow-[0_8px_24px_-16px_rgba(16,24,64,0.35)] lg:h-[56px] lg:px-[24px]'
+        className='relative z-40 mx-auto flex h-[52px] w-full max-w-[1016px] items-center justify-between rounded-[16px] bg-white px-[16px] shadow-[0_8px_24px_-16px_rgba(16,24,64,0.35)] lg:h-[56px] lg:px-[24px]'
       >
         <div className='flex items-center gap-2 lg:gap-7'>
           <button
@@ -219,8 +219,14 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
       </nav>
 
       {drawerOpen && (
-        <div className='mx-auto mt-[8px] w-full max-w-[1016px] rounded-[16px] border border-solid border-[#ececec] bg-white p-[10px] shadow-[0_16px_40px_-20px_rgba(16,24,64,0.4)] lg:hidden'>
-          {LAKESIDE_NAV.map((entry) =>
+        <>
+          <div 
+            className='fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden' 
+            onClick={() => setDrawerOpen(false)} 
+            aria-hidden='true'
+          />
+          <div className='absolute left-[16px] right-[16px] top-[76px] z-40 mx-auto max-w-[1016px] rounded-[16px] border border-solid border-[#ececec] bg-white p-[10px] shadow-[0_16px_40px_-20px_rgba(16,24,64,0.4)] lg:hidden'>
+            {LAKESIDE_NAV.map((entry) =>
             entry.items ? (
               <div key={entry.label}>
                 <button
@@ -273,6 +279,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
             </Link>
           </div>
         </div>
+        </>
       )}
     </header>
   )
