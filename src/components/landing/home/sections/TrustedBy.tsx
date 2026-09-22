@@ -19,7 +19,7 @@ export default function TrustedBy() {
           aria-hidden='true'
           className='absolute inset-y-0 right-[32px] w-px bg-[#e7e7e7] lg:right-0'
         />
-        <p className='text-center text-[20px] text-[#393939] lg:text-[14px]'>
+        <p className='text-center text-[14px] text-[#393939] lg:text-[20px]'>
           Trusted by Engineers at
         </p>
         <div className='olakehome-marquee mt-[20px] lg:mt-[26px] lg:-mx-[24px]'>
