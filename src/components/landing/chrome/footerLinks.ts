@@ -50,5 +50,5 @@ export const FOOTER_SOCIALS: (FooterLink & { icon: 'linkedin' | 'x' | 'slack' | 
 
 export const FOOTER_WORDMARK = {
   eyebrow: 'OLake',
-  headline: 'Fastest Data Replication'
+  headline: 'Apache Iceberg table Ingestion and Maintenance'
 }

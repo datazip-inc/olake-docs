@@ -61,5 +61,13 @@ export const TRUSTED_LOGOS: TrustedLogo[] = [
     h: 88,
     maxH: '42px',
     maxW: '180px'
+  },
+  {
+    src: '/img/customers/licious/licious_logo.webp',
+    name: 'Licious',
+    w: 168,
+    h: 88,
+    maxH: '40px',
+    maxW: '160px'
   }
 ]

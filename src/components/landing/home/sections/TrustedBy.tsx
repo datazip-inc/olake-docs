@@ -22,19 +22,21 @@ export default function TrustedBy() {
         <p className='text-center text-[14px] text-[#393939] lg:text-[20px]'>
           Trusted by Engineers at
         </p>
-        <div className='olakehome-marquee mt-[20px] lg:mt-[26px] lg:-mx-[24px]'>
+        <div className='olakehome-marquee mt-[20px] overflow-hidden lg:mt-[26px] lg:-mx-[24px]'>
+          <style>{`.olakehome-marquee * { scrollbar-width: none !important; } .olakehome-marquee *::-webkit-scrollbar { display: none !important; }`}</style>
           <Marquee
             autoFill
             direction='left'
             pauseOnHover
             speed={32}
             gradient={false}
-            className='items-center'
+            className='items-center overflow-hidden'
+            style={{ overflowY: 'hidden' }}
           >
             {TRUSTED_LOGOS.map((logo) => (
               <div
                 key={logo.name}
-                className='mx-[14px] flex h-[34px] items-center justify-center lg:mx-[23px]'
+                className='mx-[14px] flex h-[34px] items-center justify-center overflow-hidden lg:mx-[23px]'
               >
                 <img
                   src={logo.src}
