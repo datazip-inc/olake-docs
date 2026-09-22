@@ -42,6 +42,10 @@ olakego/source-[SOURCE-TYPE]:latest \\
                 <li><Link to="/docs/connectors/mysql#2-provide-configuration-details-1">MySQL Config file</Link></li>
                 <li><Link to="/docs/connectors/oracle#2-provide-configuration-details-1">Oracle Config file</Link></li>
                 <li><Link to="/docs/connectors/postgres#2-provide-configuration-details-1">PostgreSQL Config file</Link></li>
+                <li><Link to="/docs/connectors/s3/?config-type=olake-cli#2-provide-configuration-details-1">S3 Config file</Link></li>
+                <li><Link to="/docs/connectors/db2/#2-provide-configuration-details-1">DB2 Config file</Link></li>
+                <li><Link to="/docs/connectors/mssql/?config-type=olake-cli#2-provide-configuration-details-1">MSSQL Config file</Link></li>
+                <li><Link to="/docs/connectors/kafka/#2-provide-configuration-details-1">Kafka Config file</Link></li>
               </ul>
             </li>
           </ul>
@@ -83,11 +87,17 @@ olakego/source-[SOURCE-TYPE]:latest \\
             <li>Specifies the path to the destination configuration file.</li>
             <li>For details about destination configuration files, see:
               <ul>
-                <li><Link to="/docs/writers/iceberg/catalog/glue#configuration">AWS Glue Catalog configuration</Link></li>
-                <li><Link to="/docs/writers/iceberg/catalog/rest">REST Catalog configuration</Link></li>
-                <li><Link to="/docs/writers/iceberg/catalog/jdbc#configuration">JDBC Catalog configuration</Link></li>
-                <li><Link to="/docs/writers/iceberg/catalog/hive#configuration">Hive Catalog configuration</Link></li>
-                <li><Link to="/docs/writers/parquet/config#configuration">Parquet configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/glue/?tab=glue-cli#configuration">AWS Glue Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?tab=rest-cli">Generic REST Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=lakekeeper&tab=lakekeeper-cli#configuration-1">Lakekeeper Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=nessie&tab=nessie-cli#configuration-2">Nessie Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=s3-tables&tab=s3tables-cli#configuration-3">S3 Tables Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=unity&tab=unity-cli#configuration-4">Unity Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=polaris&tab=polaris-cli#configuration-5">Apache Polaris Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=biglake&tab=biglake-cli#configuration-6">BigLake Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/jdbc/?tab=jdbc-cli#configuration">JDBC Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/hive/?tab=hive-cli#configuration">Hive Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/parquet/config/?S3=OLake-CLI#configuration">Parquet configuration</Link></li>
               </ul>
             </li>
           </ul>
