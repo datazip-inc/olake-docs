@@ -521,6 +521,11 @@ const config = {
             to: '/docs/',
             from: '/docs/features'
           },
+          // Release notes index has no category page; point it at the overview
+          {
+            to: '/docs/release/ingestion/overview',
+            from: '/docs/release/ingestion'
+          },
           // Fusion release notes moved to fusion/release/maintenance
           {
             to: '/docs/fusion/release/maintenance/overview',
