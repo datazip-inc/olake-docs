@@ -126,7 +126,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
           <p>The <code>state.json</code> file is organized into two main sections:</p>
 
           <h4>1. Global State</h4>
-          <p>The <strong><code>global</code></strong> section contains global state information that applies to all streams anddriver-specific replication metadata that tracks the overall position in the source database's change log. The structure varies by database driver:</p>
+          <p>The <strong><code>global</code></strong> section contains global state information that applies to all streams and driver-specific replication metadata that tracks the overall position in the source database's change log. The structure varies by database driver:</p>
 
           <Tabs>
             <TabItem value="mysql_global" label="MySQL" default>
