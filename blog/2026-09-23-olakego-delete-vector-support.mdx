@@ -1,0 +1,91 @@
+---
+slug: olakego-iceberg-deletion-vector-support
+title: "Interoperability Unlocked: OLake Go Now Writes Iceberg Deletion Vectors"
+description: "OLake Go can now write Iceberg v3 deletion vectors for upserts and CDC. From immutable Parquet and merge-on-read to equality and positional deletes—and why bitmap deletion vectors close the gap with query engines."
+date: 2026-09-23
+tags: [apache-iceberg, olake-go, deletion-vectors, cdc, interoperability, databricks]
+authors: [nayan]
+image: /img/blog/cover/cover_spark_databricks_interoperability.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+If you've spent any time running data pipelines into Apache Iceberg, you've probably run into a question that sounds simple but has surprisingly deep roots: what actually happens when a row gets deleted or updated?
+
+It's a question worth sitting with, because the answer touches almost everything about how Iceberg works under the hood, and it's directly relevant to a change we're rolling out in OLake Go. Starting with this release, OLake Go can write Iceberg tables using a third delete format called deletion vectors, on top of the two it already supported. That might sound like a small technical addition, but it actually closes a real gap that's been sitting in Iceberg pipelines for a while: the gap between what your ingestion tool writes and what your query engine can actually read.
+
+This post is going to walk through that whole story from the ground up. We'll start with why Iceberg needs delete formats at all, go deep into how the two existing formats work, look honestly at where they start to struggle, then unpack exactly how deletion vectors solve that problem, and finally talk about what this means for anyone building a pipeline with OLake Go. We'll also spend real time on one specific engine, Databricks, because it's the clearest example of why this matters in practice.
+
+## Why deletes are hard in the first place
+
+To understand why Iceberg has three different ways to delete a row, you first have to understand a constraint that shapes everything about how Iceberg tables work: the actual data sitting on disk is stored in Parquet files, and Parquet files are immutable. Once a Parquet file is written and closed, you cannot reach into it and change a single byte. You can't edit row 41,237 to update a price. You can't delete row 12 and shift everything else up. The file, as a physical object sitting in object storage or on a filesystem, is frozen the moment it's written.
+
+Iceberg gives you two fundamentally different strategies for handling this:
+
+### 1. Copy on Write
+
+Copy-on-write means exactly what it says. When a row needs to be deleted or updated, Iceberg rewrites the entire data file that row lives in, producing a brand new file that contains everything except the deleted row, or with the updated row's new values baked in. The old file gets marked as no longer part of the current table state, and the new file takes its place. This makes copy-on-write an extremely expensive operation, as even a small update touching multiple files forces every affected Parquet file to be completely rewritten from scratch.
+
+### 2. Merge on Read
+
+Instead of rewriting the original data file, merge-on-read leaves it completely untouched and instead writes a small, separate file that records what has changed. At query time, when someone reads the table, the query engine combines the original data file with this separate "delete file" to reconstruct the correct, current view of the data. The deleted rows get filtered out on the fly, during the read, rather than being physically removed at write time. 
+
+The obvious appeal here is speed at write time. Deleting a single row no longer means rewriting a 500 megabyte file. It means writing a tiny file, sometimes just a few kilobytes, that records the fact that a delete happened. For CDC pipelines processing a constant stream of small changes, this is a massive win on the write side.
+
+But this also comes with a tradeoff. Every read now has to do extra work. Instead of just scanning a data file and returning results, the query engine has to also fetch the relevant delete files, apply them, and filter out anything that's been marked deleted. If a data file has accumulated a lot of delete files over time, this merge step can get expensive.
+
+Iceberg provides two different ways to write these delete files:
+
+#### 1. Equality Deletes - 
+
+It records what that row looked like, or more specifically, the value of one or more columns that identify it. Suppose you are replicating a table, a row comes in from your CDC source saying record with `id` = `2` has been deleted. The equality delete file says "any row in this table where `id` equals `2` should be considered deleted."
+
+#### 2. Positional Deletes - 
+
+Positional deletes take the opposite philosophy. Instead of describing a row by its values, they describe it by its exact physical location. A positional delete file is a small file containing pairs that look like (`file_path`, `row_position`). It says something like "row number `10` inside the file named `data-00001.parquet` is deleted". No condition to evaluate, no column values to match. Just a direct coordinate.
+
+OLake Go used to supports both of these strategies. But with Iceberg format  V3, the spec introduced a third way to record row-level deletes that is **deletion vectors**.
+
+## Idea behind Deletion vectors
+
+Instead of writing a new file every time a delete happens, a deletion vector represents deleted rows as a bitmap. One bit per row position in a data file. If a data file has a thousand rows, its deletion vector is conceptually just a thousand bits, one for each row, where a value of 0 means "this row is still alive" and a value of 1 means "this row has been deleted."
+
+Picture a data file holding five rows, at positions 0 through 4. If a CDC pipeline deletes the row at position 2, the deletion vector for that file becomes:
+
+```
+row:    0  1  2  3  4
+bit:    0  0  1  0  0
+```
+
+That's it. No new Parquet file describing a condition or a coordinate. Just a flag that gets flipped for that one position. If another row, say position 1, later gets deleted too, the same bitmap simply gets updated to reflect both:
+
+```
+row:    0  1  2  3  4
+bit:    0  1  1  0  0
+```
+
+At read time, this becomes remarkably cheap to apply. Instead of joining against a pile of delete files or evaluating conditions row by row, the query engine checks one bit per row it's scanning. Is the bit at this position set? If yes, skip the row. If no, return it. That's a direct, constant time lookup, dramatically simpler than either evaluating an equality condition or scanning through potentially hundreds of separate positional delete files.
+
+## What OLake Go supporting this actually changes?
+
+With this release, OLake Go adds deletion vectors as a third option. You can now choose your delete format directly in your job or stream settings, picking whichever of the three, equality deletes, positional deletes, or deletion vectors, best fits how you're going to query the resulting table.
+
+OLake Go now asks which downstream query engine you're going to use to read the table. Based on that answer, it only shows you the delete format options that engine actually supports, instead of leaving you to figure out compatibility on your own and find out later that a query came back with stale or missing rows.
+
+So if you select Spark as your query engine, which reads all three formats, you'll see all three options available to choose from. But if you select Databricks, which only reads deletion vectors, OLake Go narrows the list down to just that one option, and doesn't even show you equality or positional deletes as something you could pick. The format mismatch we've been talking about through this whole post, where a table gets written in a format the query engine downstream can't read, becomes something the job setup itself protects you from, rather than something you find out about after the fact.
+
+If we look closely at the query engine landscape, support for these three delete formats is not uniform, and in some cases the differences are stark enough to actually break your pipeline if you pick the wrong one. For instance:
+
+**1. Databricks -** Its documentation is explicit that it does not support reading either v2 positional deletes or v2 equality deletes at all and only reads deletion vectors. 
+
+**2. Snowflake -** It sits in a different spot. It reads v2 positional deletes and, as of a relatively recent update, deletion vectors too, but it has never supported equality deletes at all, for either managed or externally managed tables.
+
+**3. Amazon Athena -** It is currently locked to an older Iceberg specification version and can read v2 tables just fine, including both equality and positional deletes, but literally cannot open a v3 table at all yet.
+
+**4. Spark, DuckDB, Flink -** Then we have these engines (and many others) that comfortably read all three formats today, no caveats.
+
+Before this release, if your OLake Go pipeline was writing, say, equality deletes, and your organization later needed to query that same table from Databricks, you'd have hit a wall. Not a performance problem, an actual correctness problem, where the engine simply can't interpret the delete format your data was written in. Now that OLake Go can write any of the three formats, that constraint goes away. You pick the format based on who's actually going to be reading the data, not based on whatever OLake Go happened to support by default.
+
+This is really what we mean by interoperability here. It's not an abstract buzzword. It's the very concrete fact that the same OLake Go pipeline can now serve a Databricks-first team, a Snowflake-first team, an Athena-locked legacy system, and a modern Spark or Flink stack, all from the same ingestion tool, just by choosing the right delete format for each destination.
+
+<BlogCTA />
