@@ -66,6 +66,16 @@ bit:    0  1  1  0  0
 
 At read time, this becomes remarkably cheap to apply. Instead of joining against a pile of delete files or evaluating conditions row by row, the query engine checks one bit per row it's scanning. Is the bit at this position set? If yes, skip the row. If no, return it. That's a direct, constant time lookup, dramatically simpler than either evaluating an equality condition or scanning through potentially hundreds of separate positional delete files.
 
+## Why Databricks Only Supports Deletion Vectors?
+
+While most Iceberg engines (Spark, Flink, Trino, Snowflake) support merge-on-read by reconciling delete files to handle heavy CDC volumes, Databricks is the exception.
+
+Under v2, every delete or update writes a new small Parquet file, whether that's an equality condition or a positional coordinate. Under sustained CDC traffic, a frequently touched data file can end up referenced by dozens or hundreds of these delete files within a day or two. Reading that file correctly then means opening every one of those delete files, decoding each, and merging them all before returning a single row. Query planning gets heavier too, since the engine has to track a growing many-to-many relationship between data files and the delete files piling up against them. And each delete file, however small the actual deleted-row information is, still carries a full Parquet footer and metadata overhead, so the format itself adds cost on top of the sheer number of files. The result is a table that gets progressively slower to query the longer it runs without compaction, which turns compaction from routine maintenance into something you have to run constantly just to keep reads fast.
+
+Databricks appears to have sidestepped this problem entirely rather than inherited it. Its other table format, Delta Lake, already had its own bitmap based deletion vectors running in production before Iceberg v3 existed, built on the same idea: one compact bitmap per data file, checked directly at read time, instead of an ever-growing stack of separate delete files. Databricks' engine never had to solve the many-to-many delete file problem, because it never adopted the format that creates it. So when Iceberg v3 formalized its own deletion vectors, the fit was natural. Databricks' engine already knew how to check a bitmap against row positions, and extending that same path to Iceberg v3 tables was a contained piece of work.
+
+This is exactly the gap that made OLake Go's previous default a real constraint. A pipeline writing equality deletes because that suited its CDC workload would leave a Databricks user downstream with silently incorrect data, and no warning that anything was missing. Now that OLake Go can write deletion vectors directly, that specific failure mode disappears. A table ingested through OLake Go in Upsert mode with deletion vectors selected reads correctly in Databricks from the start, no rewrite and no silent gap between what was deleted and what the query returns.
+
 ## What OLake Go supporting this actually changes?
 
 With this release, OLake Go adds deletion vectors as a third option. You can now choose your delete format directly in your job or stream settings, picking whichever of the three, equality deletes, positional deletes, or deletion vectors, best fits how you're going to query the resulting table.
