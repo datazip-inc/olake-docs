@@ -4,11 +4,11 @@ import FeatureArt from '../ui/FeatureArt'
 import { FEATURES, type FeatureCard } from '@site/src/data/landing/home/features'
 
 const Card = ({ feature }: { feature: FeatureCard }) => (
-  <article className='mx-[10px] flex h-full w-[300px] shrink-0 flex-col self-stretch overflow-hidden rounded-[16px] border border-solid border-[#e6e6e6] bg-white lg:mx-[12px] lg:w-[643px]'>
+  <article className='relative z-0 mx-[10px] flex h-full w-[300px] shrink-0 flex-col self-stretch overflow-hidden whitespace-normal rounded-[16px] border border-solid border-[#e6e6e6] bg-white lg:mx-[12px] lg:w-[643px]'>
     <FeatureArt kind={feature.art} />
-    <div className='flex flex-1 flex-col px-[18px] pb-[22px] pt-[20px] lg:px-[46px] lg:pb-[30px] lg:pt-[26px]'>
+    <div className='relative z-10 flex flex-1 flex-col border-0 border-t border-solid border-[#e6e6e6] bg-white px-[18px] pb-[22px] pt-[20px] lg:px-[46px] lg:pb-[30px] lg:pt-[26px]'>
       <p className='text-[13px] text-[#616161]'>{feature.kicker}</p>
-      <h3 className='mt-[6px] text-[17px] font-normal leading-[1.3] text-[#242424] lg:text-[22px]'>
+      <h3 className='mt-[6px] max-w-full break-words text-[17px] font-normal leading-[1.3] text-[#242424] lg:text-[22px]'>
         {feature.title}
       </h3>
       <p className='mt-[10px] text-[12px] leading-[1.6] text-[#7b7b7b] lg:text-[14px]'>
@@ -107,7 +107,7 @@ export default function Features() {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUpOrLeave}
-          className='flex items-stretch overflow-x-auto overflow-y-hidden whitespace-nowrap'
+          className='flex items-stretch overflow-x-auto overflow-y-hidden'
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           <style>{`.olakehome-feature-marquee ::-webkit-scrollbar { display: none; }`}</style>
