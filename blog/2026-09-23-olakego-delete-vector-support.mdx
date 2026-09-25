@@ -5,10 +5,12 @@ description: "OLake Go can now write Iceberg v3 deletion vectors for upserts and
 date: 2026-09-23
 tags: [apache-iceberg, olake-go, deletion-vectors, cdc, interoperability, databricks]
 authors: [nayan]
-image: /img/blog/cover/cover_spark_databricks_interoperability.webp
+image: /img/blog/cover/interop_dv.webp
 ---
 
 import BlogCTA from '@site/src/components/BlogCTA';
+
+![Deletion Formats supported by OLake Go](/img/blog/cover/interop_dv.webp)
 
 If you've spent any time running data pipelines into Apache Iceberg, you've probably run into a question that sounds simple but has surprisingly deep roots: what actually happens when a row gets deleted or updated?
 
@@ -97,5 +99,71 @@ If we look closely at the query engine landscape, support for these three delete
 Before this release, if your OLake Go pipeline was writing, say, equality deletes, and your organization later needed to query that same table from Databricks, you'd have hit a wall. Not a performance problem, an actual correctness problem, where the engine simply can't interpret the delete format your data was written in. Now that OLake Go can write any of the three formats, that constraint goes away. You pick the format based on who's actually going to be reading the data, not based on whatever OLake Go happened to support by default.
 
 This is really what we mean by interoperability here. It's not an abstract buzzword. It's the very concrete fact that the same OLake Go pipeline can now serve a Databricks-first team, a Snowflake-first team, an Athena-locked legacy system, and a modern Spark or Flink stack, all from the same ingestion tool, just by choosing the right delete format for each destination.
+
+## Tutorial: Writing Iceberg Tables with Deletion Vectors
+
+In this tutorial, we'll write Iceberg tables with deletion vectors from MySQL to Snowflake Horizon Catalog using OLake Go. To spin up OLake UI, run the following command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - up -d
+```
+
+Access the services:
+- OLake UI: `http://localhost:8000`
+- Default Login: 
+    - Username: `admin`
+    - Password: `admin`
+
+### 1. Connect to MySQL as source
+
+![MySQL source](/img/blog/2026/9/mysql_source.webp)
+
+In the OLake UI, create a MySQL source and enter the connection details. You can find the detailed explanation of connection details in the [MySQL source](/docs/connectors/mysql) page.
+
+### 2. Connect Snowflake Horizon Catalog in OLake Go
+
+![Horizon source](/img/blog/2026/9/horizon.webp)
+
+In the OLake UI, create an Iceberg destination and set the catalog type to **Horizon Catalog**. Enter the catalog URL, Snowflake database, role, and credentials for the authentication method you use in Snowflake (Personal Access Token, Key-Pair, or External OAuth).
+
+The full setup, including every authentication method and configuration option, is in [Horizon Catalog setup](/docs/writers/iceberg/catalog/rest?rest-catalog=horizon). Once the connection succeeds, any OLake source can write to this destination.
+
+### 3. Create a Job
+
+![Create Job](/img/blog/2026/9/create_job.webp)
+
+In the OLake UI, create a job and select the source and destination you created in the previous steps. In the advanced settings, select the query engine you want to use to read the table. We will select Snowflake as the query engine. This makes sure that in the streams page we only get to see the delete formats (upsert type) relevant to Snowflake.
+
+### 4. Select the Streams
+
+![Select Streams](/img/blog/2026/9/streams.webp)
+
+In the streams page, we will be selecting **employee** table, select the sync mode as **Full Refresh + CDC**, ingestion mode as **Upsert** and the Upsert Type as **Deletion Vectors**. 
+
+Then we save the job and run the sync!
+
+### 5. Query the table in Snowflake
+
+![Query in Snowflake](/img/blog/2026/9/streams.webp)
+
+## How to think about choosing a format
+
+Given all three options are now on the table, the practical question becomes which one to actually pick for a given pipeline, and the honest answer is that it depends entirely on who's going to be reading the data downstream, and there's a general performance ordering worth keeping in mind once compatibility is settled.
+
+If your primary query engine only supports deletion vectors, as is the case with Databricks, that decision is effectively made for you. If you're feeding an older or more conservative engine that's still capped at v2, like Athena today, deletion vectors aren't on the table at all, but that still leaves a real choice between equality and positional deletes, and it's worth being deliberate about which one you pick rather than defaulting to whichever is more convenient to write.
+
+As a general rule, read performance across the three formats follows a fairly consistent order: deletion vectors are fastest to apply at query time, positional deletes come next, and equality deletes are the slowest of the three. The reason traces straight back to how each format works under the hood. A deletion vector is a direct bit lookup. A positional delete is a direct coordinate lookup, checking whether a given file and row position appears in a small set of records. An equality delete requires evaluating a condition against every row's actual values, which behaves more like a filter or a join than a lookup, and that cost grows with both the number of rows scanned and the number of equality delete files that have accumulated. So if you're capped at v2 because your engine, like Athena, doesn't yet read v3, positional deletes will generally give you faster reads than equality deletes for the same workload.
+
+That said, this isn't a decision to make on read performance alone. Positional deletes push more work onto the write side, because whatever is producing them needs to know exactly which file and row position a target row currently occupies, which is real bookkeeping to maintain. Equality deletes skip that entirely, since a CDC event usually already carries the primary key you need, no lookup required. So the honest framing is that positional deletes tend to win when read performance matters more and you can afford the extra write-side tracking, which describes most steady-state analytical workloads, while equality deletes stay reasonable when write-side simplicity matters more, such as during a burst of very high-frequency changes where minimizing write latency is the priority.
+
+If you're in a mixed environment, where different teams query the same underlying table through different engines, it's worth checking our full compatibility breakdown to see which single format gives you the broadest coverage across everyone who needs access, and then leaning toward positional over equality within whatever your compatibility constraints leave you.
+
+We've put together a detailed table covering exactly this, listing which query engines support which catalog as well as delete formats, over on the [OLake Go Compatibility with Query Engines](/docs/understanding/compatibility-engines/) page. 
+
+## Wrapping Up
+
+The short version of everything above is this. Iceberg has always needed a way to represent deletes and updates without rewriting entire data files every time, and it's offered increasingly sophisticated ways of doing that over time, from equality deletes to positional deletes to, now, deletion vectors. Each step has traded off write simplicity against read efficiency in different ways, and deletion vectors represent the current best answer to that tradeoff for high-frequency CDC workloads specifically, while also happening to be the only format some engines, Databricks chief among them, are willing to read at all.
+
+OLake Go now writes all three. That means the format you choose is no longer a limitation imposed by your ingestion tool. It's a decision you get to make based on what actually works best for the engines querying your data, whether that's picking the fastest option for a modern lakehouse stack, staying compatible with an older engine that hasn't caught up to v3 yet, or making sure a Databricks user downstream can actually see correct results at all. That flexibility is the interoperability we're talking about, and it's now built directly into how you configure an OLake Go pipeline.
 
 <BlogCTA />
