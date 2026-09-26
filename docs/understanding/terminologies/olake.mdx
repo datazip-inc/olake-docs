@@ -283,17 +283,26 @@ These modes control how records are written to the destination for CDC and Incre
 
 #### Upsert
 - Ensures no duplicate records at the destination. For a given key, only the most recent row value is transferred and kept in the destination.
-- When using Upsert mode, OLake Go offers two delete format options for writing to Iceberg destinations:
+- When using Upsert mode, OLake Go offers three upsert type options for writing to Iceberg destinations:
 
-  - **Equality Deletes** (default): Identifies rows to delete by matching primary key values.
-  - **Positional Deletes**: Identifies rows to delete by file path and row position.
+  - **Equality Deletes**: Identifies rows to delete by matching primary key values (Iceberg V2).
+  - **Positional Deletes**: Identifies rows to delete by file path and row position (Iceberg V2).
+  - **Deletion Vectors**: Identifies rows to delete using a compact bitmap per data file (Iceberg V3).
 
-  Equality deletes are selected by default. Choose positional deletes for faster reads or if your query engine only supports positional deletes. The upsert functionality remains the same, only the format of delete files changes.
+  The default delete format is determined by your selected query engine and follows this order: **equality deletes**, **positional deletes**, then **deletion vectors**, selecting the first format your engine supports. Different streams can have different upsert type in a particular job. 
+  
+  See [Delete Format Support by Query Engine](/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine) to check which formats different query engines support. The upsert functionality remains the same, only the format of delete files changes.
+
+  :::important Upsert Type Changes
+  - Switching from **equality deletes** to **positional deletes** or **deletion vectors** on existing jobs is supported. Subsequent syncs use the new format, and OLake Go builds indexes to migrate existing equality delete files to the new format. 
+  - Switching back from **deletion vector** to **equality deletes** on existing jobs will trigger **clear destination** operation because this is an Iceberg version downgrade (v3 to v2).
+  - Switching between **positional deletes** and **deletion vector** on existing jobs is **not supported** and will trigger **clear destination** operation.
+  :::
 
   :::warning
   Delete format options require every component below to meet these minimum version requirements. 
-  - OLake Version **0.10.0 and above**.
-  - OLake UI **0.5.2 and above**.
+  - OLake Version **0.11.0 and above**.
+  - OLake UI **0.6.0 and above**.
   - Helm chart **0.0.28 and above**.
   - OLake worker **0.3.11 and above**.
 
@@ -301,9 +310,9 @@ These modes control how records are written to the destination for CDC and Incre
   :::
 
   :::info
-  Positional deletes need persistent index storage. To learn how to set that up for your deployment, see:
-  - **Kubernetes (Helm):** [Index Storage for Positional Delete Writes](/docs/install/kubernetes/#index-storage-for-positional-delete-writes)
-  - **Docker Compose (OLake UI):** [Index DB Setup for Positional Delete Writes](/docs/install/olake-ui/#index-db-setup-for-positional-delete-writes)
+  Positional deletes and deletion vector need persistent index storage. To learn how to set that up for your deployment, see:
+  - **Kubernetes (Helm):** [Index Storage for Positional Delete/Deletion Vector Writes](/docs/install/kubernetes/#index-storage-for-positional-delete-writes)
+  - **Docker Compose (OLake UI):** [Index DB Setup for Positional Delete/Deletion Vector Writes](/docs/install/olake-ui/#index-db-setup-for-positional-delete-writes)
   :::
 
 - Example: Suppose a transaction with `id = 1` changes over time:
@@ -321,6 +330,11 @@ These modes control how records are written to the destination for CDC and Incre
   - Before change (T1 ingested): destination has `id = 1` with amount = 100, status = "created" in a data file (for example, `.../data-00001.parquet` at row position 42).
   - On change (T2 ingested via CDC): the delete file marks that file path and row position as deleted; the new row for `id = 1` with amount = 120, status = "closed" is written to destination.
   - Result: destination retains only the latest row for `id = 1` (T2), so no duplicates.
+
+- **Deletion vectors:** How duplicates are avoided: A binary bitmap (deletion vector) is maintained per data file, stored in a Puffin file, with one bit per row position. OLake Go maintains an index that maps each _olake_id to the data file and row position where its previous version lives, same as with positional deletes.
+  - Before change (T1 ingested): destination has `id = 1` with amount = 100, status = "created" in a data file (for example, `.../data-00001.parquet` at row position 42).
+  - On change (T2 ingested via CDC): the bit at position 42 in the deletion vector for `data-00001.parquet` is set to `1` (deleted); the new row for `id = 1` with amount = 120, status = "closed" is written to destination in a new data file.
+  - Result: destination retains only the latest row for id = 1 (T2), so no duplicates. Readers skip position 42 by checking the bitmap instead of scanning multiple delete files.
 
 - Recommended for transactional tables where the latest state is required (e.g., orders, customers, products).
 
