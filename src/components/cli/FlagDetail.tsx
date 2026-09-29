@@ -38,14 +38,14 @@ olakego/source-[SOURCE-TYPE]:latest \\
             <li>Specifies the path to the source configuration file.</li>
             <li>For details about configuration files for different sources, see:
               <ul>
-                <li><Link to="/docs/connectors/mongodb#2-provide-configuration-details-1">MongoDB Config file</Link></li>
-                <li><Link to="/docs/connectors/mysql#2-provide-configuration-details-1">MySQL Config file</Link></li>
-                <li><Link to="/docs/connectors/oracle#2-provide-configuration-details-1">Oracle Config file</Link></li>
-                <li><Link to="/docs/connectors/postgres#2-provide-configuration-details-1">PostgreSQL Config file</Link></li>
-                <li><Link to="/docs/connectors/s3/?config-type=olake-cli#2-provide-configuration-details-1">S3 Config file</Link></li>
-                <li><Link to="/docs/connectors/db2/#2-provide-configuration-details-1">DB2 Config file</Link></li>
-                <li><Link to="/docs/connectors/mssql/?config-type=olake-cli#2-provide-configuration-details-1">MSSQL Config file</Link></li>
-                <li><Link to="/docs/connectors/kafka/#2-provide-configuration-details-1">Kafka Config file</Link></li>
+                <li><Link to="/docs/connectors/mongodb?config-type=olake-cli#2-provide-configuration-details-1">MongoDB Config file</Link></li>
+                <li><Link to="/docs/connectors/mysql?config-type=olake-cli#2-provide-configuration-details-1">MySQL Config file</Link></li>
+                <li><Link to="/docs/connectors/oracle?config-type=olake-cli#2-provide-configuration-details-1">Oracle Config file</Link></li>
+                <li><Link to="/docs/connectors/postgres?config-type=olake-cli#2-provide-configuration-details-1">PostgreSQL Config file</Link></li>
+                <li><Link to="/docs/connectors/s3?config-type=olake-cli#2-provide-configuration-details-1">S3 Config file</Link></li>
+                <li><Link to="/docs/connectors/db2?config-type=olake-cli#2-provide-configuration-details-1">DB2 Config file</Link></li>
+                <li><Link to="/docs/connectors/mssql?config-type=olake-cli#2-provide-configuration-details-1">MSSQL Config file</Link></li>
+                <li><Link to="/docs/connectors/kafka?config-type=olake-cli#2-provide-configuration-details-1">Kafka Config file</Link></li>
               </ul>
             </li>
           </ul>
