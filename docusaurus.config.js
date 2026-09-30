@@ -410,18 +410,19 @@ const config = {
       }
     ],
 
-    [
-      '@docusaurus/plugin-content-docs',
-      {
-        id: 'iceberg-query-engine',
-        path: 'docs-iceberg-query-engine', // new folder on disk
-        routeBasePath: 'iceberg/query-engine', // final URL → /iceberg/query-engine/*
-        sidebarPath: require.resolve('./sidebarsIcebergQE.js'),
-        showLastUpdateAuthor: true,
-        showLastUpdateTime: true,
-        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/docs-iceberg-query-engine/'
-      }
-    ],
+    // Disabled: Query Engine section - users now redirected to /docs/understanding/compatibility-engines/
+    // [
+    //   '@docusaurus/plugin-content-docs',
+    //   {
+    //     id: 'iceberg-query-engine',
+    //     path: 'docs-iceberg-query-engine', // new folder on disk
+    //     routeBasePath: 'iceberg/query-engine', // final URL → /iceberg/query-engine/*
+    //     sidebarPath: require.resolve('./sidebarsIcebergQE.js'),
+    //     showLastUpdateAuthor: true,
+    //     showLastUpdateTime: true,
+    //     editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/docs-iceberg-query-engine/'
+    //   }
+    // ],
 
     [
       './src/plugins/blog-plugin',
