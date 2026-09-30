@@ -520,7 +520,7 @@ const config = {
           // Legacy Query Engine hub → compatibility doc (main docs sidebar)
           {
             to: '/docs/understanding/compatibility-engines/',
-            from: ['/iceberg/query-engine', '/iceberg/query-engine/']
+            from: '/iceberg/query-engine'
           },
           // Features page replaced by intro (intro.mdx has slug: / so it lives at /docs/)
           {
