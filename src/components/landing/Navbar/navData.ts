@@ -65,7 +65,7 @@ export const NAV_ENTRIES: NavEntry[] = [
         label: 'Iceberg',
         items: [
           { label: 'Iceberg Blogs', href: '/iceberg' },
-          { label: 'Query Engine', href: '/iceberg/query-engine' }
+          { label: 'Query Engine', href: '/docs/understanding/compatibility-engines/' }
         ]
       }
     ]
@@ -112,7 +112,7 @@ export const MOBILE_LINKS: MobileNavItem[] = [
         label: 'Iceberg',
         items: [
           { label: 'Iceberg Blogs', href: '/iceberg' },
-          { label: 'Query Engine', href: '/iceberg/query-engine' }
+          { label: 'Query Engine', href: '/docs/understanding/compatibility-engines/' }
         ]
       }
     ]

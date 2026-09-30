@@ -274,7 +274,7 @@ const config = {
               },
               {
                 label: 'Query Engine',
-                href: `/iceberg/query-engine`
+                href: `/docs/understanding/compatibility-engines/`
               }
             ]
           },
@@ -516,6 +516,11 @@ const config = {
           return undefined
         },
         redirects: [
+          // Legacy Query Engine hub → compatibility doc (main docs sidebar)
+          {
+            to: '/docs/understanding/compatibility-engines/',
+            from: ['/iceberg/query-engine', '/iceberg/query-engine/']
+          },
           // Features page replaced by intro (intro.mdx has slug: / so it lives at /docs/)
           {
             to: '/docs/',
