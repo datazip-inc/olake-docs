@@ -1733,6 +1733,60 @@ networks:
       SELECT CURRENT_REGION();
       ```
 
+    <details>
+    <summary>Example: set up the prerequisites with SQL (Snowflake-managed storage + PAT)</summary>
+
+    Run as `ACCOUNTADMIN` in a Snowsight SQL worksheet. This creates a database for OLake Go, a role scoped to it, and a service user that holds the PAT. Replace the names as needed.
+
+    ```sql
+    USE ROLE ACCOUNTADMIN;
+
+    -- Database OLake Go writes Iceberg tables into
+    CREATE DATABASE IF NOT EXISTS OLAKE_DEMO;
+    ALTER DATABASE OLAKE_DEMO SET CATALOG = 'SNOWFLAKE';
+    ALTER DATABASE OLAKE_DEMO SET EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED';
+
+    -- Role used in the Session Role Scope (session:role:OLAKE_ROLE)
+    CREATE ROLE IF NOT EXISTS OLAKE_ROLE;
+    GRANT USAGE, CREATE SCHEMA ON DATABASE OLAKE_DEMO TO ROLE OLAKE_ROLE;
+    -- Optional: lets SYSADMIN/ACCOUNTADMIN query the tables OLake Go creates
+    GRANT ROLE OLAKE_ROLE TO ROLE SYSADMIN;
+
+    -- Service user (no password, cannot sign in to Snowsight) for OLake Go
+    CREATE USER IF NOT EXISTS OLAKE_SVC TYPE = SERVICE DEFAULT_ROLE = OLAKE_ROLE;
+    GRANT ROLE OLAKE_ROLE TO USER OLAKE_SVC;
+
+    -- Authentication policy: Snowflake requires a network policy for PATs by default.
+    -- Either attach a network policy to the user, or relax the requirement as below.
+    CREATE AUTHENTICATION POLICY IF NOT EXISTS OLAKE_DEMO.PUBLIC.OLAKE_PAT_POLICY
+      PAT_POLICY = (NETWORK_POLICY_EVALUATION = ENFORCED_NOT_REQUIRED);
+    ALTER USER OLAKE_SVC SET AUTHENTICATION POLICY OLAKE_DEMO.PUBLIC.OLAKE_PAT_POLICY;
+
+    -- PAT for OLake Go. Copy token_secret from the result; it is shown only once.
+    ALTER USER OLAKE_SVC ADD PROGRAMMATIC ACCESS TOKEN OLAKE_PAT
+      ROLE_RESTRICTION = 'OLAKE_ROLE' DAYS_TO_EXPIRY = 30;
+    ```
+
+    With this setup, use `OLAKE_DEMO` as **Snowflake Database**, `session:role:OLAKE_ROLE` as **Session Role Scope**, and the `token_secret` as the **Programmatic Access Token**.
+
+    :::tip Verify the token before configuring OLake Go
+    Exchange the PAT for an access token against the Horizon endpoint. An HTTP `200` response confirms the PAT, role and authentication policy are set up correctly:
+
+    ```bash
+    curl -X POST "https://<account_identifier>.snowflakecomputing.com/polaris/api/catalog/v1/oauth/tokens" \
+      --header 'Content-Type: application/x-www-form-urlencoded' \
+      --data-urlencode 'grant_type=client_credentials' \
+      --data-urlencode 'scope=session:role:OLAKE_ROLE' \
+      --data-urlencode 'client_secret=<SNOWFLAKE_PAT>'
+    ```
+    :::
+
+    </details>
+
+    :::info Choose a delete format Snowflake can read
+    Snowflake reads positional deletes and deletion vectors, but not equality deletes. For upsert jobs writing to Horizon, set the upsert type to **Deletion Vectors** (or **Positional Deletes**). See [Delete Format Support by Query Engine](/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine).
+    :::
+
     ---
 
     ## Configuration
@@ -1888,6 +1942,53 @@ networks:
         ```
 
         <HorizonIcebergWriterCLIConfigDetails authType="external-oauth" />
+
+        </TabItem>
+
+        </Tabs>
+
+      </TabItem>
+
+      <TabItem value="workload-identity-federation-wif-oidc" label="Workload Identity Federation (WIF)/OIDC">
+
+        To use **Workload Identity Federation (WIF)/OIDC** with Horizon Catalog, configure your Snowflake service user with a workload identity, then pass a short-lived OIDC token from your identity provider to OLake Go. Follow the steps in the [Workload identity federation](https://docs.snowflake.com/en/user-guide/workload-identity-federation) documentation.
+
+        <Tabs queryString="tab">
+
+        <TabItem value="horizon-ui" label="OLake UI" default>
+        <br/>
+
+        <HorizonIcebergWriterUIConfigDetails authType="workload-identity-federation-wif-oidc" />
+
+        Click **`Create ->`** to test the connection and verify that OLake Go can validate both the Horizon Catalog REST endpoint and authentication.
+
+        </TabItem>
+
+        <TabItem value="horizon-cli" label="OLake CLI">
+
+        ### JSON Configuration
+
+        Create a json for destination config (`destination.json`)
+
+        ```json title="destination.json"
+        {
+          "type": "ICEBERG",
+          "writer": {
+            "catalog_type": "horizon",
+            "catalog_name": "horizon",
+            "rest_catalog_url": "https://<account_identifier>.snowflakecomputing.com/polaris/api/catalog",
+            "iceberg_s3_path": "SNOW",
+            "aws_region": "AWS_AP_SOUTH_1",
+            "scope": "session:role:<HORIZON_ROLE>",
+            "rest_auth_type": "Workload Identity Federation(WIF)/OIDC",
+            "credential": "<OIDC_TOKEN>",
+            "snowflake_workload_identity_provider": "OIDC",
+            "arrow_writes": false
+          }
+        }
+        ```
+
+        <HorizonIcebergWriterCLIConfigDetails authType="workload-identity-federation-wif-oidc" />
 
         </TabItem>
 
