@@ -1,0 +1,1131 @@
+---
+slug: iceberg-compaction-spark-vs-fusion-benchmark
+title: "Iceberg Compaction at Real Scale: Spark vs OLake Fusion on 2.24 TB of Partitioned TPC-H Data"
+description: "We benchmark Spark rewrite_data_files against OLake Fusion compaction on Apache Iceberg by running a full TPCH lineitem load from Postgres to GCP, applying 200k-record CDC batches every 2 minutes, and tracking TPC-H Query 6 performance, runtime, resource usage, and infrastructure cost."
+tags: [iceberg, tpch, compaction, benchmark, spark, olake, fusion]
+authors: [nayan]
+image: /img/blog/2026/4/fusion_vs_spark.webp
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<div style={{textAlign: 'center'}}>
+  <img src="/img/blog/2026/4/fusion_vs_spark.webp" alt="compaction diagram" style={{width: '80%'}} />
+</div>
+
+A while back we published a benchmark comparing Apache Spark's `rewrite_data_files` against OLake Fusion compaction on an Iceberg table under CDC load. If you haven't seen it, you can read it here: [Iceberg Compaction: Spark vs Fusion Benchmark](/blog/2026-04-22-spark-vs-fusion-compaction.mdx). In that post we took the TPC-H lineitem table, loaded it into Iceberg without any partitioning, ran continuous updates on it for about 2 hours, and compared how Spark and Fusion handled the small files that piled up.
+
+That benchmark did its job. It gave us a clean, controlled look at compaction behavior. But a few things about it were not exactly how things work in the real world, and we knew it. So this time we went back and redesigned the whole thing to look a lot more like what an actual data engineering team would be dealing with day to day.
+
+## Why The Change In Setup
+
+In practice, nobody just dumps a table into Iceberg without thinking about partitioning. If you know you are going to query a table by date ranges, you partition it by date. That is table stakes for anyone running analytics at scale, because without partitioning every query ends up scanning the whole table. Scan costs add up, and query execution slows down quickly.
+
+Scale is the other piece. Most data engineers are not working with a few hundred gigabytes. They are working with multiple terabytes, sometimes tens of terabytes, and their pipelines keep running for days, weeks, or even months. A two-hour experiment is still useful when you want to isolate how compaction behaves under load. It just does not tell you much about compaction pressure after a full day of real ingestion, with the same messiness you get from actually running infrastructure for that long.
+
+So for this round we changed three things on purpose:
+- We partitioned the table by date, like you would in production.
+- We used 10 TB of TPCH data, so that the table results in bigger magnitude on Iceberg side.
+- We ran it for 24 hours, not 2 hours, so we could see what a full day looks like.
+
+Everything else, the source database, the catalog, the ingestion engine, and the general idea of running Spark and Fusion side by side under identical CDC load, stayed the same so the two benchmarks are still philosophically consistent with each other.
+
+## Benchmark Design
+
+### 1. Data
+
+We generated 10 TB of TPC-H data and loaded it into PostgreSQL. From there we did a full load into Apache Iceberg with the **lineitem** table partitioned by month on `l_shipdate`, which gave us roughly 84 partitions. Once loaded into Iceberg, the 10 TB source compressed down to about 2.29 TB.
+
+We also synced the **part** table. Part is a small table in the TPC-H schema, so we kept it unpartitioned. We included it because the query we wanted to run was a join between lineitem and part, and we kept both tables under continuous CDC load to make the benchmark realistic.
+
+### 2. Source
+
+PostgreSQL served as the OLTP source, where we continuously issued row-level updates every minute to emulate production-like CDC traffic.
+
+100,000 random rows updated on the `l_comment` column of lineitem every minute
+20,000 random rows updated on the `p_comment` column of part every minute
+
+### 3. Destination
+
+Apache Iceberg on Google Cloud Storage was the lakehouse destination, where frequent CDC commits gradually create small files and metadata overhead.
+
+### 4. Catalog 
+
+Lakekeeper served as the Iceberg catalog, managing table metadata, snapshots, and commit coordination consistently across both environments.
+
+### 5. Ingestion Pipeline
+
+For both environments, we used OLake Go as the ingestion engine, one of the fastest open-source tools for replicating data into Apache Iceberg table format. The ingestion pipeline ran identically in both environments, with a few changes from the last benchmark to reflect the bigger, partitioned, two-table setup:
+
+- OLake Go performed a full load of both the lineitem and part tables into Iceberg, with lineitem partitioned by month on `l_shipdate` and part left unpartitioned.
+- A Python script then began continuously updating a string column on both source PostgreSQL tables at the same time, cycling endlessly: **100,000 random rows** per iteration on `l_comment` column of lineitem, and **20,000 random rows** per iteration on `p_comment` column of part. In the last benchmark we only had one table under write pressure. This time we kept both tables live for the full run, since a real CDC pipeline is rarely replicating just one table in isolation.
+    <details>
+    <summary><strong>Python CDC updater script used in this benchmark</strong></summary>
+
+    ```python
+    import psycopg2
+    import time
+
+    HOST     = "<POSTGRES_HOST_URI>"
+    PORT     = 5432
+    USER     = "postgres"
+    PASSWORD = "<PASSWORD>"
+    DATABASE = "<DATABASE_NAME>"
+    SCHEMA   = "tpch"
+
+    RUNS             = 1440     # total number of runs (24 hours * 60 minutes)
+    INTERVAL_SECONDS = 60       # 1 min between scheduled run starts
+
+    # Lineitem: ~100k rows per run out of 60B total
+    LINEITEM_TABLE        = "lineitem"
+    LINEITEM_TABLESAMPLE  = 0.00017  # ~100k rows out of 60B
+
+    # Part: ~20k rows per run out of 2B total
+    PART_TABLE            = "part"
+    PART_TABLESAMPLE      = 0.001    # ~20k rows out of 2B
+
+    print(f"Connecting to {HOST}/{DATABASE} ...")
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = psycopg2.connect(
+            host=HOST,
+            port=PORT,
+            user=USER,
+            password=PASSWORD,
+            dbname=DATABASE,
+            sslmode="require",
+        )
+        conn.autocommit = False
+        cursor = conn.cursor()
+        print("Connected successfully.")
+        print(f"Total runs     : {RUNS}")
+        print(f"Interval       : every {INTERVAL_SECONDS}s")
+        print(f"Lineitem rows  : ~100k per run (TABLESAMPLE SYSTEM {LINEITEM_TABLESAMPLE}%)")
+        print(f"Part rows      : ~20k per run (TABLESAMPLE SYSTEM {PART_TABLESAMPLE}%)")
+
+        lineitem_update_sql = f"""
+            UPDATE {SCHEMA}.{LINEITEM_TABLE} t
+            SET l_comment = substring(l_comment, 1, char_length(l_comment) - 1)
+                            || chr(65 + (random() * 25)::int)
+            FROM (
+                SELECT ctid
+                FROM {SCHEMA}.{LINEITEM_TABLE} TABLESAMPLE SYSTEM ({LINEITEM_TABLESAMPLE})
+            ) s
+            WHERE t.ctid = s.ctid
+        """
+
+        part_update_sql = f"""
+            UPDATE {SCHEMA}.{PART_TABLE} t
+            SET p_comment = substring(p_comment, 1, char_length(p_comment) - 1)
+                            || chr(65 + (random() * 25)::int)
+            FROM (
+                SELECT ctid
+                FROM {SCHEMA}.{PART_TABLE} TABLESAMPLE SYSTEM ({PART_TABLESAMPLE})
+            ) s
+            WHERE t.ctid = s.ctid
+        """
+
+        next_run_monotonic = time.monotonic()
+
+        for run_idx in range(RUNS):
+            # First run starts immediately; subsequent runs are anchored to the
+            # original start time so interval drift never accumulates.
+            if run_idx > 0:
+                sleep_seconds = next_run_monotonic - time.monotonic()
+                if sleep_seconds > 0:
+                    print(f"  Sleeping {round(sleep_seconds, 1)}s until next run ...")
+                    time.sleep(sleep_seconds)
+            next_run_monotonic += INTERVAL_SECONDS
+
+            # Update lineitem
+            print(f"\n[{run_idx + 1}/{RUNS}] Updating {LINEITEM_TABLE} - ~100k rows ...")
+            start = time.time()
+            cursor.execute(lineitem_update_sql)
+            lineitem_rows = cursor.rowcount
+            conn.commit()
+            elapsed = round(time.time() - start, 2)
+            print(f"[{run_idx + 1}/{RUNS}] {LINEITEM_TABLE} done. Rows: {lineitem_rows} | Time: {elapsed}s")
+
+            # Update part
+            print(f"[{run_idx + 1}/{RUNS}] Updating {PART_TABLE} - ~20k rows ...")
+            start = time.time()
+            cursor.execute(part_update_sql)
+            part_rows = cursor.rowcount
+            conn.commit()
+            elapsed = round(time.time() - start, 2)
+            print(f"[{run_idx + 1}/{RUNS}] {PART_TABLE} done. Rows: {part_rows} | Time: {elapsed}s")
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        if conn:
+            conn.rollback()
+            print("Transaction rolled back.")
+        raise
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+        print("\nConnection closed.")
+    ```
+
+    </details>
+- OLake Go was configured to sync every 1 minute, picking up each batch of updates from both tables and writing them to their respective Iceberg destinations as small incremental files. Since these are CDC upserts, each ingestion cycle produces new equality delete files alongside data files. For lineitem specifically, because it was partitioned by month (close to 84 partitions), each sync could create up to 84 data files and 84 equality delete files if updates touched all partitions. This means the small file problem multiplies quickly with partitioning. Over the entire 24 hour window, both file count and delete-file overhead grow steadily.
+
+### 6. Timeline 
+
+The experiment ran for 24 hours. CDC updates started immediately and ran every minute. Compactions ran automatically on their configured schedules.
+- CDC ingestion started at time zero and ran continuously for the full 24 hours, with OLake Go syncing every 1 minute as described above.
+- The TPC-H query script also started running continuously from time zero, right alongside CDC. This time we used TPC-H Query 14 modified a little to filter one year of data.
+      ```sql
+    SELECT
+        100.00 * SUM(
+            CASE
+                WHEN p_type LIKE 'PROMO%'
+                    THEN l_extendedprice * (1 - l_discount)
+                ELSE 0
+            END
+        ) / SUM(l_extendedprice * (1 - l_discount)) AS promo_revenue
+    FROM
+        {{CATALOG}}.{{DATABASE}}.lineitem,
+        {{CATALOG}}.{{DATABASE}}.part
+    WHERE
+        l_partkey = p_partkey
+        AND l_shipdate >= DATE '1995-01-01'
+        AND l_shipdate < DATE '1996-01-01'
+    ```
+
+## Infrastructure and Resources
+
+We gave Spark and Fusion the same resources for compaction, and the same resources for TPC-H query execution. 
+
+<Tabs>
+  <TabItem value="fusion-infra" label="OLake Fusion">
+
+  | Node role | Instance type | vCPUs | RAM |
+  |---|---|---|---|
+  | Master | c4a-standard-16 | 16 | 64 GB |
+  | Worker | c4a-highmem-64 | 64 | 256 GB |
+  | Worker | c4a-highmem-64 | 64 | 256 GB |
+
+  </TabItem>
+  <TabItem value="spark-infra" label="Spark">
+
+  | Node role | Instance type | vCPUs | RAM |
+  |---|---|---|---|
+  | Master | c4a-standard-16 | 16 | 64 GB |
+  | Worker | c4a-highmem-64 | 64 | 256 GB |
+  | Worker | c4a-highmem-64 | 64 | 256 GB |
+
+  </TabItem>
+  <TabItem value="tpch-infra" label="TPCH">
+
+  | Node role | Instance type | vCPUs | RAM |
+  |---|---|---|---|
+  | Master | c4a-standard-8 | 8 | 32 GB |
+  | Worker | c4a-standard-32 | 32 | 128 GB |
+  | Worker | c4a-standard-32 | 32 | 128 GB |
+
+</TabItem>
+</Tabs>
+
+## Compaction Setup and Configuration
+
+### 1. OLake Fusion Configuration
+
+We used the following Fusion cluster configuration for running the compaction:
+
+| Setting | Value |
+|---|---|
+| `spark.dynamicAllocation.enabled` | true |
+| `spark.dynamicAllocation.maxExecutors` | 90 |
+| `spark-conf.spark.executor.cores` | 1 |
+| `spark-conf.spark.executor.memory` | 4g |
+| `spark-conf.spark.executor.memoryOverhead` | 1g |
+| `spark-conf.spark.driver.memory` | 2g |
+| `spark-conf.spark.driver.memoryOverhead` | 1g |
+
+Fusion runs table optimization on Spark, and these `spark-conf` values size that workload: enough **executors and cores** to keep compaction moving in parallel, and enough **memory** overall so rewrite and merge steps are not constantly fighting for space.
+
+### Compaction Parameters
+
+We used the following parameters for the compaction:
+
+- `target-file-size-bytes`: 512 MB (the desired output file size after compaction)
+- `max-task-size-bytes`: 620 MB (the maximum size of a single task in the compaction)
+
+### How We Scheduled It
+
+This time we used all three of Fusion's compaction tiers, on a schedule meant to mirror how a real team would stagger maintenance intensity across a day:
+
+- Lite compaction: every 1 hour 
+- Medium compaction: every 2 hours 
+- Full compaction: Once per day at midnight 12:00 AM UTC
+
+In our earlier benchmark we skipped Full compaction entirely because the observation window was too short for it to be worth running. This time, with a full 24 hour window, we could actually let a Full compaction happen and see its impact and cost, which is a more complete picture of Fusion's real behavior.
+
+:::info
+To learn more about how Fusion works and the different types of compaction available, check out the [Fusion documentation](https://olake.io/docs/fusion/getting-started/overview/).
+:::
+
+### 2. Spark Configuration
+
+We used the following Spark cluster configuration for running the compaction:
+
+| Setting | Value |
+|---|---|
+| `spark.executor.cores` | 14 |
+| `spark.executor.memory` | 45g |
+| `spark.executor.memoryOverhead` | 10g |
+| `spark.driver.memory` | 34g |
+| `spark.driver.memoryOverhead` | 12g |
+| `spark.dynamicAllocation.enabled` | true |
+| `spark.dynamicAllocation.minExecutors` | 1 |
+| `spark.dynamicAllocation.maxExecutors` | 8 |
+
+### Compaction Parameters
+
+We used the following parameters for the compaction:
+
+- `target-file-size-bytes`: **512 MB**  
+  Spark tries to produce output files close to 512 MB after compaction.
+- `max-file-size-bytes`: **614 MB**  
+  Any file larger than 614 MB is treated as oversized and selected for rewrite.
+- `min-file-size-bytes`: **384 MB**  
+  Any file smaller than 384 MB is treated as undersized and selected for merge.
+- `max-concurrent-file-group-rewrites`: **120**  
+  Spark can rewrite up to 120 file groups at the same time, which controls compaction parallelism.
+- `partial-progress.enabled`: **false**  
+  Spark commits only if the entire compaction job succeeds; partial results are not committed.
+- `delete-file-threshold`: **1**  
+  If a data file has even 1 delete file attached, Spark includes it in compaction.
+
+### How We Scheduled It
+
+Spark compaction ran **every 3 hours**, giving us **8 runs across the 24 hour window**. This interval was chosen to reflect a fairly typical production maintenance cadence for a table under continuous CDC pressure, where you cannot afford to let small files accumulate for too long, but you also do not want to be running a heavy Spark job constantly.
+
+### Compaction Scripts
+
+We used two Python scripts to run and orchestrate Spark compaction. The first script, `compaction_single_run.py`, runs one compaction job on both the lineitem and part tables using Iceberg's `rewrite_data_files`, logs file statistics and snapshot IDs before and after, then exits. The second script, `run_compaction_wrapper.py`, is a scheduler that repeatedly calls `spark-submit` on the single-run script with 3 hours between scheduled starts, waits for each job to finish, and logs success or failure per run. It was configured for up to 15 runs, but since the benchmark ran for only 24 hours, it automatically stopped after 8 compactions.
+
+<details>
+<summary><strong>compaction_single_run.py</strong></summary>
+
+```python
+#!/usr/bin/env python3
+"""
+Single-run Iceberg compaction script for TPC-H tables.
+Runs compaction once and exits.
+"""
+import logging
+import time
+import datetime
+from pyspark.sql import SparkSession
+
+
+# ─── Logging Setup ─────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("iceberg-compaction")
+
+
+CATALOG  = "olake_iceberg"
+DATABASE = "tpch"
+LAKEKEEPER_WAREHOUSE = "tpch_data"
+LAKEKEEPER_URI = "http://10.20.0.43:8181/catalog"
+TABLES   = [
+    "lineitem",
+    "part",
+]
+
+
+# ─── Helper: Per-table file stats (optionally pinned to a snapshot) ─────────────
+def get_table_file_stats(spark, catalog, table_full, snapshot_id=None):
+    """
+    content = 0 -> data files
+    content = 1 -> positional delete files
+    content = 2 -> equality delete files
+    snapshot_id -> if provided, reads file state at that exact snapshot (time travel)
+                   if None, reads current state
+    """
+    version_clause = f"VERSION AS OF {snapshot_id}" if snapshot_id else ""
+
+    try:
+        row = spark.sql(
+            f"SELECT COUNT(*) AS file_count, SUM(file_size_in_bytes) AS total_bytes "
+            f"FROM {catalog}.{table_full}.files {version_clause} WHERE content = 0"
+        ).collect()[0]
+        data_count = row["file_count"]
+        data_mb    = round(row["total_bytes"] / (1024 * 1024), 2) if row["total_bytes"] else 0
+    except Exception as e:
+        log.warning(f"    Could not fetch data file stats: {e}")
+        data_count, data_mb = "N/A", "N/A"
+
+    try:
+        pos_count = spark.sql(
+            f"SELECT COUNT(*) AS file_count "
+            f"FROM {catalog}.{table_full}.files {version_clause} WHERE content = 1"
+        ).collect()[0]["file_count"]
+    except Exception as e:
+        log.warning(f"    Could not fetch positional delete file stats: {e}")
+        pos_count = "N/A"
+
+    try:
+        eq_count = spark.sql(
+            f"SELECT COUNT(*) AS file_count "
+            f"FROM {catalog}.{table_full}.files {version_clause} WHERE content = 2"
+        ).collect()[0]["file_count"]
+    except Exception as e:
+        log.warning(f"    Could not fetch equality delete file stats: {e}")
+        eq_count = "N/A"
+
+    return data_count, data_mb, pos_count, eq_count
+
+
+# ─── Helper: Find the snapshot ID that compaction created ───────────────────────
+def get_compaction_snapshot(spark, catalog, table_full, compaction_started_at):
+    """
+    After rewrite_data_files completes, find the snapshot with operation='replace'
+    that was committed after compaction started. This is the exact compaction snapshot.
+    Returns (snapshot_id, committed_at) or (None, None) if nothing was rewritten.
+    """
+    try:
+        rows = spark.sql(
+            f"SELECT snapshot_id, committed_at "
+            f"FROM {catalog}.{table_full}.snapshots "
+            f"WHERE operation = 'replace' "
+            f"AND committed_at >= TIMESTAMP '{compaction_started_at}' "
+            f"ORDER BY committed_at ASC "
+            f"LIMIT 1"
+        ).collect()
+        if rows:
+            snap_id = rows[0]["snapshot_id"]
+            snap_ts = str(rows[0]["committed_at"])
+            log.info(f"  Compaction snapshot found : id={snap_id} | committed_at={snap_ts}")
+            return snap_id, snap_ts
+        else:
+            log.warning(f"  No replace snapshot found after {compaction_started_at} — "
+                        f"compaction may have found nothing to rewrite.")
+            return None, None
+    except Exception as e:
+        log.warning(f"  Could not find compaction snapshot: {e}")
+        return None, None
+
+
+# ─── Helper: Count OLake ingestion appends during compaction window ─────────────
+def count_ingestions_during_compaction(spark, catalog, table_full,
+                                       pre_committed_at, compaction_committed_at):
+    """
+    Counts append snapshots committed strictly AFTER pre_committed_at and
+    up to AND INCLUDING compaction_committed_at.
+
+    Each OLake ingestion commit adds exactly: 1 data file + 1 equality-delete file.
+    We subtract this count from the raw POST snapshot counts to isolate the
+    pure compaction effect (no ingestion noise).
+
+    Returns 0 safely if either timestamp is None.
+    """
+    if not pre_committed_at or not compaction_committed_at:
+        log.warning("  Skipping ingestion count — missing pre or compaction timestamp.")
+        return 0
+    try:
+        row = spark.sql(
+            f"SELECT COUNT(*) AS cnt "
+            f"FROM {catalog}.{table_full}.snapshots "
+            f"WHERE operation IN ('append', 'overwrite') "
+            f"AND committed_at > TIMESTAMP '{pre_committed_at}' "
+            f"AND committed_at <= TIMESTAMP '{compaction_committed_at}'"
+        ).collect()[0]
+        cnt = row["cnt"]
+        log.info(f"  OLake ingestion commits during compaction window : {cnt} "
+                 f"(each = +1 data file, +1 eq-delete file)")
+        return cnt
+    except Exception as e:
+        log.warning(f"  Could not count ingestion snapshots during compaction: {e}")
+        return 0
+
+
+# ─── Core compaction logic for a single run ─────────────────────────────────────
+def run_compaction(spark):
+    overall_start_time = time.time()
+    overall_start_ts   = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    log.info("=" * 70)
+    log.info(f"  COMPACTION RUN STARTED AT : {overall_start_ts}")
+    log.info(f"  Tables to compact         : {TABLES}")
+    log.info("=" * 70)
+
+    for table_name in TABLES:
+        TABLE      = f"{DATABASE}.{table_name}"
+        FULL_TABLE = f"{CATALOG}.{TABLE}"
+
+        log.info("")
+        log.info("=" * 70)
+        log.info(f"  TABLE: {FULL_TABLE}")
+        log.info("=" * 70)
+
+        # Last 5 snapshots — pre
+        try:
+            snaps = spark.sql(
+                f"SELECT snapshot_id, committed_at, operation "
+                f"FROM {CATALOG}.{TABLE}.snapshots "
+                f"ORDER BY committed_at DESC LIMIT 5"
+            ).collect()
+            log.info("  [PRE] Last 5 snapshots:")
+            for row in snaps:
+                log.info(f"    snapshot_id={row['snapshot_id']} | "
+                         f"committed_at={row['committed_at']} | "
+                         f"operation={row['operation']}")
+        except Exception as e:
+            log.warning(f"  Could not fetch pre-compaction snapshots: {e}")
+
+        # File stats — pre (with caching for potential reuse)
+        data_cnt, data_mb, pos_del_cnt, eq_del_cnt = get_table_file_stats(spark, CATALOG, TABLE)
+        log.info(f"  [PRE]  Data files        (content=0) : {data_cnt} files | {data_mb} MB")
+        log.info(f"  [PRE]  Pos-delete files  (content=1) : {pos_del_cnt} files")
+        log.info(f"  [PRE]  Eq-delete files   (content=2) : {eq_del_cnt} files")
+
+        # Capture PRE boundary timestamp
+        pre_committed_at = None
+        try:
+            pre_row = spark.sql(
+                f"SELECT committed_at FROM {CATALOG}.{TABLE}.snapshots "
+                f"ORDER BY committed_at DESC LIMIT 1"
+            ).collect()
+            pre_committed_at = str(pre_row[0]["committed_at"]) if pre_row else None
+            log.info(f"  [PRE]  Snapshot boundary          : {pre_committed_at}")
+        except Exception as e:
+            log.warning(f"  Could not fetch PRE snapshot boundary: {e}")
+
+        # Disable vectorization at table level
+        try:
+            spark.sql(
+                f"ALTER TABLE {FULL_TABLE} "
+                f"SET TBLPROPERTIES ('read.parquet.vectorization.enabled' = 'false')"
+            )
+            log.info(f"  Disabled vectorization for {table_name}.")
+        except Exception as e:
+            log.warning(f"  Could not set vectorization property: {e}")
+
+        # Compaction config banner
+        log.info("  Compaction config:")
+        log.info("    strategy                          : binpack")
+        log.info("    target-file-size-bytes            : 536870912  (512 MB)")
+        log.info("    max-file-size-bytes               : 644245094  (614.4 MB)")
+        log.info("    min-file-size-bytes               : 402653184  (384 MB)")
+        log.info("    max-file-group-size-bytes         : 4294967296  (4 GB)")
+        log.info("    max-concurrent-file-group-rewrites: 120")
+        log.info("    partial-progress.enabled          : false")
+        log.info("    delete-file-threshold             : 1")
+
+        table_start_time = time.time()
+        table_start_ts   = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log.info(f"  Compaction started at : {table_start_ts}")
+
+        try:
+            # Note: Iceberg's rewrite_data_files handles data internally.
+            # Explicit caching won't help here, but metadata queries above could benefit.
+            result = spark.sql(
+                f"""
+                CALL {CATALOG}.system.rewrite_data_files(
+                    table    => '{TABLE}',
+                    strategy => 'binpack',
+                    options  => map(
+                        'target-file-size-bytes',             '536870912',
+                        'max-file-size-bytes',                '644245094',
+                        'min-file-size-bytes',                '402653184',
+                        'max-file-group-size-bytes',          '4294967296',
+                        'max-concurrent-file-group-rewrites', '120',
+                        'partial-progress.enabled',           'false',
+                        'delete-file-threshold',               '1'
+                    )
+                )
+                """
+            )
+            rows          = result.collect()
+            table_elapsed = round(time.time() - table_start_time, 2)
+            table_end_ts  = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            log.info(f"  Compaction finished at        : {table_end_ts}")
+            log.info(f"  Compaction time for this table: {table_elapsed}s  "
+                     f"({round(table_elapsed / 60, 2)} min)")
+
+            for row in rows:
+                rewritten_files = row["rewritten_data_files_count"]
+                added_files     = row["added_data_files_count"]
+                rewritten_bytes = (
+                    row["rewritten_bytes_count"]
+                    if "rewritten_bytes_count" in row.__fields__
+                    else "N/A"
+                )
+                rewritten_mb = (
+                    round(rewritten_bytes / (1024 * 1024), 2)
+                    if isinstance(rewritten_bytes, int)
+                    else "N/A"
+                )
+                log.info("  Compaction Result:")
+                log.info(f"    Files rewritten (input) : {rewritten_files}")
+                log.info(f"    Files added (output)    : {added_files}")
+                log.info(f"    Total bytes rewritten   : {rewritten_bytes}  ({rewritten_mb} MB)")
+
+        except Exception as e:
+            elapsed = round(time.time() - table_start_time, 2)
+            log.error(f"  Compaction FAILED for {table_name} after {elapsed}s")
+            log.error(f"  Error: {e}")
+            continue
+
+        # Find the exact compaction snapshot
+        compaction_snapshot_id, compaction_committed_at = get_compaction_snapshot(
+            spark, CATALOG, TABLE, table_start_ts
+        )
+
+        # Count OLake ingestions during compaction
+        ingestions_during_compaction = count_ingestions_during_compaction(
+            spark, CATALOG, TABLE, pre_committed_at, compaction_committed_at
+        )
+
+        # Read POST file counts pinned to the compaction snapshot
+        data_cnt_p, data_mb_p, pos_del_cnt_p, eq_del_cnt_p = get_table_file_stats(
+            spark, CATALOG, TABLE, snapshot_id=compaction_snapshot_id
+        )
+
+        # Subtract ingestion noise
+        true_data_cnt_p   = (
+            data_cnt_p - ingestions_during_compaction
+            if isinstance(data_cnt_p, int)
+            else data_cnt_p
+        )
+        true_eq_del_cnt_p = (
+            eq_del_cnt_p - ingestions_during_compaction
+            if isinstance(eq_del_cnt_p, int)
+            else eq_del_cnt_p
+        )
+
+        if compaction_snapshot_id:
+            log.info(f"  [POST] File stats pinned to compaction snapshot {compaction_snapshot_id}:")
+        else:
+            log.info(f"  [POST] File stats (no replace snapshot found — showing current state):")
+
+        log.info(f"  [POST] Data files (content=0) at snapshot   : {data_cnt_p} files")
+        log.info(f"  [POST] Pos-delete (content=1) at snapshot   : {pos_del_cnt_p} files")
+        log.info(f"  [POST] Eq-delete  (content=2) at snapshot   : {eq_del_cnt_p} files")
+        log.info(f"  [POST] Minus ingestion files during window  : -{ingestions_during_compaction} (data), -{ingestions_during_compaction} (eq-delete)")
+        log.info(f"  [POST] True post-compaction data files      : {true_data_cnt_p} files | {data_mb_p} MB")
+        log.info(f"  [POST] True post-compaction eq-delete files : {true_eq_del_cnt_p} files")
+
+        # Delta — pure compaction effect only
+        if isinstance(data_cnt, int) and isinstance(true_data_cnt_p, int):
+            log.info(f"  [DELTA] Data files   : {data_cnt} → {true_data_cnt_p}  "
+                     f"(change: {true_data_cnt_p - data_cnt:+d})")
+        if isinstance(pos_del_cnt, int) and isinstance(pos_del_cnt_p, int):
+            log.info(f"  [DELTA] Pos-del files: {pos_del_cnt} → {pos_del_cnt_p}  "
+                     f"(change: {pos_del_cnt_p - pos_del_cnt:+d})")
+        if isinstance(eq_del_cnt, int) and isinstance(true_eq_del_cnt_p, int):
+            log.info(f"  [DELTA] Eq-del files : {eq_del_cnt} → {true_eq_del_cnt_p}  "
+                     f"(change: {true_eq_del_cnt_p - eq_del_cnt:+d})")
+
+        # Last 3 snapshots — post
+        try:
+            snaps_after = spark.sql(
+                f"SELECT snapshot_id, committed_at, operation "
+                f"FROM {CATALOG}.{TABLE}.snapshots "
+                f"ORDER BY committed_at DESC LIMIT 3"
+            ).collect()
+            log.info("  [POST] Latest snapshots:")
+            for row in snaps_after:
+                log.info(f"    snapshot_id={row['snapshot_id']} | "
+                         f"committed_at={row['committed_at']} | "
+                         f"operation={row['operation']}")
+        except Exception as e:
+            log.warning(f"  Could not fetch post-compaction snapshots: {e}")
+
+    # Summary
+    overall_elapsed = round(time.time() - overall_start_time, 2)
+    overall_end_ts  = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    log.info("")
+    log.info("=" * 70)
+    log.info(f"  COMPACTION SUMMARY")
+    log.info("=" * 70)
+    log.info(f"  Started at  : {overall_start_ts}")
+    log.info(f"  Ended at    : {overall_end_ts}")
+    log.info(f"  Total time  : {overall_elapsed}s  ({round(overall_elapsed / 60, 2)} min)")
+    log.info("=" * 70)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MAIN
+# ══════════════════════════════════════════════════════════════════════════════
+if __name__ == "__main__":
+    log.info("Initializing SparkSession...")
+    spark = (
+        SparkSession.builder
+        .appName("iceberg-compaction-single-run")
+        .config("spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+        .config("spark.sql.catalog.olake_iceberg",
+                "org.apache.iceberg.spark.SparkCatalog")
+        .config("spark.sql.catalog.olake_iceberg.catalog-impl",
+                "org.apache.iceberg.rest.RESTCatalog")
+        .config("spark.sql.catalog.olake_iceberg.uri",
+                LAKEKEEPER_URI)
+        .config("spark.sql.catalog.olake_iceberg.warehouse",
+                LAKEKEEPER_WAREHOUSE)
+        .config("spark.sql.catalog.olake_iceberg.io-impl",
+                "org.apache.iceberg.aws.s3.S3FileIO")
+        .config("spark.sql.catalog.olake_iceberg.s3.endpoint",
+                "https://storage.googleapis.com/")
+        .config("spark.sql.catalog.olake_iceberg.s3.path-style-access", "true")
+        .config("spark.sql.catalog.olake_iceberg.client.region",        "ap-south-1")
+        .config("spark.hadoop.fs.s3a.endpoint",                     "https://storage.googleapis.com")
+        .config("spark.hadoop.fs.s3a.path.style.access",            "true")
+        .config("spark.hadoop.fs.s3a.endpoint.region",              "ap-south-1")
+        .config("spark.sql.shuffle.partitions",                     "128")
+        .config("spark.sql.defaultCatalog",                         "olake_iceberg")
+        .getOrCreate()
+    )
+
+    # Enable caching where beneficial (Spark will auto-manage cache within this session)
+    spark.sparkContext.setLogLevel("INFO")
+    spark.conf.set("spark.sql.iceberg.vectorization.enabled", "false")
+
+    log.info("SparkSession initialized successfully.")
+    log.info(f"  Spark version       : {spark.version}")
+    log.info(f"  App name            : {spark.sparkContext.appName}")
+    log.info(f"  Master              : {spark.sparkContext.master}")
+    log.info(f"  Default parallelism : {spark.sparkContext.defaultParallelism}")
+    log.info(f"  Lakekeeper URI      : {LAKEKEEPER_URI}")
+    log.info(f"  Catalog warehouse   : {LAKEKEEPER_WAREHOUSE}")
+    log.info(f"  Namespace (db)      : {DATABASE}")
+
+    run_compaction(spark)
+
+    log.info("")
+    log.info("Compaction run complete. Stopping SparkSession.")
+    spark.stop()
+
+```
+
+</details>
+
+<details>
+<summary><strong>run_compaction_wrapper.py</strong></summary>
+
+```python
+#!/usr/bin/env python3
+"""
+Compaction Benchmark Runner - Python Wrapper with 3-hour interval scheduling
+Runs 15 sequential compaction jobs with 3-hour intervals between scheduled starts.
+
+Scheduling behavior:
+- Run 1 starts at T+0
+- Run 2 scheduled at T+3h
+- Run 3 scheduled at T+6h
+- etc.
+
+If a run takes longer than 3 hours, the next run starts immediately when it finishes.
+If a run takes less than 3 hours, waits until the next scheduled time slot.
+"""
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+TOTAL_RUNS = 15
+INTERVAL_MINUTES = 180
+INTERVAL_SECONDS = INTERVAL_MINUTES * 60
+SCRIPT_PATH = "/home/nayan_datazip_io/compaction_single_run.py"
+
+# Spark submit configurations (same as dataproc_compaction.py)
+SPARK_SUBMIT_CMD = [
+    "spark-submit",
+    "--conf", "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+    "--conf", "spark.sql.catalog.olake_iceberg=org.apache.iceberg.spark.SparkCatalog",
+    "--conf", "spark.sql.catalog.olake_iceberg.catalog-impl=org.apache.iceberg.rest.RESTCatalog",
+    "--conf", "spark.sql.catalog.olake_iceberg.uri=http://10.20.0.43:8181/catalog",
+    "--conf", "spark.sql.catalog.olake_iceberg.warehouse=tpch_data",
+    "--conf", "spark.sql.catalog.olake_iceberg.io-impl=org.apache.iceberg.aws.s3.S3FileIO",
+    "--conf", "spark.sql.catalog.olake_iceberg.s3.endpoint=https://storage.googleapis.com/",
+    "--conf", "spark.sql.catalog.olake_iceberg.s3.path-style-access=true",
+    "--conf", "spark.sql.catalog.olake_iceberg.client.region=ap-south-1",
+    "--conf", "spark.sql.defaultCatalog=olake_iceberg",
+    "--conf", "spark.hadoop.fs.s3a.endpoint=https://storage.googleapis.com",
+    "--conf", "spark.hadoop.fs.s3a.path.style.access=true",
+    "--conf", "spark.hadoop.fs.s3a.endpoint.region=ap-south-1",
+    "--conf", "spark.dynamicAllocation.enabled=false",
+    "--conf", "spark.executor.instances=8",
+    "--executor-cores", "14",
+    "--executor-memory", "45g",
+    "--conf", "spark.executor.memoryOverhead=10g",
+    "--driver-memory", "34g",
+    "--conf", "spark.driver.memoryOverhead=12g",
+    "--conf", "spark.sql.parquet.enableVectorizedReader=false",
+    "--conf", "spark.sql.iceberg.vectorization.enabled=false",
+    "--conf", "spark.hadoop.io.native.lib.available=false",
+    "--conf", "spark.executor.extraJavaOptions=-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35 -XX:G1ReservePercent=20 -XX:UseAVX=0 -Darrow.enable_unsafe_memory_access=false -Darrow.enable_null_check_for_get=true -Dhadoop.io.native.lib.available=false",
+    "--conf", "spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35 -Xss8m -XX:UseAVX=0 -Darrow.enable_unsafe_memory_access=false -Darrow.enable_null_check_for_get=true",
+    SCRIPT_PATH
+]
+
+def run_benchmark():
+    print("=" * 70)
+    print("Iceberg Compaction Benchmark - 15 Runs with 3-hour intervals")
+    print("=" * 70)
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Script: {SCRIPT_PATH}")
+    print(f"Total runs: {TOTAL_RUNS}")
+    print(f"Interval: {INTERVAL_MINUTES} minutes")
+    print("=" * 70)
+    print()
+    
+    success_count = 0
+    failed_count = 0
+    schedule_anchor = time.time()
+    
+    for run_number in range(1, TOTAL_RUNS + 1):
+        # Calculate scheduled start time for this run
+        scheduled_start = schedule_anchor + (run_number - 1) * INTERVAL_SECONDS
+        now = time.time()
+        wait_seconds = scheduled_start - now
+        
+        # If we need to wait (run finished early), sleep until scheduled time
+        if wait_seconds > 0:
+            next_run_ts = datetime.fromtimestamp(scheduled_start).strftime("%Y-%m-%d %H:%M:%S")
+            print()
+            print("~" * 70)
+            print(f"  Waiting {round(wait_seconds, 1)}s until next scheduled run at {next_run_ts} ...")
+            print("~" * 70)
+            time.sleep(wait_seconds)
+        
+        print()
+        print("#" * 70)
+        print(f"#{'':<68}#")
+        print(f"#{'RUN ' + str(run_number) + ' OF ' + str(TOTAL_RUNS):^68}#")
+        print(f"#{'':<68}#")
+        print("#" * 70)
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting run {run_number}")
+        print("#" * 70)
+        
+        # Run spark-submit and wait for completion
+        try:
+            result = subprocess.run(SPARK_SUBMIT_CMD, check=False)
+            if result.returncode == 0:
+                print(f"[SUCCESS] Run {run_number} completed")
+                success_count += 1
+            else:
+                print(f"[FAILED] Run {run_number} failed with exit code {result.returncode}")
+                failed_count += 1
+        except Exception as e:
+            print(f"[ERROR] Run {run_number} encountered an exception: {e}")
+            failed_count += 1
+        
+        print()
+        print("-" * 70)
+        print(f"  END OF RUN {run_number} OF {TOTAL_RUNS}")
+        print("-" * 70)
+        
+        # Show remaining scheduled runs
+        remaining = TOTAL_RUNS - run_number
+        if remaining > 0:
+            print(f"  Remaining runs: {remaining}")
+            for future_run in range(run_number + 1, TOTAL_RUNS + 1):
+                future_ts = datetime.fromtimestamp(
+                    schedule_anchor + (future_run - 1) * INTERVAL_SECONDS
+                ).strftime("%Y-%m-%d %H:%M:%S")
+                print(f"    Run {future_run} scheduled at: {future_ts}")
+        else:
+            print("  All scheduled runs completed.")
+        print("-" * 70)
+    
+    # Final summary
+    print()
+    print("=" * 70)
+    print("ALL COMPACTION RUNS FINISHED")
+    print("=" * 70)
+    print(f"Finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Total runs executed: {TOTAL_RUNS}")
+    print(f"Interval: every {INTERVAL_MINUTES} minute(s)")
+    print(f"Successful: {success_count}")
+    print(f"Failed: {failed_count}")
+    print("=" * 70)
+    
+    return 0 if failed_count == 0 else 1
+
+if __name__ == "__main__":
+    sys.exit(run_benchmark())
+
+```
+
+</details>
+
+## TPC-H Query Execution
+
+We ran the TPC-H Query 14 (Promotion Effect) continuously throughout the 24 hour window. This query joins lineitem and part together, which makes it a good canary for this benchmark specifically because both tables were under continuous CDC pressure and both were being compacted. This query was slightly to filter one year of data instead of one month.
+
+We used the following Spark cluster configuration for the TPC-H Query 14 runs, identical on both the Spark run and the Fusion run:
+
+| Setting | Value |
+|---|---|
+| `spark.executor.instances` | 12 |
+| `spark.executor.cores` | 5 |
+| `spark.executor.memory` | 15g |
+| `spark.executor.memoryOverhead` | 4g |
+| `spark.driver.memory` | 18g |
+| `spark.driver.memoryOverhead` | 10g |
+| `spark.dynamicAllocation.enabled` | false |
+| `spark.dynamicAllocation.minExecutors` | 1 |
+
+We used two Python scripts to run TPC-H Query 14 continuously. The first script, `tpch_q14_year_dataproc.py`, is a single Spark application that runs TPC-H Q14 once on the Iceberg lineitem and part tables. The second script, `run_tpch_benchmark_wrapper.py`, is a loop that calls `spark-submit` on the single-run script 290 times in a row. Each run is a new Spark application. Unlike the compaction scheduler, there is no fixed wait between query runs.
+
+<details>
+<summary><strong>tpch_q14_year_dataproc.py</strong></summary>
+
+```python
+#!/usr/bin/env python3
+import logging
+import time
+import datetime
+from pyspark.sql import SparkSession
+
+# ─── Logging Setup ─────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("tpch-benchmark")
+
+CATALOG  = "olake_iceberg"
+# Iceberg namespace in Lakekeeper (REST catalog); must hold `lineitem`.
+DATABASE = "tpch"
+# Lakekeeper REST catalog warehouse id (matches spark.sql.catalog.benchmark.warehouse).
+LAKEKEEPER_WAREHOUSE = "tpch_data"
+LAKEKEEPER_URI = "http://10.20.0.43:8181/catalog"
+
+# ─── TPC-H Q14 — Promotion Effect ───────────────────────────────────────────────
+# Join lineitem + part. Measures promo revenue share for full year 1995.
+TPCH_Q14 = f"""
+    SELECT
+        100.00 * SUM(
+            CASE
+                WHEN p_type LIKE 'PROMO%'
+                    THEN l_extendedprice * (1 - l_discount)
+                ELSE 0
+            END
+        ) / SUM(l_extendedprice * (1 - l_discount)) AS promo_revenue
+    FROM
+        {CATALOG}.{DATABASE}.lineitem,
+        {CATALOG}.{DATABASE}.part
+    WHERE
+        l_partkey = p_partkey
+        AND l_shipdate >= DATE '1995-01-01'
+        AND l_shipdate < DATE '1996-01-01'
+"""
+
+# ─── SparkSession ──────────────────────────────────────────────────────────────
+log.info("Initializing SparkSession...")
+spark = (
+    SparkSession.builder
+    .appName("tpch-q14-benchmark")
+    .config("spark.sql.extensions",
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+    .config("spark.sql.catalog.olake_iceberg",
+            "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.olake_iceberg.catalog-impl",
+            "org.apache.iceberg.rest.RESTCatalog")
+    .config("spark.sql.catalog.olake_iceberg.uri",
+            LAKEKEEPER_URI)
+    .config("spark.sql.catalog.olake_iceberg.warehouse",
+            LAKEKEEPER_WAREHOUSE)
+    .config("spark.sql.catalog.olake_iceberg.io-impl",
+            "org.apache.iceberg.aws.s3.S3FileIO")
+    .config("spark.sql.catalog.olake_iceberg.s3.endpoint",
+            "https://storage.googleapis.com/")
+    .config("spark.sql.catalog.olake_iceberg.s3.path-style-access", "true")
+    .config("spark.sql.catalog.olake_iceberg.client.region",        "ap-south-1")
+    .config("spark.hadoop.fs.s3a.endpoint",                         "https://storage.googleapis.com")
+    .config("spark.hadoop.fs.s3a.path.style.access",                "true")
+    .config("spark.hadoop.fs.s3a.endpoint.region",                  "ap-south-1")
+    .config("spark.sql.shuffle.partitions",                         "128")
+    .config("spark.sql.defaultCatalog",                             "olake_iceberg")
+    .getOrCreate()
+)
+
+spark.conf.set("spark.sql.iceberg.vectorization.enabled", "false")
+spark.sparkContext.setLogLevel("INFO")
+
+log.info("SparkSession initialized successfully.")
+log.info(f"  Spark version          : {spark.version}")
+log.info(f"  App name               : {spark.sparkContext.appName}")
+log.info(f"  Master                 : {spark.sparkContext.master}")
+log.info(f"  SQL shuffle partitions : {spark.conf.get('spark.sql.shuffle.partitions')}")
+log.info(f"  Lakekeeper URI         : {LAKEKEEPER_URI}")
+log.info(f"  Catalog warehouse      : {LAKEKEEPER_WAREHOUSE}")
+log.info(f"  Namespace (db)         : {DATABASE}")
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SINGLE QUERY EXECUTION
+# ══════════════════════════════════════════════════════════════════════════════
+log.info("")
+log.info("=" * 70)
+log.info("  TPC-H Q14 — Promotion Effect")
+log.info(f"  Tables : {CATALOG}.{DATABASE}.lineitem, {CATALOG}.{DATABASE}.part")
+log.info("  Type   : Join lineitem + part | Promo revenue share")
+log.info("  Period : Full year 1995 (1995-01-01 to 1995-12-31)")
+log.info("=" * 70)
+
+run_start_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+log.info(f"  Query started at : {run_start_ts}")
+
+q_start = time.time()
+try:
+    result = spark.sql(TPCH_Q14)
+    rows = result.collect()
+    q_elapsed = round(time.time() - q_start, 2)
+    run_end_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    promo_revenue_val = rows[0]["promo_revenue"] if rows else None
+
+    log.info(f"  Query finished at : {run_end_ts}")
+    log.info(f"  Query time        : {q_elapsed}s  ({round(q_elapsed / 60, 2)} min)")
+    log.info("")
+    log.info("  Result:")
+    log.info(f"    promo_revenue = {promo_revenue_val}")
+    log.info("")
+    log.info("=" * 70)
+    log.info("  QUERY COMPLETED SUCCESSFULLY")
+    log.info("=" * 70)
+
+except Exception as e:
+    q_elapsed = round(time.time() - q_start, 2)
+    run_end_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log.error("")
+    log.error("=" * 70)
+    log.error(f"  Q14 FAILED after {q_elapsed}s")
+    log.error(f"  Error: {e}")
+    log.error("=" * 70)
+    spark.stop()
+    exit(1)
+
+log.info("")
+log.info("All done. Stopping SparkSession.")
+spark.stop()
+
+```
+
+</details>
+
+<details>
+<summary><strong>run_tpch_benchmark_wrapper.py</strong></summary>
+
+```python
+#!/usr/bin/env python3
+"""
+TPC-H Q14 Benchmark Runner - Python Wrapper
+Runs 290 sequential Spark jobs on the master node.
+Each run is a separate spark-submit (separate Spark application).
+"""
+import subprocess
+import sys
+from datetime import datetime
+
+TOTAL_RUNS = 290
+SCRIPT_PATH = "/home/nayan_datazip_io/tpch_q14_year_dataproc.py"
+
+def run_benchmark():
+    print("=" * 70)
+    print("TPC-H Q14 Benchmark - 290 Runs")
+    print("=" * 70)
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Script: {SCRIPT_PATH}")
+    print("=" * 70)
+    print()
+    
+    success_count = 0
+    failed_count = 0
+    
+    for run in range(1, TOTAL_RUNS + 1):
+        print()
+        print("=" * 70)
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] SUBMITTING RUN {run} OF {TOTAL_RUNS}")
+        print("=" * 70)
+        
+        # Build spark-submit command with all configs
+        cmd = [
+            "spark-submit",
+            "--conf", "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+            "--conf", "spark.sql.catalog.olake_iceberg=org.apache.iceberg.spark.SparkCatalog",
+            "--conf", "spark.sql.catalog.olake_iceberg.catalog-impl=org.apache.iceberg.rest.RESTCatalog",
+            "--conf", "spark.sql.catalog.olake_iceberg.uri=http://10.20.0.43:8181/catalog",
+            "--conf", "spark.sql.catalog.olake_iceberg.warehouse=tpch_data",
+            "--conf", "spark.sql.catalog.olake_iceberg.io-impl=org.apache.iceberg.aws.s3.S3FileIO",
+            "--conf", "spark.sql.catalog.olake_iceberg.s3.endpoint=https://storage.googleapis.com/",
+            "--conf", "spark.sql.catalog.olake_iceberg.s3.path-style-access=true",
+            "--conf", "spark.sql.catalog.olake_iceberg.client.region=ap-south-1",
+            "--conf", "spark.sql.defaultCatalog=olake_iceberg",
+            "--conf", "spark.hadoop.fs.s3a.endpoint=https://storage.googleapis.com",
+            "--conf", "spark.hadoop.fs.s3a.path.style.access=true",
+            "--conf", "spark.hadoop.fs.s3a.endpoint.region=ap-south-1",
+            "--conf", "spark.dynamicAllocation.enabled=false",
+            "--conf", "spark.executor.instances=12",
+            "--executor-cores", "5",
+            "--executor-memory", "15g",
+            "--conf", "spark.executor.memoryOverhead=4g",
+            "--driver-memory", "18g",
+            "--conf", "spark.driver.memoryOverhead=10g",
+            "--conf", "spark.sql.parquet.enableVectorizedReader=false",
+            "--conf", "spark.sql.iceberg.vectorization.enabled=false",
+            "--conf", "spark.hadoop.io.native.lib.available=false",
+            "--conf", "spark.executor.extraJavaOptions=-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35 -XX:G1ReservePercent=20 -XX:UseAVX=0 -Darrow.enable_unsafe_memory_access=false -Darrow.enable_null_check_for_get=true -Dhadoop.io.native.lib.available=false",
+            "--conf", "spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35 -Xss8m -XX:UseAVX=0 -Darrow.enable_unsafe_memory_access=false -Darrow.enable_null_check_for_get=true",
+            SCRIPT_PATH,
+            str(run),
+            str(TOTAL_RUNS)
+        ]
+        
+        # Run spark-submit and wait for completion
+        try:
+            result = subprocess.run(cmd, check=False)
+            if result.returncode == 0:
+                print(f"[SUCCESS] Run {run} completed")
+                success_count += 1
+            else:
+                print(f"[FAILED] Run {run} failed with exit code {result.returncode}")
+                failed_count += 1
+        except Exception as e:
+            print(f"[ERROR] Run {run} encountered an exception: {e}")
+            failed_count += 1
+        
+        print("-" * 70)
+    
+    # Final summary
+    print()
+    print("=" * 70)
+    print("BENCHMARK COMPLETE")
+    print("=" * 70)
+    print(f"Finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Total runs: {TOTAL_RUNS}")
+    print(f"Successful: {success_count}")
+    print(f"Failed: {failed_count}")
+    print("=" * 70)
+    
+    return 0 if failed_count == 0 else 1
+
+if __name__ == "__main__":
+    sys.exit(run_benchmark())
+
+```
+
+</details>
+
+
+
+
