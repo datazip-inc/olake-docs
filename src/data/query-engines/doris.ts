@@ -1,7 +1,8 @@
 // data/query-engines/doris.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const doris: QueryEngine = {
+export const doris: QueryEngine = createVersionedEngine({
   id: 'doris',
   name: 'Apache Doris v2.1+',
   description: 'MPP analytical database with comprehensive Iceberg read/write capabilities, vectorized execution, materialized view acceleration, and multi-catalog support for lake ingestion and analytics',
@@ -162,5 +163,21 @@ SELECT * FROM iceberg_meta("table"="sales_data", "query_type"="snapshots");`,
     'Be aware that Avro data files are not supported in current versions',
     'Configure appropriate catalog credentials and metastore URIs for secure access',
     'Monitor Iceberg client version (currently 1.6.1) for compatibility with other engines'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'Apache Doris supports only Iceberg spec v1 & v2; V3 catalog operations not supported' },
+        readWrite: { support: 'none', details: 'Cannot read or write Iceberg V3 format tables; V3 spec work follows upstream Iceberg roadmap' },
+        dml: { support: 'none', details: 'DML operations produce V2 format outputs only; V3 table format not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not supported; only V2 position/equality delete files supported' },
+        streaming: { support: 'none', details: 'No native streaming for any format version' },
+        formatV3: { support: 'none', details: 'Supports spec v1 & v2 only; spec v3 work follows upstream Iceberg roadmap — no GA support yet' },
+        timeTravel: { support: 'none', details: 'Time travel via FOR TIMESTAMP/VERSION AS OF only for V1/V2 format tables' },
+        security: { support: 'none', details: 'V3 format not supported; Doris RBAC and catalog IAM apply to V1/V2 tables only' }
+      },
+      score: 0,
+      description: 'Apache Doris v2.1+ supports Iceberg spec V1/V2 only; Format V3 (deletion vectors, row lineage, new data types) not yet supported'
+    }
+  }
+});

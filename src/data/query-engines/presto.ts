@@ -1,7 +1,8 @@
 // data/query-engines/presto.ts
 import { QueryEngine } from '../../types/iceberg';
+import { createVersionedEngine } from './versioning';
 
-export const presto: QueryEngine = {
+export const presto: QueryEngine = createVersionedEngine({
   id: 'presto',
   name: 'Presto 0.288+',
   description: 'Distributed SQL query engine with REST/Nessie catalogs, row-level DELETE, time travel, and configurable MoR/CoW modes for interactive analytics',
@@ -77,7 +78,7 @@ export const presto: QueryEngine = {
     },
     formatV3: {
       support: 'none',
-      details: 'Roadmap: read Deletion Vectors & Row Lineage after Iceberg 1.8 libraries land; write DV planned post-0.295. Currently supports v1/v2 only',
+      details: 'Presto 0.296 now bundles Iceberg 1.8.1 (library landed), but V3 format features (DV read/write, row lineage) have not yet shipped. V3 support planned in a future 0.29x release',
       externalLinks: [
         {
           label: 'Format Version Support',
@@ -157,5 +158,21 @@ FOR VERSION AS OF 1234567890;`,
     'Monitor Presto logs for audit and security compliance requirements',
     'Test experimental features thoroughly before production deployment',
     'Plan migration strategy for when MERGE operations become available'
-  ]
-};
+  ],
+  versions: {
+    v3: {
+      features: {
+        catalogs: { support: 'none', details: 'Presto only supports Iceberg V1/V2 format tables; V3 format not yet supported' },
+        readWrite: { support: 'none', details: 'Presto cannot read or write V3-format tables; deletion vectors and row lineage not supported' },
+        dml: { support: 'none', details: 'DML outputs V2 format only; MERGE not yet supported in any version; V3 not supported' },
+        morCow: { support: 'none', details: 'V3 deletion vectors not supported; only V2 position/equality delete files via table properties' },
+        streaming: { support: 'none', details: 'Batch-only; no streaming support for any format version' },
+        formatV3: { support: 'none', details: 'Presto 0.296 bundles Iceberg 1.8.1 but V3 format features (deletion vectors, row lineage) have not yet shipped; planned for a future release' },
+        timeTravel: { support: 'none', details: 'Time travel only for V1/V2 format tables; V3-format tables not supported' },
+        security: { support: 'none', details: 'V3 format not supported; security features apply to V1/V2 tables only' }
+      },
+      score: 0,
+      description: 'Presto supports Iceberg V1/V2 tables only; Format V3 (deletion vectors, row lineage) planned post-0.295 after Iceberg 1.8 library adoption'
+    }
+  }
+});

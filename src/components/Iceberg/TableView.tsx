@@ -1,267 +1,110 @@
-import React from 'react';
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
-import { QueryEngine } from '../../types/iceberg';
+import React, { useState } from 'react';
+import { EngineVersionSelection } from '../../types/iceberg';
 import { FEATURE_SHORT_NAMES, FEATURE_NAMES, SUPPORT_WEIGHTS } from '../../data/constants/features';
-import { SUPPORT_BADGE_STYLES } from '../../data/constants/supportLevels';
-import { STYLES, ANIMATIONS, TOOLTIP } from '../../data/constants/ui';
+import { STYLES } from '../../data/constants/ui';
 import SupportIcon from './SupportIcon';
 import CategoryBadge from './CategoryBadge';
+import { ResolvedEngineView } from './versionedTypes';
+import { buildEngineDetailUrl } from './versionState';
 
 interface TableViewProps {
-  engines: QueryEngine[];
+  engines: ResolvedEngineView[];
   fullWidth?: boolean;
   selectionMode?: boolean;
-  selectedEngines?: string[];
-  onEngineSelect?: (engineId: string, selected: boolean) => void;
+  selectedComparisons?: EngineVersionSelection[];
+  onEngineSelect?: (selection: EngineVersionSelection, selected: boolean) => void;
 }
 
-const TableView: React.FC<TableViewProps> = ({
-  engines,
-  fullWidth = false,
-  selectionMode = false,
-  selectedEngines = [],
-  onEngineSelect
-}) => {
-  const calculateSupportScore = (engine: QueryEngine): number => {
-    return Object.values(engine.features).reduce(
-      (score, feature) => score + SUPPORT_WEIGHTS[feature.support], 0
-    );
-  };
+const TableView: React.FC<TableViewProps> = ({ engines, fullWidth = false, selectionMode = false, selectedComparisons = [], onEngineSelect }) => {
+  const [hoveredCell, setHoveredCell] = useState<{ row: number; col: string } | null>(null);
 
-  const handleEngineClick = (engineId: string) => {
-    if (selectionMode && onEngineSelect) {
-      const isSelected = selectedEngines.includes(engineId);
-      onEngineSelect(engineId, !isSelected);
-    } else {
-      window.open(`/iceberg/query-engine/${engineId}`, '_self');
-    }
-  };
-
-  // Safety check for empty engines array
-  if (!engines || engines.length === 0) {
-    return (
-      <div className={`${STYLES.ROUNDED_CONTAINER} p-8 text-center`}>
-        <p className="text-gray-500 dark:text-gray-400">No engines to display</p>
-      </div>
-    );
+  if (!engines.length) {
+    return <div className={`${STYLES.ROUNDED_CONTAINER} p-8 text-center text-gray-500 dark:text-gray-400`}>No engines to display</div>;
   }
-
-  const sampleEngine = engines[0];
-  const featureKeys = sampleEngine ? Object.keys(sampleEngine.features) : [];
+  const featureKeys = Object.keys(engines[0].features);
+  const score = (e: ResolvedEngineView) => e.score ?? Object.values(e.features).reduce((s, f) => s + (SUPPORT_WEIGHTS[f?.support] ?? 0), 0);
+  const selected = (e: ResolvedEngineView) => selectedComparisons.some((x) => x.engine === e.baseName && x.version === e.version);
 
   return (
     <div className={`w-full ${fullWidth ? '' : 'max-w-6xl mx-auto'}`}>
-      <div className={`${STYLES.ROUNDED_CONTAINER} overflow-hidden`}>
-        {/* Mobile View */}
-        <div className="block lg:hidden">
-          <div className="space-y-4 p-4">
-            {engines.map((engine) => (
-              <div
-                key={engine.id}
-                className={`
-                  border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-all duration-200
-                  ${selectionMode && selectedEngines.includes(engine.id)
-                    ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-600'
-                    : 'bg-white dark:bg-gray-800 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700'
-                  }
-                  ${selectionMode ? 'cursor-pointer' : ''}
-                `}
-                onClick={() => handleEngineClick(engine.id)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                        {engine.name}
-                      </h3>
-                      {selectionMode && (
-                        <div className={`
-                          w-5 h-5 rounded border-2 flex items-center justify-center
-                          ${selectedEngines.includes(engine.id)
-                            ? 'bg-blue-600 border-blue-600'
-                            : 'border-gray-300 dark:border-gray-600'
-                          }
-                        `}>
-                          {selectedEngines.includes(engine.id) && (
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <CategoryBadge category={engine.category} />
-                  </div>
-                  {!selectionMode && (
-                    <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400" />
-                  )}
-                </div>
-
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  {engine.description}
-                </p>
-
-                {/* Feature Summary for Mobile */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {featureKeys.slice(0, 6).map((feature) => (
-                    <div key={feature} className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                        {FEATURE_SHORT_NAMES[feature as keyof QueryEngine['features']]}
-                      </span>
-                      <SupportIcon level={engine.features[feature as keyof QueryEngine['features']].support} />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Score */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Support Score</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {calculateSupportScore(engine)}/32
-                    </span>
-                    <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full"
-                        style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Desktop View */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className={`${STYLES.GRADIENT_HEADER} border-b border-gray-200 dark:border-gray-700`}>
+      <div className={`${STYLES.ROUNDED_CONTAINER} overflow-x-auto`}>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+              {selectionMode && <th className="px-3 py-3">Select</th>}
+              <th className="px-4 py-3 text-left">Query Engine</th>
+              {featureKeys.map((f) => (
+                <th key={f} className="px-3 py-3 text-center">
+                  {FEATURE_SHORT_NAMES[f as keyof typeof engines[0]['features']]}
+                </th>
+              ))}
+              <th className="px-3 py-3 text-center">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {engines.map((engine, rowIndex) => (
+              <tr key={engine.key} className={`${engine.version === 'v2' ? 'bg-gray-50/70 dark:bg-gray-800/40' : 'bg-blue-50/50 dark:bg-blue-950/20'} border-t border-gray-200 dark:border-gray-700`}>
                 {selectionMode && (
-                  <th className="px-4 py-4 text-center w-16">
-                    <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
-                      Select
-                    </span>
-                  </th>
+                  <td className="px-3 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selected(engine)}
+                      onChange={() => onEngineSelect?.({ engine: engine.baseName, version: engine.version }, !selected(engine))}
+                    />
+                  </td>
                 )}
-                <th className="px-6 py-4 text-left">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-semibold text-white dark:text-gray-100 uppercase tracking-wider">
-                      Query Engine
-                    </span>
-                  </div>
-                </th>
-                {featureKeys.map((feature) => (
-                  <th key={feature} className="px-3 py-4 text-center min-w-[100px]">
-                    <div className="group/tooltip relative">
-                      <span className="text-xs font-semibold text-gray-100 uppercase tracking-wider cursor-help">
-                        {FEATURE_SHORT_NAMES[feature as keyof QueryEngine['features']]}
-                      </span>
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg min-w-max max-w-xs whitespace-normal break-words">
-                        {FEATURE_NAMES[feature as keyof QueryEngine['features']]}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                      </div>
-                    </div>
-                  </th>
-                ))}
-                <th className="px-4 py-4 text-center min-w-[120px]">
-                  <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
-                    Score
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {engines.map((engine, index) => (
-                <tr
-                  key={engine.id}
-                  className={`
-                    ${ANIMATIONS.TABLE_ROW_HOVER} 
-                    ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/50 dark:bg-gray-800/50'}
-                    ${selectionMode && selectedEngines.includes(engine.id)
-                      ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-700'
-                      : ''
-                    }
-                  `}
-                  onClick={() => handleEngineClick(engine.id)}
-                >
-                  {selectionMode && (
-                    <td className="px-4 py-4 text-center">
-                      <div className={`
-                        w-5 h-5 rounded border-2 flex items-center justify-center mx-auto
-                        ${selectedEngines.includes(engine.id)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300 dark:border-gray-600'
-                        }
-                      `}>
-                        {selectedEngines.includes(engine.id) && (
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
+                <td className="px-4 py-3">
+                  <button className="border-none bg-transparent p-0 text-left cursor-pointer" onClick={() => window.open(buildEngineDetailUrl(engine.id, engine.version), '_self')}>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">{engine.baseName} ({engine.version.toUpperCase()})</div>
+                    <div className="mt-1"><CategoryBadge category={engine.category} /></div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{engine.description || 'N/A'}</p>
+                  </button>
+                </td>
+                {featureKeys.map((f, colIndex) => {
+                  const feature = engine.features[f as keyof typeof engine.features];
+                  const details = feature?.details;
+                  const featureName = FEATURE_NAMES[f as keyof typeof engines[0]['features']];
+                  const isHovered = hoveredCell?.row === rowIndex && hoveredCell?.col === f;
+
+                  const isLastCols = colIndex >= featureKeys.length - 2;
+                  const isFirstCols = colIndex <= 1;
+                  const isFirstRow = rowIndex === 0;
+
+                  const hAlign = isLastCols ? 'right-0' : isFirstCols ? 'left-0' : 'left-1/2 -translate-x-1/2';
+                  const arrowHAlign = isLastCols ? 'right-3' : isFirstCols ? 'left-3' : 'left-1/2 -translate-x-1/2';
+
+                  // Flip below for first row to avoid top-of-table clipping
+                  const vPos = isFirstRow ? 'top-full pt-1' : 'bottom-full pb-1';
+                  const arrowVPos = isFirstRow ? 'top-[-4px]' : 'bottom-[-4px]';
+
+                  return (
+                    <td
+                      key={f}
+                      className="px-3 py-3 text-center"
+                      onMouseEnter={() => details && setHoveredCell({ row: rowIndex, col: f })}
+                      onMouseLeave={() => setHoveredCell(null)}
+                    >
+                      <div className="inline-block relative">
+                        <SupportIcon level={feature?.support ?? 'none'} />
+
+                        {isHovered && details && (
+                          <div className={`absolute z-50 ${vPos} ${hAlign} pointer-events-none`}>
+                            <div className="bg-gray-900 dark:bg-gray-800 text-white rounded-xl shadow-2xl px-4 py-2 relative w-64">
+                              <div className={`absolute ${arrowVPos} ${arrowHAlign} w-3 h-3 bg-gray-900 dark:bg-gray-800 transform rotate-45`}></div>
+                              <p className="font-semibold text-white text-sm mb-0.5">{featureName}</p>
+                              <p className="text-gray-300 text-sm">{details}</p>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </td>
-                  )}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center space-x-3">
-                          <h3 className={`text-base font-semibold text-gray-900 dark:text-gray-100 ${ANIMATIONS.ICON_HOVER}`}>
-                            {engine.name}
-                          </h3>
-                          {!selectionMode && (
-                            <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          )}
-                        </div>
-                        <div className="mt-1">
-                          <CategoryBadge category={engine.category} />
-                        </div>
-                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                          {engine.description}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {featureKeys.map((feature) => (
-                    <td key={feature} className="px-3 py-4 text-center">
-                      <div className="group/tooltip relative">
-                        <SupportIcon level={engine.features[feature as keyof QueryEngine['features']].support} />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg whitespace-normal break-words leading-relaxed">
-                          <div className="font-medium mb-1 text-gray-100">
-                            {FEATURE_NAMES[feature as keyof QueryEngine['features']]}
-                          </div>
-                          <div className="text-gray-300 dark:text-gray-400">
-                            {engine.features[feature as keyof QueryEngine['features']].details}
-                          </div>
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                        </div>
-                      </div>
-                    </td>
-                  ))}
-
-                  <td className="px-4 py-4 text-center">
-                    <div className="flex flex-col items-center space-y-1">
-                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        {calculateSupportScore(engine)}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        / 32
-                      </div>
-                      <div className="w-12 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  );
+                })}
+                <td className="px-3 py-3 text-center font-semibold">{score(engine)}/32</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
