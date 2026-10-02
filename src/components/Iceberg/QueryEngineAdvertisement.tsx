@@ -65,7 +65,7 @@ function QueryEngineAdvertisement() {
 
               {/* Main CTA Button */}
               <Link
-                to="/iceberg/query-engine"
+                to="/docs/understanding/compatibility-engines/"
                 className="group inline-flex w-full sm:w-auto lg:w-full items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 hover:text-white text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
               >
                 <span>Explore Query Engines</span>
@@ -76,7 +76,7 @@ function QueryEngineAdvertisement() {
 
               {/* Secondary Link */}
               <Link
-                to="/iceberg/query-engine"
+                to="/docs/understanding/compatibility-engines/"
                 className="inline-flex w-full sm:w-auto lg:w-full items-center justify-center gap-2 px-6 py-3 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors duration-200"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
