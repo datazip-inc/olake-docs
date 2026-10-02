@@ -1,0 +1,95 @@
+---
+slug: snowflake-horizon-catalog-olake-go
+title: "Write Apache Iceberg Tables to Snowflake Horizon Catalog with OLake Go"
+description: "OLake Go writes Apache Iceberg tables to Snowflake Horizon Catalog over the Iceberg REST Catalog API. See how writes work, then run a MySQL to Horizon example."
+tags: [horizon, snowflake, iceberg, olake, rest-catalog, mysql]
+authors: [siddharth]
+image: /img/blog/2026/9/horizon-cover.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![OLake Go writing Apache Iceberg tables into Snowflake Horizon Catalog](/img/blog/2026/9/horizon-cover.webp)
+
+OLake Go already supports Iceberg catalogs such as Glue, Polaris, Unity, Lakekeeper, and BigLake. Horizon is now on that list.
+
+[Snowflake Horizon Catalog](https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon) is Snowflake’s Iceberg REST catalog. OLake Go talks to it the same way it talks to any other REST catalog: it writes the table files, then registers those tables at Horizon’s REST endpoint. After that, Snowflake (and any other engine that can reach the same catalog) can query them.
+
+## What actually happens when OLake Go writes to Horizon
+
+Think of Iceberg as two layers that have to stay in sync:
+
+- **Data files** - the Parquet that holds the rows
+- **The catalog** - tracks which files belong to which table, and which snapshot is current
+
+OLake Go produces the files. Horizon tracks the tables. The files themselves live in Snowflake-managed storage. OLake Go does not need a Snowflake-specific writer for this. It uses the Iceberg REST protocol that Horizon already exposes.
+
+When a source row is updated or deleted, Iceberg does not edit the old Parquet in place. OLake Go writes a **position delete file** that names the data file and row number to skip, then writes the new row if this was an update. Horizon does not support equality deletes (deletes by column value). Snowflake reads position deletes, so that is what OLake Go writes into Horizon.
+
+Finding those row numbers by scanning the table on every change would be slow. OLake Go keeps a local **Pebble DB index** that maps each row to its current file and position. CDC writes stay fast because the location is already known.
+
+![OLake Go writes Iceberg data and registers tables through Horizon’s REST catalog](/img/blog/2026/9/olake-go-write-to-snowflake.webp)
+
+## Connect Horizon in OLake
+
+In the OLake UI, create an Iceberg destination and set the catalog type to Horizon. Enter the catalog URL, Snowflake database, role, and credentials for the authentication method you already use in Snowflake.
+
+The full setup, including every authentication method, is in [Horizon Catalog setup](REPLACE_WITH_HORIZON_DOCS_URL). Once the connection succeeds, any OLake source can write to this destination.
+
+:::note Position deletes
+OLake Go writes Iceberg **position delete files** to Horizon, not equality deletes. A local Pebble DB index tracks each row’s file and position, so updates and deletes do not need a table scan.
+:::
+
+## Example: MySQL to Horizon
+
+Any source OLake Go already supports can write to Horizon. A MySQL sync is a simple example. Set up MySQL with the [MySQL connector](/docs/connectors/mysql), and Horizon with [Horizon Catalog setup](REPLACE_WITH_HORIZON_DOCS_URL). The rest is a normal OLake job.
+
+### Create the job
+
+In the OLake UI, open **Jobs** and click **Create Job**.
+
+![Create Job in the OLake UI](/img/blog/2026/9/create-job.webp)
+
+### Select source and destination
+
+Give the job a name and pick a schedule.
+
+Choose **MySQL** as the source connector, then the MySQL source you already configured. For the destination, choose **Apache Iceberg**, then the Horizon destination. Click **Next**. OLake validates both sides before you can continue.
+
+![Select an existing MySQL source and the Horizon Iceberg destination](/img/blog/2026/9/job-page.webp)
+
+### Configure streams and create job
+
+On **Streams**, select the tables to replicate. Set the sync mode (for example **Full Refresh + CDC**), and use **Upsert** with **position deletes** so updates match what Horizon can read. Leave other stream settings as you need them.
+
+Click **Create Job**.
+
+![Configure streams, sync mode, and position deletes for the Horizon job](/img/blog/2026/9/streams-page.webp)
+
+### Run the sync
+
+The job is saved on the Jobs page. Open the job’s actions menu and choose **Sync Now** if you do not want to wait for the next scheduled run. Wait until the sync is **Completed**.
+
+![Sync Now from the Jobs actions menu](/img/blog/2026/9/sync-now.webp)
+
+### Query in Snowflake
+
+The tables are Iceberg tables in the Snowflake database you set on the Horizon destination. In a Snowflake worksheet:
+
+```sql
+SELECT *
+FROM OLAKE."horizon_job_nyn"."employee"
+LIMIT 10;
+```
+
+Swap in your database, schema, and table names.
+
+![Query the synced Iceberg table from a Snowflake worksheet](/img/blog/2026/9/query-snowflake.webp)
+
+## Wrap-up
+
+Horizon is now an Iceberg REST destination in OLake Go. Use it like any other catalog.
+
+Full configuration is in [Horizon Catalog setup](REPLACE_WITH_HORIZON_DOCS_URL).
+
+<BlogCTA />
