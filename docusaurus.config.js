@@ -107,8 +107,6 @@ const config = {
     // Smooth (animated) scrolling for in-page links only; honours reduced motion
     require.resolve('./src/clientModules/smoothAnchors.ts'),
     // Image fade-in, theme-toggle fade and navbar scroll shadow (all honour reduced motion)
-    // Cross-fade between pages (View Transitions API); browsers without it swap instantly
-    require.resolve('./src/clientModules/viewTransitions.ts'),
     require.resolve('./src/clientModules/imageFade.ts'),
     require.resolve('./src/clientModules/uiFeel.ts'),
     require.resolve('./src/clientModules/deferredGtag.ts'),
@@ -201,7 +199,10 @@ const config = {
       tagName: 'meta',
       attributes: { name: 'msvalidate.01', content: 'C36AD97FE1CEDCD4041338A807D6BC4C' }
     },
-    // No twitter:site / twitter:creator handles anywhere on the site (removed on purpose).
+    {
+      tagName: 'meta',
+      attributes: { name: 'twitter:site', content: '@_olake' }
+    },
     // No global robots meta: Docusaurus already emits the right one per page, and a site-wide
     // "index" tag contradicted the per-page noindex on paginated lists, /search/ and 404.
     // Critical resource preloads for mobile performance
@@ -266,7 +267,9 @@ const config = {
         },
         // The navbar is rendered by src/theme/Navbar/Content from components/landing/chrome/navItems.ts.
         // This list is not displayed, but must stay non-empty: theme-common turns the mobile
-        // burger (and with it the docs sidebar drawer) off when navbar.items is empty.
+        // burger (and with it the docs sidebar drawer) off when navbar.items is empty. The check lives
+        // in the unexported context of NavbarMobileSidebarProvider (theme-common
+        // contexts/navbarMobileSidebar.js), so a wrapper cannot override it; keep this item.
         items: [{ to: '/docs', label: 'Docs', position: 'left' }]
       },
 
@@ -611,7 +614,7 @@ const config = {
             from: '/docs/core/cli'
           },
           {
-            to: '/docs/install/docker-cli/#sync-with-state-command',
+            to: '/docs/install/docker-cli/#sync',
             from: '/docs/core/state-controller'
           },
           {
@@ -872,7 +875,7 @@ const config = {
             from: '/olake/mongodb/colake-connectors-for-olake'
           },
           {
-            to: '/docs/install/docker-cli/#sync-with-state-command',
+            to: '/docs/install/docker-cli/#sync',
             from: '/olake/mongodb/colake-state-management'
           },
           {
