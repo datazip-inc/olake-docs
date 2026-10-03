@@ -74,8 +74,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            Showing <span className="font-bold text-gray-900 dark:text-gray-100">{resultsCount}</span> of{' '}
-            <span className="font-bold text-gray-900 dark:text-gray-100">{totalCount}</span> engines
+            Showing <span className="font-semibold text-gray-900 dark:text-gray-100">{resultsCount}</span> of{' '}
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{totalCount}</span> engines
           </span>
           
           {(filters.searchTerm || filters.category !== 'all') && (

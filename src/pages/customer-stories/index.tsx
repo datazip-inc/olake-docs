@@ -61,7 +61,7 @@ export default function CustomersPage() {
   }
 
   return (
-    <LakesidePage title={TITLE} description={DESCRIPTION} activePath='/customer-stories' heroBackground={<StoriesHero />}>
+    <LakesidePage title='Customer Stories' description={DESCRIPTION} activePath='/customer-stories' heroBackground={<StoriesHero />}>
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content={TITLE} />

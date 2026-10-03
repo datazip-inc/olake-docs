@@ -139,7 +139,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
       <div className={`w-full ${fullWidth ? '' : 'max-w-4xl mx-auto'} p-4 sm:p-6 lg:p-8`}>
         {/* Enhanced Header with Stats */}
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl font-semibold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-4">
             Apache Iceberg Query Engine Support Matrix
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-6">

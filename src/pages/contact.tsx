@@ -145,7 +145,7 @@ const ContactPage = () => {
 
   return (
     <LakesidePage
-      title='Contact Us - OLake'
+      title='Contact Us'
       description='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool.'
       activePath='/contact'
       heroBackground={

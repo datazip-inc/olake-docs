@@ -143,7 +143,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                 className={`${colors.icon.split(' ')[0]} transition-all duration-700`}
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-700 dark:text-gray-300">
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-700 dark:text-gray-300">
               {score}
             </span>
           </div>
@@ -161,7 +161,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
             )}
           </div>
           
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
             {title}
           </h3>
           
@@ -212,7 +212,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                     <div className="relative z-10">
                       <div className="flex items-start justify-between">
                         <div>
-                          <Dialog.Title className="text-3xl font-bold mb-2">
+                          <Dialog.Title className="text-3xl font-semibold mb-2">
                             {details.title}
                           </Dialog.Title>
                           <p className="text-lg text-white/90 max-w-3xl">

@@ -243,7 +243,7 @@ const TableView: React.FC<TableViewProps> = ({
 
                   <td className="px-4 py-4 text-center">
                     <div className="flex flex-col items-center space-y-1">
-                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                      <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {calculateSupportScore(engine)}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">

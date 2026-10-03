@@ -71,7 +71,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
       {(title || description) && (
         <div className="mb-8">
           {title && (
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {title}
             </h2>
           )}
@@ -100,7 +100,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                     aria-sort="none"
                   >
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         {column.header}
                       </span>
                       {column.tooltip && (

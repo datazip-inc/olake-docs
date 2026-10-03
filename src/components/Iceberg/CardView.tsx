@@ -69,7 +69,7 @@ const CardView: React.FC<CardViewProps> = ({ engines }) => {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Support Score</span>
               <div className="flex items-center space-x-2">
-                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {calculateSupportScore(engine)}
                 </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">/32</span>

@@ -208,7 +208,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
           <div className="absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
           
           <div className="relative z-10">
-            <h1 className="text-5xl font-bold mb-4 animate-fade-in">
+            <h1 className="text-5xl font-semibold mb-4 animate-fade-in">
               {title}
             </h1>
             <p className="text-xl text-white/90 max-w-3xl leading-relaxed">
@@ -221,7 +221,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         <section className="mb-20">
           <div className="flex items-center mb-8">
             <PiSparkle aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
               Key Features
             </h2>
           </div>
@@ -241,7 +241,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         {/*<section className="mb-20">
           <div className="flex items-center mb-8">
             <PiCode aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
               Code Examples
             </h2>
           </div>
@@ -300,7 +300,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         <section className="mb-20">
           <div className="flex items-center mb-8">
             <PiLightbulb aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
               Use Cases
             </h2>
           </div>
@@ -319,7 +319,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                       </div>
                     )}
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                         {useCase.title}
                       </h3>
                       <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -349,7 +349,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
           <div className="relative z-10">
             <div className="flex items-center mb-8">
               <PiBookOpen aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
                 Resources & Documentation
               </h2>
             </div>

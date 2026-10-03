@@ -144,7 +144,8 @@ export function describeDocTitle(
   const candidates = [
     isFusion ? ['Fusion', section].filter(Boolean).join(' ') : section,
     isFusion ? 'Fusion' : undefined,
-    isFusion ? undefined : 'OLake Go'
+    // not 'OLake Go': the site title adds ' | OLake', which would name the site twice
+    isFusion ? undefined : 'Docs'
   ]
   for (const qualifier of candidates) {
     if (!qualifier || overlaps(qualifier, title)) continue

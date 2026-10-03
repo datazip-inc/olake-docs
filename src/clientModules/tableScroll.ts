@@ -1,5 +1,5 @@
 /**
- * A table that is wider than its column scrolls sideways, and a very tall one scrolls inside itself (see "Tables" in content-elements.css).
+ * A table that is wider than its column scrolls sideways (see "Tables" in content-elements.css).
  * A scroll container that a keyboard cannot reach is an accessibility failure, so every table that
  * actually overflows gets tabindex=0 (arrow keys then scroll it) and an accessible name. Tables that
  * fit are left alone, so there are no pointless tab stops.
@@ -44,8 +44,8 @@ function labelFor(table: HTMLTableElement): string {
 }
 
 function evaluate(table: HTMLTableElement) {
-  // tables also cap their height (sticky header), so a tall table scrolls vertically as well
-  const overflows = table.scrollWidth > table.clientWidth + 1 || table.scrollHeight > table.clientHeight + 1
+  // tables only scroll sideways (they never cap their height), so only horizontal overflow counts
+  const overflows = table.scrollWidth > table.clientWidth + 1
   if (overflows) {
     if (!table.hasAttribute(MARK)) {
       table.setAttribute(MARK, '')

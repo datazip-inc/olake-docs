@@ -157,7 +157,7 @@ const AboutTeam = () => {
 
   return (
     <LakesidePage
-      title="About Us - OLake Team"
+      title="About Us"
       description="Meet the OLake team behind the fastest open-source data replication tool. Learn about our mission to simplify database to Apache Iceberg workflows."
       activePath='/about-us'
       heroBackground={

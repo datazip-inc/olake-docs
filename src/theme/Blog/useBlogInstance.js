@@ -15,20 +15,21 @@ const INSTANCES = {
     label: 'Blog',
     // Used in sentences: "... on the OLake blog"
     phrase: 'the OLake blog',
-    // Used in "in <phrase>" for author/tag page titles
-    titlePhrase: 'OLake Blog',
+    // Used in author/tag page titles ('Posts by Name - Blog'). No "OLake" in it: the site title
+    // already adds ' | OLake', and 'OLake Blog | OLake' named the site twice.
+    titlePhrase: 'Blog',
     topics: 'data replication, Apache Iceberg and lakehouse guides'
   },
   iceberg: {
     label: 'Iceberg',
     phrase: 'the OLake Apache Iceberg blog',
-    titlePhrase: 'OLake Iceberg Blog',
+    titlePhrase: 'Iceberg Blog',
     topics: 'Iceberg partitioning, catalogs, query engines and how-to guides'
   },
   'customer-stories': {
     label: 'Customer Stories',
     phrase: 'OLake customer stories',
-    titlePhrase: 'OLake Customer Stories',
+    titlePhrase: 'Customer Stories',
     topics: 'case studies from teams replicating databases to Apache Iceberg'
   }
 }
@@ -71,7 +72,7 @@ function fitTitle(candidates) {
 }
 
 /**
- * <title> of a tag page: 'Posts tagged "OLake" - OLake Blog'. It carries no post count, so it does
+ * <title> of a tag page: 'Posts tagged "OLake" - Blog'. It carries no post count, so it does
  * not change each time a post is published. `instance` is the object useBlogInstance() returns.
  */
 export function tagPageTitle(label, instance, listMetadata) {
@@ -85,7 +86,7 @@ export function tagPageTitle(label, instance, listMetadata) {
 }
 
 /**
- * <title> of an author page: 'Posts by Name - OLake Blog'. No post count, for the same reason as
+ * <title> of an author page: 'Posts by Name - Blog'. No post count, for the same reason as
  * the tag pages.
  */
 export function authorPageTitle(name, instance, listMetadata) {
