@@ -18,7 +18,7 @@ export const ANIMATIONS = {
   CARD_HOVER: "group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-blue-500/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-1 hover:border-blue-300 dark:hover:border-blue-600",
 
   // Table row hover effects
-  TABLE_ROW_HOVER: "group hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-950/30 dark:hover:to-indigo-950/30 transition-all duration-200 cursor-pointer",
+  TABLE_ROW_HOVER: "group hover:bg-linear-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-950/30 dark:hover:to-indigo-950/30 transition-all duration-200 cursor-pointer",
 
   // Icon hover effects
   ICON_HOVER: "group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors",
@@ -41,9 +41,9 @@ export const ANIMATIONS = {
 
 export const STYLES = {
   // Background gradients
-  GRADIENT_HEADER: "bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800",
-  GRADIENT_BLUE: "bg-gradient-to-r from-blue-600 to-indigo-600",
-  GRADIENT_FEATURE: "bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
+  GRADIENT_HEADER: "bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800",
+  GRADIENT_BLUE: "bg-linear-to-r from-blue-600 to-indigo-600",
+  GRADIENT_FEATURE: "bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
 
   // Container styles
   ROUNDED_CONTAINER: "bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700",
@@ -59,7 +59,7 @@ export const STYLES = {
   BUTTON_OUTLINE: "inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors",
 
   // Text styles
-  TEXT_GRADIENT: "bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent",
+  TEXT_GRADIENT: "bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent",
   TEXT_MUTED: "text-gray-600 dark:text-gray-400",
   TEXT_PRIMARY: "text-gray-900 dark:text-gray-100",
   TEXT_SECONDARY: "text-gray-700 dark:text-gray-300"
@@ -73,11 +73,11 @@ export const VIEW_TYPES = {
 
 export const TOOLTIP = {
   // Remove whitespace-nowrap and add responsive max-widths
-  CONTAINER: "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-xs sm:max-w-sm md:max-w-md whitespace-normal break-words leading-relaxed",
+  CONTAINER: "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-xs sm:max-w-sm md:max-w-md whitespace-normal wrap-break-word leading-relaxed",
 
   ARROW: "absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700",
 
-  CONTAINER_LARGE: "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-sm sm:max-w-md md:max-w-lg whitespace-normal break-words leading-relaxed"
+  CONTAINER_LARGE: "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-sm sm:max-w-md md:max-w-lg whitespace-normal wrap-break-word leading-relaxed"
 } as const;
 
 export const BREAKPOINTS = {
@@ -92,7 +92,7 @@ export const BREAKPOINTS = {
 export const COMPARISON = {
   // Comparison mode specific styles
   SELECTION_BORDER: "border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30",
-  SELECTION_CHECKBOX: "w-5 h-5 rounded border-2 flex items-center justify-center",
+  SELECTION_CHECKBOX: "w-5 h-5 rounded-sm border-2 flex items-center justify-center",
   SELECTION_CHECKBOX_CHECKED: "bg-blue-600 border-blue-600",
   SELECTION_CHECKBOX_UNCHECKED: "border-gray-300 dark:border-gray-600",
 
@@ -100,7 +100,7 @@ export const COMPARISON = {
   MAX_ENGINES: 4,
 
   // Comparison view styles
-  COMPARISON_CARD: "bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-2xl p-8 border border-blue-200 dark:border-blue-800",
+  COMPARISON_CARD: "bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-2xl p-8 border border-blue-200 dark:border-blue-800",
   COMPARISON_TABLE: "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
 } as const;
 

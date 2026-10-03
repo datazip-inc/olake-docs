@@ -7,7 +7,7 @@ export const clickhouse: QueryEngine = {
   description: 'Rapidly evolving OLAP database with experimental Iceberg read support, time travel, REST catalogs, and comprehensive write capabilities planned for 2025',
   category: 'general-purpose',
   website: 'https://clickhouse.com/',
-  documentation: 'https://clickhouse.com/docs/en/engines/table-engines/integrations/iceberg',
+  documentation: 'https://clickhouse.com/docs/reference/engines/table-engines/integrations/iceberg',
   features: {
     catalogs: {
       support: 'partial',
@@ -19,7 +19,7 @@ export const clickhouse: QueryEngine = {
         },
         {
           label: 'Iceberg Engine Documentation',
-          url: 'https://clickhouse.com/docs/en/engines/table-engines/integrations/iceberg'
+          url: 'https://clickhouse.com/docs/reference/engines/table-engines/integrations/iceberg'
         },
         {
           label: 'GitHub Iceberg Roadmap',

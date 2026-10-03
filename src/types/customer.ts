@@ -9,6 +9,8 @@ export interface CustomerStory {
   description: string;
   route: string;
   img: string;
+  imgWidth: number;
+  imgHeight: number;
   alt: string;
   companyName: string;
   category: CustomerCategory;

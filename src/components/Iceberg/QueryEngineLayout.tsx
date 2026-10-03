@@ -1,19 +1,14 @@
 // src/components/Iceberg/QueryEngineLayout.tsx
 import React from 'react';
 import Head from '@docusaurus/Head';
+import { serializeJsonLd } from '@site/src/components/JsonLd'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { useLocation } from '@docusaurus/router';
 import { FeatureCard, FeatureCardProps } from './FeatureCard';
 import { InteractiveTable, InteractiveTableProps } from './InteractiveTable';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { 
-  CodeBracketIcon,
-  LightBulbIcon,
-  BookOpenIcon,
-  ArrowTopRightOnSquareIcon,
-  SparklesIcon
-} from '@heroicons/react/24/outline';
+import { PiArrowSquareOut, PiBookOpen, PiCode, PiLightbulb, PiSparkle } from 'react-icons/pi'
 
 export interface FaqQuestion {
   '@type': 'Question';
@@ -82,6 +77,11 @@ const resourceTypeStyles = {
 
 const SITE_URL = 'https://olake.io';
 
+// FAQPage markup must match FAQs the page actually shows. These pages render no FAQ section,
+// so the FAQ schema (faqMainEntity, from src/data/query-engine-intro-schemas.js) is held back.
+// Flip this once the layout displays the same questions and answers.
+const EMIT_FAQ_SCHEMA = false;
+
 export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
   title,
   description,
@@ -99,7 +99,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
   const { siteConfig } = useDocusaurusContext();
   const location = useLocation();
   const siteUrl = siteConfig?.url?.replace(/\/$/, '') || SITE_URL;
-  const canonicalUrl = `${siteUrl}${location.pathname}`.replace(/\/$/, '') || `${siteUrl}${location.pathname}`;
+  const canonicalUrl = `${siteUrl}${location.pathname}`.replace(/\/?$/, '/');
   const pageTitleStr = schemaTitle ?? (typeof title === 'string' ? title : 'Query Engine');
   const pageDescriptionStr = schemaDescription ?? (typeof description === 'string' ? description : 'Apache Iceberg query engine documentation.');
 
@@ -189,30 +189,26 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
     { id: 'website', data: websiteSchema },
     { id: 'webPage', data: webPageSchema },
     { id: 'breadcrumb', data: breadcrumbSchema },
-    ...(faqSchema ? [{ id: 'faq', data: faqSchema }] : [])
+    ...(EMIT_FAQ_SCHEMA && faqSchema ? [{ id: 'faq', data: faqSchema }] : [])
   ];
 
   return (
     <>
       <Head>
         {jsonLdSchemas.map((schema) => (
-          <script
-            key={schema.id}
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(schema.data) }}
-          />
+          <script key={schema.id} type="application/ld+json">{serializeJsonLd(schema.data)}</script>
         ))}
       </Head>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header with gradient background */}
-        <div className="relative mb-16 overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-12 text-white shadow-2xl">
+        <div className="relative mb-16 overflow-hidden rounded-3xl bg-linear-to-r from-blue-600 to-indigo-700 p-12 text-white shadow-2xl">
           <div className="absolute inset-0 bg-black/10"></div>
           <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
           <div className="absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
           
           <div className="relative z-10">
-            <h1 className="text-5xl font-bold mb-4 animate-fade-in">
+            <h1 className="text-5xl font-semibold mb-4 animate-fade-in">
               {title}
             </h1>
             <p className="text-xl text-white/90 max-w-3xl leading-relaxed">
@@ -224,8 +220,8 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         {/* Feature Cards Section */}
         <section className="mb-20">
           <div className="flex items-center mb-8">
-            <SparklesIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <PiSparkle aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
               Key Features
             </h2>
           </div>
@@ -244,15 +240,15 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         {/* Code Examples Section */}
         {/*<section className="mb-20">
           <div className="flex items-center mb-8">
-            <CodeBracketIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <PiCode aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
               Code Examples
             </h2>
           </div>
            <div className="space-y-6">
             {codeExamples.map((example, idx) => (
               <div key={idx} className="overflow-hidden rounded-2xl bg-gray-900 shadow-xl">
-                <div className="bg-gradient-to-r from-gray-800 to-gray-850 px-6 py-4 border-b border-gray-700">
+                <div className="bg-linear-to-r from-gray-800 to-gray-850 px-6 py-4 border-b border-gray-700">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-white">
@@ -303,8 +299,8 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         {/* Use Cases Section */}
         <section className="mb-20">
           <div className="flex items-center mb-8">
-            <LightBulbIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <PiLightbulb aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
               Use Cases
             </h2>
           </div>
@@ -314,16 +310,16 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                 key={idx} 
                 className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="absolute inset-0 bg-linear-to-br from-indigo-600/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative p-8">
                   <div className="flex items-start space-x-4 mb-4">
                     {useCase.icon || (
                       <div className="p-3 rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
-                        <LightBulbIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                        <PiLightbulb aria-hidden="true" className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                       </div>
                     )}
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                         {useCase.title}
                       </h3>
                       <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -334,7 +330,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                   <ul className="space-y-3 ml-16">
                     {useCase.scenarios.map((scenario, sIdx) => (
                       <li key={sIdx} className="flex items-start">
-                        <span className="flex-shrink-0 w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full mt-1.5 mr-3"></span>
+                        <span className="shrink-0 w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full mt-1.5 mr-3"></span>
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           {scenario}
                         </span>
@@ -348,12 +344,12 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
         </section>
 
         {/* Resources Section */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 p-10 shadow-inner">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-purple-600/5"></div>
+        <section className="relative overflow-hidden rounded-3xl bg-linear-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 p-10 shadow-inner">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-600/5 to-purple-600/5"></div>
           <div className="relative z-10">
             <div className="flex items-center mb-8">
-              <BookOpenIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              <PiBookOpen aria-hidden="true" className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mr-3" />
+              <h2 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
                 Resources & Documentation
               </h2>
             </div>
@@ -366,12 +362,12 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                 rel="noopener noreferrer"
                 className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-5 transition-opacity"></div>
+                <div className="absolute inset-0 bg-linear-to-br from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-5 transition-opacity"></div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                    <BookOpenIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    <PiBookOpen aria-hidden="true" className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <ArrowTopRightOnSquareIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  <PiArrowSquareOut aria-hidden="true" className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                 </div>
                 <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Official Documentation
@@ -387,12 +383,12 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                 rel="noopener noreferrer"
                 className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-green-600 to-emerald-600 opacity-0 group-hover:opacity-5 transition-opacity"></div>
+                <div className="absolute inset-0 bg-linear-to-br from-green-600 to-emerald-600 opacity-0 group-hover:opacity-5 transition-opacity"></div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-3 rounded-xl bg-green-100 dark:bg-green-900/30">
-                    <SparklesIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    <PiSparkle aria-hidden="true" className="w-6 h-6 text-green-600 dark:text-green-400" />
                   </div>
-                  <ArrowTopRightOnSquareIcon className="w-5 h-5 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors" />
+                  <PiArrowSquareOut aria-hidden="true" className="w-5 h-5 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors" />
                 </div>
                 <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Getting Started Guide
@@ -422,7 +418,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
                           {style.label}
                         </p>
                       </div>
-                      <ArrowTopRightOnSquareIcon className={`w-5 h-5 ${style.icon} opacity-60 group-hover:opacity-100 transition-all`} />
+                      <PiArrowSquareOut aria-hidden="true" className={`w-5 h-5 ${style.icon} opacity-60 group-hover:opacity-100 transition-all`} />
                     </div>
                   </a>
                 );

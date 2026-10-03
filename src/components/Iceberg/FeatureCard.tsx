@@ -3,16 +3,7 @@ import React, { useState } from 'react';
 import { Dialog, Transition, Tab } from '@headlessui/react';
 import { Fragment } from 'react';
 import Link from '@docusaurus/Link';
-import { 
-  XMarkIcon, 
-  CheckCircleIcon, 
-  ExclamationTriangleIcon,
-  ArrowTopRightOnSquareIcon,
-  ChartBarIcon,
-  CodeBracketIcon,
-  DocumentTextIcon,
-  SparklesIcon
-} from '@heroicons/react/24/outline';
+import { PiArrowSquareOut, PiChartBar, PiCheckCircle, PiCode, PiFileText, PiSparkle, PiWarning, PiX } from 'react-icons/pi'
 
 export interface FeatureDetail {
   title: string;
@@ -60,35 +51,35 @@ export interface FeatureCardProps {
 
 const colorClasses = {
   blue: {
-    card: 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20',
+    card: 'bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20',
     border: 'border-blue-200/50 dark:border-blue-800/50',
     chip: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800',
     icon: 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50',
     accent: 'from-blue-600 to-indigo-600'
   },
   green: {
-    card: 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20',
+    card: 'bg-linear-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20',
     border: 'border-green-200/50 dark:border-green-800/50',
     chip: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 border border-green-200 dark:border-green-800',
     icon: 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50',
     accent: 'from-green-600 to-emerald-600'
   },
   purple: {
-    card: 'bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20',
+    card: 'bg-linear-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20',
     border: 'border-purple-200/50 dark:border-purple-800/50',
     chip: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
     icon: 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50',
     accent: 'from-purple-600 to-pink-600'
   },
   orange: {
-    card: 'bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20',
+    card: 'bg-linear-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20',
     border: 'border-orange-200/50 dark:border-orange-800/50',
     chip: 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 border border-orange-200 dark:border-orange-800',
     icon: 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/50',
     accent: 'from-orange-600 to-amber-600'
   },
   red: {
-    card: 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20',
+    card: 'bg-linear-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20',
     border: 'border-red-200/50 dark:border-red-800/50',
     chip: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border border-red-200 dark:border-red-800',
     icon: 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50',
@@ -97,10 +88,10 @@ const colorClasses = {
 };
 
 const tabIcons = {
-  overview: ChartBarIcon,
-  technical: CodeBracketIcon,
-  architecture: DocumentTextIcon,
-  resources: SparklesIcon
+  overview: PiChartBar,
+  technical: PiCode,
+  architecture: PiFileText,
+  resources: PiSparkle
 };
 
 export const FeatureCard: React.FC<FeatureCardProps> = ({
@@ -126,7 +117,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
         `}
       >
         {/* Background gradient effect */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${colors.accent} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+        <div className={`absolute inset-0 bg-linear-to-br ${colors.accent} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
         
         {/* Score indicator */}
         {score !== undefined && (
@@ -152,7 +143,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                 className={`${colors.icon.split(' ')[0]} transition-all duration-700`}
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-700 dark:text-gray-300">
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-700 dark:text-gray-300">
               {score}
             </span>
           </div>
@@ -160,17 +151,17 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
         
         <div className="relative z-10">
           <div className="flex items-start justify-between mb-4">
-            <div className={`p-3 rounded-xl ${colors.icon} shadow-sm`}>
+            <div className={`p-3 rounded-xl ${colors.icon} shadow-xs`}>
               {icon}
             </div>
             {chip && (
-              <span className={`px-3 mx-12 py-1 text-xs font-semibold rounded-full ${colors.chip} shadow-sm`}>
+              <span className={`px-3 mx-12 py-1 text-xs font-semibold rounded-full ${colors.chip} shadow-xs`}>
                 {chip}
               </span>
             )}
           </div>
           
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
             {title}
           </h3>
           
@@ -180,7 +171,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
           
           <div className="mt-4 flex items-center text-xs font-medium text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
             <span>Explore details</span>
-            <ArrowTopRightOnSquareIcon className="w-3 h-3 ml-1" />
+            <PiArrowSquareOut aria-hidden="true" className="w-3 h-3 ml-1" />
           </div>
         </div>
       </div>
@@ -216,12 +207,12 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
               >
                 <Dialog.Panel className="w-full max-w-6xl transform overflow-hidden rounded-3xl bg-white dark:bg-gray-900 shadow-2xl transition-all">
                   {/* Header */}
-                  <div className={`relative bg-gradient-to-br ${colors.accent} p-8 text-white`}>
+                  <div className={`relative bg-linear-to-br ${colors.accent} p-8 text-white`}>
                     <div className="absolute inset-0 bg-black/20" />
                     <div className="relative z-10">
                       <div className="flex items-start justify-between">
                         <div>
-                          <Dialog.Title className="text-3xl font-bold mb-2">
+                          <Dialog.Title className="text-3xl font-semibold mb-2">
                             {details.title}
                           </Dialog.Title>
                           <p className="text-lg text-white/90 max-w-3xl">
@@ -233,7 +224,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                           className="p-2 rounded-xl bg-white/10 hover:bg-white/20 border-none transition-colors backdrop-blur-sm cursor-pointer"
                           onClick={() => setIsOpen(false)}
                         >
-                          <XMarkIcon className="h-6 w-6" />
+                          <PiX aria-hidden="true" className="h-6 w-6" />
                         </button>
                       </div>
                     </div>
@@ -258,12 +249,12 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                             className={({ selected }) =>
                               `flex items-center space-x-2 px-4 py-2.5 text-sm font-medium rounded-xl border-none transition-all
                               ${selected 
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' 
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs' 
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                               }`
                             }
                           >
-                            <Icon className="w-4 h-4" />
+                            <Icon aria-hidden="true" className="w-4 h-4" />
                             <span className="capitalize">{tab}</span>
                           </Tab>
                         );
@@ -277,7 +268,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-6">
                               <h4 className="flex items-center text-lg font-semibold text-green-800 dark:text-green-300 mb-4">
-                                <CheckCircleIcon className="w-5 h-5 mr-2" />
+                                <PiCheckCircle aria-hidden="true" className="w-5 h-5 mr-2" />
                                 Strengths
                               </h4>
                               <ul className="space-y-2">
@@ -292,7 +283,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                             
                             <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-6">
                               <h4 className="flex items-center text-lg font-semibold text-amber-800 dark:text-amber-300 mb-4">
-                                <ExclamationTriangleIcon className="w-5 h-5 mr-2" />
+                                <PiWarning aria-hidden="true" className="w-5 h-5 mr-2" />
                                 Limitations
                               </h4>
                               <ul className="space-y-2">
@@ -307,7 +298,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                             
                             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6">
                               <h4 className="flex items-center text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
-                                <SparklesIcon className="w-5 h-5 mr-2" />
+                                <PiSparkle aria-hidden="true" className="w-5 h-5 mr-2" />
                                 Best For
                               </h4>
                               <ul className="space-y-2">
@@ -441,7 +432,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                                       {link.type || 'Documentation'}
                                     </p>
                                   </div>
-                                  <ArrowTopRightOnSquareIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                                  <PiArrowSquareOut aria-hidden="true" className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                                 </a>
                               );
                             })}

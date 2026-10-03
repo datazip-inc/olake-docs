@@ -7,7 +7,7 @@ export const bigquery: QueryEngine = {
   description: 'Serverless Google Cloud data warehouse with managed Iceberg tables, automatic optimization, Storage Write API streaming, and deep GCP ecosystem integration',
   category: 'general-purpose',
   website: 'https://cloud.google.com/bigquery',
-  documentation: 'https://cloud.google.com/bigquery/docs/iceberg-tables',
+  documentation: 'https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery',
   features: {
     catalogs: {
       support: 'partial',
@@ -19,7 +19,7 @@ export const bigquery: QueryEngine = {
         },
         {
           label: 'Create External Iceberg Tables',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-external-tables'
+          url: 'https://docs.cloud.google.com/bigquery/docs/iceberg-external-tables'
         }
       ]
     },
@@ -29,7 +29,7 @@ export const bigquery: QueryEngine = {
       externalLinks: [
         {
           label: 'BigQuery Iceberg DML Operations',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#dml'
+          url: 'https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery'
         },
         {
           label: 'Managed Iceberg Capabilities',
@@ -43,7 +43,7 @@ export const bigquery: QueryEngine = {
       externalLinks: [
         {
           label: 'Data Manipulation Language DML',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#dml'
+          url: 'https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery'
         }
       ]
     },
@@ -57,7 +57,7 @@ export const bigquery: QueryEngine = {
         },
         {
           label: 'Merge-on-Read Support',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-external-tables'
+          url: 'https://docs.cloud.google.com/bigquery/docs/iceberg-external-tables'
         }
       ]
     },
@@ -77,7 +77,7 @@ export const bigquery: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Specification Support',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-external-tables'
+          url: 'https://docs.cloud.google.com/bigquery/docs/iceberg-external-tables'
         }
       ]
     },
@@ -87,7 +87,7 @@ export const bigquery: QueryEngine = {
       externalLinks: [
         {
           label: 'Time Travel for Historical Data',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#time_travel'
+          url: 'https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery'
         }
       ]
     },
@@ -97,7 +97,7 @@ export const bigquery: QueryEngine = {
       externalLinks: [
         {
           label: 'Column-level Security and Data Masking',
-          url: 'https://cloud.google.com/bigquery/docs/iceberg-tables#security'
+          url: 'https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery'
         },
         {
           label: 'Fine-grained Security Policies',

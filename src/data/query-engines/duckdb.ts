@@ -7,7 +7,7 @@ export const duckdb: QueryEngine = {
   description: 'A light-weight, read-only analytics engine for Iceberg with SQL time travel, external file caching, and REST catalog support',
   category: 'analytics',
   website: 'https://duckdb.org/',
-  documentation: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html',
+  documentation: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview',
   features: {
     catalogs: {
       support: 'partial',
@@ -15,11 +15,11 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview'
         },
         {
           label: 'Iceberg REST Catalogs',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs'
         }
       ]
     },
@@ -29,11 +29,11 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview'
         },
         {
           label: 'Troubleshooting - Write Limitations',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting'
         }
       ]
     },
@@ -47,7 +47,7 @@ export const duckdb: QueryEngine = {
         },
         {
           label: 'Troubleshooting - Writing Not Supported',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting'
         }
       ]
     },
@@ -57,7 +57,7 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'Troubleshooting - Delete Limitations',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting'
         }
       ]
     },
@@ -67,7 +67,7 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview'
         }
       ]
     },
@@ -77,11 +77,11 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview'
         },
         {
           label: 'Troubleshooting - Current Limitations',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/troubleshooting'
         }
       ]
     },
@@ -91,7 +91,7 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Extension Overview',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/overview'
         }
       ]
     },
@@ -101,11 +101,11 @@ export const duckdb: QueryEngine = {
       externalLinks: [
         {
           label: 'S3 Iceberg Import',
-          url: 'https://duckdb.org/docs/stable/guides/network_cloud_storage/s3_iceberg_import.html'
+          url: 'https://duckdb.org/docs/stable/guides/network_cloud_storage/s3_iceberg_import'
         },
         {
           label: 'Iceberg REST Catalogs Authentication',
-          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs.html'
+          url: 'https://duckdb.org/docs/stable/core_extensions/iceberg/iceberg_rest_catalogs'
         }
       ]
     }

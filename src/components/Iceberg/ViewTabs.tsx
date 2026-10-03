@@ -1,5 +1,5 @@
 import React, { useState, useRef, useLayoutEffect } from 'react'
-import { TableCellsIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline'
+import { PiListBullets, PiSquaresFour, PiTable } from 'react-icons/pi'
 import { ViewType } from '../../types/iceberg'
 import { VIEW_TYPES } from '../../data/constants/ui'
 
@@ -13,9 +13,9 @@ interface ViewTabsProps {
 // This ensures it is only created once and its reference remains stable
 // across re-renders, preventing an infinite loop in the useLayoutEffect.
 const tabs = [
-  { id: VIEW_TYPES.TABLE, label: 'Table', icon: TableCellsIcon, shortLabel: 'Table' },
-  { id: VIEW_TYPES.CARDS, label: 'Cards', icon: Squares2X2Icon, shortLabel: 'Cards' },
-  { id: VIEW_TYPES.FEATURES, label: 'Features', icon: ListBulletIcon, shortLabel: 'Features' }
+  { id: VIEW_TYPES.TABLE, label: 'Table', icon: PiTable, shortLabel: 'Table' },
+  { id: VIEW_TYPES.CARDS, label: 'Cards', icon: PiSquaresFour, shortLabel: 'Cards' },
+  { id: VIEW_TYPES.FEATURES, label: 'Features', icon: PiListBullets, shortLabel: 'Features' }
 ];
 
 /**
@@ -64,7 +64,7 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
           {/* Animated background indicator */}
           {!disabled && (
             <div
-              className="absolute top-1 bottom-1 bg-white dark:bg-gray-700 rounded-lg shadow-sm transition-all duration-300 ease-out border border-gray-200 dark:border-gray-600"
+              className="absolute top-1 bottom-1 bg-white dark:bg-gray-700 rounded-lg shadow-xs transition-all duration-300 ease-out border border-gray-200 dark:border-gray-600"
               style={indicatorStyle}
             />
           )}
@@ -77,12 +77,14 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
             return (
               <button
                 key={tab.id}
-                ref={(el) => (tabsRef.current[index] = el)}
+                ref={(el) => {
+                  tabsRef.current[index] = el
+                }}
                 onClick={() => handleTabClick(tab.id as ViewType)}
                 disabled={disabled}
                 className={`
                   relative z-10 flex items-center justify-center space-x-2 px-6 py-3 text-sm font-medium border-none bg-gray-200 dark:bg-slate-700 rounded-lg transition-all duration-200 flex-1 cursor-pointer
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                  focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500
                   focus-visible:ring-offset-2
                   focus-visible:ring-offset-gray-100 dark:focus-visible:ring-offset-gray-800
                   ${disabled 
@@ -96,7 +98,7 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
                 aria-pressed={isActive}
                 aria-label={`Switch to ${tab.label} view`}
               >
-                <Icon className={`w-4 h-4 ${disabled ? '' : 'transition-transform group-hover:scale-110'}`} />
+                <Icon aria-hidden="true" className={`w-4 h-4 ${disabled ? '' : 'transition-transform group-hover:scale-110'}`} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -113,7 +115,7 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
           {/* Animated background indicator for mobile */}
           {!disabled && (
             <div
-              className="absolute top-1 bottom-1 bg-white dark:bg-gray-700 rounded-md shadow-sm transition-all duration-300 ease-out border border-gray-200 dark:border-gray-600"
+              className="absolute top-1 bottom-1 bg-white dark:bg-gray-700 rounded-md shadow-xs transition-all duration-300 ease-out border border-gray-200 dark:border-gray-600"
               style={indicatorStyle}
             />
           )}
@@ -126,7 +128,9 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
             return (
               <button
                 key={tab.id}
-                ref={(el) => (tabsRef.current[index] = el)}
+                ref={(el) => {
+                  tabsRef.current[index] = el
+                }}
                 onClick={() => handleTabClick(tab.id as ViewType)}
                 disabled={disabled}
                 className={`
@@ -143,7 +147,7 @@ const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange, disabled 
                 aria-label={`Switch to ${tab.label} view`}
                 title={tab.label}
               >
-                <Icon className={`w-5 h-5 ${disabled ? '' : 'transition-transform hover:scale-110'}`} />
+                <Icon aria-hidden="true" className={`w-5 h-5 ${disabled ? '' : 'transition-transform hover:scale-110'}`} />
               </button>
             );
           })}

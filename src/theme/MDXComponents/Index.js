@@ -7,12 +7,14 @@ import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
 import FusionBlogCTA from '@site/src/components/FusionBlogCTA'
 import TestimonialCard from '@site/src/components/TestimonialCard'
+import TLDR from '@site/src/components/TLDR'
 import CollapsibleTip from '@site/src/components/CollapsibleTip';
+import Figure from '@site/src/components/Figure';
+import Video from '@site/src/components/Video';
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
 import DocCardList from '@theme/DocCardList';
-import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
 import DockerDiscoverMongoDB from '../../../docs/shared/commands/DockerDiscoverMongoDB.mdx'
 import DockerSyncMongoDB from '../../../docs/shared/commands/DockerSyncMongoDB.mdx'
@@ -141,14 +143,16 @@ const MDXComponents = {
   Tpsr,
   //   img,
   //   Img: img,
-  DocsFooter,
   Tabs,
   TabItem,
   Hr,
   BlogCTA,
   FusionBlogCTA,
   TestimonialCard,
+  TLDR,
   CollapsibleTip,
+  Figure,
+  Video,
   DocCardList,
 
   DockerDiscoverMongoDB,

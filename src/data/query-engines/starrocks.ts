@@ -7,7 +7,7 @@ export const starrocks: QueryEngine = {
   description: 'Vectorized OLAP engine with read-write Iceberg support, async materialized views, CBO optimization, and strong analytical performance for lakehouse analytics',
   category: 'general-purpose',
   website: 'https://www.starrocks.io/',
-  documentation: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/',
+  documentation: 'https://docs.starrocks.io/docs/quick_start/iceberg/',
   features: {
     catalogs: {
       support: 'full',
@@ -15,7 +15,7 @@ export const starrocks: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Catalog Configuration',
-          url: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/'
+          url: 'https://docs.starrocks.io/docs/quick_start/iceberg/'
         },
         {
           label: 'Apache Iceberg Blog',
@@ -63,7 +63,7 @@ export const starrocks: QueryEngine = {
       externalLinks: [
         {
           label: 'Async Materialized Views',
-          url: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/'
+          url: 'https://docs.starrocks.io/docs/quick_start/iceberg/'
         }
       ]
     },
@@ -73,7 +73,7 @@ export const starrocks: QueryEngine = {
       externalLinks: [
         {
           label: 'File Format Support',
-          url: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/'
+          url: 'https://docs.starrocks.io/docs/quick_start/iceberg/'
         }
       ]
     },

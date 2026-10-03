@@ -1,9 +1,9 @@
 // src/components/Iceberg/InteractiveTable.tsx
 import React, { useState } from 'react';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { PiInfo } from 'react-icons/pi'
 import { Transition } from '@headlessui/react';
 
-import { useLocation } from "react-router-dom";
+import { useLocation } from "@docusaurus/router";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 
 
@@ -71,7 +71,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
       {(title || description) && (
         <div className="mb-8">
           {title && (
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {title}
             </h2>
           )}
@@ -91,7 +91,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
             aria-label={title || "Data table"}
           >
             <thead>
-              <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850">
+              <tr className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850">
                 {columns.map((column) => (
                   <th
                     key={column.key}
@@ -100,7 +100,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                     aria-sort="none"
                   >
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         {column.header}
                       </span>
                       {column.tooltip && (
@@ -108,11 +108,11 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                           <button
                             onMouseEnter={() => setHoveredHeader(column.key)}
                             onMouseLeave={() => setHoveredHeader(null)}
-                            className="rounded-lg border-none p-1 transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-gray-700"
+                            className="rounded-lg border-none p-1 transition-colors hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 dark:hover:bg-gray-700"
                             aria-label={`Information about ${column.header}`}
                             aria-describedby={`tooltip-${column.key}`}
                           >
-                            <InformationCircleIcon className="w-4 h-4 text-blue-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                            <PiInfo aria-hidden="true" className="w-4 h-4 text-blue-400 hover:text-gray-600 dark:hover:text-gray-300" />
                           </button>
 
                           <Transition
@@ -146,7 +146,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
               {rows.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
-                  className="group transition-all duration-200 hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-50/50 dark:hover:from-gray-800/50 dark:hover:to-gray-800/30"
+                  className="group transition-all duration-200 hover:bg-linear-to-r hover:from-gray-50 hover:to-gray-50/50 dark:hover:from-gray-800/50 dark:hover:to-gray-800/30"
                 >
                   {columns.map((column) => {
                     const cell = row[column.key];
@@ -188,7 +188,7 @@ export const InteractiveTable: React.FC<InteractiveTableProps> = ({
                             <div className="bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-xl shadow-2xl p-4 relative">
                               <div className="absolute bottom-[-6px] left-6 w-3 h-3 bg-gray-900 dark:bg-gray-800 transform rotate-45"></div>
                               <div className="flex items-start space-x-2">
-                                <InformationCircleIcon className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                                <PiInfo aria-hidden="true" className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                                 <div className="text-gray-100">{cell.tooltip}</div>
                               </div>
                             </div>

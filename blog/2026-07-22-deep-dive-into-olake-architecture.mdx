@@ -1,7 +1,7 @@
 ---
 slug: olake-architecture-deep-dive
 title: "Deep dive into OLake Go architecture"
-description: "How OLake Go works under the hood: eight sources driven by one sync engine, chunked parallel backfills, native CDC, state management, the Arrow write path to Apache Iceberg, and Parquet on S3-compatible storage."
+description: "OLake Go architecture deep dive: eight sources, one sync engine, chunked parallel backfills, native CDC, state and the Arrow write path to Iceberg."
 image: /img/blog/cover/olake-architecture-deep-dive-cover.webp
 authors: [vaibhav]
 tags: [olake, iceberg, cdc, go]
@@ -9,17 +9,17 @@ tags: [olake, iceberg, cdc, go]
 
 import BlogCTA from '@site/src/components/BlogCTA';
 
-# Deep dive into OLake Go architecture
-
 ![Inside OLake Go's Architecture with schematic database, data flow, and network icon illustrations on a dark blue background](/img/blog/cover/olake-architecture-deep-dive-cover.webp)
 
-## TL;DR
+<TLDR>
 
 - **OLake Go** is an open-source, single-binary ingestion engine that replicates PostgreSQL, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka, and S3 into Apache Iceberg (or Parquet on object storage), with no Spark, Flink, Kafka, or Debezium in the pipeline.
 - One **sync engine** drives all eight sources. A source is just a small driver interface; parallel execution, retries, state tracking, and exactly-once delivery are all built once in the shared engine, not per source.
 - **Full loads are chunked**, which makes them run in parallel and resume after a crash by re-running only the unfinished chunks.
 - **CDC** tails each database's native log (Postgres WAL, MySQL binlog, MongoDB change streams, SQL Server CDC tables) and hands off from the initial load without losing or duplicating rows.
 - **Progress lives in `state.json` and in the Iceberg table itself**, so recovering from a crash means rereading a file, not rebuilding a running server.
+
+</TLDR>
 
 [OLake Go](https://github.com/datazip-inc/olake) is an open source ingestion engine that replicates data from transactional databases, Kafka, and S3 into Apache Iceberg tables, or as plain Parquet files on S3-compatible object storage. It is written in Go and runs as a single process: no Kafka cluster in the middle, no Spark or Flink job doing the writing, no Debezium server tailing your database.
 
@@ -57,7 +57,7 @@ At the highest level, a sync is three stages connected by an in-process pipeline
 
 </div>
 
-Everything ships as one container image per source, and every image exposes the same command surface: `spec`, `check`, `discover`, `sync`, and `clear-destination`. To know more about what each command and its flags do, read the [commands and flags documentation](https://olake.io/docs/community/commands-and-flags).
+Everything ships as one container image per source, and every image exposes the same command surface: `spec`, `check`, `discover`, `sync`, and `clear-destination`. To know more about what each command and its flags do, read the [commands and flags documentation](/docs/community/commands-and-flags).
 
 A sync is fully described by JSON files passed as flags: the source config, the destination config, a `streams.json` selecting which streams to sync and how (sync mode, partitioning, filters, normalization), and a `state.json` carrying whatever the previous run learned. The process reads them, does its work, updates `state.json`, and exits:
 
@@ -272,7 +272,7 @@ That small struct is the unit of everything in a full load: the unit of parallel
 
 </div>
 
-Chunk boundaries are computed from cheap metadata rather than by scanning data: page counts and physical row locators, primary key ranges, or a small sample of keys, depending on what the source database exposes. Each source has its own strategy, from CTID ranges in Postgres to `splitVector` in MongoDB, and we have written a whole blog on exactly how each one works: [What makes OLake Go fast](https://olake.io/blog/what-makes-olake-fast). Boundaries are also chosen with the destination in mind, sizing each chunk to produce roughly one well-sized Parquet file rather than a spray of small ones.
+Chunk boundaries are computed from cheap metadata rather than by scanning data: page counts and physical row locators, primary key ranges, or a small sample of keys, depending on what the source database exposes. Each source has its own strategy, from CTID ranges in Postgres to `splitVector` in MongoDB, and we have written a whole blog on exactly how each one works: [What makes OLake Go fast](/blog/what-makes-olake-fast). Boundaries are also chosen with the destination in mind, sizing each chunk to produce roughly one well-sized Parquet file rather than a spray of small ones.
 
 The execution loop is compact enough to show whole:
 
@@ -302,7 +302,7 @@ utils.ConcurrentInGroupWithRetry(a.GlobalConnGroup, chunks, a.driver.MaxRetries(
 
 The ordering here is what makes full loads resumable. The complete chunk list is persisted to `state.json` before any data is read, each chunk is removed from state only after it finishes, and chunks are processed through the bounded worker pool with each one writing through its own destination writer. Kill the process at any point, restart it, and the engine reads the surviving chunk list and processes only what is left.
 
-There is one subtle failure window: a chunk's data was committed at the destination, but the process died before the state file recorded it. For Iceberg syncs, OLake Go closes this window at commit time. Every chunk writes under a stable thread ID, and each Iceberg commit records that ID in the table's own metadata, so a retried chunk is recognized and skipped instead of written twice. To see this guarantee traced end to end, check how [exactly-once delivery works during full refresh](https://olake.io/blog/exactly-once-delivery-iceberg#full-refresh).
+There is one subtle failure window: a chunk's data was committed at the destination, but the process died before the state file recorded it. For Iceberg syncs, OLake Go closes this window at commit time. Every chunk writes under a stable thread ID, and each Iceberg commit records that ID in the table's own metadata, so a retried chunk is recognized and skipped instead of written twice. To see this guarantee traced end to end, check how [exactly-once delivery works during full refresh](/blog/exactly-once-delivery-iceberg#full-refresh).
 
 This chunked full load runs first for every stream. Incremental and CDC then continue from there, reading only what has changed since. For CDC, the interesting part is what happens the moment that first load's last chunk finishes.
 
@@ -319,7 +319,7 @@ Every database exposes its change log differently, and OLake Go reads each one n
 | **MongoDB** | Oplog | Change streams, resumed via resume tokens |
 | **SQL Server** | CDC capture tables | Polled in LSN ranges through the native CDC functions |
 
-Each source has its own CDC prerequisites, and OLake Go validates them when the connection is set up, so a misconfiguration surfaces immediately instead of hours into a sync. The setup guide for each connector covers exactly what to enable: [PostgreSQL](https://olake.io/docs/connectors/postgres/overview), [MySQL](https://olake.io/docs/connectors/mysql/overview), [SQL Server](https://olake.io/docs/connectors/mssql), and [MongoDB](https://olake.io/docs/connectors/mongodb/cdc_setup).
+Each source has its own CDC prerequisites, and OLake Go validates them when the connection is set up, so a misconfiguration surfaces immediately instead of hours into a sync. The setup guide for each connector covers exactly what to enable: [PostgreSQL](/docs/connectors/postgres), [MySQL](/docs/connectors/mysql), [SQL Server](/docs/connectors/mssql), and [MongoDB](/docs/connectors/mongodb/cdc_setup).
 
 ### One log or many: the execution topologies
 
@@ -525,7 +525,7 @@ for {
 
 The decoding step is where `pgoutput` messages become records. Relation messages describe each table's shape and are cached so later change messages can be decoded against them, begin and commit messages mark transaction boundaries (the session only ever stops at a completed transaction, never mid-way through one), and each insert, update, or delete is converted and pushed to its stream's writer. One practical warning surfaces here too: if a table's replica identity is not `FULL`, unchanged TOAST column values can be missing from update events, and OLake Go logs exactly that so you can fix it on the source.
 
-The acknowledgement order is the load-bearing detail: the slot's LSN advances only after the destination commit succeeds, which means Postgres keeps WAL around until the lakehouse truly has the data. A crash between commit and acknowledgement is also covered: the committed position stored in the destination is compared against the local state on the next run, and if the destination is ahead, the engine replays exactly up to that position before resuming normal streaming, so the slot, the state file, and the table converge. To trace this failure by failure, with worked examples for each source family, check how [exactly-once delivery works during CDC](https://olake.io/blog/exactly-once-delivery-iceberg#cdc).
+The acknowledgement order is the load-bearing detail: the slot's LSN advances only after the destination commit succeeds, which means Postgres keeps WAL around until the lakehouse truly has the data. A crash between commit and acknowledgement is also covered: the committed position stored in the destination is compared against the local state on the next run, and if the destination is ahead, the engine replays exactly up to that position before resuming normal streaming, so the slot, the state file, and the table converge. To trace this failure by failure, with worked examples for each source family, check how [exactly-once delivery works during CDC](/blog/exactly-once-delivery-iceberg#cdc).
 
 ## Incremental sync
 
@@ -558,9 +558,9 @@ a.state.SetCursor(stream.Self(), primaryCursor, a.FormatCursorValue(maxPrimaryCu
 
 The comparison behind that maximum is type-aware, so timestamps, numbers, and ObjectIDs all order correctly rather than being compared as strings. And because every record is stamped with `_op_type` of `u`, the destination applies it as an [upsert](#destinations-and-the-write-path), replacing the previous copy of the row by its `_olake_id`, so a rerun of the same window updates rows in place instead of duplicating them. Streams configured append-only are the exception; they skip the replacement and simply append.
 
-The bookmark is protected the same way CDC positions are: it is saved to `state.json` only after the destination commit, and a copy rides inside the commit itself, so a crash between committing and saving state is recovered from the destination on the next run. To walk that failure sequence step by step, check how [exactly-once delivery works for incremental syncs](https://olake.io/blog/exactly-once-delivery-iceberg#incremental). Cursor values are also normalized before saving, timestamps to a fixed UTC format and MongoDB ObjectIDs to hex, so a bookmark written by one run always compares cleanly in the next.
+The bookmark is protected the same way CDC positions are: it is saved to `state.json` only after the destination commit, and a copy rides inside the commit itself, so a crash between committing and saving state is recovered from the destination on the next run. To walk that failure sequence step by step, check how [exactly-once delivery works for incremental syncs](/blog/exactly-once-delivery-iceberg#incremental). Cursor values are also normalized before saving, timestamps to a fixed UTC format and MongoDB ObjectIDs to hex, so a bookmark written by one run always compares cleanly in the next.
 
-#### Example: incremental on Postgres
+### Example: incremental on Postgres
 
 For a Postgres table with `updated_at` as the primary cursor, the two phases boil down to two shapes of query:
 
@@ -788,7 +788,7 @@ if sizeSoFar < targetSize {
 }
 ```
 
-Data files target 512 MB and delete files 64 MB. Writers are also partition-aware: each record's partition values are computed from the stream's `partition_regex` (with Iceberg transforms like `day` or `identity`), and every partition key gets its own rolling writer, so files land already organized the way the table is partitioned. Finished files are shipped to the JVM as raw bytes over gRPC, and the JVM places them in object storage under paths it allocated. To see how this pipeline was designed, check the [Arrow writer architecture](https://olake.io/blog/olake-arrow-based-iceberg-ingestion#olake-gos-new-arrow-writer-architecture) post.
+Data files target 512 MB and delete files 64 MB. Writers are also partition-aware: each record's partition values are computed from the stream's `partition_regex` (with Iceberg transforms like `day` or `identity`), and every partition key gets its own rolling writer, so files land already organized the way the table is partitioned. Finished files are shipped to the JVM as raw bytes over gRPC, and the JVM places them in object storage under paths it allocated. To see how this pipeline was designed, check the [Arrow writer architecture](/blog/olake-arrow-based-iceberg-ingestion#olake-gos-new-arrow-writer-architecture) post.
 
 ### Upserts: equality and positional deletes
 
@@ -926,7 +926,7 @@ if prevMetadataState != nil {
 
 Change streams recover against the recorded position instead of a chunk id: if the table is ahead of the local state, the run replays the log up to exactly the table's position before resuming, so nothing is reapplied and nothing is skipped. That inversion, treating the committed table as the source of truth rather than the process's own memory, is what lets a stateless binary promise exactly-once.
 
-The full guarantee, walked through failure by failure with a worked example for full refresh, CDC, and incremental, is its own deep dive: [How OLake Go guarantees exactly-once delivery to Apache Iceberg](https://olake.io/blog/exactly-once-delivery-iceberg).
+The full guarantee, walked through failure by failure with a worked example for full refresh, CDC, and incremental, is its own deep dive: [How OLake Go guarantees exactly-once delivery to Apache Iceberg](/blog/exactly-once-delivery-iceberg).
 
 ## Schema and type handling
 
@@ -1037,7 +1037,7 @@ if evolution {
 }
 ```
 
-Conflicting types that are not clean promotions, an `int` column that starts receiving strings, converge to their common ancestor exactly as they did in discovery: the column widens to `String` rather than the sync breaking. The reasoning behind evolving in place, and the full set of promotions Iceberg permits, are covered in the [schema evolution docs](https://olake.io/docs/features/schema).
+Conflicting types that are not clean promotions, an `int` column that starts receiving strings, converge to their common ancestor exactly as they did in discovery: the column widens to `String` rather than the sync breaking. The reasoning behind evolving in place, and the full set of promotions Iceberg permits, are covered in the [schema evolution docs](/docs/features/schema).
 
 ## Wrapping up
 
@@ -1051,10 +1051,10 @@ And the **destination itself is the source of truth**. State on disk is an optim
 
 And it does all of it as a single process, with no cluster to babysit between the database and the table. If this is the kind of system you like taking apart, the code is the best next read: start at the sync command and follow a record from a chunk all the way to the commit.
 
-- Get started: [OLake Go quickstart](https://olake.io/docs/getting-started/quickstart)
+- Get started: [OLake Go quickstart](/docs/getting-started/quickstart)
 - The code: [github.com/datazip-inc/olake](https://github.com/datazip-inc/olake)
-- Contribute guide to OLake Go: [contributing guide](https://olake.io/docs/community/contributing)
-- Ask us anything: [OLake Go Slack community](https://olake.io/slack)
+- Contribute guide to OLake Go: [contributing guide](/docs/community/contributing)
+- Ask us anything: [OLake Go Slack community](https://olake.io/slack/)
 
 ## FAQ
 
@@ -1072,7 +1072,7 @@ The Go process builds the Parquet files itself, but the Iceberg catalog integrat
 
 ### Q4. How is exactly-once guaranteed without an external coordinator?
 
-Every Iceberg commit writes the data files and a table property named `olake_2pc`, recording what was committed, in one atomic transaction. The table itself is the ledger: on the next run OLake Go reads `olake_2pc` and skips anything already committed. The [exactly-once delivery deep dive](https://olake.io/blog/exactly-once-delivery-iceberg) walks through it failure by failure.
+Every Iceberg commit writes the data files and a table property named `olake_2pc`, recording what was committed, in one atomic transaction. The table itself is the ledger: on the next run OLake Go reads `olake_2pc` and skips anything already committed. The [exactly-once delivery deep dive](/blog/exactly-once-delivery-iceberg) walks through it failure by failure.
 
 ### Q5. If a column is added to a source table mid-sync, do I need to re-run discover?
 

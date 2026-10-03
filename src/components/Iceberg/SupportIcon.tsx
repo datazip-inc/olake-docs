@@ -1,11 +1,6 @@
 // components/Iceberg/SupportIcon.tsx
 import React from 'react';
-import { 
-  CheckIcon,
-  XMarkIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline';
-import { Zap } from 'lucide-react';
+import { PiCheck, PiLightning, PiWarning, PiX } from 'react-icons/pi'
 import { SupportLevel } from '../../types/iceberg';
 import { SUPPORT_ICON_COLORS } from '../../data/constants/supportLevels';
 
@@ -19,13 +14,13 @@ const SupportIcon: React.FC<SupportIconProps> = ({ level, className }) => {
 
   switch (level) {
     case 'full':
-      return <CheckIcon className={iconClass} />;
+      return <PiCheck aria-hidden="true" className={iconClass} />;
     case 'partial':
-      return <ExclamationTriangleIcon className={iconClass} />;
+      return <PiWarning aria-hidden="true" className={iconClass} />;
     case 'preview':
-      return <Zap className={iconClass} />;
+      return <PiLightning aria-hidden="true" className={iconClass} />;
     case 'none':
-      return <XMarkIcon className={iconClass} />;
+      return <PiX aria-hidden="true" className={iconClass} />;
   }
 };
 

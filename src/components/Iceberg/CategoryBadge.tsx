@@ -1,6 +1,6 @@
 // components/Iceberg/CategoryBadge.tsx
 import React from 'react';
-import { Database, Zap, Cloud, Cpu, BarChart3 } from 'lucide-react';
+import { PiChartBar, PiCloud, PiCpu, PiDatabase, PiLightning } from 'react-icons/pi'
 import { QueryEngine } from '../../types/iceberg';
 import { CATEGORY_STYLES, CATEGORY_LABELS } from '../../data/constants/categories';
 
@@ -21,17 +21,17 @@ const CategoryBadge: React.FC<CategoryBadgeProps> = ({
   const getCategoryIcon = () => {
     switch (category) {
       case 'general-purpose':
-        return <Database className={iconClass} />;
+        return <PiDatabase aria-hidden="true" className={iconClass} />;
       case 'streaming':
-        return <Zap className={iconClass} />;
+        return <PiLightning aria-hidden="true" className={iconClass} />;
       case 'analytics':
-        return <BarChart3 className={iconClass} />;
+        return <PiChartBar aria-hidden="true" className={iconClass} />;
       case 'cloud-native':
-        return <Cloud className={iconClass} />;
+        return <PiCloud aria-hidden="true" className={iconClass} />;
       case 'embedded':
-        return <Cpu className={iconClass} />;
+        return <PiCpu aria-hidden="true" className={iconClass} />;
       default:
-        return <Database className={iconClass} />;
+        return <PiDatabase aria-hidden="true" className={iconClass} />;
     }
   };
 

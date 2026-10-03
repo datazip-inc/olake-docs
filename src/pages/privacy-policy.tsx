@@ -1,17 +1,14 @@
 import React from 'react';
-import Layout from '@theme/Layout';
+import LegalPage from '@site/src/components/pages-misc/LegalPage';
 
 const PrivacyPolicyPage = () => {
   return (
-    <Layout
+    <LegalPage
       title="Privacy Policy — OLake™ by Datazip"
       description="Privacy Policy for OLake™ by Datazip. How we collect, use, process, share, and protect your personal data under DPDPA and applicable laws."
+      heading="Privacy Policy — OLake™ by Datazip"
+      lastUpdated="Last Updated: 5 February 2026"
     >
-      <main className="container margin-vert--lg">
-        <div className="row">
-          <div className="col col--10 col--offset-1">
-            <h1>Privacy Policy — OLake™ by Datazip</h1>
-            <p className="margin-bottom--md" style={{ color: 'var(--ifm-font-color-base)' }}><strong>Last Updated: 5 February 2026</strong></p>
 
             <h2>1. INTRODUCTION</h2>
             <p>
@@ -243,10 +240,7 @@ const PrivacyPolicyPage = () => {
 
             <h2>19. GOVERNING LAW</h2>
             <p>This Privacy Policy is governed by the laws of India, particularly the DPDPA and its implementing rules and regulations.</p>
-          </div>
-        </div>
-      </main>
-    </Layout>
+    </LegalPage>
   );
 };
 

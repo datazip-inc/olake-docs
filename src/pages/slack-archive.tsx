@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { useLocation } from '@docusaurus/router';
+import RedirectNotice from '@site/src/components/pages-misc/RedirectNotice';
 
 const ARCHIVE_URL = 'https://datazip-inc.github.io/olake-slack-archive/';
 
@@ -31,17 +32,7 @@ export default function SlackArchiveRedirect() {
         />
         <link rel="canonical" href={canonicalUrl} />
       </Head>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        flexDirection: 'column',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>
-        <h1>Redirecting to OLake Community Slack Archive...</h1>
-        <p>If you're not redirected automatically, <a href={ARCHIVE_URL}>click here</a>.</p>
-      </div>
+      <RedirectNotice title='Redirecting to OLake Community Slack Archive...' href={ARCHIVE_URL} />
     </>
   );
 }

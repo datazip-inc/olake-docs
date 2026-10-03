@@ -1,166 +1,145 @@
 #!/usr/bin/env node
 
 /**
- * Script to generate image sitemap for all static images
+ * Generates build/image-sitemap.xml from the BUILT site.
+ *
+ * For every page listed in build/sitemap.xml it reads the page's HTML and collects the images that
+ * page actually shows (<img src> plus og:image), so each <url> is a real page URL with its own
+ * images. Images that appear on most pages (logo, nav and footer art) are skipped, and so are
+ * data: URIs and images hosted on other sites. Pages that are noindex or client-redirect stubs are
+ * skipped.
+ *
+ * Google only reads <image:loc> (image:title and image:caption were dropped in 2022), so that is
+ * all that is written. A page can list at most 1000 images.
+ *
+ * Usage: node scripts/generate-image-sitemap.js [buildDir]   (default: ./build)
+ * Run after `docusaurus build`; robots.txt points crawlers at /image-sitemap.xml.
  */
 
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('fs')
+const path = require('path')
 
-async function generateImageSitemap() {
-  
-  const staticDir = path.join(__dirname, '../static');
-  const buildDir = path.join(__dirname, '../build');
-  const imageSitemapPath = path.join(buildDir, 'image-sitemap.xml');
-  const siteUrl = 'https://olake.io';
-  
+const SITE_URL = 'https://olake.io'
+const MAX_IMAGES_PER_PAGE = 1000
+// An image shown on more than this share of pages is site chrome, not page content
+const CHROME_SHARE = 0.3
+
+const escapeXml = (s) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+
+const decodeEntities = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'")
+
+/** Reads <loc>/<lastmod> pairs from build/sitemap.xml. */
+function readPages(buildDir) {
+  const xml = fs.readFileSync(path.join(buildDir, 'sitemap.xml'), 'utf8')
+  const pages = []
+  for (const block of xml.match(/<url>[\s\S]*?<\/url>/g) || []) {
+    const loc = /<loc>([^<]+)<\/loc>/.exec(block)
+    if (!loc) continue
+    const lastmod = /<lastmod>([^<]+)<\/lastmod>/.exec(block)
+    pages.push({ url: decodeEntities(loc[1]), lastmod: lastmod ? lastmod[1] : null })
+  }
+  return pages
+}
+
+/** Maps a page URL to its built index.html, or null if it is not a built page. */
+function htmlPathFor(buildDir, pageUrl) {
+  if (!pageUrl.startsWith(SITE_URL)) return null
+  const pathname = decodeURIComponent(new URL(pageUrl).pathname)
+  const file = path.join(buildDir, pathname, pathname.endsWith('.html') ? '' : 'index.html')
+  return fs.existsSync(file) ? file : null
+}
+
+/** Absolute, percent-encoded URLs of the images in one HTML document (same site only). */
+function extractImages(html) {
+  const found = new Set()
+  const add = (raw) => {
+    if (!raw) return
+    const src = decodeEntities(raw.trim())
+    if (!src || src.startsWith('data:')) return
+    let url
+    try {
+      url = new URL(src, SITE_URL + '/')
+    } catch {
+      return
+    }
+    if (url.origin !== SITE_URL) return
+    if (!/\.(png|jpe?g|gif|webp|avif|svg)$/i.test(url.pathname)) return
+    found.add(url.href) // URL#href percent-encodes spaces and other unsafe characters
+  }
+
+  for (const tag of html.match(/<img\b[^>]*>/gi) || []) {
+    const m = /\ssrc=(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag)
+    if (m) add(m[1] ?? m[2] ?? m[3])
+  }
+  for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+    if (!/\bproperty=(?:"og:image"|'og:image'|og:image)(?=[\s/>])/i.test(tag)) continue
+    const m = /\scontent=(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag)
+    if (m) add(m[1] ?? m[2] ?? m[3])
+  }
+  return [...found]
+}
+
+function generateImageSitemap(buildDir = path.join(__dirname, '../build')) {
+  const pages = readPages(buildDir)
+
+  const perPage = []
+  const pageCountByImage = new Map()
+  for (const page of pages) {
+    const file = htmlPathFor(buildDir, page.url)
+    if (!file) continue
+    const html = fs.readFileSync(file, 'utf8')
+    // Defensive: a noindex page or a client-redirect stub must not be advertised, even if it slipped
+    // into sitemap.xml
+    if (/<meta\b[^>]*name=["']?robots["']?[^>]*noindex/i.test(html) || /http-equiv=["']?refresh/i.test(html)) continue
+    const images = extractImages(html)
+    perPage.push({ ...page, images })
+    for (const img of images) pageCountByImage.set(img, (pageCountByImage.get(img) || 0) + 1)
+  }
+
+  const chromeLimit = Math.max(3, Math.floor(perPage.length * CHROME_SHARE))
+  const isChrome = (img) => pageCountByImage.get(img) > chromeLimit
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+  xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+  xml += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
+
+  let pagesWithImages = 0
+  let imageCount = 0
+  for (const page of perPage) {
+    let images = page.images.filter((img) => !isChrome(img))
+    if (images.length === 0) continue
+    if (images.length > MAX_IMAGES_PER_PAGE) {
+      console.warn(`image-sitemap: ${page.url} has ${images.length} images, keeping ${MAX_IMAGES_PER_PAGE}`)
+      images = images.slice(0, MAX_IMAGES_PER_PAGE)
+    }
+    pagesWithImages++
+    imageCount += images.length
+    xml += '  <url>\n'
+    xml += `    <loc>${escapeXml(page.url)}</loc>\n`
+    if (page.lastmod) xml += `    <lastmod>${escapeXml(page.lastmod)}</lastmod>\n`
+    for (const img of images) {
+      xml += `    <image:image>\n      <image:loc>${escapeXml(img)}</image:loc>\n    </image:image>\n`
+    }
+    xml += '  </url>\n'
+  }
+  xml += '</urlset>\n'
+
+  const out = path.join(buildDir, 'image-sitemap.xml')
+  fs.writeFileSync(out, xml, 'utf8')
+  console.log(
+    `image-sitemap: ${imageCount} images on ${pagesWithImages} of ${perPage.length} pages ` +
+      `(skipped ${[...pageCountByImage.keys()].filter(isChrome).length} site-wide images) -> ${out}`
+  )
+}
+
+if (require.main === module) {
   try {
-    // Recursively find all image files
-    const imageExtensions = ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif'];
-    const imageFiles = [];
-    
-    const scanDirectory = async (dir) => {
-      const items = await fs.readdir(dir, { withFileTypes: true });
-      
-      for (const item of items) {
-        const fullPath = path.join(dir, item.name);
-        
-        if (item.isDirectory()) {
-          await scanDirectory(fullPath);
-        } else if (item.isFile()) {
-          const ext = path.extname(item.name).toLowerCase();
-          if (imageExtensions.includes(ext)) {
-            // Convert to web path (remove static/ prefix)
-            const webPath = fullPath.replace(staticDir, '');
-            imageFiles.push({
-              path: webPath,
-              fullPath: fullPath,
-              name: item.name,
-              ext: ext,
-              lastModified: (await fs.stat(fullPath)).mtime
-            });
-          }
-        }
-      }
-    };
-    
-    await scanDirectory(staticDir);
-    
-    
-    // Generate XML sitemap for images only (no page URLs to avoid duplicates)
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n';
-    xml += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
-    
-    // Sort images by path for consistent output
-    const sortedImages = imageFiles.sort((a, b) => a.path.localeCompare(b.path));
-    
-    // Only include images that are referenced on actual pages
-    // Skip standalone images that aren't used on pages
-    const pageImages = sortedImages.filter(image => {
-      // Only include images that are likely used on pages
-      return image.path.includes('/blog/') || 
-             image.path.includes('/docs/') || 
-             image.path.includes('/webinar/') ||
-             image.path.includes('/connectors/') ||
-             image.path.includes('/iceberg/') ||
-             image.path.includes('/logo/') ||
-             image.path.includes('/authors/');
-    });
-    
-    // Group images by their page context for better organization
-    const imagesByPage = {};
-    
-    for (const image of pageImages) {
-      // Determine the page URL based on image path
-      let pageUrl = siteUrl + '/';
-      if (image.path.includes('/blog/')) {
-        pageUrl = siteUrl + '/blog';
-      } else if (image.path.includes('/docs/')) {
-        pageUrl = siteUrl + '/docs';
-      } else if (image.path.includes('/iceberg/')) {
-        pageUrl = siteUrl + '/iceberg';
-      } else if (image.path.includes('/webinar/')) {
-        pageUrl = siteUrl + '/webinar';
-      } else if (image.path.includes('/connectors/')) {
-        pageUrl = siteUrl + '/connectors';
-      }
-      
-      // Group images by page URL
-      if (!imagesByPage[pageUrl]) {
-        imagesByPage[pageUrl] = [];
-      }
-      imagesByPage[pageUrl].push(image);
-    }
-    
-    // Generate XML for each page with its images
-    for (const [pageUrl, pageImages] of Object.entries(imagesByPage)) {
-      const lastMod = pageImages[0].lastModified.toISOString().split('T')[0];
-      
-      xml += '  <url>\n';
-      xml += `    <loc>${pageUrl}</loc>\n`;
-      xml += `    <lastmod>${lastMod}</lastmod>\n`;
-      
-      // Add all images for this page
-      for (const image of pageImages) {
-        const imageUrl = `${siteUrl}${image.path}`;
-        
-        xml += '    <image:image>\n';
-        xml += `      <image:loc>${imageUrl}</image:loc>\n`;
-        
-        // Generate title from filename
-        const title = image.name
-          .replace(/\.[^/.]+$/, '') // Remove extension
-          .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
-          .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize words
-        
-        xml += `      <image:title>${title}</image:title>\n`;
-        
-        // Generate caption based on path context
-        let caption = title;
-        if (image.path.includes('/blog/')) {
-          caption = `Blog image: ${title}`;
-        } else if (image.path.includes('/docs/')) {
-          caption = `Documentation image: ${title}`;
-        } else if (image.path.includes('/webinar/')) {
-          caption = `Webinar image: ${title}`;
-        } else if (image.path.includes('/connectors/')) {
-          caption = `Connector image: ${title}`;
-        } else if (image.path.includes('/iceberg/')) {
-          caption = `Iceberg image: ${title}`;
-        } else if (image.path.includes('/logo/')) {
-          caption = `OLake logo: ${title}`;
-        } else if (image.path.includes('/authors/')) {
-          caption = `Author image: ${title}`;
-        }
-        
-        xml += `      <image:caption>${caption}</image:caption>\n`;
-        xml += '    </image:image>\n';
-      }
-      
-      xml += '  </url>\n';
-    }
-    
-    xml += '</urlset>';
-    
-    // Ensure build directory exists
-    await fs.mkdir(buildDir, { recursive: true });
-    
-    // Write the sitemap file
-    await fs.writeFile(imageSitemapPath, xml, 'utf8');
-    
-    
-    // Show some sample images
-    
+    generateImageSitemap(process.argv[2] ? path.resolve(process.argv[2]) : undefined)
   } catch (error) {
-    console.error('❌ Error generating image sitemap:', error);
-    process.exit(1);
+    console.error('Error generating image sitemap:', error)
+    process.exit(1)
   }
 }
 
-// Run the script
-if (require.main === module) {
-  generateImageSitemap();
-}
-
-module.exports = generateImageSitemap;
+module.exports = generateImageSitemap
