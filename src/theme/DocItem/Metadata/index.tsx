@@ -5,7 +5,7 @@ import type MetadataType from '@theme/DocItem/Metadata';
 import type {WrapperProps} from '@docusaurus/types';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import {useDoc, useDocsSidebar} from '@docusaurus/plugin-content-docs/client';
-import {useTitleFormatter} from '@docusaurus/theme-common/internal';
+import {useTitleFormatter} from '@site/src/lib/docusaurus';
 import JsonLd from '@site/src/components/JsonLd';
 import {describeDocTitle, getSeoTitle, stripSiteSuffix} from '../../seo/helpers';
 

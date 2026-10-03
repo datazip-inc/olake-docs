@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDateTimeFormat } from '@docusaurus/theme-common/internal'
+import { useDateTimeFormat } from '@site/src/lib/docusaurus'
 import PostCard from '@site/src/components/blog/PostCard'
 
 /**

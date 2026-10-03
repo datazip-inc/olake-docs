@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from '@docusaurus/Link'
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client'
-import { useDateTimeFormat } from '@docusaurus/theme-common/internal'
+import { useDateTimeFormat } from '@site/src/lib/docusaurus'
 import PostCard from './PostCard'
 import usePostEnd from './PostEndContext'
 
