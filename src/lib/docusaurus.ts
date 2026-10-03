@@ -2,8 +2,8 @@ import {useMemo} from 'react'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 
 /**
- * Small public-API replacements for two hooks that only exist in `@docusaurus/theme-common/internal`
- * (private, may change in any Docusaurus release). Same behaviour for this site: one locale, no
+ * Small public-API replacements for two hooks that Docusaurus only exposes through its private
+ * theme-common entry point (it may change in any release). Same behaviour for this site: one locale, no
  * custom title formatter.
  */
 
