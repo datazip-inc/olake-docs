@@ -24,8 +24,9 @@ export default function BlogPostPageWrapper(props) {
   const cleanPermalink = metadata.permalink && !metadata.permalink.endsWith('/') ? `${metadata.permalink}/` : metadata.permalink;
   const canonicalUrl = cleanPermalink ? `${siteConfig.url}${cleanPermalink}` : null;
 
-  // Open Graph image: a 1200x630 JPEG generated from the post's cover at build time
-  // (scripts/generate-og-images.js, files in static/img/og/). The path is a pure function of the
+  // Open Graph image: a 1200x630 JPEG generated from the post's cover by `npm run og-images`
+  // (scripts/generate-og-images.js; files committed in static/img/og/, CI runs it with --check
+  // so a missing or stale one fails the build). The path is a pure function of the
   // cover path; keep ogPath in sync with that script. A post without a local raster cover gets the
   // site card, which is also 1200x630.
   const frontImage = metadata.frontMatter?.image;
@@ -74,7 +75,7 @@ export default function BlogPostPageWrapper(props) {
         {cleanPermalink && <meta property="og:url" content={canonicalUrl} />}
         
 
-        {/* Twitter card details (no twitter:site / twitter:creator handles on purpose) */}
+        {/* Twitter card details (twitter:site is set site-wide in docusaurus.config.js headTags) */}
         <meta name="twitter:title" content={seoTitle ?? metadata.title} />
         <meta name="twitter:description" content={metadata.description} />
         <meta name="twitter:label1" content="Written by" />
