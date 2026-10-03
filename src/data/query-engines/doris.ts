@@ -7,7 +7,7 @@ export const doris: QueryEngine = {
   description: 'MPP analytical database with comprehensive Iceberg read/write capabilities, vectorized execution, materialized view acceleration, and multi-catalog support for lake ingestion and analytics',
   category: 'general-purpose',
   website: 'https://doris.apache.org/',
-  documentation: 'https://doris.apache.org/docs/lakehouse/datalake-analytics/iceberg',
+  documentation: 'https://doris.apache.org/docs/lakehouse/catalogs/iceberg-catalog/',
   features: {
     catalogs: {
       support: 'full',
@@ -15,7 +15,7 @@ export const doris: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Catalog Documentation',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-analytics/iceberg'
+          url: 'https://doris.apache.org/docs/lakehouse/catalogs/iceberg-catalog/'
         },
         {
           label: 'Iceberg Catalog Configuration',
@@ -29,11 +29,11 @@ export const doris: QueryEngine = {
       externalLinks: [
         {
           label: 'Iceberg Data Building',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-building/iceberg-build'
+          url: 'https://doris.apache.org/docs/lakehouse/best-practices/doris-iceberg/'
         },
         {
           label: 'Data Operations Examples',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-building/iceberg-build'
+          url: 'https://doris.apache.org/docs/lakehouse/best-practices/doris-iceberg/'
         }
       ]
     },
@@ -43,11 +43,11 @@ export const doris: QueryEngine = {
       externalLinks: [
         {
           label: 'DML Operations Support',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-building/iceberg-build'
+          url: 'https://doris.apache.org/docs/lakehouse/best-practices/doris-iceberg/'
         },
         {
           label: 'Delete File Support',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-analytics/iceberg'
+          url: 'https://doris.apache.org/docs/lakehouse/catalogs/iceberg-catalog/'
         }
       ]
     },
@@ -57,7 +57,7 @@ export const doris: QueryEngine = {
       externalLinks: [
         {
           label: 'Position and Equality Delete Support',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-analytics/iceberg'
+          url: 'https://doris.apache.org/docs/lakehouse/catalogs/iceberg-catalog/'
         },
         {
           label: 'Doris and Iceberg Best Practices',
@@ -81,7 +81,7 @@ export const doris: QueryEngine = {
       externalLinks: [
         {
           label: 'Format Compatibility',
-          url: 'https://doris.apache.org/docs/lakehouse/datalake-analytics/iceberg'
+          url: 'https://doris.apache.org/docs/lakehouse/catalogs/iceberg-catalog/'
         }
       ]
     },

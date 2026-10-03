@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowLeft, ArrowRight, FileVideo } from "lucide-react";
+import { PiArrowLeft, PiArrowRight, PiFileVideo } from 'react-icons/pi'
 
 /**
  * Slide metadata
@@ -60,18 +60,18 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
       <button
         type="button"
         onClick={() => scroll("left")}
-        className="hidden md:flex items-center justify-center absolute left-0 top-1/2 -translate-y-1/2 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-full p-2 shadow hover:bg-white dark:hover:bg-gray-800 transition"
+        className="hidden md:flex items-center justify-center absolute left-0 top-1/2 -translate-y-1/2 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-full p-2 shadow-sm hover:bg-white dark:hover:bg-gray-800 transition"
         aria-label="Scroll left"
       >
-        <ArrowLeft className="h-5 w-5" />
+        <PiArrowLeft aria-hidden="true" className="h-5 w-5" />
       </button>
       <button
         type="button"
         onClick={() => scroll("right")}
-        className="hidden md:flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-full p-2 shadow hover:bg-white dark:hover:bg-gray-800 transition"
+        className="hidden md:flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm rounded-full p-2 shadow-sm hover:bg-white dark:hover:bg-gray-800 transition"
         aria-label="Scroll right"
       >
-        <ArrowRight className="h-5 w-5" />
+        <PiArrowRight aria-hidden="true" className="h-5 w-5" />
       </button>
 
       {/* Slide cards container */}
@@ -103,7 +103,7 @@ export const SlidesCarousel: React.FC<SlidesCarouselProps> = ({
                 />
               ) : (
                 <div className="flex h-40 w-full items-center justify-center rounded-t-xl bg-gray-100 dark:bg-gray-800">
-                  <FileVideo
+                  <PiFileVideo
                     className="h-10 w-10 text-gray-400 transition-colors group-hover:text-blue-600"
                     aria-hidden="true"
                   />

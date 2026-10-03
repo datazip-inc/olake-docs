@@ -1,112 +1,84 @@
-import React from 'react';
-import { useHistory } from "react-router-dom";
-import Image from '@theme/IdealImage';
-import { FaArrowRight } from 'react-icons/fa';
-import clsx from 'clsx';
-import { CustomerCategory } from '../../types/customer';
+import React from 'react'
+import Link from '@docusaurus/Link'
+import Card from '@site/src/components/landing/ui/Card'
+import { CustomerStory } from '../../types/customer'
 
-interface CustomerCardProps {
-  title: string;
-  description: string;
-  route: string;
-  img: string;
-  alt: string;
-  companyName: string;
-  category: CustomerCategory;
+type CustomerCardProps = Pick<
+  CustomerStory,
+  'title' | 'description' | 'route' | 'img' | 'imgWidth' | 'imgHeight' | 'alt' | 'companyName' | 'category'
+> & {
+  /** First card on the page: its cover is above the fold, so it loads eagerly. */
+  priority?: boolean
 }
 
-const CustomerCard: React.FC<CustomerCardProps> = ({
+const Arrow = () => (
+  <svg width='14' height='14' viewBox='0 0 14 14' fill='none' aria-hidden='true' className='shrink-0 transition-transform group-hover:translate-x-[2px]'>
+    <path d='M1 7h12M8 2l5 5-5 5' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' />
+  </svg>
+)
+
+/**
+ * One story tile on the list: cover, company and category, headline, summary. The headline is the
+ * link and its ::after stretches over the whole card, so the card is clickable and crawlable.
+ */
+export default function CustomerCard({
   title,
   description,
   route,
   img,
+  imgWidth,
+  imgHeight,
   alt,
   companyName,
-  category
-}) => {
-  const router = useHistory();
-
-  const handleNavigation = () => {
-    router.push(route);
-  };
-
-  // Category pill colors
-  const categoryColors = {
-    [CustomerCategory.B2B]: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-    [CustomerCategory.CustomerInternet]: 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
-    [CustomerCategory.Fintech]: 'bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-  };
-
-  const pillColor = categoryColors[category];
-
+  category,
+  priority
+}: CustomerCardProps) {
   return (
-    <article
-      className="group flex flex-col h-full bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl border-0 transition-all duration-500 ease-out transform hover:-translate-y-2 hover:scale-[1.02] cursor-pointer relative"
-      onClick={handleNavigation}
+    <Card
+      as='article'
+      className='group relative flex h-full flex-col gap-[16px] p-[12px] lg:p-[16px] lk-lift'
     >
-      {/* Image Section */}
-      <div className="relative overflow-hidden">
-        <div className="aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700">
-          <Image
-            img={img}
-            alt={alt}
-            className="w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110"
-          />
-          {/* Company Logo/Name Overlay */}
-          <div className="absolute bottom-4 left-4 z-10">
-            <span className="text-[#193AE6] font-bold text-xl drop-shadow-lg">
-              {companyName}
-            </span>
-          </div>
-        </div>
+      <div className='overflow-hidden rounded-[10px] border border-solid border-olake-line bg-white'>
+        <img
+          src={img}
+          alt={alt}
+          width={imgWidth}
+          height={imgHeight}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
+          decoding='async'
+          className='block aspect-[2/1] h-auto w-full object-contain'
+        />
       </div>
 
-      {/* Content Section */}
-      <div className="flex flex-col flex-grow p-6 space-y-4">
-        {/* Category Pill */}
-        <div className="flex items-start">
-          <span className={clsx(
-            'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium',
-            pillColor
-          )}>
+      <div className='flex grow flex-col px-[4px] pb-[4px]'>
+        <div className='flex items-center justify-between gap-[12px]'>
+          <span className='text-[14px] font-medium text-olake-ink'>{companyName}</span>
+          <span className='rounded-[8px] border border-solid border-olake-line bg-olake-surface-alt px-[8px] py-[2px] text-[12px] leading-[1.5] text-olake-text-2'>
             {category}
           </span>
         </div>
 
-        {/* Title */}
-        <h3 className="font-bold text-lg text-gray-900 dark:text-gray-50 leading-tight line-clamp-2 group-hover:text-[#193ae6] dark:group-hover:text-blue-400 transition-colors duration-300">
-          {title}
+        <h3 className='mt-[12px] text-[17px] font-normal leading-[1.3] text-olake-ink lg:text-[18px]'>
+          <Link
+            to={route}
+            className='text-olake-ink no-underline hover:text-olake-ink hover:no-underline focus-visible:outline-none after:absolute after:inset-0 after:rounded-[16px] focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-olake-blue'
+          >
+            <span className='line-clamp-4'>{title}</span>
+          </Link>
         </h3>
 
-        {/* Description */}
-        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-3 flex-grow">
+        <p className='mt-[10px] line-clamp-3 text-[13px] leading-[1.6] text-olake-text-2 lg:text-[14px]'>
           {description}
         </p>
 
-        {/* CTA Section */}
-        <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Read Story
-            </span>
-            <div className="flex items-center text-[#193ae6] dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-300">
-              <FaArrowRight className="w-4 h-4" />
-            </div>
-          </div>
-        </div>
+        <div className='min-h-[16px] grow' aria-hidden='true' />
+
+        <span className='flex items-center justify-between pt-[4px] text-[14px] font-medium text-olake-muted transition-colors group-hover:text-olake-blue lg:text-[15px]'>
+          Read story
+          <Arrow />
+        </span>
       </div>
-
-      {/* Subtle bottom accent line */}
-      <div className="h-1 bg-gradient-to-r from-[#193ae6] to-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-out origin-left" />
-    </article>
-  );
-};
-
-export default CustomerCard;
-
-
-
-
-
-
-
+    </Card>
+  )
+}

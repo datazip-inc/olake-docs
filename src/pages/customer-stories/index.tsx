@@ -1,163 +1,104 @@
-import React, { useState } from "react";
-// @ts-ignore
-import Layout from '@theme/Layout';
+import React, { useState } from 'react'
 import Head from '@docusaurus/Head'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
-import clsx from 'clsx';
-import CustomerGrid from '../../components/customers/CustomerGrid';
-import { CustomerStory, CustomerCategory } from '../../types/customer';
-import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
+import LakesidePage from '@site/src/components/landing/ui/LakesidePage'
+import Section from '@site/src/components/landing/ui/Section'
+import CustomerGrid from '../../components/customers/CustomerGrid'
+import { CustomerCategory } from '../../types/customer'
+import { CUSTOMER_STORIES } from '@site/src/data/customers/stories'
+import JsonLd from '@site/src/components/JsonLd'
+import { cn } from '@site/src/lib/utils'
 
-const CustomersPage = () => {
+const TITLE = 'Customer Stories - OLake'
+const DESCRIPTION =
+  'Hear more stories of teams across industries using OLake to securely sync their data and build modern data lakehouses.'
+
+type Filter = 'All Stories' | CustomerCategory
+
+const FILTERS: Filter[] = ['All Stories', CustomerCategory.B2B, CustomerCategory.CustomerInternet]
+
+/** Hero of the list. Its wrapper (`.lakeside-hero-bg`) lives in LakesidePage. */
+const StoriesHero = () => (
+  <section className='relative px-[32px] pb-[40px] pt-[150px] lg:px-[24px] lg:pb-[56px] lg:pt-[170px]'>
+    <div className='mx-auto w-full max-w-[1016px] lg:text-center'>
+      <h1 className='olake-h1 mb-0'>
+        Customer stories
+      </h1>
+      <p className='mb-0 mt-[12px] text-[13px] leading-[1.55] text-olake-text lg:mx-auto lg:mt-[18px] lg:max-w-[640px] lg:text-[15px]'>
+        Hear more stories of teams across industries using OLake to securely sync their data.
+      </p>
+    </div>
+  </section>
+)
+
+export default function CustomersPage() {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
   const siteUrl = siteConfig?.url || 'https://olake.io'
   const canonicalUrl = `${siteUrl}${location.pathname || '/'}`
-  
-  const [activeFilter, setActiveFilter] = useState<'All Stories' | CustomerCategory>('All Stories');
 
-  // Customer stories data (sorted by date, most recent first - same as blog)
-  const customerStories: CustomerStory[] = [
-    {
-      title: "Reliable Lakehouse Ingestion at Scale: How LendingKart Improved Data Correctness and Compressed Lake Ingestion Volume by 100×",
-      description: 'How LendingKart reduced daily MongoDB data movement from gigabytes to megabytes while completing an 11 years historical backfill that their Debezium + Spark setup couldn\'t deliver reliably.',
-      route: '/customer-stories/lendingkart-Improved-Data-Correctness',
-      img: '/img/customers/lendingkart/cover-image-lendingkart.webp',
-      alt: 'LendingKart customer story',
-      companyName: 'LendingKart',
-      category: CustomerCategory.B2B,
-      date: '2026-02-11'
-    },
-    {
-      title: "PhysicsWallah Evaluates MongoDB CDC Ingestion into a Lakehouse with Apache Iceberg and OLake",
-      description: 'At PhysicsWallah, the Data Engineering team operates a large-scale lakehouse platform that powers analytics, reporting, and AI-driven use cases. A significant portion of operational data originates from MongoDB, making reliable and scalable CDC ingestion a foundational requirement.',
-      route: '/customer-stories/physicswallah-mongodb-cdc-iceberg',
-      img: '/img/customers/physicswallah/cover-image-pw.webp',
-      alt: 'PhysicsWallah customer story',
-      companyName: 'PhysicsWallah',
-      category: CustomerCategory.CustomerInternet,
-      date: '2026-01-30'
-    },
-    {
-      title: "From 40-Minute to Sub-Minute Segmentation Queries: How Bitespeed rebuilt its customer segmentation engine using OLake and Apache Iceberg",
-      description: 'Bitespeed is a customer engagement and messaging platform built for modern commerce brands. Learn how they rebuilt their segmentation engine using OLake and Apache Iceberg without breaking their budget.',
-      route: '/customer-stories/bitespeed-segmentation-queries',
-      img: '/img/customers/bitespeed/cover-image-bitespeed.webp',
-      alt: 'Bitespeed customer story',
-      companyName: 'Bitespeed',
-      category: CustomerCategory.CustomerInternet,
-      date: '2026-01-13'
-    },
-    {
-      title: "Cordial's Path to an AI-Ready Lakehouse: Large scale Multi-Cluster MongoDB Ingestion with OLake",
-      description: 'Cordial, a leading marketing automation platform, is unifying thousands of MongoDB collections into a single Apache Iceberg based lakehouse architecture to power its next generation of AI agents.',
-      route: '/customer-stories/cordial-real-time-data-sync',
-      img: '/img/customers/cordial/cover-image-cordial.webp',
-      alt: 'Cordial customer story',
-      companyName: 'Cordial',
-      category: CustomerCategory.B2B,
-      date: '2025-12-15'
-    },
-    {
-      title: "Astrotalk's Migration to Databricks: How OLake Replaced Google Datastream for Large-Scale Database Replication",
-      description: 'Astrotalk runs one of India\'s largest astrology platforms, serving millions of users and handling large volumes of transactional data across PostgreSQL and MySQL. As the company began shifting from Google BigQuery to a Databricks-based lakehouse, they needed a reliable way to replicate databases to S3.',
-      route: '/customer-stories/astro-talk-lakehouse-transformation',
-      img: '/img/customers/astrotalk/cover-image-astro.webp',
-      alt: 'Astro Talk customer story',
-      companyName: 'Astro Talk',
-      category: CustomerCategory.CustomerInternet,
-      date: '2025-12-15'
-    },
-    {
-      title: "Zero Pipeline Failures, 50% Faster Loads: How Xeno Rebuilt Their Data Foundation on OLake",
-      description: 'Xeno, an AI-powered customer engagement platform for retailers, kept hitting broken replication on AWS DMS whenever its MySQL schema changed. After migrating MySQL CDC to OLake on Kubernetes, full-load time dropped nearly 50% and schema changes stopped breaking pipelines.',
-      route: '/customer-stories/xeno-aws-dms-alternative-mysql-cdc',
-      img: '/img/customers/xeno/cover-image-xeno.webp',
-      alt: 'Xeno customer story',
-      companyName: 'Xeno',
-      category: CustomerCategory.B2B,
-      date: '2026-06-14'
+  const [activeFilter, setActiveFilter] = useState<Filter>('All Stories')
+
+  // CollectionPage + ItemList of the stories the grid shows by default ("All Stories").
+  const collectionSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Customer Stories',
+    description: DESCRIPTION,
+    url: `${siteUrl}/customer-stories/`,
+    isPartOf: { '@type': 'WebSite', name: 'OLake', url: `${siteUrl}/` },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: CUSTOMER_STORIES.length,
+      itemListElement: CUSTOMER_STORIES.map((story, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: story.title,
+        url: `${siteUrl}${story.route.replace(/\/?$/, '/')}`
+      }))
     }
-  ].sort((a, b) => b.date.localeCompare(a.date));
-
-  const filters: Array<'All Stories' | CustomerCategory> = ['All Stories', CustomerCategory.B2B, CustomerCategory.CustomerInternet];
+  }
 
   return (
-    <Layout
-      title='Customer Stories - OLake'
-      description='Hear more stories of teams across industries using OLake to securely sync their data and build modern data lakehouses.'
-    >
+    <LakesidePage title={TITLE} description={DESCRIPTION} activePath='/customer-stories' heroBackground={<StoriesHero />}>
       <Head>
         <meta property='og:type' content='website' />
-        <meta property='og:title' content='Customer Stories - OLake' />
-        <meta property='og:description' content='Hear more stories of teams across industries using OLake to securely sync their data and build modern data lakehouses.' />
+        <meta property='og:title' content={TITLE} />
+        <meta property='og:description' content={DESCRIPTION} />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
-        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
-        <meta name='twitter:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-og-card.png' />
+        <meta name='twitter:image' content='https://olake.io/img/logo/olake-og-card.png' />
       </Head>
+      <JsonLd data={collectionSchema} />
 
-      {/* Breadcrumbs */}
-      <div className='container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8'>
-        <CentralizedBreadcrumbs type="customers" title="Customer Stories" />
-      </div>
-
-      {/* Hero Section */}
-      <section className='relative bg-white py-12 dark:bg-gray-900 lg:py-16'>
-        <div className='container relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
-          <div className='space-y-6 text-center'>
-            {/* Main heading */}
-            <div className='space-y-4'>
-              <h1 className='text-4xl font-bold leading-tight text-gray-900 dark:text-gray-50 sm:text-5xl lg:text-6xl'>
-                Customer stories
-              </h1>
-              <p className='mx-auto max-w-3xl text-xl leading-relaxed text-gray-600 dark:text-gray-300'>
-                Hear more stories of teams across industries using OLake to securely sync their data.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Filter Tabs */}
-      <section className='bg-white dark:bg-gray-900 py-6'>
-        <div className='container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
-          <div className='flex flex-wrap justify-center gap-3 py-2'>
-            {filters.map((filter) => (
+      {/* Infima gives headings, paragraphs and lists bottom margins and lists a left padding;
+          the lakeside reset is zero-specificity and loses, so it is undone here for the whole list. */}
+      <div className='[&_:is(h2,h3,p,ul)]:mb-0 [&_ul]:pl-0'>
+        <Section flush className='pb-[56px] pt-[8px] lg:pb-[96px] lg:pt-[8px]'>
+          <div role='group' aria-label='Filter stories' className='mb-[24px] flex flex-wrap gap-[8px] lg:mb-[32px]'>
+            {FILTERS.map((filter) => (
               <button
                 key={filter}
+                type='button'
+                aria-pressed={activeFilter === filter}
                 onClick={() => setActiveFilter(filter)}
-                className={clsx(
-                  'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-200',
+                className={cn(
+                  'h-[34px] cursor-pointer rounded-[8px] border border-solid px-[14px] text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue',
                   activeFilter === filter
-                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                    ? 'border-olake-ink bg-olake-ink text-olake-surface'
+                    : 'border-olake-btn-border bg-olake-surface text-olake-btn-secondary hover:bg-olake-surface-alt hover:text-olake-ink'
                 )}
               >
-                {filter === 'All Stories' ? 'All Stories' : filter}
+                {filter}
               </button>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Customer Stories Grid */}
-      <section className='bg-gray-50 dark:bg-gray-950 min-h-screen py-16 lg:py-20'>
-        <div className='container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <CustomerGrid customers={customerStories} activeFilter={activeFilter} />
-        </div>
-      </section>
-    </Layout>
-  );
-};
-
-export default CustomersPage;
-
-
-
-
-
-
-
+          <CustomerGrid customers={CUSTOMER_STORIES} activeFilter={activeFilter} />
+        </Section>
+      </div>
+    </LakesidePage>
+  )
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { PiArrowSquareOut } from 'react-icons/pi'
 import { QueryEngine } from '../../types/iceberg';
 import { FEATURE_SHORT_NAMES, FEATURE_NAMES, SUPPORT_WEIGHTS } from '../../data/constants/features';
 import { SUPPORT_BADGE_STYLES } from '../../data/constants/supportLevels';
@@ -93,7 +93,7 @@ const TableView: React.FC<TableViewProps> = ({
                     <CategoryBadge category={engine.category} />
                   </div>
                   {!selectionMode && (
-                    <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400" />
+                    <PiArrowSquareOut aria-hidden="true" className="w-4 h-4 text-gray-400" />
                   )}
                 </div>
 
@@ -122,7 +122,7 @@ const TableView: React.FC<TableViewProps> = ({
                     </span>
                     <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full"
+                        className="bg-linear-to-r from-blue-500 to-indigo-600 h-2 rounded-full"
                         style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
                       />
                     </div>
@@ -158,7 +158,7 @@ const TableView: React.FC<TableViewProps> = ({
                       <span className="text-xs font-semibold text-gray-100 uppercase tracking-wider cursor-help">
                         {FEATURE_SHORT_NAMES[feature as keyof QueryEngine['features']]}
                       </span>
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg min-w-max max-w-xs whitespace-normal break-words">
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg min-w-max max-w-xs whitespace-normal wrap-break-word">
                         {FEATURE_NAMES[feature as keyof QueryEngine['features']]}
                         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
                       </div>
@@ -211,7 +211,7 @@ const TableView: React.FC<TableViewProps> = ({
                             {engine.name}
                           </h3>
                           {!selectionMode && (
-                            <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <PiArrowSquareOut aria-hidden="true" className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                           )}
                         </div>
                         <div className="mt-1">
@@ -228,7 +228,7 @@ const TableView: React.FC<TableViewProps> = ({
                     <td key={feature} className="px-3 py-4 text-center">
                       <div className="group/tooltip relative">
                         <SupportIcon level={engine.features[feature as keyof QueryEngine['features']].support} />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg whitespace-normal break-words leading-relaxed">
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-xl min-w-max max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg whitespace-normal wrap-break-word leading-relaxed">
                           <div className="font-medium mb-1 text-gray-100">
                             {FEATURE_NAMES[feature as keyof QueryEngine['features']]}
                           </div>
@@ -251,7 +251,7 @@ const TableView: React.FC<TableViewProps> = ({
                       </div>
                       <div className="w-12 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                         <div
-                          className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300"
+                          className="bg-linear-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
                         />
                       </div>

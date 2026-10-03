@@ -1,21 +1,7 @@
 import React, { Suspense, lazy, ComponentType, useEffect, useRef, useState } from 'react'
-import TestimonialsSection from './site/TestimonialsSection'
 
 // Define component types for better type safety
-type LazyComponentName =
-  | 'BlogShowcase'
-  | 'BenchmarkSection'
-  | 'BenchmarkOlakeSection'
-  | 'FeatureShowcase'
-  | 'IcebergHero'
-  | 'WorkflowDiagram'
-  | 'InfoBoxes'
-  | 'SetupStepsSection'
-  | 'RegistrationSection'
-  | 'Glace'
-  | 'WebinarGrid'
-  | 'ActiveContributors'
-  | 'TestimonialsSection'
+type LazyComponentName = 'ActiveContributors'
 
 // Lazy load heavy components with error handling
 const createLazyComponent = (importFn: () => Promise<{ default: ComponentType<any> }>) => {
@@ -37,20 +23,9 @@ const createLazyComponent = (importFn: () => Promise<{ default: ComponentType<an
   )
 }
 
-const BlogShowcase = createLazyComponent(() => import('./site/BlogShowcase'))
-const BenchmarkSection = createLazyComponent(() => import('./site/BenchmarkSection'))
-const FeatureShowcase = createLazyComponent(() => import('./site/FeatureShowcase'))
-const IcebergHero = createLazyComponent(() => import('./site/IcebergHero'))
-const WorkflowDiagram = createLazyComponent(() => import('./site/WorkflowDiagram'))
-const InfoBoxes = createLazyComponent(() => import('./site/InfoBoxes'))
-const SetupStepsSection = createLazyComponent(() => import('./site/SetupStepsSection'))
-const RegistrationSection = createLazyComponent(() => import('./site/RegistrationSection'))
-const Glace = createLazyComponent(() => import('./site/Glace'))
-const WebinarGrid = createLazyComponent(() => import('./webinars/WebinarGrid'))
 const ActiveContributors = createLazyComponent(
   () => import('./community/improved/ActiveContributors')
 )
-const BenchmarkOlakeSection = createLazyComponent(() => import('./site/BenchmarkOlakeSection'))
 
 // Loading fallback component
 const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> = ({
@@ -61,10 +36,10 @@ const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> =
     <div className='flex w-full animate-pulse space-x-4'>
       <div className='h-10 w-10 rounded-full bg-gray-300'></div>
       <div className='flex-1 space-y-2 py-1'>
-        <div className='h-4 w-3/4 rounded bg-gray-300'></div>
+        <div className='h-4 w-3/4 rounded-sm bg-gray-300'></div>
         <div className='space-y-2'>
-          <div className='h-4 rounded bg-gray-300'></div>
-          <div className='h-4 w-5/6 rounded bg-gray-300'></div>
+          <div className='h-4 rounded-sm bg-gray-300'></div>
+          <div className='h-4 w-5/6 rounded-sm bg-gray-300'></div>
         </div>
       </div>
     </div>
@@ -73,19 +48,7 @@ const LoadingFallback: React.FC<{ componentName: string; minHeight?: number }> =
 
 // Component mapping for type safety
 const COMPONENT_MAP: Record<LazyComponentName, ComponentType<any>> = {
-  BlogShowcase,
-  BenchmarkSection,
-  BenchmarkOlakeSection,
-  FeatureShowcase,
-  IcebergHero,
-  WorkflowDiagram,
-  InfoBoxes,
-  SetupStepsSection,
-  RegistrationSection,
-  Glace,
-  WebinarGrid,
-  ActiveContributors,
-  TestimonialsSection
+  ActiveContributors
 } as const
 
 // Lazy component wrapper

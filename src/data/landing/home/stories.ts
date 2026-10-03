@@ -15,21 +15,21 @@ export const STORIES: Story[] = [
   {
     company: 'Xeno',
     logo: '/img/custom-stories/xeno-logo.png',
-    cover: '/img/custom-stories/xeno-cover.png',
+    cover: '/img/custom-stories/xeno-cover.webp',
     title: 'Zero pipeline failures, 50% faster loads',
     href: '/customer-stories/xeno-aws-dms-alternative-mysql-cdc'
   },
   {
     company: 'Cordial',
     logo: '/img/landing/v2/logo-cordial.webp',
-    cover: '/img/custom-stories/cordial-cover.png',
+    cover: '/img/custom-stories/cordial-cover.webp',
     title: 'Cordial’s path to an AI ready lakehouse',
     href: '/customer-stories/cordial-real-time-data-sync'
   },
   {
     company: 'Bitespeed',
     logo: '/img/landing/v2/logo-bitespeed.webp',
-    cover: '/img/custom-stories/bitespeed-cover.png',
+    cover: '/img/custom-stories/bitespeed-cover.webp',
     title: 'From 40-minute to sub-minute segmentation queries',
     href: '/customer-stories/bitespeed-segmentation-queries'
   }

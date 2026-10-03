@@ -1,6 +1,8 @@
 import React from 'react'
 import Link from '@docusaurus/Link'
-import SectionHeading from '../ui/SectionHeading'
+import SectionHeading from '../../ui/SectionHeading'
+import { CARD_CLASS } from '../../ui/Card'
+import { cn } from '@site/src/lib/utils'
 import { STORIES, STORIES_INTRO } from '@site/src/data/landing/home/stories'
 
 const StoryCard = ({
@@ -10,7 +12,7 @@ const StoryCard = ({
   story: (typeof STORIES)[number]
   layout?: 'featured' | 'horizontal' | 'standard'
 }) => {
-  const baseCard = 'group flex overflow-hidden rounded-[20px] border border-solid border-[#ececec] bg-white p-[12px] lg:p-[16px] text-[#202020] transition-shadow hover:shadow-[0_18px_40px_-28px_rgba(16,24,64,0.4)]'
+  const baseCard = cn(CARD_CLASS, 'group flex p-[12px] lg:p-[16px] text-olake-ink lk-lift')
   
   const logoHeight = story.company === 'Xeno' ? 'h-[14px]' : story.company === 'Cordial' ? 'h-[22px]' : 'h-[18px]'
 
@@ -33,10 +35,10 @@ const StoryCard = ({
             className={`block w-auto object-contain ${logoHeight}`}
             style={{ maxWidth: '120px', alignSelf: 'flex-start' }}
           />
-          <p className='mt-[16px] text-[16px] leading-[1.3] text-[#202020] lg:text-[20px]'>
+          <p className='mt-[16px] text-[16px] leading-[1.3] text-olake-ink lg:text-[20px]'>
             {story.title}
           </p>
-          <span className='mt-auto pt-[16px] text-[14px] lg:text-[15px] font-medium text-[#a0a0a0] transition-colors group-hover:text-[#6b8afd]'>Read More</span>
+          <span className='mt-auto pt-[16px] text-[14px] lg:text-[15px] font-medium text-olake-muted transition-colors group-hover:text-olake-blue'>Read More</span>
         </div>
       </Link>
     )
@@ -67,13 +69,13 @@ const StoryCard = ({
         <p
           className={
             layout === 'featured'
-              ? 'mt-[16px] text-[18px] leading-[1.3] text-[#202020] lg:text-[26px]'
-              : 'mt-[16px] text-[16px] leading-[1.3] text-[#202020] lg:text-[20px]'
+              ? 'mt-[16px] text-[18px] leading-[1.3] text-olake-ink lg:text-[26px]'
+              : 'mt-[16px] text-[16px] leading-[1.3] text-olake-ink lg:text-[20px]'
           }
         >
           {story.title}
         </p>
-        <span className='mt-auto pt-[16px] text-[14px] lg:text-[15px] font-medium text-[#a0a0a0] transition-colors group-hover:text-[#6b8afd]'>Read More</span>
+        <span className='mt-auto pt-[16px] text-[14px] lg:text-[15px] font-medium text-olake-muted transition-colors group-hover:text-olake-blue'>Read More</span>
       </div>
     </Link>
   )

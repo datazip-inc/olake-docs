@@ -1,26 +1,27 @@
 import React from 'react'
-import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
+import LakesidePage from '@site/src/components/landing/ui/LakesidePage'
+import Section from '@site/src/components/landing/ui/Section'
+import Card from '@site/src/components/landing/ui/Card'
+import SectionHeading from '@site/src/components/landing/ui/SectionHeading'
+import PageHero from '@site/src/components/pages-misc/PageHero'
 
+import { serializeJsonLd } from '@site/src/components/JsonLd'
 const teamMembers = [
   {
     name: 'Shubham Satish Baldava',
     designation: 'CTO',
     linkedin: 'https://linkedin.com/in/shubham-baldava',
-    image: '/img/authors/shubham.webp'
+    image: '/img/authors/shubham.webp',
+    size: 800
   },
   {
     name: 'Rohan Khameshra',
     designation: 'CEO',
     linkedin: 'https://linkedin.com/in/rohan-khameshra',
-    image: '/img/authors/rohan.webp'
-  },  
-  {
-    name: 'Sandeep Devarapalli ',
-    designation: 'CMO',
-    linkedin: 'https://linkedin.com/in/sandeepdevarapalli',
-    image: '/img/authors/sandeep.webp'
-  },
+    image: '/img/authors/rohan.webp',
+    size: 800
+  }
 
   // Add more team members as needed...
 ]
@@ -142,16 +143,6 @@ const AboutTeam = () => {
           name: 'OLake'
         },
         image: 'https://olake.io/img/authors/rohan.webp'
-      },
-      {
-        '@type': 'Person',
-        name: 'Sandeep Devarapalli',
-        jobTitle: 'CMO',
-        worksFor: {
-          '@type': 'Organization',
-          name: 'OLake'
-        },
-        image: 'https://olake.io/img/authors/sandeep.webp'
       }
     ]
   }
@@ -165,71 +156,58 @@ const AboutTeam = () => {
   ]
 
   return (
-    <Layout 
+    <LakesidePage
       title="About Us - OLake Team"
       description="Meet the OLake team behind the fastest open-source data replication tool. Learn about our mission to simplify database to Apache Iceberg workflows."
+      activePath='/about-us'
+      heroBackground={
+        <PageHero title='About OLake - Fastest Open Source Data Replication Tool'>
+          <p>
+            OLake is the fastest open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable—with recent benchmarks showing up to 500× faster ingest than common alternatives—so your team can stop handling connectors and start focusing on models, products, and impact.
+          </p>
+          <p>
+            Born from real-world issues with slow, fragile ingestion, OLake gives you a clean UI/CLI, resilient CDC, and a path that keeps getting faster with every release—and we're actively pushing those benchmarks even further. No vendor lock-in, no plumbing issues—just a reliable way to move data into Iceberg for your modern analytics.
+          </p>
+        </PageHero>
+      }
     >
       <Head>
         {jsonLdSchemas.map((schema) => (
-          <script
-            key={schema.id}
-            type='application/ld+json'
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify(schema.data)
-            }}
-          />
+          <script key={schema.id} type='application/ld+json'>{serializeJsonLd(schema.data)}</script>
         ))}
       </Head>
-      <div className='bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100'>
-        <div className='mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8'>
-          {/* About Us Section */}
-          <section className='mb-16'>
-            <h1 className='mb-4 text-center text-3xl font-extrabold' style={{ color: '#193AE6' }}>
-              About OLake - Fastest Open Source Data Replication Tool
-            </h1>
-            <p className='mx-auto max-w-2xl text-center text-lg'>
-              OLake is the fastest open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable—with recent benchmarks showing up to 500× faster ingest than common alternatives—so your team can stop handling connectors and start focusing on models, products, and impact.
-            </p>
-            <p className='mx-auto max-w-2xl text-center text-lg mt-6'>
-              Born from real-world issues with slow, fragile ingestion, OLake gives you a clean UI/CLI, resilient CDC, and a path that keeps getting faster with every release—and we're actively pushing those benchmarks even further. No vendor lock-in, no plumbing issues—just a reliable way to move data into Iceberg for your modern analytics.
-            </p>
-          </section>
-
-          {/* Our Team Section */}
-          <section>
-            <h2 className='mb-8 text-center text-3xl font-extrabold' style={{ color: '#193AE6' }}>
-              Our Team
-            </h2>
-            <div className='grid gap-8 sm:grid-cols-2 lg:grid-cols-3'>
-              {teamMembers.map((member, index) => (
-                <div key={index} className='text-center'>
-                  <div className='mx-auto h-40 w-40'>
-                    <img
-                      src={member.image}
-                      alt={`${member.name} | Olake ${member.designation}`}
-                      className='h-40 w-40 rounded-full object-cover transition duration-300 hover:border hover:border-gray-300'
-                      loading="lazy" decoding="async"
-                    />
-                  </div>
-                  <h3 className='mt-4 text-xl font-medium'>{member.name}</h3>
-                  <p className='text-gray-500 dark:text-gray-400'>{member.designation}</p>
-                  <div className='mt-2'>
-                    <a
-                      href={member.linkedin}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='text-[#193AE6] hover:underline'
-                    >
-                      LinkedIn
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-    </Layout>
+      <Section flush className='pb-[56px] pt-[16px] lg:pb-[96px] lg:pt-[24px]'>
+        <SectionHeading title='Our Team' align='center' />
+        <ul className='mb-0 list-none p-0 mt-[28px] grid grid-cols-1 gap-[16px] sm:grid-cols-2 lg:mt-[44px] lg:gap-[24px] mx-auto max-w-[680px]'>
+          {teamMembers.map((member) => (
+            <Card as='li' key={member.name} className='flex flex-col items-center px-[24px] py-[32px] text-center'>
+              <img
+                src={member.image}
+                alt={`${member.name.trim()} | Olake ${member.designation}`}
+                width={member.size}
+                height={member.size}
+                loading='lazy'
+                decoding='async'
+                className='size-[112px] rounded-full border border-solid border-olake-line object-cover lg:size-[128px]'
+              />
+              <h3 className='mb-0 mt-[20px] text-[18px] font-normal leading-[1.3] text-olake-ink lg:text-[20px]'>
+                {member.name.trim()}
+              </h3>
+              <p className='mb-0 mt-[4px] text-[14px] text-olake-muted'>{member.designation}</p>
+              <a
+                href={member.linkedin}
+                target='_blank'
+                rel='noopener noreferrer'
+                aria-label={`${member.name.trim()} on LinkedIn`}
+                className='mt-[14px] rounded-[4px] text-[14px] text-olake-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue'
+              >
+                LinkedIn
+              </a>
+            </Card>
+          ))}
+        </ul>
+      </Section>
+    </LakesidePage>
   )
 }
 

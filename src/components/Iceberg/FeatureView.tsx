@@ -21,7 +21,7 @@ const FeatureView: React.FC<FeatureViewProps> = ({ engines }) => {
       {FEATURE_FOCUS_LIST.map((feature) => (
         <div key={feature} className={`${STYLES.ROUNDED_CONTAINER} p-6`}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-linear-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">
                 {feature.charAt(0).toUpperCase()}
               </span>

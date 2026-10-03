@@ -1,5 +1,5 @@
 import React from 'react'
-import Marquee from 'react-fast-marquee'
+import Marquee from '@site/src/components/ui/Marquee'
 import { TRUSTED_LOGOS } from '@site/src/data/landing/home/logos'
 
 /**
@@ -9,27 +9,25 @@ import { TRUSTED_LOGOS } from '@site/src/data/landing/home/logos'
  */
 export default function TrustedBy() {
   return (
-    <section className='border-0 border-y border-solid border-[#e7e7e7] bg-white'>
+    <section className='border-0 border-y border-solid border-olake-line-rule bg-white'>
       <div className='relative mx-auto w-full max-w-[1016px] px-[32px] py-[28px] lg:px-[24px] lg:py-[34px]'>
         <span
           aria-hidden='true'
-          className='absolute inset-y-0 left-[32px] w-px bg-[#e7e7e7] lg:left-0'
+          className='absolute inset-y-0 left-[32px] w-px bg-olake-line-rule lg:left-0'
         />
         <span
           aria-hidden='true'
-          className='absolute inset-y-0 right-[32px] w-px bg-[#e7e7e7] lg:right-0'
+          className='absolute inset-y-0 right-[32px] w-px bg-olake-line-rule lg:right-0'
         />
-        <p className='text-center text-[14px] text-[#393939] lg:text-[20px]'>
+        <p className='text-center text-[14px] text-olake-text lg:text-[20px]'>
           Trusted by Engineers at
         </p>
-        <div className='olakehome-marquee mt-[20px] overflow-hidden lg:mt-[26px] lg:-mx-[24px]'>
-          <style>{`.olakehome-marquee * { scrollbar-width: none !important; } .olakehome-marquee *::-webkit-scrollbar { display: none !important; }`}</style>
+        <div className='olakehome-marquee mt-[20px] overflow-hidden lg:mt-[26px] lg:mx-[-24px]'>
           <Marquee
             autoFill
             direction='left'
             pauseOnHover
             speed={32}
-            gradient={false}
             className='items-center overflow-hidden'
             style={{ overflowY: 'hidden' }}
           >

@@ -1,6 +1,6 @@
 // components/Iceberg/CardView.tsx
 import React from 'react';
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { PiArrowSquareOut } from 'react-icons/pi'
 import { QueryEngine } from '../../types/iceberg';
 import { FEATURE_NAMES, SUPPORT_WEIGHTS } from '../../data/constants/features';
 import { SUPPORT_BADGE_STYLES } from '../../data/constants/supportLevels';
@@ -42,7 +42,7 @@ const CardView: React.FC<CardViewProps> = ({ engines }) => {
                 </div>
               </div>
             </div>
-            <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            <PiArrowSquareOut aria-hidden="true" className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
           
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2 leading-relaxed">
@@ -77,7 +77,7 @@ const CardView: React.FC<CardViewProps> = ({ engines }) => {
             </div>
             <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div 
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500"
+                className="bg-linear-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${(calculateSupportScore(engine) / 32) * 100}%` }}
               ></div>
             </div>

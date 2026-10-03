@@ -1,10 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  MagnifyingGlassIcon, 
-  ScaleIcon,
-  ChartBarIcon,
-  FunnelIcon
-} from '@heroicons/react/24/outline';
+import { PiChartBar, PiFunnel, PiMagnifyingGlass, PiScales } from 'react-icons/pi'
 import { QueryEngine, FilterOptions, ViewType } from '../../types/iceberg';
 import { QUERY_ENGINES } from '../../data/query-engines';
 import FilterControls from './FilterControls';
@@ -63,24 +58,6 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
     return engines;
   }, [filters, maxEngines]);
 
-  // JSON-LD structured data for SEO
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": "Apache Iceberg Query Engine Support Matrix",
-    "description": "Comprehensive comparison of query engines supporting Apache Iceberg table format",
-    "author": {
-      "@type": "Organization",
-      "name": "Olake.io"
-    },
-    "datePublished": new Date().toISOString(),
-    "about": {
-      "@type": "SoftwareApplication",
-      "name": "Apache Iceberg",
-      "applicationCategory": "Data Lake Technology"
-    }
-  };
-
   const handleEngineSelection = (engineId: string, selected: boolean) => {
     setSelectedEngines(prev => 
       selected 
@@ -120,18 +97,12 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
         return (
           <CardView 
             engines={filteredEngines}
-            selectionMode={isComparisonMode}
-            selectedEngines={selectedEngines}
-            onEngineSelect={handleEngineSelection}
           />
         );
       case 'features':
         return (
           <FeatureView 
             engines={filteredEngines}
-            selectionMode={isComparisonMode}
-            selectedEngines={selectedEngines}
-            onEngineSelect={handleEngineSelection}
           />
         );
       default:
@@ -163,16 +134,12 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
 
   return (
     <>
-      {/* SEO structured data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-      />
+      {/* Structured data for /iceberg/query-engine/ is emitted by docs-iceberg-query-engine/intro.mdx via JsonLd */}
       
       <div className={`w-full ${fullWidth ? '' : 'max-w-4xl mx-auto'} p-4 sm:p-6 lg:p-8`}>
         {/* Enhanced Header with Stats */}
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-4">
             Apache Iceberg Query Engine Support Matrix
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-6">
@@ -183,7 +150,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
           <div className="flex flex-wrap justify-center gap-4 mb-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-2">
-                <ChartBarIcon className="w-4 h-4 text-blue-600" />
+                <PiChartBar aria-hidden="true" className="w-4 h-4 text-blue-600" />
                 <span className="text-sm text-gray-600 dark:text-gray-400">
                   {filteredEngines.length} of {QUERY_ENGINES.length} engines
                 </span>
@@ -193,7 +160,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
             {isComparisonMode && (
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-4 py-2 border border-blue-200 dark:border-blue-700">
                 <div className="flex items-center space-x-2">
-                  <ScaleIcon className="w-4 h-4 text-blue-600" />
+                  <PiScales aria-hidden="true" className="w-4 h-4 text-blue-600" />
                   <span className="text-sm text-blue-600 dark:text-blue-400">
                     {selectedEngines.length} selected for comparison
                   </span>
@@ -227,14 +194,14 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
                 onClick={toggleComparisonMode}
                 className={`
                   inline-flex items-center px-4 py-2 rounded-lg border font-medium transition-all duration-200 border-gray-300 dark:border-gray-600
-                  hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer
+                  hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer
                   ${isComparisonMode 
                     ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }
                 `}
               >
-                <ScaleIcon className="w-4 h-4 mr-2" />
+                <PiScales aria-hidden="true" className="w-4 h-4 mr-2" />
                 {isComparisonMode ? 'Exit Comparison' : 'Compare Engines'}
               </button>
             )}
@@ -243,7 +210,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
           {isComparisonMode && (
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
               <div className="flex items-start space-x-3">
-                <FunnelIcon className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <PiFunnel aria-hidden="true" className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
                     Comparison Mode Active
@@ -268,7 +235,7 @@ const IcebergQueryEngines: React.FC<IcebergQueryEnginesProps> = ({
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 w-full">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+                <PiMagnifyingGlass aria-hidden="true" className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 No engines found

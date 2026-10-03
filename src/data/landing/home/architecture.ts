@@ -17,7 +17,7 @@ export const ARCHITECTURE_INTRO = {
   eyebrow: 'Architecture',
   title: 'Works with what you run',
   body: 'OLake Go supports ingestion from 8 different sources into Iceberg and Parquet. OLake Fusion keeps your Iceberg tables fast, through scheduled compaction and maintenance.',
-  cta: { label: 'Get in touch', href: '/contact' }
+  cta: { label: 'Get in touch', href: '/contact/' }
 }
 
 export const ARCHITECTURE_GROUPS: ChipGroup[] = [
