@@ -188,11 +188,11 @@ olake-docs/
   authors: [author_id]
   tags: [tag1, tag2]
   description: Brief description
-  image: ./img/blog/YYYY/MM/cover.webp
+  image: /img/blog/cover/post-slug-cover.webp
   ---
   ```
 - **Image Organization**:
-  - Cover images: `static/img/blog/YYYY/MM/post-title-cover.webp`
+  - Cover images: `static/img/blog/cover/post-slug-cover.webp` (referenced as `/img/blog/cover/post-slug-cover.webp`)
   - Content images: `static/img/blog/YYYY/MM/post-title-1.webp`
 
 #### 2.2.3 Source Code (`/src`)
@@ -244,7 +244,7 @@ olake-docs/
 
 #### 2.4.1 Core Dependencies
 
-- Docusaurus v3.8.1
+- Docusaurus v3.10.2
 - React v18.3.1
 - TailwindCSS v3.4.17
 - TypeScript v5.0.0
@@ -439,7 +439,7 @@ graph LR
 
 #### 4.2.1 Core Framework
 
-- **Docusaurus v3.8.1**
+- **Docusaurus v3.10.2**
   - Documentation framework
   - MDX support
   - Plugin system
@@ -561,8 +561,9 @@ module.exports = {
   tagline: ' Data Lake ',
   url: 'https://olake.io/docs',
   baseUrl: '/',
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  // Broken links/anchors fail the build in CI (GitHub Actions sets CI=true) and only warn locally
+  onBrokenLinks: process.env.CI ? 'throw' : 'warn',
+  onBrokenAnchors: process.env.CI ? 'throw' : 'warn',
   favicon: 'img/favicon.ico',
   organizationName: 'datazip-inc',
   projectName: 'olake-docs',
@@ -729,12 +730,12 @@ The project integrates with several third-party services and plugins to enhance 
 
 #### 4.8.7 IndexNow
 
-- **Purpose**: Automatically notifies search engines (Bing, Yandex, etc.) when content is updated, speeding up indexing
+- **Purpose**: Automatically notifies IndexNow-participating search engines (Bing, Yandex, Naver, Seznam and others; not Google) when content is updated, speeding up indexing
 - **Configuration**: Custom plugin located at `src/plugins/indexnow/index.js`
 - **How it works**:
   - After each build, the plugin reads the generated sitemap
   - Extracts all URLs from the sitemap
-  - Submits them to IndexNow API endpoints for Bing and Yandex
+  - Submits them to the shared IndexNow endpoint (api.indexnow.org), which forwards them to all participating engines; HTTP 200 and 202 count as success, the status is logged, and a failure never fails the build. Runs only on a push to master
   - Helps get new content indexed faster than waiting for search engines to crawl naturally
 - **API Key**: Stored in `INDEXNOW_KEY` environment variable (also hardcoded as fallback)
 
