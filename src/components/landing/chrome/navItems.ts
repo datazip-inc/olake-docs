@@ -24,7 +24,7 @@ export interface MegaColumn {
 /** Wide desktop panel: a featured card, link columns and a help band. Mobile uses `items`. */
 export interface MegaMenu {
   /** Optional blue card on the left; menus without one use the full width for their columns. */
-  feature?: { eyebrow: string; title: string; text: string; cta: LakesideNavLink }
+  feature?: { eyebrow?: string; title: string; text?: string; cta: LakesideNavLink }
   columns: MegaColumn[]
   band: { title: string; text: string; cta: LakesideNavLink; icon: 'slack' | 'github' | 'arrow' }
 }
@@ -34,56 +34,20 @@ export interface LakesideNavEntry {
   href?: string
   items?: LakesideNavLink[]
   mega?: MegaMenu
-}
-
-/** Docs mega menu. Every href is an existing docs route. */
-const DOCS_MEGA: MegaMenu = {
-  columns: [
-    {
-      title: 'OLake Go',
-      subtitle: 'Database replication',
-      icon: 'go',
-      links: [
-        { label: 'Overview', href: '/docs' },
-        { label: 'Quickstart', href: '/docs/getting-started/quickstart/' },
-        { label: 'Architecture', href: '/docs/core/architecture/' },
-        { label: 'Install', href: '/docs/install/docker-cli/' },
-        { label: 'Release notes', href: '/docs/release/ingestion/overview/' }
-      ]
-    },
-    {
-      title: 'OLake Fusion',
-      subtitle: 'Iceberg table maintenance',
-      icon: 'fusion',
-      links: [
-        { label: 'Overview', href: '/docs/fusion/getting-started/overview' },
-        { label: 'Quickstart', href: '/docs/fusion/getting-started/quickstart/' },
-        { label: 'Architecture', href: '/docs/fusion/core/architecture/' },
-        { label: 'Install', href: '/docs/fusion/install/kubernetes-compaction/' },
-        { label: 'Release notes', href: '/docs/fusion/release/maintenance/overview/' }
-      ]
-    }
-  ],
-  band: {
-    title: 'Stuck on something?',
-    text: 'Ask the OLake community on Slack, or open an issue on GitHub.',
-    cta: { label: 'Join the Slack community', href: SLACK_URL },
-    icon: 'slack'
-  }
+  /** Shown in the mobile drawer only; the desktop navbar leaves it out. */
+  mobileOnly?: boolean
 }
 
 /** Products mega menu. */
 const PRODUCTS_MEGA: MegaMenu = {
   feature: {
-    eyebrow: 'Two products',
     title: 'Replicate, then maintain',
-    text: 'OLake Go replicates databases into Apache Iceberg. OLake Fusion runs compaction and maintenance on Iceberg tables.',
     cta: { label: 'Try OLake Go', href: '/docs/getting-started/quickstart/' }
   },
   columns: [
     {
       title: 'OLake Go',
-      subtitle: 'Database replication',
+      subtitle: 'Databases, Kafka & S3 → Iceberg',
       icon: 'go',
       links: [
         { label: 'Overview', href: '/olake-go' },
@@ -115,7 +79,6 @@ const PRODUCTS_MEGA: MegaMenu = {
 /** Resources mega menu. Customer names are the story routes that exist on the site. */
 const RESOURCES_MEGA: MegaMenu = {
   feature: {
-    eyebrow: 'From the blog',
     title: 'Read the OLake blog',
     text: 'Guides and comparisons on moving data into Apache Iceberg.',
     cta: { label: 'Browse the blog', href: '/blog' }
@@ -127,7 +90,7 @@ const RESOURCES_MEGA: MegaMenu = {
       icon: 'learn',
       links: [
         { label: 'Blog', href: '/blog' },
-        { label: 'Iceberg blogs', href: '/iceberg' },
+        { label: 'Iceberg blogs', href: '/blog/tags/iceberg/' },
         { label: 'Webinars & events', href: '/webinar' },
         { label: 'Documentation', href: '/docs' }
       ]
@@ -182,12 +145,12 @@ export const LAKESIDE_NAV: LakesideNavEntry[] = [
       { label: 'Customer Stories', href: '/customer-stories' },
       { label: 'Webinars & Events', href: '/webinar' },
       { label: 'OLake Community', href: '/community' },
-      { label: 'Iceberg Blogs', href: '/iceberg' }
+      { label: 'Iceberg Blogs', href: '/blog/tags/iceberg/' }
     ]
   },
   {
     label: 'Docs',
-    mega: DOCS_MEGA,
+    mobileOnly: true,
     items: [
       { label: 'OLake Go', href: '/docs' },
       { label: 'OLake Fusion', href: '/docs/fusion/getting-started/overview' }

@@ -150,11 +150,13 @@ function MegaPanel({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => voi
         {mega.feature && (
           <div className='lk-mega-feature flex flex-col justify-between rounded-[12px] p-[20px]'>
           <div>
-            <span className='text-[12px] font-medium uppercase tracking-[0.06em] text-olake-on-blue/80'>
-              {mega.feature.eyebrow}
-            </span>
+            {mega.feature.eyebrow && (
+              <span className='text-[12px] font-medium uppercase tracking-[0.06em] text-olake-on-blue/80'>{mega.feature.eyebrow}</span>
+            )}
             <p className='mb-0 mt-[8px] text-[20px] leading-[1.25] text-olake-on-blue'>{mega.feature.title}</p>
-            <p className='mb-0 mt-[8px] text-[14px] leading-[1.5] text-olake-on-blue/85'>{mega.feature.text}</p>
+            {mega.feature.text && (
+              <p className='mb-0 mt-[8px] text-[14px] leading-[1.5] text-olake-on-blue/85'>{mega.feature.text}</p>
+            )}
           </div>
           <NavAnchor
             link={mega.feature.cta}
@@ -410,7 +412,7 @@ export default function LakesideNavbar({
             OLake
           </Link>
           <div className={cn('items-center gap-[24px]', wideFlex)}>
-            {LAKESIDE_NAV.map((entry) => (
+            {LAKESIDE_NAV.filter((entry) => !entry.mobileOnly).map((entry) => (
               <DesktopEntry
                 key={entry.label}
                 entry={entry}
