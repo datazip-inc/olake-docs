@@ -58,7 +58,6 @@ const docSidebar = {
       type: 'category',
       label: 'Sources',
       items: [
-        { type: 'doc', id: 'connectors/overview', label: 'Overview' },
         {
           type: 'category',
           label: 'PostgreSQL',

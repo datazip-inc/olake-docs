@@ -17,13 +17,14 @@ export interface LakesideNavLink {
 export interface MegaColumn {
   title: string
   subtitle: string
-  icon: 'go' | 'fusion' | 'sources' | 'start' | 'learn' | 'customers' | 'community'
+  icon: 'go' | 'fusion' | 'learn' | 'customers' | 'community'
   links: LakesideNavLink[]
 }
 
 /** Wide desktop panel: a featured card, link columns and a help band. Mobile uses `items`. */
 export interface MegaMenu {
-  feature: { eyebrow: string; title: string; text: string; cta: LakesideNavLink }
+  /** Optional blue card on the left; menus without one use the full width for their columns. */
+  feature?: { eyebrow: string; title: string; text: string; cta: LakesideNavLink }
   columns: MegaColumn[]
   band: { title: string; text: string; cta: LakesideNavLink; icon: 'slack' | 'github' | 'arrow' }
 }
@@ -37,22 +38,16 @@ export interface LakesideNavEntry {
 
 /** Docs mega menu. Every href is an existing docs route. */
 const DOCS_MEGA: MegaMenu = {
-  feature: {
-    eyebrow: 'Start here',
-    title: 'Quickstart',
-    text: 'Set up OLake Go and run your first sync into Apache Iceberg.',
-    cta: { label: 'Open the quickstart', href: '/docs/getting-started/quickstart/' }
-  },
   columns: [
     {
       title: 'OLake Go',
       subtitle: 'Database replication',
       icon: 'go',
       links: [
-        { label: 'Docs home', href: '/docs' },
-        { label: 'Create your first pipeline', href: '/docs/getting-started/creating-first-pipeline/' },
+        { label: 'Overview', href: '/docs' },
+        { label: 'Quickstart', href: '/docs/getting-started/quickstart/' },
         { label: 'Architecture', href: '/docs/core/architecture/' },
-        { label: 'Install with Docker', href: '/docs/install/docker-cli/' },
+        { label: 'Install', href: '/docs/install/docker-cli/' },
         { label: 'Release notes', href: '/docs/release/ingestion/overview/' }
       ]
     },
@@ -63,21 +58,9 @@ const DOCS_MEGA: MegaMenu = {
       links: [
         { label: 'Overview', href: '/docs/fusion/getting-started/overview' },
         { label: 'Quickstart', href: '/docs/fusion/getting-started/quickstart/' },
-        { label: 'Types of compaction', href: '/docs/fusion/compaction/types-of-compaction/' },
-        { label: 'Catalogs', href: '/docs/fusion/maintenance/catalogs/' },
-        { label: 'Metrics', href: '/docs/fusion/maintenance/metrics/' }
-      ]
-    },
-    {
-      title: 'Sources',
-      subtitle: 'Connector guides',
-      icon: 'sources',
-      links: [
-        { label: 'All connectors', href: '/docs/connectors/overview/' },
-        { label: 'Postgres', href: '/docs/connectors/postgres/' },
-        { label: 'MySQL', href: '/docs/connectors/mysql/' },
-        { label: 'MongoDB', href: '/docs/connectors/mongodb/' },
-        { label: 'SQL Server', href: '/docs/connectors/mssql/' }
+        { label: 'Architecture', href: '/docs/fusion/core/architecture/' },
+        { label: 'Install', href: '/docs/fusion/install/kubernetes-compaction/' },
+        { label: 'Release notes', href: '/docs/fusion/release/maintenance/overview/' }
       ]
     }
   ],
@@ -105,7 +88,6 @@ const PRODUCTS_MEGA: MegaMenu = {
       links: [
         { label: 'Overview', href: '/olake-go' },
         { label: 'Documentation', href: '/docs' },
-        { label: 'Connectors', href: '/docs/connectors/overview/' },
         { label: 'Quickstart', href: '/docs/getting-started/quickstart/' },
         { label: 'GitHub', href: GITHUB_REPO_URL, external: true }
       ]
@@ -117,20 +99,8 @@ const PRODUCTS_MEGA: MegaMenu = {
       links: [
         { label: 'Overview', href: '/olake-fusion' },
         { label: 'Documentation', href: '/docs/fusion/getting-started/overview' },
-        { label: 'Types of compaction', href: '/docs/fusion/compaction/types-of-compaction/' },
         { label: 'Quickstart', href: '/docs/fusion/getting-started/quickstart/' },
         { label: 'GitHub', href: FUSION_GITHUB_REPO_URL, external: true }
-      ]
-    },
-    {
-      title: 'Get started',
-      subtitle: 'Try it your way',
-      icon: 'start',
-      links: [
-        { label: 'Quickstart', href: '/docs/getting-started/quickstart/' },
-        { label: 'Playground', href: '/docs/getting-started/playground/' },
-        { label: 'Set up the OLake UI', href: '/docs/getting-started/olake-ui/' },
-        { label: 'Pricing', href: PRICING_LINK.href }
       ]
     }
   ],
