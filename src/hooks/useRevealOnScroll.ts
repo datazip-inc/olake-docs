@@ -16,7 +16,7 @@ export default function useRevealOnScroll(rootSelector = '.lakeside-page') {
 
     const root = document.querySelector(rootSelector)
     if (!root) return undefined
-    const sections = Array.from(root.querySelectorAll<HTMLElement>(':scope > section, :scope > div > section, :scope > .lakeside-benchmark-suite'))
+    const sections = Array.from(root.querySelectorAll<HTMLElement>(':scope > section, :scope > div > section, :scope > .lakeside-benchmark-suite, :scope > main > section, :scope > main > div > section, :scope > main > .lakeside-benchmark-suite, :scope > main > div > div > section, :scope > main > div > .lakeside-benchmark-suite'))
       .filter((el) => !el.closest('.lakeside-hero-bg') && !el.closest('footer'))
       .filter((el) => el.getBoundingClientRect().top > window.innerHeight)
 
