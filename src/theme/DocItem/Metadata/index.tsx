@@ -25,8 +25,7 @@ type Props = WrapperProps<typeof MetadataType>;
  *
  * Also emits a TechArticle JSON-LD block for the main docs (/docs/...). Every field is something
  * the page shows: the title, the description (front matter, else the first paragraph) and the
- * "Last updated" date. Pages that carry their own structured data are skipped: the docs home
- * (docs/intro.mdx) and the Iceberg query-engine docs (QueryEngineLayout).
+ * "Last updated" date. The docs home (docs/intro.mdx) carries its own structured data and is skipped.
  */
 export default function MetadataWrapper(props: Props): ReactNode {
   const {metadata, frontMatter, assets} = useDoc();

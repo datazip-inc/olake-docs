@@ -153,7 +153,6 @@ olake-docs/
 │   # - Redirects and URL rewrites
 │
 ├── sidebars.js          # Documentation sidebar structure
-├── sidebarsIcebergQE.js # Iceberg Query Engine sidebar
 ├── tailwind.config.js   # Tailwind CSS configuration
 ├── tsconfig.json        # TypeScript configuration
 ├── package.json         # Dependencies and scripts
