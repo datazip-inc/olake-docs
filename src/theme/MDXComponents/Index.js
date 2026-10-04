@@ -10,6 +10,7 @@ import TestimonialCard from '@site/src/components/TestimonialCard'
 import TLDR from '@site/src/components/TLDR'
 import CollapsibleTip from '@site/src/components/CollapsibleTip';
 import Figure from '@site/src/components/Figure';
+import DocsIntroCard from '@site/src/components/docs/DocsIntroCard';
 import Video from '@site/src/components/Video';
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
@@ -117,7 +118,6 @@ import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIc
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
-import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
 
 import OLakeFeaturesTLDR from '../../../docs/shared/OLakeFeaturesTLDR.mdx'
 import SupportedSources from '../../../docs/shared/SupportedSources.mdx'
@@ -152,6 +152,7 @@ const MDXComponents = {
   TLDR,
   CollapsibleTip,
   Figure,
+  DocsIntroCard,
   Video,
   DocCardList,
 
@@ -257,7 +258,6 @@ const MDXComponents = {
   AdditionalReferences,
   CatalogQuery,
   YouTubeEmbed,
-  IcebergQueryEngines,
 
   OLakeFeaturesTLDR,
   SupportedSources,
