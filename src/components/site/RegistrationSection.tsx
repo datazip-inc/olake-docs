@@ -92,8 +92,7 @@ const RegistrationSection: React.FC = () => {
         className='grid grid-cols-1 gap-[32px] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-[56px]'
       >
         <Card className='p-[24px] lg:p-[40px]'>
-          <p className='mb-0 text-[14px] font-medium text-olake-blue'>OLake</p>
-          <h2 className='mb-0 mt-[6px] text-[24px] font-normal leading-[1.2] tracking-[-0.01em] text-olake-ink lg:text-[32px]'>
+          <h2 className='mb-0 text-[24px] font-normal leading-[1.2] tracking-[-0.01em] text-olake-ink lg:text-[32px]'>
             Get in touch
           </h2>
           <p className='mb-0 mt-[10px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
@@ -105,8 +104,7 @@ const RegistrationSection: React.FC = () => {
         </Card>
 
         <div className='lg:pt-[12px]'>
-          <p className='mb-0 text-[14px] font-medium text-olake-blue'>OLake</p>
-          <h2 className='mb-0 mt-[6px] text-[24px] font-normal leading-[1.2] tracking-[-0.01em] text-olake-ink lg:text-[38px]'>
+          <h2 className='mb-0 text-[24px] font-normal leading-[1.2] tracking-[-0.01em] text-olake-ink lg:text-[38px]'>
             Interested?
           </h2>
           <ul className='mb-0 list-none p-0 mt-[24px] flex flex-col gap-[24px] border-0 border-t border-solid border-olake-line-rule pt-[24px] lg:mt-[32px] lg:pt-[32px]'>
