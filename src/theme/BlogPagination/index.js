@@ -35,7 +35,7 @@ export function BlogPagination({ metadata }) {
   if (!metadata || !metadata.totalPages || metadata.totalPages <= 1) return null
 
   const { page, totalPages } = metadata
-  // The page-1 permalink of this list, e.g. /blog, /iceberg/tags/trino or /blog/authors/akshay
+  // The page-1 permalink of this list, e.g. /blog, /blog/tags/trino or /blog/authors/akshay
   const base = (metadata.permalink || '/').replace(/\/page\/\d+\/?$/, '').replace(/\/$/, '')
   const pagePath = (n) => (n === 1 ? base || '/' : `${base}/page/${n}`)
 

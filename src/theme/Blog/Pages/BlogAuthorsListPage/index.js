@@ -11,8 +11,6 @@ import PageHeader from '@site/src/components/blog/PageHeader'
 // title, description and h1 (stock text is the identical "Authors" everywhere).
 const AUTHORS_DESCRIPTIONS = {
   blog: 'Meet the engineers and writers behind the OLake blog, and browse the posts each author has published.',
-  iceberg:
-    'Meet the authors of the OLake Apache Iceberg blog and browse the Iceberg articles each of them has written.',
   'customer-stories':
     'Meet the authors behind OLake customer stories and browse the case studies each of them has written.'
 }

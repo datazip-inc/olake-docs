@@ -49,7 +49,7 @@ Stack: Docusaurus 3.10, React 19, Tailwind CSS 4, strict MDX 3.
    | Command | What it checks |
    | ------- | -------------- |
    | `npm run typecheck` | `tsc --noEmit` over the TypeScript sources |
-   | `npm run lint:content` | MDX and front matter rules for docs, blog, iceberg and customer-stories files; details in 1.2. Errors fail the command only when you run it yourself. |
+   | `npm run lint:content` | MDX and front matter rules for docs, blog and customer-stories files; details in 1.2. Errors fail the command only when you run it yourself. |
    | `npm run og-images -- --check` | Fails if a blog cover has no 1200x630 social card in `static/img/og/`, or the cover changed since the card was rendered. Writes nothing. Run it after adding a post or changing a cover. |
 
 #### 1.1 Design system pointers
@@ -129,10 +129,9 @@ A card is stale when the SHA-256 of its source cover no longer matches `scripts/
 
 ### 2. Adding a Blog Post
 
-| Directory  | When to use             |
-| ---------- | ----------------------- |
-| `/blog`    | General OLake topics    |
-| `/iceberg` | Iceberg-specific topics |
+| Directory | When to use              |
+| --------- | ------------------------ |
+| `/blog`   | OLake and Iceberg topics |
 
 1. **Navigate** to the correct directory.
 2. **Create an MDX file**: `YYYY-MM-DD-blog-slug.mdx`.
@@ -171,7 +170,7 @@ static/img/blog/2025/05/flatten-array-2.webp
 3. To expose a component globally in MDX, **import it once** in
    `src/theme/MDXComponents/Index.js`.
 
-   * Afterwards, you can use `<MyComponent/>` in any file under `/blog`, `/docs`, or `/iceberg`.
+   * Afterwards, you can use `<MyComponent/>` in any file under `/blog` or `/docs`.
    * **HTML pages** in `src/pages` still require **manual imports**.
 
 ---
@@ -242,7 +241,7 @@ Breaking these has cost search traffic before. Run `npm run build` and `npm run 
 * **Titles.** The site title is `OLake`, so every `<title>` ends in ` | OLake` (docs too). Keep the rendered title at 60 characters or fewer, so the frontmatter title at about 52. If the visible H1 needs to be longer, add `seo_title: "..."` (about 52 characters) to the frontmatter: it replaces only `<title>`, `og:title` and `twitter:title`, and the H1 keeps `title`. Docs titles under 25 characters get their sidebar section appended automatically. Code: `src/theme/seo/helpers.ts`, `src/theme/DocItem/Metadata`, `src/theme/BlogPostPage`.
 * **Descriptions.** Every page needs its own `description` of 120 to 155 characters (max 160, min 100), unique across the site. Do not copy one post's description into another, and do not leave it truncated with "...". Files in `docs/shared` are snippets and have no frontmatter.
 * **Pages that must not be indexed** get `noindex, follow`: confirmation pages, archive pages, tag and author pagination, zero-post authors, `/search/`. The theme does this for the generated pages; add it yourself to any new thank-you or utility page. Keep them crawlable (no robots.txt block), otherwise Google never sees the tag.
-* **Taxonomy pages** (blog, iceberg, customer-stories archive, authors, tags) get their title, description and H1 from the swizzled components in `src/theme` (`Blog/useBlogInstance.js`). Titles carry no post count (the count made SEO audits report "title changed" on every new post). A new blog instance must be added there, or its pages fall back to the "Blog" wording.
+* **Taxonomy pages** (blog and customer-stories archive, authors, tags) get their title, description and H1 from the swizzled components in `src/theme` (`Blog/useBlogInstance.js`). Titles carry no post count (the count made SEO audits report "title changed" on every new post). A new blog instance must be added there, or its pages fall back to the "Blog" wording.
 * **Sitemap exclusions** live in the sitemap options of `docusaurus.config.js` (tags, authors, archive, search, `docs/shared`, confirmation pages, pagination). `docs/shared` is not built as pages at all.
 * **One `og:type`, one H1, one JSON-LD per schema.** Pages under `src/pages` get `og:type=website` from `src/theme/Layout`; posts emit `article`. Emit JSON-LD with `src/components/JsonLd`, not `<Head><script dangerouslySetInnerHTML>` (Helmet drops it).
 * **Images.** Keep every image under about 300 KB (WebP; no GIFs, use short muted looping video).

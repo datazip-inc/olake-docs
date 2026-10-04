@@ -4,10 +4,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl'
 import { useLocation } from '@docusaurus/router'
 import clsx from 'clsx'
 
-// The three blog instances (docusaurus.config.js: olake-blog, iceberg-blog, customer-stories-blog)
+// The two blog instances (docusaurus.config.js: olake-blog, customer-stories-blog)
 const SECTIONS = [
   { label: 'Blog', path: '/blog' },
-  { label: 'Iceberg', path: '/iceberg' },
   { label: 'Customer Stories', path: '/customer-stories' }
 ]
 

@@ -46,7 +46,6 @@ export default function BlogPostPageWrapper(props) {
   // FAQ text that no longer matches the page) are archived in drafts/seo/.
   const SECTIONS = {
     '/blog/': 'Blog',
-    '/iceberg/': 'Apache Iceberg',
     '/customer-stories/': 'Customer Stories'
   };
   const sectionPath = Object.keys(SECTIONS).find((p) => (metadata.permalink || '').startsWith(p));

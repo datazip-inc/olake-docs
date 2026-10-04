@@ -25,8 +25,8 @@ const STRICT = args.includes('--strict')
 const QUIET = args.includes('--quiet')
 const onlyPaths = args.filter((a) => !a.startsWith('--'))
 
-const POST_DIRS = ['blog', 'iceberg', 'customer-stories']
-const DOC_DIRS = ['docs', 'docs-iceberg-query-engine']
+const POST_DIRS = ['blog', 'customer-stories']
+const DOC_DIRS = ['docs']
 const TITLE_MAX = 70
 const DESC_MIN = 120
 const DESC_MAX = 160
@@ -123,13 +123,13 @@ function lintMarkdown(file, kind) {
       add('warn', file, no, 'tldr-heading', 'summary written as a heading: use the <TLDR> component')
     }
     // absolute internal links with a file extension never resolve
-    if (/\]\(\/(?:docs|blog|iceberg|customer-stories)[^)\s]*\.mdx?(?:[#)])/.test(ln)) {
+    if (/\]\(\/(?:docs|blog|customer-stories)[^)\s]*\.mdx?(?:[#)])/.test(ln)) {
       add('warn', file, no, 'link-extension', 'internal link ends in .md/.mdx: it resolves, but link to the route instead')
     }
     if (/\]\(\/blog\/\d{4}\/\d{2}\/\d{2}\//.test(ln)) {
       add('error', file, no, 'old-blog-url', 'old date-style /blog/YYYY/MM/DD/ URL: use the post slug')
     }
-    if (/https:\/\/olake\.io\/(?:docs|blog|iceberg|customer-stories)\//.test(ln) && !/^\s*(?:import|export)\b/.test(ln)) {
+    if (/https:\/\/olake\.io\/(?:docs|blog|customer-stories)\//.test(ln) && !/^\s*(?:import|export)\b/.test(ln)) {
       add('warn', file, no, 'self-link', 'absolute olake.io link: prefer a relative /path/')
     }
     if (kind === 'post' && /<h1[\s>]/i.test(noInline)) {

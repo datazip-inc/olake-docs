@@ -11,8 +11,6 @@ import PageHeader from '@site/src/components/blog/PageHeader'
 // title, description and h1 (stock text is the identical "Tags" everywhere).
 const TAGS_DESCRIPTIONS = {
   blog: 'Browse OLake blog posts by topic tag, from CDC and data replication to Apache Iceberg, catalogs and query engines.',
-  iceberg:
-    'Browse OLake Apache Iceberg articles by topic tag, including partitioning, catalogs, query engines and migrations.',
   'customer-stories':
     'Browse OLake customer stories by topic tag to find case studies for your database, catalog or query engine.'
 }

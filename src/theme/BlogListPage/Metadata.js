@@ -6,7 +6,7 @@ import { useLocation } from '@docusaurus/router'
 import Head from '@docusaurus/Head'
 import { serializeJsonLd } from '@site/src/components/JsonLd'
 
-// Head metadata of the blog and Iceberg list pages: title, Open Graph, robots for /page/N, and the
+// Head metadata of the blog list pages: title, Open Graph, robots for /page/N, and the
 // JSON-LD schemas. Moved verbatim out of index.js, which now only renders the page.
 export default function BlogListPageMetadata(props) {
   const { metadata } = props
@@ -24,8 +24,6 @@ export default function BlogListPageMetadata(props) {
   // Paginated list pages get a unique title ("Blogs on OLake - Page 2"); page 1 keeps the plain title.
   const baseTitle = isBlogOnlyMode ? siteTitle : blogTitle
   const title = pageNumber > 1 ? `${baseTitle} - Page ${pageNumber}` : baseTitle
-
-  const isIcebergListing = permalink.startsWith('/iceberg')
 
   const primaryUrl = 'https://olake.io/'
   const blogUrl = `${siteUrl}${permalink}`.replace(/\/?$/, '/')
@@ -164,169 +162,17 @@ export default function BlogListPageMetadata(props) {
     ]
   }
 
-  const icebergMainEntity = {
-    '@type': 'ItemList',
-    name: 'Iceberg posts',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        item: {
-          '@type': 'Article',
-          name: 'All about Iceberg Partitioning and Partitioning Writing Strategies',
-          url: 'https://olake.io/iceberg/iceberg-partitioning-and-writing-strategies/',
-          author: { '@type': 'Person', name: 'Badal Prasad Singh' },
-          datePublished: '2025-06-24',
-          timeRequired: 'PT9M'
-        }
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        item: {
-          '@type': 'Article',
-          name: 'OLake + Glue + Snowflake - A Deep Dive into Modern Data Partitioning',
-          url: 'https://olake.io/iceberg/olake-glue-snowflake/',
-          author: { '@type': 'Person', name: 'Merlyn Mathew' },
-          datePublished: '2025-05-28',
-          timeRequired: 'PT10M'
-        }
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        item: {
-          '@type': 'Article',
-          name: 'Iceberg Partitioning vs. Hive Partitioning',
-          url: 'https://olake.io/iceberg/hive-partitioning-vs-iceberg-partitioning/',
-          author: { '@type': 'Person', name: 'Sandeep Devarapalli' },
-          datePublished: '2025-05-13',
-          timeRequired: 'PT30M'
-        }
-      },
-      {
-        '@type': 'ListItem',
-        position: 4,
-        item: {
-          '@type': 'Article',
-          name: 'OLake for Simple Iceberg Ingestion using Glue Catalog, Athena for Query',
-          url: 'https://olake.io/iceberg/olake-iceberg-athena/',
-          author: { '@type': 'Person', name: 'Merlyn Mathew' },
-          datePublished: '2025-05-08',
-          timeRequired: 'PT7M'
-        }
-      },
-      {
-        '@type': 'ListItem',
-        position: 5,
-        item: {
-          '@type': 'Article',
-          name: 'OLake for Simple Iceberg Ingestion using Glue Catalog, Trino for Query',
-          url: 'https://olake.io/iceberg/olake-iceberg-trino/',
-          author: { '@type': 'Person', name: 'Merlyn Mathew' },
-          datePublished: '2025-05-08',
-          timeRequired: 'PT12M'
-        }
-      },
-      {
-        '@type': 'ListItem',
-        position: 6,
-        item: {
-          '@type': 'Article',
-          name: 'Step-by-Step Guide - Replicating PostgreSQL to Iceberg with OLake & AWS Glue',
-          url: 'https://olake.io/iceberg/postgres-to-iceberg-using-glue/',
-          author: { '@type': 'Person', name: 'Rohan Khameshra' },
-          datePublished: '2025-04-11',
-          timeRequired: 'PT11M'
-        }
-      }
-    ]
-  }
-
-  const icebergCollectionPageSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    url: blogUrl,
-    name: 'Blogs on Apache Iceberg',
-    description:
-      'Collection of OLake blog posts about Apache Iceberg: partitioning, query engines, Glue/Athena/Trino integration, and migration guides.',
-    isPartOf: {
-      '@type': 'WebSite',
-      url: primaryUrl,
-      name: 'OLake'
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: 'OLake',
-      url: primaryUrl,
-      logo: {
-        '@type': 'ImageObject',
-        url: 'https://olake.io/img/logo/olake-blue.svg',
-        width: 32,
-        height: 32
-      }
-    },
-    mainEntity: icebergMainEntity
-  }
-
-  const icebergBreadcrumbSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: primaryUrl
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Iceberg',
-        item: blogUrl
-      }
-    ]
-  }
-
-  const icebergItemListSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: 'Explore Iceberg Query Engines',
-    url: blogUrl,
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Explore Query Engines',
-        item: 'https://olake.io/iceberg/query-engine/'
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'View Feature Matrix',
-        item: 'https://olake.io/iceberg/query-engine/'
-      }
-    ]
-  }
-
   const baseSchemas = [
     { id: 'organization', data: organizationSchema },
     { id: 'website', data: websiteSchema }
   ]
 
-  const jsonLdSchemas = isIcebergListing
-    ? [
-        ...baseSchemas,
-        { id: 'collectionPage', data: icebergCollectionPageSchema },
-        { id: 'breadcrumb', data: icebergBreadcrumbSchema },
-        { id: 'itemList', data: icebergItemListSchema }
-      ]
-    : [
-        ...baseSchemas,
-        { id: 'collectionPage', data: blogCollectionPageSchema },
-        { id: 'breadcrumb', data: blogBreadcrumbSchema },
-        { id: 'itemList', data: blogItemListSchema }
-      ]
+  const jsonLdSchemas = [
+    ...baseSchemas,
+    { id: 'collectionPage', data: blogCollectionPageSchema },
+    { id: 'breadcrumb', data: blogBreadcrumbSchema },
+    { id: 'itemList', data: blogItemListSchema }
+  ]
 
   return (
     <>

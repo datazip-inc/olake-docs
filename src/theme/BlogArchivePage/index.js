@@ -12,8 +12,6 @@ import PageHeader from '@site/src/components/blog/PageHeader'
 // title, description and h1 (stock text is the identical "Archive" everywhere).
 const ARCHIVE_DESCRIPTIONS = {
   blog: 'Browse every OLake blog post by year: data replication, CDC, Apache Iceberg and lakehouse guides from the OLake team.',
-  iceberg:
-    'Browse all OLake Apache Iceberg articles by year: partitioning, catalogs, query engines and lakehouse how-to guides.',
   'customer-stories':
     'Browse all OLake customer stories and case studies by year, from teams replicating databases to Apache Iceberg.'
 }

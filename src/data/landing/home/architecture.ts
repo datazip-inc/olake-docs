@@ -5,8 +5,7 @@
  * (`landing/pages/useHomeLogic.ts` → `archSources`, `archDestinations`), which
  * are the same eight connectors `src/data/benchmarkData.ts` benchmarks.
  * Catalogs and query engines have no structured source in the repo yet; the
- * lists below are the ones the docs and the query-engine pages
- * (`src/data/query-engines/*`) cover.
+ * lists below are the ones the docs cover.
  */
 export interface ChipGroup {
   title: string

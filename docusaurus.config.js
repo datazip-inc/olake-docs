@@ -131,13 +131,12 @@ const config = {
           lastmod: 'date',
           // changefreq/priority are ignored by Google, so they are left at the plugin defaults.
           // The patterns must be prefixed with /** because tags, authors and archive pages live
-          // under each blog instance (/blog/tags, /iceberg/tags, /customer-stories/tags, ...).
+          // under each blog instance (/blog/tags, /customer-stories/tags, ...).
           ignorePatterns: [
             '/**/tags/**',
             '/**/authors/**',
             // Blog archive pages only. A broader /**/archive/** would also hide /docs/archive/.
             '/blog/archive/**',
-            '/iceberg/archive/**',
             '/customer-stories/archive/**',
             '/search/**',
             '/docs/shared/**',
@@ -344,20 +343,6 @@ const config = {
     ],
 
     [
-      '@docusaurus/plugin-content-docs',
-      {
-        id: 'iceberg-query-engine',
-        path: 'docs-iceberg-query-engine', // new folder on disk
-        routeBasePath: 'iceberg/query-engine', // final URL → /iceberg/query-engine/*
-        sidebarPath: require.resolve('./sidebarsIcebergQE.js'),
-        beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin],
-        showLastUpdateAuthor: true,
-        showLastUpdateTime: true,
-        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/docs-iceberg-query-engine/'
-      }
-    ],
-
-    [
       './src/plugins/blog-plugin',
       {
         path: 'blog',
@@ -394,41 +379,6 @@ const config = {
       }
     ],
 
-    [
-      './src/plugins/blog-plugin',
-      {
-        path: 'iceberg',
-        id: 'iceberg-blog',
-        // Real last-modified dates (from git) for the sitemap lastmod and the page metadata
-        showLastUpdateTime: true,
-        editLocalizedFiles: false,
-        blogTitle: 'Blogs on Apache Iceberg',
-        feedOptions: { title: 'Blogs on Apache Iceberg' },
-        blogDescription:
-          'Guides on Apache Iceberg: table format internals, catalogs, partitioning, query engines and how to replicate databases into Iceberg.',
-        blogSidebarCount: 'ALL',
-        blogSidebarTitle: 'List Iceberg blog',
-        routeBasePath: 'iceberg',
-        include: ['**/*.md', '**/*.mdx'],
-        exclude: [
-          '**/_*.{js,jsx,ts,tsx,md,mdx}',
-          '**/_*/**',
-          '**/*.test.{js,jsx,ts,tsx}',
-          '**/__tests__/**'
-        ],
-        postsPerPage: 6,
-        truncateMarker: /<!--\s*(truncate)\s*-->/,
-        showReadingTime: true,
-        onUntruncatedBlogPosts: 'ignore',
-        // Tags used in a post but missing from this instance's tags.yml
-        // Remove this to remove the "edit this page" links.
-        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
-        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
-        rehypePlugins: [imageFetchPriorityRehypePlugin],
-        // Adds width/height to local images so they reserve space (no layout shift)
-        beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
-      }
-    ],
     [
       './src/plugins/blog-plugin',
       {
@@ -477,10 +427,70 @@ const config = {
           { to: '/contact', from: '/ai-lake' },
           // URLs that still get search traffic (Search Console) but had no redirect
           // Author pages removed for authors without posts
-          { to: '/blog/authors', from: '/blog/authors/aakash' },
           { to: '/blog/authors', from: '/blog/authors/pavan' },
           { to: '/blog/authors', from: '/blog/authors/arsham' },
-          { to: '/iceberg/authors', from: '/iceberg/authors/ankit' },
+          // The separate Iceberg blog (/iceberg) was merged into the main blog: posts keep their slugs
+          { to: '/blog/data-partitioning-in-s3/', from: '/iceberg/data-partitioning-in-s3/' },
+          { to: '/blog/mor-vs-cow/', from: '/iceberg/mor-vs-cow/' },
+          { to: '/blog/why-iceberg/', from: '/iceberg/why-iceberg/' },
+          { to: '/blog/move-to-iceberg/', from: '/iceberg/move-to-iceberg/' },
+          { to: '/blog/paimon-vs-iceberg/', from: '/iceberg/paimon-vs-iceberg/' },
+          { to: '/blog/postgres-to-iceberg-using-glue/', from: '/iceberg/postgres-to-iceberg-using-glue/' },
+          { to: '/blog/olake-iceberg-athena/', from: '/iceberg/olake-iceberg-athena/' },
+          { to: '/blog/olake-iceberg-trino/', from: '/iceberg/olake-iceberg-trino/' },
+          { to: '/blog/hive-partitioning-vs-iceberg-partitioning/', from: '/iceberg/hive-partitioning-vs-iceberg-partitioning/' },
+          { to: '/blog/olake-glue-snowflake/', from: '/iceberg/olake-glue-snowflake/' },
+          { to: '/blog/iceberg-partitioning-and-writing-strategies/', from: '/iceberg/iceberg-partitioning-and-writing-strategies/' },
+          { to: '/blog/databricks-vs-iceberg/', from: '/iceberg/databricks-vs-iceberg/' },
+          { to: '/blog/tags/iceberg/', from: '/iceberg/' },
+          { to: '/blog/', from: '/iceberg/page/2/' },
+          { to: '/blog/archive/', from: '/iceberg/archive/' },
+          { to: '/blog/authors/', from: '/iceberg/authors/' },
+          { to: '/blog/authors/aakash/', from: '/iceberg/authors/aakash/' },
+          { to: '/blog/authors/ankit/', from: '/iceberg/authors/ankit/' },
+          { to: '/blog/authors/badal/', from: '/iceberg/authors/badal/' },
+          { to: '/blog/authors/merlyn/', from: '/iceberg/authors/merlyn/' },
+          { to: '/blog/authors/nayan/', from: '/iceberg/authors/nayan/' },
+          { to: '/blog/authors/priyansh/', from: '/iceberg/authors/priyansh/' },
+          { to: '/blog/authors/rohan/', from: '/iceberg/authors/rohan/' },
+          { to: '/blog/authors/sandeep/', from: '/iceberg/authors/sandeep/' },
+          { to: '/blog/tags/', from: '/iceberg/tags/' },
+          { to: '/blog/tags/athena/', from: '/iceberg/tags/athena/' },
+          { to: '/blog/tags/databricks/', from: '/iceberg/tags/databricks/' },
+          { to: '/blog/tags/glue/', from: '/iceberg/tags/glue/' },
+          { to: '/blog/tags/hive/', from: '/iceberg/tags/hive/' },
+          { to: '/blog/tags/iceberg/', from: '/iceberg/tags/iceberg/' },
+          { to: '/blog/tags/olake/', from: '/iceberg/tags/olake/' },
+          { to: '/blog/tags/partitioning/', from: '/iceberg/tags/partitioning/' },
+          { to: '/blog/tags/postgres/', from: '/iceberg/tags/postgres/' },
+          { to: '/blog/tags/s3/', from: '/iceberg/tags/s3/' },
+          { to: '/blog/tags/snowflake/', from: '/iceberg/tags/snowflake/' },
+          { to: '/blog/tags/trino/', from: '/iceberg/tags/trino/' },
+          { to: '/blog/tags/iceberg/', from: '/iceberg/tags/iceberg/page/2/' },
+          // The Iceberg query engine compatibility section (/iceberg/query-engine) was removed: each page goes to the closest post
+          { to: '/blog/iceberg-query-engine-interoperability-spark-databricks/', from: '/iceberg/query-engine/' },
+          { to: '/blog/olake-iceberg-athena/', from: '/iceberg/query-engine/athena/' },
+          { to: '/blog/olake-iceberg-trino/', from: '/iceberg/query-engine/trino/' },
+          { to: '/blog/databricks-vs-iceberg/', from: '/iceberg/query-engine/databricks/' },
+          { to: '/blog/olake-glue-snowflake/', from: '/iceberg/query-engine/snowflake/' },
+          { to: '/blog/apache-iceberg-hive-comparison/', from: '/iceberg/query-engine/hive/' },
+          { to: '/blog/build-data-lakehouse-iceberg-clickhouse-olake/', from: '/iceberg/query-engine/clickhouse/' },
+          { to: '/blog/postgres-iceberg-doris-lakehouse-olake/', from: '/iceberg/query-engine/doris/' },
+          { to: '/blog/building-open-data-lakehouse-with-olake-presto/', from: '/iceberg/query-engine/presto/' },
+          { to: '/blog/postgres-cdc-bigquery-iceberg-biglake/', from: '/iceberg/query-engine/bigquery/' },
+          { to: '/blog/iceberg-query-engine-interoperability-spark-databricks/', from: '/iceberg/query-engine/spark/' },
+          {
+            to: '/blog/iceberg-query-engine-interoperability-spark-databricks/',
+            from: [
+              '/iceberg/query-engine/flink/',
+              '/iceberg/query-engine/duckdb/',
+              '/iceberg/query-engine/impala/',
+              '/iceberg/query-engine/dreamio/',
+              '/iceberg/query-engine/dremio/',
+              '/iceberg/query-engine/starburst/',
+              '/iceberg/query-engine/starrocks/'
+            ]
+          },
           // Duplicate blog tags merged into one each (apache-iceberg -> iceberg, data-lake -> lake)
           { to: '/blog/tags/iceberg', from: '/blog/tags/apache-iceberg' },
           { to: '/blog/tags/lake', from: '/blog/tags/data-lake' },
@@ -1166,10 +1176,6 @@ const config = {
             from: '/docs/connectors/intro'
           },
 
-          {
-            to: '/iceberg/paimon-vs-iceberg',
-            from: '/blog/paimon-vs-iceberg'
-          },
           {
             to: '/docs/writers/parquet/config',
             from: '/docs/category/aws-s3'
