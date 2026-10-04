@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from '@docusaurus/Link'
 import { useLocation } from '@docusaurus/router'
 import {
+  PiArrowRightBold,
   PiArrowUpRight,
   PiBookOpenText,
   PiGithubLogo,
-  PiLightning,
   PiSlackLogo,
+  PiStackBold,
   PiUsersThree,
-  PiWrench,
   PiChatsCircle
 } from 'react-icons/pi'
 import { cn } from '@site/src/lib/utils'
@@ -106,12 +106,29 @@ function entryIsActive(entry: LakesideNavEntry, pathname: string): boolean {
   return !!entry.items?.some((item) => hit(item.href))
 }
 
-const MEGA_ICON: Record<MegaColumn['icon'], ReactNode> = {
-  go: <PiLightning size={18} aria-hidden='true' />,
-  fusion: <PiWrench size={18} aria-hidden='true' />,
+const MEGA_ICON: Partial<Record<MegaColumn['icon'], ReactNode>> = {
   learn: <PiBookOpenText size={18} aria-hidden='true' />,
   customers: <PiUsersThree size={18} aria-hidden='true' />,
   community: <PiChatsCircle size={18} aria-hidden='true' />
+}
+
+/**
+ * Product tile: the OLake mark on the brand blue with a small badge that says which product it is
+ * (an arrow for OLake Go's replication, stacked layers for OLake Fusion's table maintenance).
+ */
+function ProductTile({ product }: { product: 'go' | 'fusion' }) {
+  const Glyph = product === 'go' ? PiArrowRightBold : PiStackBold
+  return (
+    <span
+      aria-hidden='true'
+      className='relative flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] bg-olake-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]'
+    >
+      <img src='/img/landing/shared/olake-mark-small.svg' alt='' width={22} height={22} />
+      <span className='absolute -bottom-[5px] -right-[5px] flex h-[16px] w-[16px] items-center justify-center rounded-full border-[1.5px] border-solid border-olake-blue bg-olake-surface text-olake-blue dark:border-olake-blue-on-dark dark:text-olake-blue-on-dark'>
+        <Glyph size={10} />
+      </span>
+    </span>
+  )
 }
 
 const BAND_ICON: Record<MegaMenu['band']['icon'], ReactNode> = {
@@ -159,9 +176,13 @@ function MegaPanel({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => voi
           {mega.columns.map((col) => (
             <div key={col.title}>
               <div className='flex items-start gap-[10px] pb-[10px]'>
-                <span className='flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[8px] bg-olake-surface-muted text-olake-ink'>
-                  {MEGA_ICON[col.icon]}
-                </span>
+                {col.icon === 'go' || col.icon === 'fusion' ? (
+                  <ProductTile product={col.icon} />
+                ) : (
+                  <span className='flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[8px] bg-olake-surface-muted text-olake-ink'>
+                    {MEGA_ICON[col.icon]}
+                  </span>
+                )}
                 <span>
                   <span className='block text-[14px] font-medium leading-[1.3] text-olake-ink'>{col.title}</span>
                   <span className='block text-[13px] leading-[1.4] text-olake-muted'>{col.subtitle}</span>
