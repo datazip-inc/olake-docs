@@ -90,7 +90,7 @@ export default function GoArchitecture() {
           <div className='flex flex-col items-center lg:mx-[72px]'>
             <div
               ref={nodeRef}
-              className='flex h-[104px] w-[104px] items-center justify-center rounded-[22px] border border-solid border-olake-blue-ring bg-olake-blue shadow-[var(--olake-shadow-btn)] lg:h-[116px] lg:w-[116px]'
+              className='go-node flex h-[104px] w-[104px] items-center justify-center rounded-[22px] border border-solid border-olake-blue-ring bg-olake-blue shadow-[var(--olake-shadow-btn)] lg:h-[116px] lg:w-[116px]'
             >
               <img
                 src='/img/landing/shared/olake-mark-small.svg'
@@ -104,10 +104,10 @@ export default function GoArchitecture() {
             </div>
             <p className='mt-[12px] text-[15px] text-olake-ink'>{GO_ARCHITECTURE_LABELS.node}</p>
             <ul className='mt-[12px] flex flex-wrap justify-center gap-[6px]'>
-              {GO_SYNC_MODES.map((mode) => (
+              {GO_SYNC_MODES.map((mode, i) => (
                 <li
                   key={mode}
-                  className='rounded-[8px] border border-solid border-olake-line bg-olake-surface-alt px-[10px] py-[4px] text-[12px] text-olake-text'
+                  className={`go-chip go-chip-${i + 1} rounded-[8px] border border-solid border-olake-line bg-olake-surface-alt px-[10px] py-[4px] text-[12px] text-olake-text`}
                 >
                   {mode}
                 </li>

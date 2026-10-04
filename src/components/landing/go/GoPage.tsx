@@ -7,8 +7,9 @@ import GoFeatures from './GoFeatures'
 import GoBenchmark from './GoBenchmark'
 import GoFaq from './GoFaq'
 import GoCta from './GoCta'
+import './go.css'
 
-/** The OLake Go product page: hero, diagram, problem, features, benchmarks, FAQ and a closing CTA. */
+/** The OLake Go product page: hero, diagram, problem, features, benchmarks, a closing CTA and the FAQ. */
 export default function GoPage({ title, description }: { title: string; description: string }) {
   return (
     <LakesidePage
@@ -19,7 +20,7 @@ export default function GoPage({ title, description }: { title: string; descript
     >
       {/* Infima gives headings, paragraphs and lists bottom margins and lists a left padding;
           the lakeside reset is zero-specificity and loses, so it is undone here for the whole page. */}
-      <div className='[&_:is(h2,h3,p,ul)]:mb-0 [&_ul]:pl-0'>
+      <div className='go-page [&_:is(h2,h3,p,ul)]:mb-0 [&_ul]:pl-0'>
         <GoArchitecture />
         <GoProblem />
         <GoFeatures />
@@ -28,8 +29,8 @@ export default function GoPage({ title, description }: { title: string; descript
             <GoBenchmark />
           </div>
         </div>
-        <GoFaq />
         <GoCta />
+        <GoFaq />
       </div>
     </LakesidePage>
   )

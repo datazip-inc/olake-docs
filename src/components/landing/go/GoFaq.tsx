@@ -51,7 +51,7 @@ export default function GoFaq() {
                   role='region'
                   aria-labelledby={`go-faq-q-${i}`}
                   hidden={!isOpen}
-                  className={cn(!isOpen && 'hidden')}
+                  className={cn('go-reveal', !isOpen && 'hidden')}
                 >
                   <p className='max-w-[640px] pb-[22px] text-[14px] leading-[1.65] text-olake-text-2 lg:text-[15px]'>
                     {faq.a}

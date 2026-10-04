@@ -1,16 +1,38 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { PiArrowClockwise, PiChartBar, PiColumns, PiTable } from 'react-icons/pi'
 import Section from '../ui/Section'
 import SectionHeading from '../ui/SectionHeading'
 import Card from '../ui/Card'
 import { cn } from '@site/src/lib/utils'
-import { GO_FEATURES, GO_FEATURES_INTRO } from '@site/src/data/landing/go/features'
+import {
+  GO_FEATURES,
+  GO_FEATURES_INTRO,
+  type GoFeatureArt
+} from '@site/src/data/landing/go/features'
 import FeatureVisual from './FeatureVisual'
 import { useFeatureCycle } from './useFeatureCycle'
+
+const ICONS: Record<GoFeatureArt, React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>> = {
+  tiered: PiChartBar,
+  decay: PiTable,
+  chunk: PiColumns,
+  resume: PiArrowClockwise
+}
 
 /** The feature selector: four tabs on the left, the active capability's card on the right. */
 export default function GoFeatures() {
   const { ref, active, progress, select } = useFeatureCycle(GO_FEATURES.length)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+  // The card slides in when the feature changes, but not on the first paint.
+  const [changed, setChanged] = useState(false)
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    setChanged(true)
+  }, [active])
 
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
     const last = GO_FEATURES.length - 1
@@ -26,9 +48,10 @@ export default function GoFeatures() {
   }
 
   const feature = GO_FEATURES[active]
+  const Icon = ICONS[feature.art]
 
   return (
-    <Section id='features'>
+    <Section id='features' className='go-features-tint'>
       <SectionHeading eyebrow={GO_FEATURES_INTRO.eyebrow} title={GO_FEATURES_INTRO.title} />
       <div
         ref={ref}
@@ -52,7 +75,7 @@ export default function GoFeatures() {
                 onClick={() => select(i)}
                 onKeyDown={(event) => onKeyDown(event, i)}
                 className={cn(
-                  'group cursor-pointer border-0 bg-transparent p-0 text-left',
+                  'go-tab group cursor-pointer border-0 bg-transparent p-0 text-left',
                   'rounded-[8px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue'
                 )}
               >
@@ -66,8 +89,8 @@ export default function GoFeatures() {
                 </span>
                 <span aria-hidden='true' className='block h-px w-full bg-olake-line-rule'>
                   <span
-                    className={cn('block h-px bg-olake-blue', !selected && 'w-0')}
-                    style={selected ? { width: `${progress}%` } : undefined}
+                    className='go-tab-fill block h-px w-full origin-left bg-olake-blue'
+                    style={{ transform: `scaleX(${selected ? progress / 100 : 0})` }}
                   />
                 </span>
               </button>
@@ -80,9 +103,18 @@ export default function GoFeatures() {
             role='tabpanel'
             id='go-feature-panel'
             aria-labelledby={`go-feature-tab-${feature.id}`}
-            className='flex flex-1 flex-col'
+            className={cn('flex flex-1 flex-col', changed && 'go-card-in')}
+            key={feature.id}
           >
-            <FeatureVisual art={feature.art} />
+            <span
+              aria-hidden='true'
+              className='go-feature-tile m-[16px] mb-0 flex h-[40px] w-[40px] items-center justify-center rounded-[10px] text-olake-on-blue lg:mx-[24px] lg:mt-[24px]'
+            >
+              <Icon size={22} aria-hidden />
+            </span>
+            <div className='mt-[16px]'>
+              <FeatureVisual art={feature.art} />
+            </div>
             <div className='flex-1 border-0 border-t border-solid border-olake-line px-[18px] pb-[22px] pt-[20px] lg:px-[36px] lg:pb-[30px] lg:pt-[26px]'>
               <h3 className='text-[17px] font-normal leading-[1.3] text-olake-ink lg:text-[22px]'>
                 {feature.title}

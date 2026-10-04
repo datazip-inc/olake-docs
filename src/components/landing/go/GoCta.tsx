@@ -9,7 +9,7 @@ import { GO_CTA } from '@site/src/data/landing/go/cta'
  */
 export default function GoCta() {
   return (
-    <Section flush className='pb-[56px] lg:pb-[96px]'>
+    <Section flush className='pb-[56px] pt-[56px] lg:pb-[96px] lg:pt-[96px]'>
       <div className='overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface'>
         <div className='px-[24px] pb-[28px] pt-[36px] text-left lg:px-[64px] lg:pb-[40px] lg:pt-[56px]'>
           <h2 className='max-w-[520px] text-[26px] font-normal leading-[1.15] tracking-[-0.01em] text-olake-ink lg:text-[40px]'>

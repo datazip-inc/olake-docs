@@ -51,7 +51,7 @@ const Tiered = () => (
       <div className='rounded-[8px] border border-solid border-olake-line bg-olake-surface-alt p-[8px] lg:p-[10px]'>
         <Caption>CDC</Caption>
         <div className='mt-[10px] flex h-[34px] items-center gap-[4px]'>
-          <span className='block h-[7px] w-[7px] shrink-0 rounded-full bg-olake-blue' />
+          <span className='go-live-dot block h-[7px] w-[7px] shrink-0 rounded-full bg-olake-blue' />
           <span className='block h-[2px] flex-1 bg-linear-to-r from-olake-blue to-transparent' />
         </div>
         <p className='mt-[8px] text-[10px] text-olake-text-2'>real-time</p>

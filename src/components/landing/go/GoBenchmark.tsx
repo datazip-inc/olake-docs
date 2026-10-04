@@ -242,7 +242,7 @@ export default function GoBenchmark() {
               id='go-benchmark-info'
               hidden={!infoOpen}
               className={cn(
-                'flex-col gap-[10px] border-0 border-t border-solid border-olake-line px-[16px] py-[16px] text-[13px] leading-[1.6] text-olake-text-2 lg:px-[24px] lg:text-[14px]',
+                'go-reveal flex-col gap-[10px] border-0 border-t border-solid border-olake-line px-[16px] py-[16px] text-[13px] leading-[1.6] text-olake-text-2 lg:px-[24px] lg:text-[14px]',
                 infoOpen ? 'flex' : 'hidden'
               )}
             >
