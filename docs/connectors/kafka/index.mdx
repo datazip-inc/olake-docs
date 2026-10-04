@@ -226,7 +226,10 @@ The following columns are automatically included when syncing Kafka messages to 
 
 :::warning Message Format Requirement
 - The Kafka messages **must contain data in JSON or AVRO format**. 
-- If messages are null or empty, OLake Go will read the messages but **skip writing them to the destination**. For AVRO format, a **Confluence Schema Registry must be configured**—schema registry is mandatory only for AVRO data and if not provided OLake Go will consider the messages as JSON format.
+- For AVRO format, a Confluence Schema Registry must be configured—schema registry is mandatory only for AVRO data and if not provided OLake Go will consider the messages as JSON format.
+- **Null or empty messages** are handled based on the stream's ingestion mode:
+  - **Append:** the message is read but not written to the destination.
+  - **Upsert:** a message that has a key but a `null` value then OLake Go uses the configured **Deduplication Key** to find the matching record and **deletes** it from the destination.
 :::
 
 ### Normalization
@@ -236,6 +239,25 @@ OLake Go provides flexibility in how message values are stored:
 - **Normalization = `true`**: The payload in the `value` column is Level 0 flattened, and each nested field becomes a separate column in the destination table. This makes querying individual fields easier.
   
 - **Normalization = `false`**: The payload is stored as-is in the `value` column without flattening. The entire JSON object remains in a single column.
+
+## Upsert behavior and limitations
+
+In **Upsert** mode, OLake Go uses the configured **Deduplication Key** to decide whether an incoming message is a new record, an update, or a delete.
+
+| Scenario | Behavior |
+| --- | --- |
+| Key not present in the destination | The record is **inserted**. |
+| Key already present | The existing record is removed with a **positional delete** and the latest record is inserted. |
+| Tombstone (key present, `null` value) | The matching record is **deleted**. [TBC: no-match behavior] |
+| Dedup key field is **missing** from a message | The record is **inserted**. The sync does not fail. |
+| Dedup key is present but its value is `null`, and the message has a payload | The **sync fails**. Iceberg does not support a null deduplication key. |
+| Multiple dedup keys, **all** null | The **sync fails**. |
+| Multiple dedup keys, **at least one** non-null | The sync **does not fail**. |
+| Dedup key value changes for an entity | Treated as a **new record**, not an update. The previous record stays in the destination. |
+
+:::note
+Multiple columns can be selected as the deduplication key. Together they must uniquely identify a record.
+:::
 
 ---
 
