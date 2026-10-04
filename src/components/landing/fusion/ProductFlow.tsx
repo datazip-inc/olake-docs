@@ -1,15 +1,24 @@
 import React from 'react'
 import { PiCheckBold } from 'react-icons/pi'
 import Section from '../ui/Section'
+import { cn } from '@site/src/lib/utils'
 import { FLOW } from '@site/src/data/landing/fusion/hero'
 
 const NODE_LABEL = 'mt-[10px] text-[11px] leading-[1.35] lg:text-[13px]'
 
-const Connector = () => (
+/** The line between two nodes, with small dots travelling along it (motion allowed only). */
+const Connector = ({ lag = false }: { lag?: boolean }) => (
   <span
     aria-hidden='true'
-    className='mt-[35px] block h-[2px] min-w-[16px] flex-1 bg-linear-to-r from-olake-line-strong via-olake-blue to-olake-line-strong lg:mt-[43px]'
-  />
+    className={cn(
+      'fusion-conn relative mt-[35px] block h-[2px] min-w-[16px] flex-1 bg-linear-to-r from-olake-line-strong via-olake-blue to-olake-line-strong lg:mt-[43px]',
+      lag && 'fusion-conn--lag'
+    )}
+  >
+    <i className='fusion-dot' />
+    <i className='fusion-dot' />
+    <i className='fusion-dot' />
+  </span>
 )
 
 /** Iceberg tables go in, OLake Fusion works on them, optimized Iceberg tables come out. */
@@ -35,7 +44,7 @@ export default function ProductFlow() {
           <Connector />
 
           <div className='flex w-[96px] shrink-0 flex-col items-center text-center lg:w-[150px]'>
-            <span className='flex h-[72px] w-[72px] items-center justify-center rounded-[16px] border border-solid border-olake-blue-ring bg-olake-blue shadow-[var(--olake-shadow-btn)] lg:h-[88px] lg:w-[88px]'>
+            <span className='fusion-ring relative flex h-[72px] w-[72px] items-center justify-center rounded-[16px] border border-solid border-olake-blue-ring bg-olake-blue shadow-[var(--olake-shadow-btn)] lg:h-[88px] lg:w-[88px]'>
               <img
                 src='/img/landing/shared/olake-mark-small.svg'
                 alt='OLake Fusion'
@@ -51,7 +60,7 @@ export default function ProductFlow() {
             </p>
           </div>
 
-          <Connector />
+          <Connector lag />
 
           <div className='flex w-[96px] shrink-0 flex-col items-center text-center lg:w-[150px]'>
             <span className='relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-2 border-solid border-olake-blue bg-olake-blue-tint lg:h-[88px] lg:w-[88px]'>
@@ -72,10 +81,13 @@ export default function ProductFlow() {
         </div>
 
         <ul className='mt-[20px] flex p-0 flex-wrap items-center justify-center gap-[8px] lg:mt-[24px] lg:gap-[10px]'>
-          {FLOW.capabilities.map((item) => (
+          {FLOW.capabilities.map((item, i) => (
             <li
               key={item.label}
-              className='inline-flex items-center gap-[8px] rounded-[8px] border border-solid border-olake-line bg-olake-surface-alt px-[12px] py-[6px] text-[12px] text-olake-text lg:text-[13px]'
+              className={cn(
+                'fusion-pill inline-flex items-center gap-[8px] rounded-[8px] border border-solid border-olake-line bg-olake-surface-alt px-[12px] py-[6px] text-[12px] text-olake-text lg:text-[13px]',
+                `fusion-pill--${i + 1}`
+              )}
             >
               {item.label}
               {item.badge && (

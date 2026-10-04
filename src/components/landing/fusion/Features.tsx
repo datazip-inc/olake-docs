@@ -141,12 +141,13 @@ export default function Features() {
                 id={`fusion-panel-${feature.kind}`}
                 aria-labelledby={`fusion-tab-${feature.kind}`}
                 aria-hidden={i !== active}
+                data-active={i === active}
                 className={cn(
-                  'col-start-1 row-start-1 min-w-0',
+                  'fusion-panel col-start-1 row-start-1 min-w-0',
                   i === active ? 'visible' : 'invisible'
                 )}
               >
-                <Card className='flex h-full flex-col'>
+                <Card className='fusion-card flex h-full flex-col'>
                   <FeatureVisual kind={feature.kind} />
                   <div className='flex-1 border-0 border-t border-solid border-olake-line px-[20px] pb-[24px] pt-[20px] lg:px-[32px] lg:pb-[30px] lg:pt-[26px]'>
                     <h3 className='mb-0 text-[17px] font-normal leading-[1.3] text-olake-ink lg:text-[22px]'>
