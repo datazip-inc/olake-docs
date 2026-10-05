@@ -138,6 +138,34 @@ const BAND_ICON: Record<MegaMenu['band']['icon'], ReactNode> = {
 }
 
 /** Wide panel under the pill: featured card, link columns, help band. */
+/** Icon or product tile, title and subtitle of a mega menu column. `linked` adds the hover arrow. */
+function ColumnHeader({ col, linked = false }: { col: MegaColumn; linked?: boolean }) {
+  return (
+    <>
+      {col.icon === 'go' || col.icon === 'fusion' ? (
+        <ProductTile product={col.icon} />
+      ) : (
+        <span className='flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[8px] bg-olake-surface-muted text-olake-ink'>
+          {MEGA_ICON[col.icon]}
+        </span>
+      )}
+      <span>
+        <span className='flex items-center gap-[4px] text-[14px] font-medium leading-[1.3] text-olake-ink group-hover:text-olake-blue dark:group-hover:text-olake-blue-on-dark'>
+          {col.title}
+          {linked && (
+            <PiArrowUpRight
+              size={13}
+              aria-hidden='true'
+              className='opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100'
+            />
+          )}
+        </span>
+        <span className='block text-[13px] leading-[1.4] text-olake-muted'>{col.subtitle}</span>
+      </span>
+    </>
+  )
+}
+
 function MegaPanel({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => void }) {
   return (
     <div className='overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface shadow-[var(--olake-shadow-menu)]'>
@@ -183,18 +211,20 @@ function MegaPanel({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => voi
                 i > 0 && 'border-0 border-l border-solid border-olake-line'
               )}
             >
-              <div className='mb-[8px] flex items-start gap-[10px] border-0 border-b border-solid border-olake-line pb-[12px]'>
-                {col.icon === 'go' || col.icon === 'fusion' ? (
-                  <ProductTile product={col.icon} />
+              <div className='mb-[8px] border-0 border-b border-solid border-olake-line pb-[12px]'>
+                {col.href ? (
+                  <NavAnchor
+                    link={{ label: col.title, href: col.href }}
+                    onClick={onNavigate}
+                    className='group -m-[6px] flex items-start gap-[10px] rounded-[10px] p-[6px] no-underline transition-colors hover:bg-olake-blue-tint hover:no-underline'
+                  >
+                    <ColumnHeader col={col} linked />
+                  </NavAnchor>
                 ) : (
-                  <span className='flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[8px] bg-olake-surface-muted text-olake-ink'>
-                    {MEGA_ICON[col.icon]}
-                  </span>
+                  <div className='flex items-start gap-[10px]'>
+                    <ColumnHeader col={col} />
+                  </div>
                 )}
-                <span>
-                  <span className='block text-[14px] font-medium leading-[1.3] text-olake-ink'>{col.title}</span>
-                  <span className='block text-[13px] leading-[1.4] text-olake-muted'>{col.subtitle}</span>
-                </span>
               </div>
               <ul className='m-0 list-none p-0'>
                 {col.links.map((link) => (

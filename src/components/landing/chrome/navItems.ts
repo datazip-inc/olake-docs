@@ -18,6 +18,8 @@ export interface MegaColumn {
   title: string
   subtitle: string
   icon: 'go' | 'fusion' | 'learn' | 'customers' | 'community'
+  /** Makes the column header (icon, title, subtitle) a link, e.g. a product's overview page. */
+  href?: string
   links: LakesideNavLink[]
 }
 
@@ -49,8 +51,8 @@ const PRODUCTS_MEGA: MegaMenu = {
       title: 'OLake Go',
       subtitle: 'Databases, Kafka & S3 → Iceberg',
       icon: 'go',
+      href: '/olake-go',
       links: [
-        { label: 'Overview', href: '/olake-go' },
         { label: 'Documentation', href: '/docs' },
         { label: 'Quickstart', href: '/docs/getting-started/quickstart/' },
         { label: 'GitHub', href: GITHUB_REPO_URL, external: true }
@@ -60,8 +62,8 @@ const PRODUCTS_MEGA: MegaMenu = {
       title: 'OLake Fusion',
       subtitle: 'Iceberg table maintenance',
       icon: 'fusion',
+      href: '/olake-fusion',
       links: [
-        { label: 'Overview', href: '/olake-fusion' },
         { label: 'Documentation', href: '/docs/fusion/getting-started/overview' },
         { label: 'Quickstart', href: '/docs/fusion/getting-started/quickstart/' },
         { label: 'GitHub', href: FUSION_GITHUB_REPO_URL, external: true }
