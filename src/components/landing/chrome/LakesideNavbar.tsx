@@ -170,14 +170,20 @@ function MegaPanel({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => voi
         )}
         <div
           className={cn(
-            'grid gap-[8px] px-[12px] pb-[8px] pt-[12px]',
+            'grid px-[12px] pb-[8px] pt-[12px]',
             mega.columns.length === 2 ? 'grid-cols-2' : 'grid-cols-3',
             !mega.feature && 'px-[16px] pt-[16px]'
           )}
         >
-          {mega.columns.map((col) => (
-            <div key={col.title}>
-              <div className='flex items-start gap-[10px] pb-[10px]'>
+          {mega.columns.map((col, i) => (
+            <div
+              key={col.title}
+              className={cn(
+                'px-[12px]',
+                i > 0 && 'border-0 border-l border-solid border-olake-line'
+              )}
+            >
+              <div className='mb-[8px] flex items-start gap-[10px] border-0 border-b border-solid border-olake-line pb-[12px]'>
                 {col.icon === 'go' || col.icon === 'fusion' ? (
                   <ProductTile product={col.icon} />
                 ) : (
