@@ -31,6 +31,8 @@ const TITLE_MAX = 70
 const DESC_MIN = 120
 const DESC_MAX = 160
 const TAGS_MAX = 8
+// Category tags (blog filter: src/components/blog/categories.js) are not counted against TAGS_MAX
+const CATEGORY_TAGS = new Set(['how-to', 'benchmarks', 'product-updates', 'thought-leadership', 'alternatives'])
 
 const findings = [] // { level, file, line, rule, msg }
 const add = (level, file, line, rule, msg) =>
@@ -227,7 +229,8 @@ function lintPosts() {
       // tags
       const tags = Array.isArray(fm.tags) ? fm.tags : []
       if (!tags.length) add('error', file, 1, 'tags-missing', 'missing tags')
-      if (tags.length > TAGS_MAX) add('error', file, 1, 'tags-count', `${tags.length} tags (max ${TAGS_MAX})`)
+      const topicTags = tags.filter((t) => !CATEGORY_TAGS.has(t))
+      if (topicTags.length > TAGS_MAX) add('error', file, 1, 'tags-count', `${topicTags.length} topic tags (max ${TAGS_MAX})`)
       for (const t of tags) {
         if (typeof t === 'string' && !(t in tagsDef)) add('error', file, 1, 'tag-undefined', `tag "${t}" is not defined in ${dir}/tags.yml`)
       }

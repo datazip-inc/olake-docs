@@ -9,6 +9,7 @@ import Head from '@docusaurus/Head'
 import BlogListPageMetadata from './Metadata'
 import { BlogPagination } from '../BlogPagination'
 import PageHeader from '@site/src/components/blog/PageHeader'
+import CategoryFilter from '@site/src/components/blog/CategoryFilter'
 
 function BlogListPageContent(props) {
   const { metadata, items, sidebar } = props
@@ -30,7 +31,9 @@ function BlogListPageContent(props) {
           />
         </Head>
       )}
-      <PageHeader title={metadata.blogTitle} description={metadata.blogDescription} />
+      <PageHeader title={metadata.blogTitle} description={metadata.blogDescription}>
+        <CategoryFilter />
+      </PageHeader>
       <BlogPostItems items={items} featured={metadata.page === 1} />
       <BlogPagination metadata={metadata} />
     </BlogLayout>
