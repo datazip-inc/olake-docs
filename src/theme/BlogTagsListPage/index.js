@@ -6,7 +6,7 @@ import BlogLayout from '@theme/BlogLayout'
 import SearchMetadata from '@theme/SearchMetadata'
 import useBlogInstance from '@theme/Blog/useBlogInstance'
 import PageHeader from '@site/src/components/blog/PageHeader'
-import { isCategoryTag } from '@site/src/components/blog/categories'
+import { isHiddenCategoryTag } from '@site/src/components/blog/categories'
 
 // Swizzled from @docusaurus/theme-classic so each blog instance gets its own
 // title, description and h1 (stock text is the identical "Tags" everywhere).
@@ -28,7 +28,7 @@ export default function BlogTagsListPage({ tags, sidebar }) {
       <SearchMetadata tag='blog_tags_list' />
       <BlogLayout sidebar={sidebar}>
         <PageHeader title={title} description={description} />
-        {listTagsByLetters(tags.filter((tag) => !isCategoryTag(tag))).map(({ letter, tags: letterTags }) => (
+        {listTagsByLetters(tags.filter((tag) => !isHiddenCategoryTag(tag, key))).map(({ letter, tags: letterTags }) => (
           <section key={letter} className='ob-year'>
             <div className='ob-year__head'>
               <h2 id={letter} className='ob-year__label'>

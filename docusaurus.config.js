@@ -389,7 +389,8 @@ const config = {
         editLocalizedFiles: false,
         blogTitle: 'Customer Stories',
         feedOptions: { title: 'OLake Customer Stories' },
-        blogDescription: 'Customer success stories and case studies',
+        blogDescription:
+          'Hear more stories of teams across industries using OLake to securely sync their data and build modern data lakehouses.',
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'Customer Stories',
         routeBasePath: 'customer-stories',

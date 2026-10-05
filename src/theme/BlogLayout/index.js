@@ -5,14 +5,14 @@ import BlogSidebar from '@theme/BlogSidebar'
 import BlogBreadcrumbs from '@theme/BlogBreadcrumbs'
 import useIsBlogPostPage from '@theme/Blog/useIsBlogPostPage'
 import ReadingProgress from '@site/src/components/blog/ReadingProgress'
-import PostAside from '@site/src/components/blog/PostAside'
 import NextSteps from '@site/src/components/blog/NextSteps'
 
 /**
  * Shared shell of every blog page (list, post, tag, author, archive) in the three blog instances.
  *
- * Post pages: a 720px reading column; from 1100px a sticky OLake call-to-action card beside it,
- * and the "Next steps" block (older/newer post, related posts) below at the container width. The
+ * Post pages: a 720px reading column; from 1100px the title spans the full width and a sticky OLake
+ * call-to-action card sits beside the article under it (the card is rendered by BlogPostItem, so it
+ * can share the article's grid with the title), and the "Next steps" block (older/newer post, related posts) below at the container width. The
  * table of contents is not here: it is a card at the top of the article (BlogPostItem).
  * Other pages: the 1016px site container, with breadcrumbs (the list pages opt out with
  * `hideBreadcrumbs`: "Home / Blog" above the "Blogs" heading says nothing). Post pages have none: the trail would
@@ -38,7 +38,6 @@ export default function BlogLayout(props) {
             {!isPost && !hideBreadcrumbs && <BlogBreadcrumbs label={breadcrumbLabel} />}
             {children}
           </main>
-          {isPost && <PostAside />}
         </div>
         {isPost && <NextSteps />}
       </div>

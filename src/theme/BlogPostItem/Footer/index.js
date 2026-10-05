@@ -6,7 +6,8 @@ import EditMetaRow from '@theme/EditMetaRow'
 import AuthorCards from '@site/src/components/blog/AuthorCards'
 import PostCtaBand from '@site/src/components/blog/PostCtaBand'
 import usePostEnd from '@site/src/components/blog/PostEndContext'
-import { isCategoryTag } from '@site/src/components/blog/categories'
+import useBlogInstance from '@theme/Blog/useBlogInstance'
+import { isHiddenCategoryTag } from '@site/src/components/blog/categories'
 
 /**
  * End of a post: author bio cards, the publish date, the tags, the edit / last-updated row, and a short OLake call
@@ -16,9 +17,10 @@ import { isCategoryTag } from '@site/src/components/blog/categories'
  */
 export default function BlogPostItemFooter() {
   const { metadata } = useBlogPost()
+  const { key: instanceKey } = useBlogInstance()
   const { tags: allTags, editUrl, lastUpdatedBy, lastUpdatedAt, date } = metadata
-  // Category tags (How-To, ...) drive the blog filter; only topic tags are listed here
-  const tags = allTags.filter((tag) => !isCategoryTag(tag))
+  // The blog's category tags (How-To, ...) drive its filter row; only topic tags are listed here
+  const tags = allTags.filter((tag) => !isHiddenCategoryTag(tag, instanceKey))
   // Fixed locale and UTC: same text on the server and in the browser
   const dateFormat = useDateTimeFormat({ day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
   const { bodyCta } = usePostEnd()

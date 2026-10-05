@@ -6,11 +6,14 @@ import BlogPostItemHeader from '@theme/BlogPostItem/Header'
 import BlogPostItemContent from '@theme/BlogPostItem/Content'
 import BlogPostItemFooter from '@theme/BlogPostItem/Footer'
 import PostToc from '@site/src/components/blog/PostToc'
+import PostAside from '@site/src/components/blog/PostAside'
 
 /**
  * One blog post (always the post page: lists use PostCard). Same parts as the stock component
  * (header, content, footer) with the collapsible table of contents between header and body; it is
  * outside the `.markdown` container, so the image zoom and the feed content never see it.
+ * The sticky call-to-action card (PostAside) is part of the article so that, from 1100px, the title
+ * can span the full width above the body and the card (the article is a two-column grid).
  */
 export default function BlogPostItem({ children, className }) {
   const { metadata, toc } = useBlogPost()
@@ -26,6 +29,7 @@ export default function BlogPostItem({ children, className }) {
       {!hideToc && <PostToc toc={toc} minLevel={minLevel} maxLevel={maxLevel} />}
       <BlogPostItemContent>{children}</BlogPostItemContent>
       <BlogPostItemFooter />
+      <PostAside />
     </BlogPostItemContainer>
   )
 }

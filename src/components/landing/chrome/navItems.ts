@@ -90,7 +90,6 @@ const RESOURCES_MEGA: MegaMenu = {
       icon: 'learn',
       links: [
         { label: 'Blog', href: '/blog' },
-        { label: 'Iceberg blogs', href: '/blog/tags/iceberg/' },
         { label: 'Webinars & events', href: '/webinar' },
         { label: 'Documentation', href: '/docs' }
       ]

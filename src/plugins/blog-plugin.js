@@ -2,13 +2,6 @@ const blogPluginExports = require('@docusaurus/plugin-content-blog')
 
 const defaultBlogPlugin = blogPluginExports.default
 
-// Blog instances whose list page (page 1 of the listing) is served by a hand-built page in
-// src/pages instead. The blog plugin would register the same path, which Docusaurus reports as
-// "Duplicate routes found" and resolves in a non-deterministic order.
-const INSTANCES_WITH_CUSTOM_LIST_PAGE = new Set(['customer-stories-blog'])
-
-const stripTrailingSlash = (p) => (p.length > 1 ? p.replace(/\/+$/, '') : p)
-
 /**
  * The archive page (src/theme/BlogArchivePage) only reads `date`, `permalink` and `title` of each
  * post, but the plugin hands the route the full metadata of every post (description, tags, authors,
@@ -122,12 +115,6 @@ function pickRelated(post, candidates) {
 async function blogPluginExtended(context, options) {
   const blogPluginInstance = await defaultBlogPlugin(context, options)
 
-  // routeBasePath arrives validated with a leading slash, so join defensively.
-  const listPath = stripTrailingSlash(
-    `/${context.siteConfig.baseUrl}/${options.routeBasePath}`.replace(/\/{2,}/g, '/')
-  )
-  const hasCustomListPage = INSTANCES_WITH_CUSTOM_LIST_PAGE.has(options.id)
-
   return {
     ...blogPluginInstance,
     contentLoaded: async function (params) {
@@ -173,11 +160,6 @@ async function blogPluginExtended(context, options) {
             // Post routes carry both `content` and `sidebar` modules
             if (route.modules && route.modules.content && relatedModules.has(route.path)) {
               route = { ...route, modules: { ...route.modules, related: relatedModules.get(route.path) } }
-            }
-            // Drop only the list route that collides with src/pages. Post, tag, author, archive
-            // and later pagination routes are kept.
-            if (hasCustomListPage && stripTrailingSlash(route.path) === listPath) {
-              return
             }
             addRoute(slimListRoute(slimArchiveRoute(route), listModules))
           }

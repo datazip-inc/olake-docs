@@ -53,7 +53,8 @@ function BlogTagsPostsPageContent(props) {
   // No count and no blog name in the heading: 'Posts tagged “Trino”'.
   const heading = `Posts tagged “${tag.label}”`
   // A category page (How-To, Benchmarks, ...) is headed by the category name and shows the filter row
-  const category = categoryOf(tag)
+  const { key: instanceKey } = useBlogInstance()
+  const category = categoryOf(tag, instanceKey)
   return (
     <BlogLayout sidebar={sidebar} breadcrumbLabel={tag.label}>
       {tag.unlisted && <Unlisted />}

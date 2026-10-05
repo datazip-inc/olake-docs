@@ -1,30 +1,33 @@
 import React from 'react'
 import clsx from 'clsx'
 import Link from '@docusaurus/Link'
-import { BLOG_CATEGORIES, categoryPermalink } from './categories'
+import useBlogInstance from '@theme/Blog/useBlogInstance'
+import { CATEGORY_SETS, categoryPermalink } from './categories'
 
 /**
- * Filter row for the blog list: "All" plus one link per category. Each link goes to a real page
- * (the blog home or the category's tag page), so filtering is paginated and crawlable.
- * `active` is a category slug, or undefined for "All".
+ * Filter row for a blog list: "All" plus one link per category of the current blog instance. Each
+ * link goes to a real page (the list or the category's tag page), so filtering is paginated and
+ * crawlable. `active` is a category slug, or undefined for "All".
  */
 export default function CategoryFilter({ active }) {
+  const { key } = useBlogInstance()
+  const { base, categories } = CATEGORY_SETS[key]
   return (
-    <nav aria-label='Blog categories' className='ob-cats'>
+    <nav aria-label='Categories' className='ob-cats'>
       <ul className='ob-cats__list'>
         <li>
           <Link
-            to='/blog/'
+            to={base}
             className={clsx('ob-chip ob-chip--lg', !active && 'ob-chip--active')}
             aria-current={!active ? 'page' : undefined}
           >
             All
           </Link>
         </li>
-        {BLOG_CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <li key={c.slug}>
             <Link
-              to={categoryPermalink(c.slug)}
+              to={categoryPermalink(key, c.slug)}
               className={clsx('ob-chip ob-chip--lg', active === c.slug && 'ob-chip--active')}
               aria-current={active === c.slug ? 'page' : undefined}
             >

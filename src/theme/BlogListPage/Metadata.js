@@ -5,10 +5,11 @@ import SearchMetadata from '@theme/SearchMetadata'
 import { useLocation } from '@docusaurus/router'
 import Head from '@docusaurus/Head'
 import { serializeJsonLd } from '@site/src/components/JsonLd'
+import useBlogInstance from '@theme/Blog/useBlogInstance'
 
 // Head metadata of the blog list pages: title, Open Graph, robots for /page/N, and the
 // JSON-LD schemas. Moved verbatim out of index.js, which now only renders the page.
-export default function BlogListPageMetadata(props) {
+function BlogMetadata(props) {
   const { metadata } = props
   const {
     siteConfig: { title: siteTitle, url: siteUrl }
@@ -192,4 +193,63 @@ export default function BlogListPageMetadata(props) {
       </Head>
     </>
   )
+}
+
+const CUSTOMER_STORIES_OG_IMAGE = 'https://olake.io/img/logo/olake-og-card.png'
+
+// The customer stories list: a CollectionPage with the stories on the page, Open Graph and the
+// social card. (The blog's schemas above describe the blog, so they are not reused here.)
+function CustomerStoriesMetadata({ metadata, items }) {
+  const {
+    siteConfig: { url: siteUrl }
+  } = useDocusaurusContext()
+  const { blogDescription, blogTitle, permalink } = metadata
+  const location = useLocation()
+  const isPaginationPage = /\/page\/\d+/.test(location.pathname)
+  const pageNumber = Number(metadata.page) || Number(/\/page\/(\d+)/.exec(location.pathname)?.[1]) || 1
+  const title = pageNumber > 1 ? `${blogTitle} - Page ${pageNumber}` : blogTitle
+  const listUrl = `${siteUrl}${permalink}`.replace(/\/?$/, '/')
+
+  const collectionSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Customer Stories',
+    description: blogDescription,
+    url: listUrl,
+    isPartOf: { '@type': 'WebSite', name: 'OLake', url: `${siteUrl}/` },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: items.length,
+      itemListElement: items.map((item, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.content.metadata.title,
+        url: `${siteUrl}${item.content.metadata.permalink.replace(/\/?$/, '/')}`
+      }))
+    }
+  }
+
+  return (
+    <>
+      <PageMetadata title={title} description={blogDescription} />
+      <SearchMetadata tag='blog_posts_list' />
+      <Head>
+        <meta property='og:type' content='website' />
+        <meta property='og:title' content={title} />
+        {blogDescription && <meta property='og:description' content={blogDescription} />}
+        <meta property='og:url' content={listUrl} />
+        <meta property='og:site_name' content='OLake' />
+        <meta property='og:locale' content='en_US' />
+        <meta property='og:image' content={CUSTOMER_STORIES_OG_IMAGE} />
+        <meta name='twitter:image' content={CUSTOMER_STORIES_OG_IMAGE} />
+        {isPaginationPage && <meta name='robots' content='noindex, follow' />}
+        <script type='application/ld+json'>{serializeJsonLd(collectionSchema)}</script>
+      </Head>
+    </>
+  )
+}
+
+export default function BlogListPageMetadata(props) {
+  const { key } = useBlogInstance()
+  return key === 'customer-stories' ? <CustomerStoriesMetadata {...props} /> : <BlogMetadata {...props} />
 }
