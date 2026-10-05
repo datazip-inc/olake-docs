@@ -38,7 +38,7 @@ Ensure the following requirements are met before proceeding:
 - **Kubernetes 1.19+**: Administrative access to a Kubernetes cluster
 - **Helm 3.2.0+**: Helm client installed and configured. [Installation Guide](https://helm.sh/docs/intro/install/)
 - **kubectl**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL, Elasticsearch and the shared storage volume
+- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL, Elasticsearch and (when using NFS mode) the shared storage volume. For S3 log file storage mode, a StorageClass with ReadWriteMany is not required.
     ```bash
     # List available StorageClass
     kubectl get storageclass
@@ -381,9 +381,127 @@ global:
     OLAKE_SECRET_KEY: ""  # Empty = no encryption
 ```
 
-### Persistent Storage Configuration
+### S3 Log File Storage Configuration
 
-The OLake Go application components (UI, Worker, and Activity Pods) require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata.
+S3 is used as centralized object storage in OLake Go for storing and sharing logs, configuration files, and other files across different OLake components and pods.
+
+Configure S3 log file storage in `values.yaml`:
+
+```yaml
+global:
+  # -- Local storage mode for job configuration and log files.
+  #   - "s3": S3-compatible storage (configure s3LogFileStorage below)
+  #   - "nfs": NFS shared volume (DEPRECATED; currently the default)
+  logFileStorageMode: "s3"  # Default is "nfs", recommended to use "s3"
+
+# S3 Log File Storage (used when global.logFileStorageMode is "s3")
+s3LogFileStorage:
+  # -- Enable in-cluster MinIO for S3 log storage.
+  #   - true: Deploy the built-in MinIO instance.
+  #   - false: Use hosted/external S3-compatible storage.
+  enabled: true
+
+  # -- S3-compatible endpoint.
+  # Auto-configured when enabled: true.
+  # Required when using an external S3-compatible service such as MinIO.
+  endpoint: ""
+
+  bucket: "olake"
+  region: "us-east-1"
+  prefix: ""
+
+  # -- Static credentials for external S3/MinIO/GCS S3 API.
+  # Leave empty when using IRSA or built-in MinIO.
+  existingSecret: ""
+
+  auth:
+    # -- MinIO root credentials when enabled: true.
+    # These credentials are also used as OLAKE_S3_* credentials.
+    # Override rootPassword with a secure password for non-local environments.
+    rootUser: "olake"
+    rootPassword: "password"
+
+```
+
+`s3LogFileStorage.enabled: true`, the chart deploys in-cluster MinIO and OLake Go uses that MinIO bucket automatically. **For external S3-compatible storage**, set `s3LogFileStorage.enabled: false` and configure the endpoint and credentials as required:
+
+```yaml
+global:
+  logFileStorageMode: "s3"
+
+s3LogFileStorage:
+  enabled: false
+  endpoint: ""  # or your S3-compatible endpoint
+  bucket: "my-olake-bucket"
+  region: "us-west-2"
+  prefix: "olake-logs/"
+  existingSecret: "my-s3-credentials"  # Kubernetes secret with access keys
+```
+
+**Configuration Notes:**
+- `logFileStorageMode` must remain set to `s3` when S3 storage is enabled
+- For AWS S3, the `endpoint` can be left empty and for S3-compatible services configure `endpoint`
+
+
+```yaml
+s3LogFileStorage:
+
+  role:
+    # Use an IAM role for hosted S3 authentication; supports EKS IRSA and EKS Pod Identity.
+    # When true, existingSecret is not required.
+    enabled: true
+    # Required for EKS IRSA; leave empty when using EKS Pod Identity.
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-s3-log-storage-role"
+```
+
+:::note
+For AWS S3 with IRSA (IAM Roles for Service Accounts), leave `existingSecret` empty and ensure the job service account is configured with the appropriate IAM role. 
+:::
+
+<details>
+  <summary>IAM Policy for S3 Log File Storage</summary>
+  ```yaml
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+          {
+              "Sid": "S3BucketReadWrite",
+              "Effect": "Allow",
+              "Action": [
+                  "s3:ListBucket",
+                  "s3:GetBucket*",
+                  "s3:*Object"
+              ],
+              "Resource": [
+                  "arn:aws:s3:::{S3_BUCKET_NAME}",
+                  "arn:aws:s3:::{S3_BUCKET_NAME}/*"
+              ]
+          },
+          {
+              "Sid": "ListAllBuckets",
+              "Effect": "Allow",
+              "Action": "s3:ListAllMyBuckets",
+              "Resource": "*"
+          }
+      ]
+  }
+  ```
+</details>
+
+**Configuration Notes:**
+- Replace `123456789012` with the AWS account ID
+- Replace `olake-s3-log-storage-role` with the IAM role name
+
+:::warning NFS Deprecation
+NFS storage is currently the default storage mode (`logFileStorageMode: "nfs"`), but it is **marked as deprecated** and will be removed at the end of 2026 and **S3 will become the default storage mode**.
+
+**For new deployments**, S3 storage is recommended.
+:::
+
+### Persistent Storage Configuration (NFS - Deprecated)
+
+The OLake Go application components (UI, Worker, and Activity Pods) require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata when using NFS storage mode.
 
 For production, a robust, highly-available RWX-capable storage solution such as AWS EFS, GKE Filestore, or Azure Files must be used. This is achieved by disabling the built-in NFS server and providing an existing Kubernetes StorageClass that is backed by a managed storage service. An example for using StorageClass is given below:
 
@@ -402,6 +520,10 @@ For development and quick starts, a simple NFS server is included and enabled by
 
 :::warning
 **Bottlerocket OS on AWS EKS:** The built-in NFS server is incompatible with Bottlerocket OS worker nodes. For such AWS EKS configurations, AWS EFS must be used as an alternative, which requires setting `nfsServer.enabled: false` and configuring the EFS CSI driver as shown above.
+:::
+
+:::warning NFS Deprecation
+NFS storage (`logFileStorageMode: "nfs"`) is **deprecated** and will be removed at the end of 2026. After removal, S3 will become the default storage mode.
 :::
 
 ### External PostgreSQL Configuration
