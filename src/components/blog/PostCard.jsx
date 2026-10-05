@@ -9,6 +9,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl'
  * `priority` marks the first card of the page: its cover is loaded eagerly and at high priority
  * (it is the largest contentful paint element), every other cover is lazy.
  * `headingLevel` is the title's tag ('h2' in lists, 'h3' under a section heading).
+ * `showDescription` is false for the related posts at the end of a post (title and cover are enough there).
  */
 export default function PostCard({
   post,
@@ -16,6 +17,7 @@ export default function PostCard({
   featured = false,
   half = false,
   headingLevel: Heading = 'h2',
+  showDescription = true,
   formatDate
 }) {
   const { permalink, title, date, description, frontMatter, authors } =
@@ -52,7 +54,7 @@ export default function PostCard({
           <Link to={permalink}>{title}</Link>
         </Heading>
 
-        {description && <p className='ob-card__excerpt'>{description}</p>}
+        {showDescription && description && <p className='ob-card__excerpt'>{description}</p>}
 
         <div className='ob-meta'>
           {author && (

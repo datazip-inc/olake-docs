@@ -60,6 +60,7 @@ export default function NextSteps() {
                 key={card.permalink}
                 post={{ content: { metadata: card } }}
                 headingLevel='h4'
+                showDescription={false}
                 formatDate={formatDate}
               />
             ))}
