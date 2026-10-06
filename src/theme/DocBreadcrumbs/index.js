@@ -32,7 +32,7 @@ export default function DocBreadcrumbsWrapper(props) {
       },
       {
         label: 'Query Engine',
-        href: '/iceberg/query-engine'
+        href: '/docs/understanding/compatibility-engines/'
       },
       // Add the current page as the last item
       ...props.items.slice(-1)

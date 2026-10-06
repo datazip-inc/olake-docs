@@ -171,7 +171,7 @@ export const QueryEngineLayout: React.FC<QueryEngineLayoutProps> = ({
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: `${siteUrl}/` },
       { '@type': 'ListItem', position: 2, name: 'Iceberg', item: `${siteUrl}/iceberg/` },
-      { '@type': 'ListItem', position: 3, name: 'Query Engine', item: `${siteUrl}/iceberg/query-engine/` },
+      { '@type': 'ListItem', position: 3, name: 'Query Engine', item: `${siteUrl}/docs/understanding/compatibility-engines/` },
       { '@type': 'ListItem', position: 4, name: pageTitleStr.slice(0, 100), item: canonicalUrl }
     ]
   };

@@ -10,7 +10,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl'
 import { useLocation } from '@docusaurus/router'
 
 import { BlogPagination } from '../BlogPagination'
-import QueryEngineAdvertisement from '../../components/Iceberg/QueryEngineAdvertisement'
 import Head from '@docusaurus/Head'
 
 function BlogListPageMetadata(props) {
@@ -375,9 +374,6 @@ function BlogListPageContent(props) {
   const { metadata, items, sidebar } = props
   const location = useLocation()
 
-  // Check if we're on the iceberg route
-  const isIcebergRoute = location.pathname === '/iceberg' || location.pathname === '/iceberg/'
-
   return (
     <BlogLayout sidebar={sidebar}>
       {/* Preload first blog card image to improve LCP on listing */}
@@ -393,8 +389,6 @@ function BlogListPageContent(props) {
         </Head>
       )}
       <BlogHomepageBanner {...props} />
-      {/* Conditionally render Query Engine Advertisement */}
-      {isIcebergRoute && <QueryEngineAdvertisement />}
       <BlogPostItems items={items} />
       <BlogPagination metadata={metadata} />
     </BlogLayout>
