@@ -468,8 +468,9 @@ const config = {
           { to: '/blog/tags/snowflake/', from: '/iceberg/tags/snowflake/' },
           { to: '/blog/tags/trino/', from: '/iceberg/tags/trino/' },
           { to: '/blog/tags/iceberg/', from: '/iceberg/tags/iceberg/page/2/' },
-          // The Iceberg query engine compatibility section (/iceberg/query-engine) was removed: each page goes to the closest post
-          { to: '/blog/iceberg-query-engine-interoperability-spark-databricks/', from: '/iceberg/query-engine/' },
+          // The Iceberg query engine compatibility section (/iceberg/query-engine) was removed: the hub goes to the
+          // compatibility doc, every other page to the closest post
+          { to: '/docs/understanding/compatibility-engines/', from: '/iceberg/query-engine/' },
           { to: '/blog/olake-iceberg-athena/', from: '/iceberg/query-engine/athena/' },
           { to: '/blog/olake-iceberg-trino/', from: '/iceberg/query-engine/trino/' },
           { to: '/blog/databricks-vs-iceberg/', from: '/iceberg/query-engine/databricks/' },
