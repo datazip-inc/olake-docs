@@ -95,6 +95,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
                 <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=unity&tab=unity-cli#configuration-4">Unity Catalog configuration</Link></li>
                 <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=polaris&tab=polaris-cli#configuration-5">Apache Polaris Catalog configuration</Link></li>
                 <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=biglake&tab=biglake-cli#configuration-6">BigLake Catalog configuration</Link></li>
+                <li><Link to="/docs/writers/iceberg/catalog/rest/?rest-catalog=horizon&tab=horizon-cli#configuration-7">Snowflake Horizon Catalog configuration</Link></li>
                 <li><Link to="/docs/writers/iceberg/catalog/jdbc/?tab=jdbc-cli#configuration">JDBC Catalog configuration</Link></li>
                 <li><Link to="/docs/writers/iceberg/catalog/hive/?tab=hive-cli#configuration">Hive Catalog configuration</Link></li>
                 <li><Link to="/docs/writers/parquet/config/?S3=OLake-CLI#configuration">Parquet configuration</Link></li>
