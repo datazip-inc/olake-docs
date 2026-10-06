@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import SectionHeading from '../ui/SectionHeading'
+import SectionHeading from '../../ui/SectionHeading'
 import FeatureArt from '../ui/FeatureArt'
 import { FEATURES, type FeatureCard } from '@site/src/data/landing/home/features'
 
@@ -8,10 +8,10 @@ const Card = ({ feature }: { feature: FeatureCard }) => (
     <FeatureArt kind={feature.art} />
     <div className='relative z-10 flex flex-1 flex-col border-0 border-t border-solid border-[#e6e6e6] bg-white px-[18px] pb-[22px] pt-[20px] lg:px-[46px] lg:pb-[30px] lg:pt-[26px]'>
       <p className='text-[13px] text-[#616161]'>{feature.kicker}</p>
-      <h3 className='mt-[6px] max-w-full break-words text-[17px] font-normal leading-[1.3] text-[#242424] lg:text-[22px]'>
+      <h3 className='mt-[6px] max-w-full wrap-break-word text-[17px] font-normal leading-[1.3] text-[#242424] lg:text-[22px]'>
         {feature.title}
       </h3>
-      <p className='mt-[10px] text-[12px] leading-[1.6] text-[#7b7b7b] lg:text-[14px]'>
+      <p className='mt-[10px] text-[12px] leading-[1.6] text-olake-muted lg:text-[14px]'>
         {feature.body}
       </p>
     </div>
@@ -107,10 +107,12 @@ export default function Features() {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUpOrLeave}
-          className='flex items-stretch overflow-x-auto overflow-y-hidden'
+          tabIndex={0}
+          role='region'
+          aria-label='OLake features, scrollable'
+          className='flex items-stretch overflow-x-auto overflow-y-hidden focus-visible:outline-2 focus-visible:outline-olake-blue'
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          <style>{`.olakehome-feature-marquee ::-webkit-scrollbar { display: none; }`}</style>
           {/* We duplicate the features array 4 times to ensure an infinite loop in both directions */}
           {[...FEATURES, ...FEATURES, ...FEATURES, ...FEATURES].map((feature, i) => (
             <div key={`${feature.kicker}-${i}`} className='pointer-events-none select-none'>

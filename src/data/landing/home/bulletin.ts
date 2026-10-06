@@ -51,14 +51,14 @@ export const BULLETIN_TABS: BulletinTab[] = [
         tag: 'Webinar',
         title: 'Building High-Performance Iceberg Data Platforms, Anywhere',
         href: 'https://app.livestorm.co/datazip-inc-1/building-high-performance-iceberg-data-platforms-anywhere/live?s=5d46d287-8240-4c95-9016-e18428c82f3c#/',
-        img: '/img/landing/v2/brenna-buuck.png',
+        img: '/img/landing/v2/brenna-buuck.webp',
         external: true
       },
       {
         tag: 'Webinar',
         title: 'Apache Arrow + ADBC & Apache Iceberg',
         href: 'https://www.youtube.com/watch?v=shrS0qdOPis&list=PL0H6rlkVhiiGSaO_xr1xBJ16dQKI-jvF_&index=14',
-        img: '/img/landing/v2/matt-topol.png',
+        img: '/img/landing/v2/matt-topol.webp',
         external: true
       }
     ]

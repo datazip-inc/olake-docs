@@ -1,11 +1,15 @@
 import React from 'react'
-import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
+import { serializeJsonLd } from '@site/src/components/JsonLd'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
-import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaSlack, FaLinkedin } from 'react-icons/fa'
-import LazyComponent from '@site/src/components/LazyComponent'
-import LightModeEnforcer from '@site/src/components/LightModeEnforcer'
+import { PiEnvelopeSimple, PiLinkedinLogo, PiMapPin, PiSlackLogo } from 'react-icons/pi'
+import LakesidePage from '@site/src/components/landing/ui/LakesidePage'
+import Section from '@site/src/components/landing/ui/Section'
+import Card from '@site/src/components/landing/ui/Card'
+import PageHero from '@site/src/components/pages-misc/PageHero'
+import RegistrationSection from '@site/src/components/site/RegistrationSection'
+import '@site/src/components/pages-misc/pages-misc.css'
 
 const stripTrailingSlash = (value?: string) => {
   if (!value) {
@@ -140,12 +144,19 @@ const ContactPage = () => {
   ]
 
   return (
-    <Layout
-      title='Contact Us - OLake'
+    <LakesidePage
+      title='Contact Us'
       description='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool.'
-      wrapperClassName='landing-page'
+      activePath='/contact'
+      heroBackground={
+        <PageHero title='Contact Us'>
+          <p>
+            Get in touch with the OLake team. Contact us for support, partnerships, or questions
+            about our open-source data replication tool.
+          </p>
+        </PageHero>
+      }
     >
-      <LightModeEnforcer />
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content='Contact Us - OLake' />
@@ -156,92 +167,83 @@ const ContactPage = () => {
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
-        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-og-card.png' />
         {jsonLdSchemas.map((schema) => (
-          <script
-            key={schema.id}
-            type='application/ld+json'
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify(schema.data)
-            }}
-          />
+          <script key={schema.id} type='application/ld+json'>{serializeJsonLd(schema.data)}</script>
         ))}
       </Head>
-      <div id='olake-form-product' className='min-h-[80vh]'>
-        <LazyComponent component='RegistrationSection' />
-      </div>
-      <div className='bg-white px-4 py-12 text-gray-800 dark:bg-gray-900 dark:text-gray-200 sm:px-6 lg:px-8'>
-        <div className='mx-auto max-w-4xl'>
-          <h1 className='mb-10 text-center text-4xl font-extrabold'>Contact Us</h1>
-          <div className='grid grid-cols-1 gap-10 md:grid-cols-2'>
-            <div className='space-y-8'>
-              <div>
-                <h2 className='mb-3 text-2xl font-bold'>Other ways to reach us</h2>
-                <div className='space-y-4'>
-                  <div className='flex items-center space-x-4'>
-                    <FaEnvelope className='text-2xl' />
-                    <a href='mailto:hello@olake.io' className='hover:underline'>
-                      hello@olake.io
-                    </a>
-                  </div>
-                  <div className='flex items-start space-x-4'>
-                    <FaMapMarkerAlt className='mt-1 text-2xl' />
-                    <div>
-                      <p className='font-semibold'>Headquarters</p>
-                      <p>Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA</p>
-                      <p className='mt-2 font-semibold'>Working Address</p>
-                      <p>
-                        HustleHub H203, 522, 24th Main Rd, Parangi Palaya, Sector 2, HSR Layout,
-                        Bengaluru, Karnataka 560102
-                      </p>
-                    </div>
-                  </div>
-                  <div className='flex items-center space-x-4'>
-                    <FaSlack className='text-2xl' />
-                    <a
-                      href='https://olake.io/slack'
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='hover:underline'
-                    >
-                      Join our Slack
-                    </a>
-                  </div>
+      <RegistrationSection />
+      <Section flush className='pb-[56px] pt-[16px] lg:pb-[96px] lg:pt-[24px]'>
+        <div className='grid grid-cols-1 items-start gap-[16px] lg:grid-cols-2 lg:gap-[24px]'>
+          <Card className='p-[24px] lg:p-[32px]'>
+            <h2 className='mb-0 text-[20px] font-normal leading-[1.25] text-olake-ink lg:text-[24px]'>
+              Other ways to reach us
+            </h2>
+            <ul className='mb-0 list-none p-0 mt-[20px] flex flex-col gap-[20px]'>
+              <li className='flex items-center gap-[16px]'>
+                <PiEnvelopeSimple aria-hidden='true' className='size-[20px] shrink-0 text-olake-muted' />
+                <a href='mailto:hello@olake.io' className='olake-link text-[15px]'>
+                  hello@olake.io
+                </a>
+              </li>
+              <li className='flex items-start gap-[16px]'>
+                <PiMapPin aria-hidden='true' className='mt-[2px] size-[20px] shrink-0 text-olake-muted' />
+                <div className='text-[15px] leading-[1.6] text-olake-text-2'>
+                  <p className='mb-0 font-medium text-olake-ink'>Headquarters</p>
+                  <p className='mb-0'>Datazip, Inc. 16192 COASTAL HWY LEWES, DE 19958, USA</p>
+                  <p className='mb-0 mt-[14px] font-medium text-olake-ink'>Working Address</p>
+                  <p className='mb-0'>
+                    HustleHub H203, 522, 24th Main Rd, Parangi Palaya, Sector 2, HSR Layout,
+                    Bengaluru, Karnataka 560102
+                  </p>
                 </div>
-              </div>
-            </div>
+              </li>
+              <li className='flex items-center gap-[16px]'>
+                <PiSlackLogo aria-hidden='true' className='size-[20px] shrink-0 text-olake-muted' />
+                <a
+                  href='https://olake.io/slack/'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='olake-link text-[15px]'
+                >
+                  Join our Slack
+                </a>
+              </li>
+            </ul>
+          </Card>
 
-            <div className='space-y-8'>
-              <h2 className='mb-3 text-2xl font-bold'>Connect with Our Team on LinkedIn</h2>
-              <ul className='space-y-4'>
-                <li className='flex items-center space-x-4'>
-                  <FaLinkedin className='text-2xl' />
-                  <a
-                    href='https://www.linkedin.com/in/rohan-khameshra/'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='hover:underline'
-                  >
-                    Rohan
-                  </a>
-                </li>
-                <li className='flex items-center space-x-4'>
-                  <FaLinkedin className='text-2xl' />
-                  <a
-                    href='https://www.linkedin.com/in/shubham-baldava/'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='hover:underline'
-                  >
-                    Shubham
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
+          <Card className='p-[24px] lg:p-[32px]'>
+            <h2 className='mb-0 text-[20px] font-normal leading-[1.25] text-olake-ink lg:text-[24px]'>
+              Connect with Our Team on LinkedIn
+            </h2>
+            <ul className='mb-0 list-none p-0 mt-[20px] flex flex-col gap-[20px]'>
+              <li className='flex items-center gap-[16px]'>
+                <PiLinkedinLogo aria-hidden='true' className='size-[20px] shrink-0 text-olake-muted' />
+                <a
+                  href='https://www.linkedin.com/in/rohan-khameshra/'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='olake-link text-[15px]'
+                >
+                  Rohan
+                </a>
+              </li>
+              <li className='flex items-center gap-[16px]'>
+                <PiLinkedinLogo aria-hidden='true' className='size-[20px] shrink-0 text-olake-muted' />
+                <a
+                  href='https://www.linkedin.com/in/shubham-baldava/'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='olake-link text-[15px]'
+                >
+                  Shubham
+                </a>
+              </li>
+            </ul>
+          </Card>
         </div>
-      </div>
-    </Layout>
+      </Section>
+    </LakesidePage>
   )
 }
 

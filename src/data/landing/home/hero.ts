@@ -1,5 +1,5 @@
 /** Hero copy and calls to action for the lakeside home page. */
-import { GITHUB_REPO_URL } from '@site/src/components/landing/Navbar/navData'
+import { GITHUB_REPO_URL } from '@site/src/components/landing/chrome/navItems'
 
 export const HERO = {
   /** Rendered as one heading; `tail` picks up the design's grey clause. */

@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from '@docusaurus/Link'
-import SectionHeading from '../ui/SectionHeading'
+import SectionHeading from '../../ui/SectionHeading'
 import { FUSION_BENCHMARK } from '@site/src/data/landing/home/fusionBenchmark'
 
 const ExternalMark = () => (
@@ -32,9 +32,9 @@ export default function FusionBenchmark() {
         <div className='mt-[24px] p-[12px] lg:mt-[32px] lg:p-[14px]'>
           {/* One flat grey card: a header band, then columns split by vertical
               rules only — no row lines, which is what the design shows. */}
-          <div className='overflow-hidden rounded-[16px] bg-[#f4f4f4]'>
+          <div className='overflow-hidden rounded-[16px] bg-olake-surface-muted'>
             <div className='flex flex-col gap-[8px] border-0 border-b border-solid border-[#e3e3e3] px-[20px] py-[18px] lg:flex-row lg:items-center lg:justify-between lg:px-[28px] lg:py-[22px]'>
-              <p className='text-[15px] text-[#202020] lg:text-[17px]'>{b.title}</p>
+              <p className='text-[15px] text-olake-ink lg:text-[17px]'>{b.title}</p>
               <Link
                 to={b.linkHref}
                 className='inline-flex items-center gap-[6px] text-[13px] text-[#2b5bf0] transition-opacity hover:opacity-80 lg:text-[14px]'
@@ -64,15 +64,15 @@ export default function FusionBenchmark() {
                         {row.metric}
                       </th>
                       <td className='border-0 border-r border-solid border-[#e3e3e3] px-[16px] py-[18px] text-center'>
-                        <span className='inline-flex items-center gap-[10px] text-[14px] text-[#202020]'>
+                        <span className='inline-flex items-center gap-[10px] text-[14px] text-olake-ink'>
                           {row.fusion}
-                          <span className='rounded-[6px] bg-[#dff5d0] px-[8px] py-[3px] text-[12px] text-[#2f6b1f]'>
+                          <span className='rounded-[6px] bg-olake-success-bg px-[8px] py-[3px] text-[12px] text-olake-success-text'>
                             {row.delta}
                           </span>
                         </span>
                       </td>
                       <td
-                        className={`px-[16px] py-[18px] text-center text-[14px] text-[#5d5d5d] ${
+                        className={`px-[16px] py-[18px] text-center text-[14px] text-olake-text-2 ${
                           i === b.rows.length - 1 ? 'pb-[34px]' : ''
                         }`}
                       >

@@ -5,8 +5,7 @@
  * (`landing/pages/useHomeLogic.ts` → `archSources`, `archDestinations`), which
  * are the same eight connectors `src/data/benchmarkData.ts` benchmarks.
  * Catalogs and query engines have no structured source in the repo yet; the
- * lists below are the ones the docs and the query-engine pages
- * (`src/data/query-engines/*`) cover.
+ * lists below are the ones the docs cover.
  */
 export interface ChipGroup {
   title: string
@@ -17,7 +16,7 @@ export const ARCHITECTURE_INTRO = {
   eyebrow: 'Architecture',
   title: 'Works with what you run',
   body: 'OLake Go supports ingestion from 8 different sources into Iceberg and Parquet. OLake Fusion keeps your Iceberg tables fast, through scheduled compaction and maintenance.',
-  cta: { label: 'Get in touch', href: '/contact' }
+  cta: { label: 'Get in touch', href: '/contact/' }
 }
 
 export const ARCHITECTURE_GROUPS: ChipGroup[] = [

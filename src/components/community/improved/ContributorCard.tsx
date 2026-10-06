@@ -1,9 +1,6 @@
-
 // src/components/community/improved/ContributorCard.tsx
 import React, { useState } from 'react'
-import { Card } from '../../ui/card'
-import { CircularProgress } from '../../ui/CircularProgress'
-import clsx from 'clsx'
+import { cn } from '@site/src/lib/utils'
 import contributorPoints from '../../../data/contributor-points.json'
 
 export interface ContributorProps {
@@ -20,6 +17,12 @@ interface PR {
   number: number
 }
 
+const SIZE = 96
+const STROKE = 4
+const RADIUS = SIZE / 2 - STROKE / 2
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+
+/** Avatar inside a points ring; hovering (or focusing) the card lists the contributor's recent PRs. */
 export const ImprovedContributorCard: React.FC<{ contributor: ContributorProps }> = ({
   contributor
 }) => {
@@ -28,13 +31,12 @@ export const ImprovedContributorCard: React.FC<{ contributor: ContributorProps }
   const [showPRs, setShowPRs] = useState(false)
   const [loadingPRs, setLoadingPRs] = useState(false)
 
-  const size = 100
-  const strokeWidth = 4
-
   // Get points from JSON file, fallback to contributions count
-  const points = contributorPoints.contributors[contributor.login]?.points || contributor.contributions
+  const points =
+    contributorPoints.contributors[contributor.login]?.points || contributor.contributions
   const maxPoints = 100
   const percentage = Math.min((points / maxPoints) * 100, 100)
+  const dashOffset = CIRCUMFERENCE - (percentage / 100) * CIRCUMFERENCE
 
   const fetchPRs = async () => {
     if (prs.length > 0 || loadingPRs) return
@@ -53,97 +55,98 @@ export const ImprovedContributorCard: React.FC<{ contributor: ContributorProps }
     }
   }
 
+  const open = () => {
+    setShowPRs(true)
+    fetchPRs()
+  }
+
   return (
-    <Card
-      className={clsx(
-        'group relative flex flex-col items-center p-6 space-y-4',
-        'transition-all duration-300 hover:shadow-2xl hover:-translate-y-2',
-        'bg-white dark:bg-gray-800 overflow-visible'
-      )}
-      onMouseEnter={() => {
-        setShowPRs(true)
-        fetchPRs()
-      }}
+    <div
+      className='relative flex h-full flex-col items-center rounded-[16px] border border-solid border-olake-line bg-olake-surface px-[20px] py-[24px] text-center transition-colors hover:border-olake-line-strong'
+      onMouseEnter={open}
       onMouseLeave={() => setShowPRs(false)}
+      onFocus={open}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setShowPRs(false)
+      }}
     >
-      <div className="relative" style={{ width: size, height: size }}>
-        <CircularProgress
-          percentage={percentage}
-          size={size}
-          strokeWidth={strokeWidth}
-          progressColor="#193ae6"
-          useGradient={true}
-          gradientColors={['#193ae6', '#607bff']}
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
+      <div className='relative' style={{ width: SIZE, height: SIZE }}>
+        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden='true'>
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            fill='none'
+            strokeWidth={STROKE}
+            className='stroke-olake-line'
+          />
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            fill='none'
+            strokeWidth={STROKE}
+            strokeLinecap='round'
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+            className='stroke-olake-blue'
+          />
+        </svg>
+        <div className='absolute inset-0 flex items-center justify-center'>
           <div
-            className="overflow-hidden rounded-full ring-4 ring-white dark:ring-gray-800 transition-transform duration-300 group-hover:scale-105"
-            style={{ width: size - strokeWidth * 2, height: size - strokeWidth * 2 }}
+            className='overflow-hidden rounded-full'
+            style={{ width: SIZE - STROKE * 4, height: SIZE - STROKE * 4 }}
           >
             <img
               src={imageError ? '/img/authors/author.webp' : contributor.avatar_url}
               alt={`${contributor.login}'s avatar`}
+              width={SIZE - STROKE * 4}
+              height={SIZE - STROKE * 4}
               onError={() => setImageError(true)}
-              loading="lazy" decoding="async"
-              className="object-cover w-full h-full"
+              loading='lazy'
+              decoding='async'
+              className='block h-full w-full object-cover'
             />
           </div>
         </div>
       </div>
 
-      <div className="text-center space-y-2">
-        <a
-          href={contributor.html_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-lg font-bold text-gray-900 dark:text-gray-100 hover:text-[#193ae6] dark:hover:text-blue-400 transition-colors"
-        >
-          @{contributor.login}
-        </a>
-        <div className="flex flex-col items-center">
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-[#193ae6] dark:text-blue-400">
-              {points}
-            </span>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              points
-            </span>
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {contributor.contributions} PR{contributor.contributions !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
+      <a
+        href={contributor.html_url}
+        target='_blank'
+        rel='noopener noreferrer'
+        className='mt-[14px] max-w-full truncate text-[16px] text-olake-ink transition-colors hover:text-olake-blue'
+      >
+        @{contributor.login}
+      </a>
+      <p className='mt-[6px] text-[14px] text-olake-text-2'>
+        <span className='text-[20px] text-olake-ink'>{points}</span> points
+      </p>
+      <p className='mt-[2px] text-[12px] text-olake-muted'>
+        {contributor.contributions} PR{contributor.contributions !== 1 ? 's' : ''}
+      </p>
 
-      {/* PR Tooltip */}
+      {/* PR popover */}
       {showPRs && (
         <div
-          className={clsx(
-            'absolute z-[100] w-80 p-4 bg-white dark:bg-gray-900 rounded-lg shadow-2xl',
-            'border border-gray-200 dark:border-gray-700',
-            'left-1/2 transform -translate-x-1/2 bottom-full mb-2',  // Changed from 'top-full mt-2'
-            'transition-opacity duration-200',
-            showPRs ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          className={cn(
+            'absolute bottom-full left-1/2 z-[100] mb-[8px] w-[min(320px,calc(100vw-48px))] -translate-x-1/2 rounded-[12px] border border-solid border-olake-line bg-olake-surface p-[16px] text-left',
+            'shadow-[var(--olake-shadow-menu)]'
           )}
-          style={{
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',  // Stronger shadow
-            minWidth: '320px'  // Ensure minimum width
-          }}
         >
-          <h4 className="font-bold text-sm mb-2 text-gray-900 dark:text-gray-100">
-            Recent Pull Requests
-          </h4>
+          <h4 className='text-[13px] font-medium text-olake-ink'>Recent Pull Requests</h4>
           {loadingPRs ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+            <p className='mt-[8px] text-[13px] text-olake-muted'>Loading...</p>
           ) : prs.length > 0 ? (
-            <ul className="space-y-2">
+            <ul className='mt-[8px] flex flex-col gap-[8px]'>
               {prs.map((pr) => (
                 <li key={pr.number}>
                   <a
                     href={pr.html_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-[#193ae6] dark:text-blue-400 hover:underline block truncate"
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='block truncate text-[13px] text-olake-blue hover:text-olake-blue-hover'
                   >
                     #{pr.number} - {pr.title}
                   </a>
@@ -151,13 +154,11 @@ export const ImprovedContributorCard: React.FC<{ contributor: ContributorProps }
               ))}
             </ul>
           ) : (
-            <div className="text-sm text-gray-500 dark:text-gray-400">No PRs found</div>
+            <p className='mt-[8px] text-[13px] text-olake-muted'>No PRs found</p>
           )}
         </div>
       )}
-
-      <div className="absolute inset-0 bg-gradient-to-t from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-    </Card>
+    </div>
   )
 }
 

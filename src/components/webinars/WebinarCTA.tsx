@@ -1,38 +1,38 @@
 // components/WebinarCTA.jsx
 
-import React from 'react';
-import { FaVideo } from 'react-icons/fa';
-import CTAButton from './CTAButton';
-
-// const BASE_PATH = process.env.NEXT_PUBLIC_BASE_URL || '';
+import React from 'react'
+import { PiVideoCamera } from 'react-icons/pi'
+import CTAButton from './CTAButton'
 
 type WebinarCTAProps = {
-  CTAText: string;
-};
+  CTAText: string
+}
 
+/** Closing card of a webinar, event or meetup page, pointing at the webinars page. */
 const WebinarCTA: React.FC<WebinarCTAProps> = ({ CTAText }) => {
   return (
-    <div className="bg-blue-600 text-white py-12 px-6 md:px-12 text-center rounded-lg shadow-lg">
+    <div className='rounded-[16px] border border-solid border-olake-line bg-olake-surface px-[24px] py-[36px] text-left lg:px-[64px] lg:py-[56px]'>
       {/* CTA Title */}
-      <h3 className="text-2xl md:text-3xl font-semibold mb-4">
+      <h2 className='max-w-[560px] text-[26px] leading-[1.15] font-normal tracking-[-0.01em] text-olake-ink lg:text-[40px]'>
         {CTAText}
-      </h3>
-      
+      </h2>
+
       {/* Description */}
-      <p className="text-lg mb-6">
+      <p className='mt-[14px] max-w-[640px] text-[13px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
         Secure your spot by registering below.
       </p>
-      
-      {/* CTA Button */}
-      <CTAButton
-        buttonText="Watch Our Webinar & Events Page!"
-        icon={FaVideo}
-        href= '/webinar'
-        variant="outline"
-        className="mx-auto text-white text-sm"
-      />
-    </div>
-  );
-};
 
-export default WebinarCTA;
+      {/* CTA Button */}
+      <div className='mt-[22px] flex lg:mt-[28px]'>
+        <CTAButton
+          buttonText='Watch Our Webinar & Events Page!'
+          icon={PiVideoCamera}
+          href='/webinar/'
+          variant='primary'
+        />
+      </div>
+    </div>
+  )
+}
+
+export default WebinarCTA

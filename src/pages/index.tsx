@@ -20,7 +20,7 @@ export default function Home() {
       wrapperClassName='landing-page'
       noFooter
     >
-      {/* The lakeside design uses Geist (loaded async via font-loading-optimizer.js) */}
+      {/* The lakeside design uses Geist (self-hosted, see src/css/fonts.css) */}
       <LandingSeo
         title={HOME_SEO.title}
         description={HOME_SEO.description}
