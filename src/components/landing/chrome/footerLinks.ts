@@ -30,6 +30,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       { label: 'Docs', href: '/docs' },
       { label: 'Blog', href: '/blog' },
       { label: 'Learn', href: '/learn' },
+      { label: 'Compare', href: '/compare' },
       { label: 'Customer stories', href: '/customer-stories' },
       { label: 'Webinars & events', href: '/webinar' },
       { label: 'Community', href: '/community' }

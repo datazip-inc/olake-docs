@@ -13,7 +13,7 @@
  *                                  off, so diagrams and text stay readable); the bars are the cover's
  *                                  own edge colour (plain covers) or a blurred copy of it (busy ones)
  *
- * Input: the `image:` front-matter path of every post in blog/, customer-stories/ and learn/
+ * Input: the `image:` front-matter path of every post in blog/, customer-stories/, learn/ and compare/
  * (a local path under static/). Output: static/img/og/<cover path under static/img>.jpg, for example
  * /img/blog/2025/10/x.webp -> /img/og/blog/2025/10/x.jpg. The mapping is a pure function of the
  * cover path (ogPath below), so the page can compute the URL without a manifest.
@@ -43,7 +43,7 @@ const sharp = require('sharp')
 const ROOT = path.resolve(__dirname, '..')
 const STATIC = path.join(ROOT, 'static')
 const MANIFEST = path.join(__dirname, 'og-images.manifest.json')
-const CONTENT_DIRS = ['blog', 'customer-stories', 'learn']
+const CONTENT_DIRS = ['blog', 'customer-stories', 'learn', 'compare']
 const W = 1200
 const H = 630
 const TARGET_RATIO = W / H

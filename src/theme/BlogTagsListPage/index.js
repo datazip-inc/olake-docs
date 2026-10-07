@@ -15,7 +15,9 @@ const TAGS_DESCRIPTIONS = {
   'customer-stories':
     'Browse OLake customer stories by topic tag to find case studies for your database, catalog or query engine.',
   learn:
-    'Browse OLake Learn explainers by topic tag, from data pipelines and change data capture to Apache Iceberg and the lakehouse.'
+    'Browse OLake Learn explainers by topic tag, from data pipelines and change data capture to Apache Iceberg and the lakehouse.',
+  compare:
+    'Browse OLake comparisons by topic tag, from data replication and CDC tools to Apache Iceberg, catalogs and query engines.'
 }
 
 export default function BlogTagsListPage({ tags, sidebar }) {

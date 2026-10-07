@@ -14,7 +14,9 @@ const AUTHORS_DESCRIPTIONS = {
   'customer-stories':
     'Meet the authors behind OLake customer stories and browse the case studies each of them has written.',
   learn:
-    'Meet the engineers and writers behind OLake Learn, and browse the plain-language explainers each author has published.'
+    'Meet the engineers and writers behind OLake Learn, and browse the plain-language explainers each author has published.',
+  compare:
+    'Meet the engineers and writers behind OLake Compare, and browse the comparisons each author has published.'
 }
 
 export default function BlogAuthorsListPage({ authors, sidebar }) {

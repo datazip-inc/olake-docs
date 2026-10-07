@@ -47,7 +47,8 @@ export default function BlogPostPageWrapper(props) {
   const SECTIONS = {
     '/blog/': 'Blog',
     '/customer-stories/': 'Customer Stories',
-    '/learn/': 'Learn'
+    '/learn/': 'Learn',
+    '/compare/': 'Compare'
   };
   const sectionPath = Object.keys(SECTIONS).find((p) => (metadata.permalink || '').startsWith(p));
   const breadcrumbSchema =

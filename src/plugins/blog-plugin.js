@@ -2,11 +2,11 @@ const blogPluginExports = require('@docusaurus/plugin-content-blog')
 
 const defaultBlogPlugin = blogPluginExports.default
 
-// Blog instances that share the authors file of another instance (learn-blog reads blog/authors.yml).
+// Blog instances that share the authors file of another instance (learn-blog and compare-blog read blog/authors.yml).
 // Docusaurus builds a page for every author in the file, even one with no posts in the instance, so
-// the shared file would add an empty /learn/authors/<name>/ page for every blog author. For these
+// the shared file would add an empty /learn/authors/<name>/ (or /compare/authors/<name>/) page for every blog author. For these
 // instances the authors list and the author pages keep only the authors who have posts there.
-const INSTANCES_HIDING_EMPTY_AUTHORS = new Set(['learn-blog'])
+const INSTANCES_HIDING_EMPTY_AUTHORS = new Set(['learn-blog', 'compare-blog'])
 
 /**
  * The archive page (src/theme/BlogArchivePage) only reads `date`, `permalink` and `title` of each

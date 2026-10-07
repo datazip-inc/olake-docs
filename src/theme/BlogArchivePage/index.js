@@ -15,7 +15,9 @@ const ARCHIVE_DESCRIPTIONS = {
   'customer-stories':
     'Browse all OLake customer stories and case studies by year, from teams replicating databases to Apache Iceberg.',
   learn:
-    'Browse every OLake Learn explainer by year: data pipelines, change data capture, Apache Iceberg and the data lakehouse.'
+    'Browse every OLake Learn explainer by year: data pipelines, change data capture, Apache Iceberg and the data lakehouse.',
+  compare:
+    'Browse every OLake comparison by year: alternatives, versus pages, pricing breakdowns and best-of lists for data replication tools.'
 }
 
 // The plugin hands posts over newest first; keep that order inside each year
