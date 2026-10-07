@@ -84,12 +84,15 @@ with DAG(
         )
     )
     
-    # Streams config volume: Contains pre-generated streams configuration
+    # Streams config volume: Contains pre-generated selected_streams.json and available_streams.json
     streams_config_volume = k8s.V1Volume(
         name="streams-config-volume",
         config_map=k8s.V1ConfigMapVolumeSource(
             name=STREAMS_CONFIG_MAP_NAME,
-            items=[k8s.V1KeyToPath(key="streams.json", path="streams.json")]
+            items=[
+                k8s.V1KeyToPath(key="available_streams.json", path="available_streams.json"),
+                k8s.V1KeyToPath(key="selected_streams.json", path="selected_streams.json"),
+            ]
         )
     )
     
@@ -157,7 +160,7 @@ with DAG(
     )
     
     # --- Init Container for Sync Task ---
-    # Copies source, destination, AND streams configs from ConfigMaps to the shared PVC
+    # Copies source, destination, AND both streams files from ConfigMaps to the shared PVC
     # Also ensures an empty state.json exists if one is not already present.
     # Define a security context that will be used by both containers
     security_context = k8s.V1SecurityContext(
@@ -165,7 +168,7 @@ with DAG(
         run_as_group=0,        # Choose a group ID
     )
 
-    # Updated command to copy all three files and conditionally create state.json
+    # Updated command to copy all four files and conditionally create state.json
     init_container_sync = k8s.V1Container(
         name="init-config",
         image="busybox", # Standard utility image
@@ -173,7 +176,8 @@ with DAG(
             "mkdir -p /mnt/workspace && \
             cp /etc/source-config/source.json /mnt/workspace/ && \
             cp /etc/destination-config/destination.json /mnt/workspace/ && \
-            cp /etc/streams-config/streams.json /mnt/workspace/ && \
+            cp /etc/streams-config/available_streams.json /mnt/workspace/ && \
+            cp /etc/streams-config/selected_streams.json /mnt/workspace/ && \
             if [ ! -f /mnt/workspace/state.json ]; then \
             echo '{}' > /mnt/workspace/state.json; \
             fi && \
@@ -255,8 +259,9 @@ with DAG(
         arguments=[
             "sync",
             "--config", "/mnt/config/source.json",     # Path within the mounted volume
-            "--catalog", "/mnt/config/streams.json",    # Path within the mounted volume
             "--destination", "/mnt/config/destination.json", # Path within the mounted volume
+            "--available-streams", "/mnt/config/available_streams.json", # Path within the mounted volume
+            "--selected-streams", "/mnt/config/selected_streams.json",   # Path within the mounted volume
             "--state", "/mnt/config/state.json"
         ],
 

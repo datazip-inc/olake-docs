@@ -59,13 +59,18 @@ At the highest level, a sync is three stages connected by an in-process pipeline
 
 Everything ships as one container image per source, and every image exposes the same command surface: `spec`, `check`, `discover`, `sync`, and `clear-destination`. To know more about what each command and its flags do, read the [commands and flags documentation](/docs/community/commands-and-flags).
 
-A sync is fully described by JSON files passed as flags: the source config, the destination config, a `streams.json` selecting which streams to sync and how (sync mode, partitioning, filters, normalization), and a `state.json` carrying whatever the previous run learned. The process reads them, does its work, updates `state.json`, and exits:
+A sync is fully described by JSON files passed as flags: the source config, the destination config, a pair of streams files (`selected_streams.json` selecting which streams to sync and how: sync mode, partitioning, filters, normalization, and `available_streams.json` from discover), and a `state.json` carrying whatever the previous run learned. The process reads them, does its work, updates `state.json`, and exits:
+
+:::info
+The commands and examples below use OLake's current streams config: `selected_streams.json` + `available_streams.json`, in place of the older single `streams.json` file. Still on `streams.json`? See the [migration guide](/docs/core/configs/streams-migration) to switch.
+:::
 
 ```sh
 docker run -v "$PWD:/mnt/config" olakego/source-postgres:latest sync \
   --config /mnt/config/source.json \
   --destination /mnt/config/destination.json \
-  --catalog /mnt/config/streams.json \
+  --selected-streams /mnt/config/selected_streams.json \
+  --available-streams /mnt/config/available_streams.json \
   --state /mnt/config/state.json
 ```
 
@@ -113,7 +118,7 @@ utils.ConcurrentInGroupWithRetry(a.GlobalConnGroup, streams, a.driver.MaxRetries
     })
 ```
 
-A thousand tables inspect in seconds rather than serially, and the merged result is written to `streams.json`.
+A thousand tables inspect in seconds rather than serially, and the merged result is written to `available_streams.json`, with a `selected_streams.json` alongside it.
 
 A later `sync` trusts that file for which streams to read and does not repeat the catalog inspection. Schema changes are still picked up, just by a different path: a new column or a widened type arrives in the data during the sync itself, and the Iceberg table is evolved to match on the fly, without anyone re-running `discover` (covered in [schema and type handling](#schema-and-type-handling)).
 
@@ -151,7 +156,7 @@ Which of these driver methods the engine actually calls for a given stream depen
 
 ## Sync modes
 
-Every stream carries its own sync mode in `streams.json`, so one sync can mix modes freely: a huge immutable events table on full refresh, a slowly changing dimension on incremental, and the hot transactional tables on CDC.
+Every stream carries its own sync mode in `selected_streams.json`, so one sync can mix modes freely: a huge immutable events table on full refresh, a slowly changing dimension on incremental, and the hot transactional tables on CDC.
 
 There are four modes:
 
@@ -174,7 +179,7 @@ if stream.SupportedSyncModes.Exists(types.CDC) && driver.CDCSupported() {
 }
 ```
 
-The generated `streams.json` is where you override that choice per stream, along with normalization, partitioning, filters, and append behavior.
+The generated `selected_streams.json` is where you override that choice per stream, along with normalization, partitioning, filters, and append behavior.
 
 ### What a record carries
 
@@ -205,7 +210,7 @@ A sync run therefore starts with a simple classification: every selected stream 
 
 The orchestrator is the shared engine layer that turns those buckets into actual work. It is the same code for all sources, which is why behaviors like retries, connection limits, and resumability are identical whether you are syncing Postgres or MongoDB.
 
-A `sync` starts by classifying the selected streams from `streams.json`. The only validation at this stage is of the catalog itself; a stream whose filter is malformed (too many conditions, a column that is not in the stream's schema, a value that does not parse) is skipped with a warning rather than failing the whole job. Before a single row is read, the [destination writer pool](#destinations-and-the-write-path) is built and its connection checked, so a bad destination config fails in seconds instead of after an hour of reading.
+A `sync` starts by classifying the selected streams from `selected_streams.json`. The only validation at this stage is of the streams files themselves; a stream whose filter is malformed (too many conditions, a column that is not in the stream's schema, a value that does not parse) is skipped with a warning rather than failing the whole job. Before a single row is read, the [destination writer pool](#destinations-and-the-write-path) is built and its connection checked, so a bad destination config fails in seconds instead of after an hour of reading.
 
 Then the buckets execute:
 
@@ -968,7 +973,7 @@ Two integer widths meet at the wider integer (`Int32` + `Int64` → `Int64`), an
 
 ### Normalization: columns, or one JSON blob
 
-Whether that type system is even applied to a stream is a per-stream choice called **normalization**, set in `streams.json`.
+Whether that type system is even applied to a stream is a per-stream choice called **normalization**, set in `selected_streams.json`.
 
 With normalization **off**, OLake Go does not inspect the record's shape at all. It serializes the entire source record to a single JSON string and stores it in one `data` column, alongside the `_olake_*` metadata columns:
 

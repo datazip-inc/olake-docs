@@ -124,15 +124,8 @@ import SupportedSources from '../../../docs/shared/SupportedSources.mdx'
 import SupportedDestinations from '../../../docs/shared/SupportedDestinations.mdx'
 import SupportedIcebergCatalogs from '../../../docs/shared/SupportedIcebergCatalogs.mdx'
 
-import SelectedStreamsOnly from '../../../docs/shared/streams/SelectedStreamsOnly.mdx'
-import SelectedStreamsOnlyDetails from '../../../docs/shared/streams/SelectedStreamsOnlyDetails.mdx'
-import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
-import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
-import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
-import StreamsConfiguration from '../../../docs/shared/streams/StreamsConfiguration.mdx'
 
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
-import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
 import Faq from '../../components/olake/Faq';
 
 
@@ -264,15 +257,8 @@ const MDXComponents = {
   SupportedDestinations,
   SupportedIcebergCatalogs,
 
-  SelectedStreamsOnly,
-  SelectedStreamsOnlyDetails,
-  StreamsFull,
-  StreamsOnly,
-  StreamsOnlyDetails,
-  StreamsConfiguration,
 
   OLakePathInfo,
-  StreamSelectionExample,
   Faq
 };
 

@@ -1,0 +1,281 @@
+---
+title: Streams v1 (legacy streams.json) reference
+description: Frozen reference for the deprecated single-file streams.json format, with field tables, examples, and legacy --streams, --catalog, and --difference commands.
+sidebar_position: 4
+sidebar_label: Streams v1 (legacy)
+keywords: [streams.json, legacy streams.json, streams v1, --streams, --catalog, --difference, OLake streams config]
+---
+
+# Streams v1: `streams.json` (legacy) reference
+
+:::warning[Deprecated: legacy `streams.json`]
+The single-file `streams.json` format is deprecated. It still works, and OLake logs a warning when you use it.
+OLake will remove it in a future release.
+To move to Streams v2, read the [migration guide](/docs/core/configs/streams-migration). For Streams v2, see the [streams reference](/docs/core/configs/streams).
+:::
+
+
+## Legacy commands
+
+All examples assume files in `/mnt/config`.
+
+### discover (first time)
+
+```bash
+discover --config /mnt/config/source.json
+```
+
+OLake writes `streams.json`, `selected_streams.json`, and `available_streams.json` in the config folder.
+
+### discover with `--streams` (re-run and keep your edits)
+
+```bash
+discover --config /mnt/config/source.json \
+  --streams /mnt/config/streams.json
+```
+
+`--catalog` is a deprecated alias of `--streams`.
+
+### discover with `--difference`
+
+```bash
+discover --streams /mnt/config/streams.json \
+  --difference /mnt/config/new_streams.json
+```
+
+OLake writes `difference_streams.json` next to the old file. It lists selected streams that are new or changed in a way that needs a destination reset.
+
+### sync with `--streams`
+
+```bash
+sync --config /mnt/config/source.json \
+  --destination /mnt/config/destination.json \
+  --streams /mnt/config/streams.json \
+  --state /mnt/config/state.json
+```
+
+### clear-destination with `--streams`
+
+```bash
+clear-destination --destination /mnt/config/destination.json \
+  --streams /mnt/config/streams.json
+```
+
+These flags log this warning:
+
+```text
+--streams is deprecated and will be removed in a future release; use --available-streams and --selected-streams instead
+```
+
+## `streams.json` file structure
+
+The `streams.json` file is organized into two main sections:
+
+- **`selected_streams`:** Lists the streams that have been chosen for processing. These are grouped by namespace.
+- **`streams`:** Contains an array of stream definitions. Each stream holds details about its schema, supported synchronization modes, primary keys, and other metadata.
+
+## 1. Selected streams
+
+The **`selected_streams`** section groups streams by their namespace. For example, the configuration might look like this:
+
+```json title="streams.json"
+"selected_streams": {
+  "my_db": [
+    {
+      "partition_regex": "/{dropoff_datetime, year}",
+      "stream_name": "table1",
+      "normalization": true,
+      "update_type": "eq",
+      "append_mode": false,
+      "selected_columns": {
+                    "columns": [
+                        "_cdc_timestamp",
+                        "_olake_id",
+                        "_cdc_lsn",
+                        "_op_type",
+                        "id",
+                        "updated_at",
+                        "dropoff_datetime",
+                        "_olake_timestamp"
+                    ],
+                    "sync_new_columns": true
+                },
+      "filter": "UPDATED_AT >= \"08-JUN-25 07.19.23.690870000 AM\""
+    },
+    {
+      "partition_regex": "",
+      "stream_name": "table2",
+      "normalization": false,
+      "append_mode": false,
+      "selected_columns": {
+                    "columns": [
+                        "_cdc_timestamp",
+                        "_olake_id",
+                        "_cdc_lsn",
+                        "_op_type",
+                        "id",
+                        "city",
+                        "_olake_timestamp"
+                    ],
+                    "sync_new_columns": true
+                },
+      "filter": "city = \"London\""
+    }
+  ]
+}
+```
+
+### Details about all the fields mentioned in selected streams
+
+| **Component**         | **Type** | **Example Value**                                                            | **Description**                                                                                                                                                                                                                     |
+|-----------------------|---------------|------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`namespace`**       | string        | `my_db`                                                                   | Groups streams that belong to a specific database or logical category                                                                                                                                                               |
+| **`stream_name`**     | string        | `"table1"`, `"table2"`                                                   | Identifier for the stream. Must match the stream name defined in the `Streams` configurations.                                                                                                                                   |
+| **`partition_regex`** | string        | `"/{dropoff_datetime, year}"` | A pattern defining how to partition the data. To read more, refer the [Partition Regex for S3](/docs/writers/parquet/partitioning#partition-regex-attributes) or [Partition Regex for iceberg](/docs/writers/iceberg/partitioning#how-iceberg-handles-partitions)                                             |
+| **`normalization`**   | boolean       | `true`                                                                       | Converts top-level JSON fields into columns, while nested JSON objects are stored as string values.                                                                                |
+| **`update_type`**     | string        | `"eq"` or `"pos"` or `"dv"`                                                                    | Specifies the format in which delete files are written during sync. <br/> `"eq"` writes equality delete files. <br/> `"pos"` writes positional delete files. <br/> `"dv"` writes deletion vector files.                                                                                |
+| **`append_mode`**     | boolean       | `false`                                                                      | Disables upserts in Iceberg when set to `true`. (In upsert mode dedupe happens via equality delete)                                                                                             |
+| **`selected_columns.columns`**     | array  | `["_cdc_timestamp", "id", "updated_at"]`                                                                      | List of columns to be included in the sync for each stream.                                                                                              |
+| **`selected_columns.sync_new_columns`**     | boolean  | `true`                                                                      | If `true`, newly discovered columns are automatically included in future syncs. If `false`, new columns must be manually added to `selected_columns.columns` to be synced.                                                                                             |
+| **`filter`**          | string        | `"UPDATED_AT >= \"08-JUN-25 07.19.23.690870000 AM\""`                                                                 | Ensures that only data matching the specified condition is synced.                                                                                                                                                              |
+
+
+## 2. Streams
+
+The **streams** section is an array where each element is an object that defines a specific data stream. For example, one stream definition looks like this:
+
+```json title="streams.json"
+{
+  "stream": {
+    "name": "table1",
+    "namespace": "my_db",
+    "type_schema": {
+      "properties": {
+        "_id": {
+          "type": ["string"],
+          "destination_column_name":"_id"
+        },
+        "name": {
+          "type": ["string"],
+          "destination_column_name":"name"
+        },
+        "marks": {
+          "type": ["integer"],
+          "destination_column_name":"marks"
+        },
+        "updated_at": {
+          "type": ["timestamp"],
+          "destination_column_name":"updated_at"
+        },
+        ...
+      }
+    },
+    "supported_sync_modes": ["full_refresh", "cdc", "incremental", "strict_cdc"],
+    "source_defined_primary_key": ["_id"],
+    "available_cursor_fields": ["_id", "name", "marks", "updated_at"],
+    "sync_mode": "incremental",
+    "cursor_field": "updated_at",
+    "destination_database": "prefix:my_db",
+    "destination_table": "table1"
+  }
+}
+```
+
+
+### 2.1 Stream Configuration Elements
+
+| **Component**                    | **Example Value**                                | **Description & Possible Values**                                                                                                                                               |
+|----------------------------------|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`name`**                       |  `"stream_8"`                                     | Unique identifier for the stream. Each stream must have a unique name.                                                                                                          |
+| **`namespace`**                  | `"olake_db"`                                     | The grouping or database name that the stream belongs to.                                                          |
+| **`type_schema`**                | *(JSON object with properties)*                  | Defines the columns in streams or tables, including the destination column name. The source column name is normalized by replacing special characters and spaces with underscores (`_`) and is used as the final column name in the destination table. |
+| **`supported_sync_modes`**       | `["full_refresh", "cdc", "incremental","strict_cdc"]`         | Lists the sync modes the stream supports. Includes `"full_refresh"`, `"cdc"`, `"strict_cdc"` and `"incremental"`.                                                               |
+| **`source_defined_primary_key`** | `["_id"]`                                        | Specifies the field(s) that is set as a primary key in the source.                                                                |
+| **`available_cursor_fields`**    | `["_id", "name", "marks", "updated_at"]`         | Lists fields that can be used to track synchronization progress in `incremental` sync mode.                                                                                     |
+| **`sync_mode`**                  | `"incremental"`                                  | Indicates the active sync mode. Possible values are defined in `supported_sync_modes`.                                                                  |
+| **`cursor_field`**               | `"updated_at"`                                   | Defines the cursor field used to track incremental sync.  |
+| **`destination_database`**       | `"prefix:my_db"`                                 | Specifies the destination database name where data will be stored. By default, the driver name is used as the prefix, but you can override it using the [`--destination-database-prefix`](/docs/community/commands-and-flags#6-destination-database-prefix) flag. The source namespace is always appended to the database name. All special characters and spaces are replaced with (`_`), and the database is automatically created if it doesn’t exist. |
+| **`destination_table`**          | `"table1"`                                       | Specifies the name of the destination table where the data will be stored. The table name is derived from the source stream name and normalized by replacing special characters and spaces with underscores (`_`). |
+
+## Full example
+
+```json title="OLAKE_DIRECTORY/streams.json"
+{
+  "selected_streams": {
+    "otter_db": [
+      {
+        "partition_regex": "{now(),2025,YYYY}-{now(),06,MM}-{now(),13,DD}/{string_change_language,,}",
+        "stream_name": "stream_0",
+        "normalization": false,
+        "append_mode": false,
+        "chunk_column": ""
+      },
+      {
+        "partition_regex": "{,1999,YYYY}-{,09,MM}-{,31,DD}/{latest_revision,,}",
+        "stream_name": "stream_8",
+        "normalization": false,
+        "append_mode": false,
+        "chunk_column": ""
+      }
+    ]
+  },
+  "streams": [
+    {
+      "stream": {
+        "name": "stream_8",
+        "namespace": "otter_db",
+        "type_schema": { "...": "..." },
+        "supported_sync_modes": ["full_refresh", "cdc"],
+        "source_defined_primary_key": ["_id"],
+        "available_cursor_fields": [],
+        "sync_mode": "cdc"
+      }
+    }
+  ]
+}
+```
+
+## Select or exclude a stream
+
+A stream syncs only if it is listed in `selected_streams`. To exclude `customer`, delete its entry.
+
+**Before (including `customer`):**
+
+```json title="OLAKE_DIRECTORY/streams.json"
+"selected_streams": {
+  "otter_db": [
+    {
+      "stream_name": "order",
+      "partition_regex": "",
+      "normalization": false,
+      "append_mode": false,
+      "chunk_column": ""
+    },
+    {
+      "stream_name": "customer",
+      "partition_regex": "",
+      "normalization": false,
+      "append_mode": false,
+      "chunk_column": ""
+    }
+  ]
+}
+```
+
+**After (excluding `customer`):**
+
+```json title="OLAKE_DIRECTORY/streams.json"
+"selected_streams": {
+  "otter_db": [
+    {
+      "stream_name": "order",
+      "partition_regex": "",
+      "normalization": false,
+      "append_mode": false,
+      "chunk_column": ""
+    }
+  ]
+}
+```
+
+For more on `partition_regex`, see [Iceberg partitioning](/docs/writers/iceberg/partitioning) or [S3 partitioning](/docs/writers/parquet/partitioning).

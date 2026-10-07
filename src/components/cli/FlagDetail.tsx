@@ -60,23 +60,59 @@ olakego/source-[SOURCE-TYPE]:latest \\
       description: (
         <>
           <p><strong>Description:</strong></p>
-          <p>Specifies the path to the streams.json file. This file is generated after the discover command. When used during discovery, this flag updates the existing streams.json:</p>
+          <div className="admonition admonition-warning alert alert--warning">
+            <div className="admonition-content">
+              <p><strong>Deprecated.</strong> Still works and logs a warning. Also available as <code>--catalog</code> (alias). Deprecated — use <code>--selected-streams</code> and <code>--available-streams</code>. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link>.</p>
+            </div>
+          </div>
+          <p>Specifies the path to the legacy <code>streams.json</code> file. This file is generated after the discover command. When used during discovery, this flag updates the existing <code>streams.json</code> and also writes <code>selected_streams.json</code> and <code>available_streams.json</code>:</p>
           <ul>
             <li>Keeps prior manual changes.</li>
             <li>Adds new streams detected in the source database.</li>
             <li>Allows selecting which columns should be synced for each table.</li>
             <li>Allows updating the destination database name for each stream.</li>
           </ul>
-          <div className="admonition admonition-info alert alert--info">
-            <div className="admonition-content">
-              <p>➡️ You must learn about <code>streams.json</code> configuration. Refer to the <Link to="/docs/install/docker-cli#streams-config">Streams Config</Link> guide.</p>
-            </div>
-          </div>
         </>
       ),
       usage: {
         'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --streams [PATH_TO_STREAMS_FILE]`,
         docker: `--streams /mnt/config/streams.json`
+      }
+    },
+    'available-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Specifies the path to <code>available_streams.json</code>. Discover writes this read-only file. Do not edit it.</li>
+            <li>Must be passed together with <code>--selected-streams</code>.</li>
+            <li>Used by <code>discover</code> (merge, keeps your edits), <code>sync</code> and <code>clear-destination</code>.</li>
+            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --selected-streams [PATH_TO_SELECTED_STREAMS_FILE] --available-streams [PATH_TO_AVAILABLE_STREAMS_FILE]`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json`
+      }
+    },
+    'selected-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Specifies the path to <code>selected_streams.json</code>. This is the file you edit. It lists the streams to sync and their settings.</li>
+            <li>Must be passed together with <code>--available-streams</code>.</li>
+            <li>Used by <code>discover</code> (merge, keeps your edits), <code>sync</code> and <code>clear-destination</code>.</li>
+            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --selected-streams [PATH_TO_SELECTED_STREAMS_FILE] --available-streams [PATH_TO_AVAILABLE_STREAMS_FILE]`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json`
       }
     },
     destination: {
@@ -352,7 +388,7 @@ Example:
           <p><strong>Description:</strong></p>
           <ul>
             <li>Applies only to the sync command.</li>
-            <li>By default, sync skips source schema discovery to keep runs fast and trusts the catalog passed (<code>--streams /path/to/streams.json</code>) from a prior discover run.</li>
+            <li>By default, sync skips source schema discovery to keep runs fast and trusts the streams files passed (<code>--selected-streams</code> and <code>--available-streams</code>, or the deprecated <code>--streams</code>) from a prior discover run.</li>
             <li>When this flag is passed, sync re-discovers source schema and validates configured streams against the source.</li>
           </ul>
         </>
@@ -366,6 +402,11 @@ Example:
       description: (
         <>
           <p><strong>Description:</strong></p>
+          <div className="admonition admonition-warning alert alert--warning">
+            <div className="admonition-content">
+              <p><strong>Deprecated.</strong> Still works and logs a warning. Deprecated — use <code>--selected-streams</code> and <code>--available-streams</code>. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link>.</p>
+            </div>
+          </div>
           <ul>
             <li>Used with the discover command to compare differences between two streams, specifically an old stream and a new stream.</li>
             <li>Must be used together with <code>--streams /path/old_streams.json</code> to specify the path to the old streams file.</li>
@@ -386,6 +427,49 @@ Example:
         'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --streams /path/old_streams.json --difference /path/new_streams.json`,
         docker: `--streams /path/old_streams.json \\
 --difference /path/new_streams.json`
+      }
+    },
+    'difference-available-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Applies only to the discover command.</li>
+            <li>Specifies the path to the new <code>available_streams.json</code> to compare against the old files.</li>
+            <li>Must be passed together with <code>--difference-selected-streams</code>.</li>
+            <li>Does not connect to the source, so <code>--config</code> is not needed.</li>
+            <li>Writes <code>difference_streams.json</code> next to the old files. It lists selected streams that are new or changed in a way that needs a destination reset.</li>
+            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] discover --selected-streams /path/selected_streams.json --available-streams /path/available_streams.json --difference-selected-streams /path/new_selected_streams.json --difference-available-streams /path/new_available_streams.json`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json \\
+--difference-selected-streams /mnt/config/new_selected_streams.json \\
+--difference-available-streams /mnt/config/new_available_streams.json`
+      }
+    },
+    'difference-selected-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Applies only to the discover command.</li>
+            <li>Specifies the path to the new <code>selected_streams.json</code> to compare against the old files.</li>
+            <li>Must be passed together with <code>--difference-available-streams</code>.</li>
+            <li>The old side and the new side can each use either format. For example, use legacy <code>--streams</code> with the new difference pair.</li>
+            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] discover --selected-streams /path/selected_streams.json --available-streams /path/available_streams.json --difference-selected-streams /path/new_selected_streams.json --difference-available-streams /path/new_available_streams.json`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json \\
+--difference-selected-streams /mnt/config/new_selected_streams.json \\
+--difference-available-streams /mnt/config/new_available_streams.json`
       }
     },
     'destination-type': {
@@ -437,7 +521,7 @@ check \\
           <p><strong>Description:</strong></p>
           <ul>
             <li>Prevents saving of any files generated by the command. This flag is valid for all available commands.</li>
-            <li>Example: If used with discover, the <code>streams.json</code> file and related logs are not saved.</li>
+            <li>Example: If used with discover, the generated streams files and related logs are not saved.</li>
           </ul>
         </>
       ),
