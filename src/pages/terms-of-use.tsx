@@ -1,17 +1,14 @@
 import React from 'react';
-import Layout from '@theme/Layout';
+import LegalPage from '@site/src/components/pages-misc/LegalPage';
 
 const TermsOfUsePage = () => {
   return (
-    <Layout
+    <LegalPage
       title="Terms of Service"
       description="OLake Terms of Service (OLake by Datazip) - Terms governing subscription to and use of OLake by Datazip, Inc."
+      heading="OLake Terms of Service (OLake by Datazip)"
+      lastUpdated="Last Updated: 5 February 2026"
     >
-      <main className="container margin-vert--lg">
-        <div className="row">
-          <div className="col col--10 col--offset-1">
-            <h1>OLake Terms of Service (OLake by Datazip)</h1>
-            <p className="margin-bottom--md" style={{ color: 'var(--ifm-font-color-base)' }}><strong>Last Updated: 5 February 2026</strong></p>
             <p>
               THESE TERMS OF SERVICE (THESE &quot;TERMS&quot;) GOVERN SUBSCRIPTION TO AND USE OF OLake™, BY DATAZIP, INC (&quot;Datazip&quot;). IF YOU REGISTER FOR A FREE TRIAL/PILOT OF OLake, THE APPLICABLE PROVISIONS OF THESE TERMS WILL ALSO GOVERN THAT FREE TRIAL/PILOT.
             </p>
@@ -244,10 +241,7 @@ const TermsOfUsePage = () => {
 
             <h2>34. No Third-Party Beneficiaries</h2>
             <p>These Terms are for the sole benefit of the signatories and are not intended to benefit any third party.</p>
-          </div>
-        </div>
-      </main>
-    </Layout>
+    </LegalPage>
   );
 };
 

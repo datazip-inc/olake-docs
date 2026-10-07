@@ -17,7 +17,7 @@ type Metric = (typeof METRICS)[number]
 /**
  * Four competitor columns. Kafka is benchmarked against Apache Flink rather
  * than Debezium, so the set is per-connector — same rule the OLake Go page
- * uses (`landing/pages/useGoLogic.ts`).
+ * uses (`data/landing/go/faq.ts`).
  */
 const competitorKeys = (bench: Partial<ConnectorBenchmark>): string[] =>
   bench.rowsSynced?.flink !== undefined

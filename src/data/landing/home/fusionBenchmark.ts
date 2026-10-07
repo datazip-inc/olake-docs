@@ -1,6 +1,6 @@
 /**
  * Fusion vs Spark compaction benchmark, as published on the OLake Fusion page
- * (`landing/pages/useFusionLogic.ts`): TPC-H lineitem, ~1.8 billion rows.
+ * (`data/landing/fusion/benchmark.ts`): TPC-H lineitem, ~1.8 billion rows.
  */
 export interface FusionBenchmarkRow {
   metric: string
