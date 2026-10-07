@@ -13,7 +13,9 @@ import PageHeader from '@site/src/components/blog/PageHeader'
 const ARCHIVE_DESCRIPTIONS = {
   blog: 'Browse every OLake blog post by year: data replication, CDC, Apache Iceberg and lakehouse guides from the OLake team.',
   'customer-stories':
-    'Browse all OLake customer stories and case studies by year, from teams replicating databases to Apache Iceberg.'
+    'Browse all OLake customer stories and case studies by year, from teams replicating databases to Apache Iceberg.',
+  learn:
+    'Browse every OLake Learn explainer by year: data pipelines, change data capture, Apache Iceberg and the data lakehouse.'
 }
 
 // The plugin hands posts over newest first; keep that order inside each year

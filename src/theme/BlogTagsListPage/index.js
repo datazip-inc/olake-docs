@@ -13,7 +13,9 @@ import { isHiddenCategoryTag } from '@site/src/components/blog/categories'
 const TAGS_DESCRIPTIONS = {
   blog: 'Browse OLake blog posts by topic tag, from CDC and data replication to Apache Iceberg, catalogs and query engines.',
   'customer-stories':
-    'Browse OLake customer stories by topic tag to find case studies for your database, catalog or query engine.'
+    'Browse OLake customer stories by topic tag to find case studies for your database, catalog or query engine.',
+  learn:
+    'Browse OLake Learn explainers by topic tag, from data pipelines and change data capture to Apache Iceberg and the lakehouse.'
 }
 
 export default function BlogTagsListPage({ tags, sidebar }) {

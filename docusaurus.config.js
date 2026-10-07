@@ -131,13 +131,14 @@ const config = {
           lastmod: 'date',
           // changefreq/priority are ignored by Google, so they are left at the plugin defaults.
           // The patterns must be prefixed with /** because tags, authors and archive pages live
-          // under each blog instance (/blog/tags, /customer-stories/tags, ...).
+          // under each blog instance (/blog/tags, /customer-stories/tags, /learn/tags, ...).
           ignorePatterns: [
             '/**/tags/**',
             '/**/authors/**',
             // Blog archive pages only. A broader /**/archive/** would also hide /docs/archive/.
             '/blog/archive/**',
             '/customer-stories/archive/**',
+            '/learn/archive/**',
             '/search/**',
             '/docs/shared/**',
             '/webinar/**-confirmation/**',
@@ -406,6 +407,44 @@ const config = {
         showReadingTime: true,
         onUntruncatedBlogPosts: 'ignore',
         // Tags used in a post but missing from this instance's tags.yml
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin],
+        // Adds width/height to local images so they reserve space (no layout shift)
+        beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
+      }
+    ],
+
+    [
+      './src/plugins/blog-plugin',
+      {
+        path: 'learn',
+        id: 'learn-blog',
+        // Real last-modified dates (from git) for the sitemap lastmod and the page metadata
+        showLastUpdateTime: true,
+        editLocalizedFiles: false,
+        blogTitle: 'Learn',
+        feedOptions: { title: 'OLake Learn' },
+        blogDescription:
+          'Plain-language explainers from the OLake team on data pipelines, change data capture, Apache Iceberg and the data lakehouse.',
+        blogSidebarCount: 'ALL',
+        blogSidebarTitle: 'Learn',
+        routeBasePath: 'learn',
+        // Tags are shared with the blog (one vocabulary). Authors have their own file, learn/authors.yml,
+        // so the section lists only the people who write in it (a shared file would add an empty
+        // author page for every blog author).
+        tags: '../blog/tags.yml',
+        include: ['**/*.md', '**/*.mdx'],
+        exclude: [
+          '**/_*.{js,jsx,ts,tsx,md,mdx}',
+          '**/_*/**',
+          '**/*.test.{js,jsx,ts,tsx}',
+          '**/__tests__/**'
+        ],
+        postsPerPage: 12,
+        truncateMarker: /<!--\s*(truncate)\s*-->/,
+        showReadingTime: true,
+        onUntruncatedBlogPosts: 'ignore',
         editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
         rehypePlugins: [imageFetchPriorityRehypePlugin],
