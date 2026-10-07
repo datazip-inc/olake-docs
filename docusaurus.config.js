@@ -430,9 +430,9 @@ const config = {
         blogSidebarCount: 'ALL',
         blogSidebarTitle: 'Learn',
         routeBasePath: 'learn',
-        // Tags are shared with the blog (one vocabulary). Authors have their own file, learn/authors.yml,
-        // so the section lists only the people who write in it (a shared file would add an empty
-        // author page for every blog author).
+        // Authors and tags are shared with the blog: one list of people and one tag vocabulary, no copies.
+        // The plugin wrapper (src/plugins/blog-plugin.js) hides the authors who have no posts in /learn.
+        authorsMapPath: '../blog/authors.yml',
         tags: '../blog/tags.yml',
         include: ['**/*.md', '**/*.mdx'],
         exclude: [

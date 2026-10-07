@@ -87,8 +87,7 @@ olake-docs/
 │   └── YYYY-MM-DD-*.mdx # Blog post files
 │
 ├── learn/                 # Plain-language explainers (/learn/<slug>/)
-│   ├── authors.yml       # Authors of the explainers (tags come from blog/tags.yml)
-│   └── YYYY-MM-DD-*.mdx # Explainer files
+│   └── YYYY-MM-DD-*.mdx # Explainer files (authors and tags come from blog/authors.yml and blog/tags.yml)
 │
 ├── docs/                 # Main documentation
 │   ├── getting-started/ # Onboarding guides

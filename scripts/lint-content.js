@@ -26,7 +26,8 @@ const QUIET = args.includes('--quiet')
 const onlyPaths = args.filter((a) => !a.startsWith('--'))
 
 const POST_DIRS = ['blog', 'customer-stories', 'learn']
-// Tag definitions per post folder: learn shares the blog's tags.yml (see docusaurus.config.js)
+// Author and tag definitions per post folder: learn shares the blog's files (see docusaurus.config.js)
+const AUTHOR_FILES = { learn: 'blog/authors.yml' }
 const TAG_FILES = { learn: 'blog/tags.yml' }
 const DOC_DIRS = ['docs']
 const TITLE_MAX = 70
@@ -211,7 +212,7 @@ function lintMarkdown(file, kind) {
 
 function lintPosts() {
   for (const dir of POST_DIRS) {
-    const authors = readYaml(path.join(ROOT, dir, 'authors.yml'))
+    const authors = readYaml(path.join(ROOT, AUTHOR_FILES[dir] ?? `${dir}/authors.yml`))
     const tagsDef = readYaml(path.join(ROOT, TAG_FILES[dir] ?? `${dir}/tags.yml`))
     const slugs = new Map()
     for (const file of walk(path.join(ROOT, dir))) {
@@ -226,7 +227,7 @@ function lintPosts() {
       const as = Array.isArray(fm.authors) ? fm.authors : fm.authors ? [fm.authors] : []
       if (!as.length) add('error', file, 1, 'authors-missing', 'missing authors')
       for (const a of as) {
-        if (typeof a === 'string' && !(a in authors)) add('error', file, 1, 'author-unknown', `author "${a}" is not in ${dir}/authors.yml`)
+        if (typeof a === 'string' && !(a in authors)) add('error', file, 1, 'author-unknown', `author "${a}" is not in ${AUTHOR_FILES[dir] ?? `${dir}/authors.yml`}`)
       }
       // tags
       const tags = Array.isArray(fm.tags) ? fm.tags : []

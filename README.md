@@ -141,9 +141,8 @@ A card is stale when the SHA-256 of its source cover no longer matches `scripts/
 3. **Copy the front-matter** (metadata) from an existing post and update it.
 4. **Manage authors**
 
-   * `blog/` and `customer-stories/` have their own `authors.yml`; `learn/` has its own too.
-   * Add new authors here before referencing them in a post. A `learn/` post must use an author listed in `learn/authors.yml` (copy the entry from `blog/authors.yml`).
-   * `learn/` has no `tags.yml`: it uses `blog/tags.yml`, so a new tag is added there.
+   * `blog/` and `customer-stories/` have their own `authors.yml`. `learn/` has neither an `authors.yml` nor a `tags.yml`: it uses `blog/authors.yml` and `blog/tags.yml`, so add a new author or tag there.
+   * Add new authors here before referencing them in a post. `/learn/authors/` lists only the authors who have a post in `learn/`.
 5. **Append** `<BlogCTA/>` **as the final line** of every blog post.
 
 ---
