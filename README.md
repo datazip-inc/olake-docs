@@ -49,7 +49,7 @@ Stack: Docusaurus 3.10, React 19, Tailwind CSS 4, strict MDX 3.
    | Command | What it checks |
    | ------- | -------------- |
    | `npm run typecheck` | `tsc --noEmit` over the TypeScript sources |
-   | `npm run lint:content` | MDX and front matter rules for docs, blog and customer-stories files; details in 1.2. Errors fail the command only when you run it yourself. |
+   | `npm run lint:content` | MDX and front matter rules for docs, blog, customer-stories and learn files; details in 1.2. Errors fail the command only when you run it yourself. |
    | `npm run og-images -- --check` | Fails if a blog cover has no 1200x630 social card in `static/img/og/`, or the cover changed since the card was rendered. Writes nothing. Run it after adding a post or changing a cover. |
 
 #### 1.1 Design system pointers
@@ -129,9 +129,11 @@ A card is stale when the SHA-256 of its source cover no longer matches `scripts/
 
 ### 2. Adding a Blog Post
 
-| Directory | When to use              |
-| --------- | ------------------------ |
-| `/blog`   | OLake and Iceberg topics |
+| Directory           | When to use                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `/blog`             | OLake and Iceberg topics, comparisons, alternatives and pricing                                  |
+| `/customer-stories` | Case studies from teams that use OLake                                                           |
+| `/learn`            | Plain-language explainers (served at `/learn/<slug>/`); there is no separate `/compare` section |
 
 1. **Navigate** to the correct directory.
 2. **Create an MDX file**: `YYYY-MM-DD-blog-slug.mdx`.
@@ -139,8 +141,9 @@ A card is stale when the SHA-256 of its source cover no longer matches `scripts/
 3. **Copy the front-matter** (metadata) from an existing post and update it.
 4. **Manage authors**
 
-   * Each directory has its own `authors.yml`.
-   * Add new authors here before referencing them in a post.
+   * `blog/` and `customer-stories/` have their own `authors.yml`; `learn/` has its own too.
+   * Add new authors here before referencing them in a post. A `learn/` post must use an author listed in `learn/authors.yml` (copy the entry from `blog/authors.yml`).
+   * `learn/` has no `tags.yml`: it uses `blog/tags.yml`, so a new tag is added there.
 5. **Append** `<BlogCTA/>` **as the final line** of every blog post.
 
 ---
@@ -241,7 +244,7 @@ Breaking these has cost search traffic before. Run `npm run build` and `npm run 
 * **Titles.** The site title is `OLake`, so every `<title>` ends in ` | OLake` (docs too). Keep the rendered title at 60 characters or fewer, so the frontmatter title at about 52. If the visible H1 needs to be longer, add `seo_title: "..."` (about 52 characters) to the frontmatter: it replaces only `<title>`, `og:title` and `twitter:title`, and the H1 keeps `title`. Docs titles under 25 characters get their sidebar section appended automatically. Code: `src/theme/seo/helpers.ts`, `src/theme/DocItem/Metadata`, `src/theme/BlogPostPage`.
 * **Descriptions.** Every page needs its own `description` of 120 to 155 characters (max 160, min 100), unique across the site. Do not copy one post's description into another, and do not leave it truncated with "...". Files in `docs/shared` are snippets and have no frontmatter.
 * **Pages that must not be indexed** get `noindex, follow`: confirmation pages, archive pages, tag and author pagination, zero-post authors, `/search/`. The theme does this for the generated pages; add it yourself to any new thank-you or utility page. Keep them crawlable (no robots.txt block), otherwise Google never sees the tag.
-* **Taxonomy pages** (blog and customer-stories archive, authors, tags) get their title, description and H1 from the swizzled components in `src/theme` (`Blog/useBlogInstance.js`). Titles carry no post count (the count made SEO audits report "title changed" on every new post). A new blog instance must be added there, or its pages fall back to the "Blog" wording.
+* **Taxonomy pages** (blog, customer-stories and learn archive, authors, tags) get their title, description and H1 from the swizzled components in `src/theme` (`Blog/useBlogInstance.js`). Titles carry no post count (the count made SEO audits report "title changed" on every new post). A new blog instance must be added there, or its pages fall back to the "Blog" wording. `/learn/` is the third instance (`learn-blog`, folder `learn/`): its list page is in the sitemap, its archive, tag and author pages are not, and `/learn/page/N/` is `noindex, follow`. When adding a folder of posts, also update `POST_DIRS` in `scripts/lint-content.js`, `CONTENT_DIRS` in `scripts/generate-og-images.js` and the `@source` list in `src/css/custom.css`.
 * **Sitemap exclusions** live in the sitemap options of `docusaurus.config.js` (tags, authors, archive, search, `docs/shared`, confirmation pages, pagination). `docs/shared` is not built as pages at all.
 * **One `og:type`, one H1, one JSON-LD per schema.** Pages under `src/pages` get `og:type=website` from `src/theme/Layout`; posts emit `article`. Emit JSON-LD with `src/components/JsonLd`, not `<Head><script dangerouslySetInnerHTML>` (Helmet drops it).
 * **Images.** Keep every image under about 300 KB (WebP; no GIFs, use short muted looping video).
