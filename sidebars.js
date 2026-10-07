@@ -58,31 +58,10 @@ const docSidebar = {
       type: 'category',
       label: 'Sources',
       items: [
-        {
-          type: 'category',
-          label: 'PostgreSQL',
-          link: { type: 'doc', id: 'connectors/postgres/index' },
-          collapsed: true,
-          items: [
-            { type: 'doc', id: 'connectors/postgres/setup/aurora', label: 'AWS Aurora Postgres' },
-            { type: 'doc', id: 'connectors/postgres/setup/rds', label: 'AWS RDS Postgres' },
-            { type: 'doc', id: 'connectors/postgres/setup/local', label: 'Local Setup for Testing' },
-            { type: 'doc', id: 'connectors/postgres/setup/azure', label: 'Azure Database for PostgreSQL' },
-            { type: 'doc', id: 'connectors/postgres/setup/gcp', label: 'Google Cloud SQL for PostgreSQL' },
-            { type: 'doc', id: 'connectors/postgres/setup/generic', label: 'Generic PostgreSQL Server' },
-          ],
-        },
+        { type: 'doc', id: 'connectors/postgres/index', label: 'PostgreSQL' },
         { type: 'doc', id: 'connectors/mongodb/index', label: 'MongoDB' },
         { type: 'doc', id: 'connectors/mysql/index', label: 'MySQL' },
-        {
-          type: 'category',
-          label: 'Oracle',
-          link: { type: 'doc', id: 'connectors/oracle/index' },
-          collapsed: true,
-          items: [
-            { type: 'doc', id: 'connectors/oracle/setup/generic', label: 'Generic Oracle Setup' },
-          ],
-        },
+        { type: 'doc', id: 'connectors/oracle/index', label: 'Oracle' },
         { type: 'doc', id: 'connectors/kafka/index', label: 'Kafka' },
         { type: 'doc', id: 'connectors/db2/index', label: 'DB2 LUW' },
         { type: 'doc', id: 'connectors/s3/index', label: 'S3' },
@@ -118,8 +97,6 @@ const docSidebar = {
           label: 'Parquet Writer',
           items: [
             { type: 'doc', id: 'writers/parquet/config', label: 'Configuration' },
-            { type: 'doc', id: 'writers/parquet/gcs', label: 'Google Cloud Storage' },
-            { type: 'doc', id: 'writers/parquet/local', label: 'Local System' },
             { type: 'doc', id: 'writers/parquet/permission', label: 'IAM Permissions' },
             { type: 'doc', id: 'writers/parquet/partitioning', label: 'Partitioning' },
             { type: 'doc', id: 'writers/parquet/troubleshoot', label: 'Troubleshooting' },
