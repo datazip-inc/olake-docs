@@ -1,155 +1,94 @@
 import React from 'react'
-import { useHistory } from '@docusaurus/router'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '../../components/ui/pagination.tsx'
+import clsx from 'clsx'
+import Link from '@docusaurus/Link'
 
-export const BlogPagination = ({ metadata }) => {
-  const history = useHistory()
+/**
+ * Page numbers to show: the first and last page, the current page and its neighbours, with
+ * 'ellipsis' markers for the gaps. Up to 7 pages are listed in full.
+ */
+function pageList(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set([1, total, current - 1, current, current + 1])
+  if (current <= 3) [2, 3, 4].forEach((p) => pages.add(p))
+  if (current >= total - 2) [total - 3, total - 2, total - 1].forEach((p) => pages.add(p))
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  const out = []
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push('ellipsis')
+    out.push(p)
+  })
+  return out
+}
 
-  const getBasePath = () => {
-    const path = history.location.pathname
-    // Check if we're on /iceberg or /blog
-    if (path.includes('/iceberg')) {
-      return '/iceberg'
-    } else if (path.includes('/blog')) {
-      return '/blog'
-    }
-    // Default fallback
-    return '/blog'
-  }
+const Arrow = ({ dir }) => (
+  <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+    <path d={dir === 'prev' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
+  </svg>
+)
 
-  const handleParams = () => {
-    const path = history.location.pathname
-    const parts = path.split('/').filter((p) => p !== '')
+/**
+ * Numbered pagination for list pages, tag pages and author pages. Everything comes from the
+ * page metadata (permalink, page, totalPages), so it works the same in every blog instance
+ * and renders identically on the server and in the browser.
+ */
+export function BlogPagination({ metadata }) {
+  if (!metadata || !metadata.totalPages || metadata.totalPages <= 1) return null
 
-    // Check if the path contains 'page' keyword
-    const pageIndex = parts.indexOf('page')
-    if (pageIndex !== -1 && pageIndex < parts.length - 1) {
-      const pageNumber = parseInt(parts[pageIndex + 1], 10)
-      return !isNaN(pageNumber) && pageNumber > 0 ? pageNumber : 1
-    }
+  const { page, totalPages } = metadata
+  // The page-1 permalink of this list, e.g. /blog, /blog/tags/trino or /blog/authors/akshay
+  const base = (metadata.permalink || '/').replace(/\/page\/\d+\/?$/, '').replace(/\/$/, '')
+  const pagePath = (n) => (n === 1 ? base || '/' : `${base}/page/${n}`)
 
-    // Default to page 1 if no page number found
-    return 1
-  }
-
-  const page = handleParams()
-  const basePath = getBasePath()
-
-  const getPagePath = (pageNum) => {
-    return pageNum === 1 ? basePath : `${basePath}/page/${pageNum}`
-  }
-
-  const handlePageChange = (e, value) => {
-    e.preventDefault()
-    if (value === page) {
-      return
-    }
-    const newPagePath = getPagePath(value)
-    history.push(newPagePath)
-  }
-
-  // Generate array of page numbers - show current, prev, next, and last page
-  const generatePagination = (currentPage, totalPages) => {
-    const pages = []
-
-    // Ensure we have valid numbers
-    const current = parseInt(currentPage, 10)
-    const total = parseInt(totalPages, 10)
-
-    if (isNaN(current) || isNaN(total) || current < 1 || total < 1) {
-      return [1] // Return safe default
-    }
-
-    if (total <= 4) {
-      // If 4 or fewer pages, show all pages
-      for (let i = 1; i <= total; i++) {
-        pages.push(i)
-      }
-      return pages
-    }
-
-    // For page 1: show [1, 2, ..., last]
-    if (current === 1) {
-      pages.push(1, 2, 'ellipsis', total)
-      return pages
-    }
-
-    // For page 2: show [1, 2, 3, ..., last]
-    if (current === 2) {
-      pages.push(1, 2, 3, 'ellipsis', total)
-      return pages
-    }
-
-    // For last page: show [1, ..., prev, last]
-    if (current === total) {
-      pages.push(1, 'ellipsis', total - 1, total)
-      return pages
-    }
-
-    // For second to last page: show [1, ..., prev, second-last, last]
-    if (current === total - 1) {
-      pages.push(1, 'ellipsis', total - 2, total - 1, total)
-      return pages
-    }
-
-    // For middle pages: show [1, ..., prev, current, next, ..., last]
-    pages.push(1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total)
-    return pages
-  }
-
-  if (!metadata || !metadata.totalPages || metadata.totalPages <= 1) {
-    return null
-  }
-
-  const pages = generatePagination(page, metadata.totalPages)
-  const hasPrevious = page > 1
-  const hasNext = page < metadata.totalPages
+  const hasPrev = page > 1
+  const hasNext = page < totalPages
 
   return (
-    <Pagination className='mb-8 mt-8'>
-      <PaginationContent>
-        <PaginationItem>
-          <PaginationPrevious
-            href={hasPrevious ? getPagePath(page - 1) : undefined}
-            onClick={(e) => hasPrevious && handlePageChange(e, page - 1)}
-            className={!hasPrevious ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-          />
-        </PaginationItem>
+    <nav className='ob-pager' aria-label='Blog list page navigation'>
+      {hasPrev ? (
+        <Link to={pagePath(page - 1)} rel='prev' className='ob-pager__item ob-pager__step' aria-label='Previous page'>
+          <Arrow dir='prev' />
+          <span className='ob-pager__text'>Previous</span>
+        </Link>
+      ) : (
+        <span className='ob-pager__item ob-pager__step ob-pager__item--disabled' aria-hidden='true'>
+          <Arrow dir='prev' />
+          <span className='ob-pager__text'>Previous</span>
+        </span>
+      )}
 
-        {pages.map((pageNum, index) => (
-          <PaginationItem key={`${pageNum}-${index}`}>
-            {pageNum === 'ellipsis' ? (
-              <PaginationEllipsis />
+      <ul className='ob-pager__pages'>
+        {pageList(page, totalPages).map((p, i) => (
+          <li key={`${p}-${i}`}>
+            {p === 'ellipsis' ? (
+              <span className='ob-pager__gap' aria-hidden='true'>
+                …
+              </span>
             ) : (
-              <PaginationLink
-                href={getPagePath(pageNum)}
-                onClick={(e) => handlePageChange(e, pageNum)}
-                isActive={page === pageNum}
-                className='cursor-pointer'
+              <Link
+                to={pagePath(p)}
+                className={clsx('ob-pager__item', p === page && 'ob-pager__item--current')}
+                aria-current={p === page ? 'page' : undefined}
+                aria-label={`Page ${p}`}
               >
-                {pageNum}
-              </PaginationLink>
+                {p}
+              </Link>
             )}
-          </PaginationItem>
+          </li>
         ))}
+      </ul>
 
-        <PaginationItem>
-          <PaginationNext
-            href={hasNext ? getPagePath(page + 1) : undefined}
-            onClick={(e) => hasNext && handlePageChange(e, page + 1)}
-            className={!hasNext ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-          />
-        </PaginationItem>
-      </PaginationContent>
-    </Pagination>
+      {hasNext ? (
+        <Link to={pagePath(page + 1)} rel='next' className='ob-pager__item ob-pager__step' aria-label='Next page'>
+          <span className='ob-pager__text'>Next</span>
+          <Arrow dir='next' />
+        </Link>
+      ) : (
+        <span className='ob-pager__item ob-pager__step ob-pager__item--disabled' aria-hidden='true'>
+          <span className='ob-pager__text'>Next</span>
+          <Arrow dir='next' />
+        </span>
+      )}
+    </nav>
   )
 }
 

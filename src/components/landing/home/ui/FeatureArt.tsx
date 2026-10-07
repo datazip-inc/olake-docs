@@ -9,7 +9,7 @@ import type { FeatureArt as FeatureArtKind } from '@site/src/data/landing/home/f
  */
 
 const Shell = ({ children }: { children: React.ReactNode }) => (
-  <div className='flex h-[186px] items-center justify-center bg-[#ececec] px-[22px] lg:h-[240px]'>
+  <div className='flex h-[186px] items-center justify-center bg-olake-line px-[22px] lg:h-[240px]'>
     <div className='h-full w-full max-w-[420px] translate-y-[16px] overflow-hidden rounded-[8px] bg-[#fdfdfd] px-[16px] pt-[14px] shadow-[0_0_10px_0_rgba(0,0,0,0.15)]'>
       {children}
     </div>
@@ -18,19 +18,19 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
 
 const Ingestion = () => (
   <Shell>
-    <p className='text-[11px] text-[#202020]'>Running Ingestion</p>
-    <pre className='mt-[10px] whitespace-pre font-mono text-[10px] leading-[1.7] text-[#5d5d5d]'>
+    <p className='text-[11px] text-olake-ink'>Running Ingestion</p>
+    <pre className='mt-[10px] whitespace-pre font-mono text-[10px] leading-[1.7] text-olake-text-2'>
       {`# run it
 $ OLake sync
 orders      1,204,553 rows   00:41  ✓
 customers     318,090 rows   00:12  ✓`}
     </pre>
     <div className='mt-[14px] flex items-center justify-between text-[10px]'>
-      <span className='text-[#0029ce]'>Run Progress</span>
-      <span className='text-[#0029ce]'>57%</span>
+      <span className='text-olake-blue'>Run Progress</span>
+      <span className='text-olake-blue'>57%</span>
     </div>
-    <div className='mt-[6px] h-[5px] w-full overflow-hidden rounded-[3px] bg-[#ececec]'>
-      <div className='h-full w-[57%] rounded-[3px] bg-gradient-to-r from-[#1e3ae0] to-[#c8d2ff]' />
+    <div className='mt-[6px] h-[5px] w-full overflow-hidden rounded-[3px] bg-olake-line'>
+      <div className='h-full w-[57%] rounded-[3px] bg-linear-to-r from-[#1e3ae0] to-[#c8d2ff]' />
     </div>
   </Shell>
 )
@@ -49,22 +49,22 @@ const TREE: { depth: number; label: string; size?: string; active?: boolean }[] 
 
 const Lakehouse = () => (
   <Shell>
-    <p className='border-0 border-b border-solid border-[#ececec] pb-[10px] text-[11px] text-[#202020]'>
+    <p className='border-0 border-b border-solid border-olake-line pb-[10px] text-[11px] text-olake-ink'>
       s3://lake/warehouse
     </p>
-    <div className='mt-[8px] font-mono text-[9px] leading-[1.9] text-[#5d5d5d]'>
+    <div className='mt-[8px] font-mono text-[9px] leading-[1.9] text-olake-text-2'>
       {TREE.map((row) => (
         <div
           key={row.label}
           className={`flex items-center justify-between rounded-[3px] px-[4px] ${
-            row.active ? 'bg-[#f1f3ff] text-[#0029ce]' : ''
+            row.active ? 'bg-[#f1f3ff] text-olake-blue' : ''
           }`}
         >
           <span style={{ paddingLeft: `${row.depth * 12}px` }}>
             {row.depth > 0 ? '└─ ' : ''}
             {row.label}
           </span>
-          {row.size && <span className='text-[#a1a1a1]'>{row.size}</span>}
+          {row.size && <span className='text-olake-muted'>{row.size}</span>}
         </div>
       ))}
     </div>
@@ -73,29 +73,29 @@ const Lakehouse = () => (
 
 const Vpc = () => (
   <Shell>
-    <div className='mx-auto flex h-[20px] w-[180px] items-center gap-[6px] rounded-[4px] bg-[#ececec] px-[8px] text-[9px] text-[#202020]'>
+    <div className='mx-auto flex h-[20px] w-[180px] items-center gap-[6px] rounded-[4px] bg-olake-line px-[8px] text-[9px] text-olake-ink'>
       <span aria-hidden='true'>🔒</span>
       YOUR-VPC
-      <span className='ml-auto text-[#5d5d5d]'>APC SOUTH 1</span>
+      <span className='ml-auto text-olake-text-2'>APC SOUTH 1</span>
     </div>
     <div className='mt-[12px] rounded-[6px] border border-dashed border-[#d6d6d6] bg-[rgba(236,236,236,0.2)] px-[14px] py-[12px]'>
-      <div className='flex items-center gap-[8px] text-[10px] text-[#202020]'>
+      <div className='flex items-center gap-[8px] text-[10px] text-olake-ink'>
         <span className='inline-block h-[8px] w-[8px] rounded-full bg-[#1e3ae0]' />
         Postgress
       </div>
-      <p className='ml-[3px] border-0 border-l border-solid border-[#d6d6d6] pl-[14px] font-mono text-[9px] text-[#193ae6]'>
+      <p className='ml-[3px] border-0 border-l border-solid border-[#d6d6d6] pl-[14px] font-mono text-[9px] text-olake-blue'>
         res
       </p>
-      <div className='flex items-center gap-[8px] text-[10px] text-[#202020]'>
+      <div className='flex items-center gap-[8px] text-[10px] text-olake-ink'>
         <span className='inline-block h-[8px] w-[8px] rounded-full bg-[#1e3ae0]' />
         OLake
       </div>
-      <p className='ml-[3px] border-0 border-l border-solid border-[#d6d6d6] pl-[14px] font-mono text-[9px] text-[#193ae6]'>
+      <p className='ml-[3px] border-0 border-l border-solid border-[#d6d6d6] pl-[14px] font-mono text-[9px] text-olake-blue'>
         container
       </p>
-      <div className='mt-[6px] flex h-[20px] items-center gap-[8px] rounded-[4px] bg-[#ececec] px-[8px] text-[10px] text-[#202020]'>
+      <div className='mt-[6px] flex h-[20px] items-center gap-[8px] rounded-[4px] bg-olake-line px-[8px] text-[10px] text-olake-ink'>
         s3://lake
-        <span className='ml-auto font-mono text-[9px] text-[#193ae6]'>iceberg</span>
+        <span className='ml-auto font-mono text-[9px] text-olake-blue'>iceberg</span>
       </div>
     </div>
   </Shell>
@@ -103,9 +103,9 @@ const Vpc = () => (
 
 const Maintenance = () => (
   <Shell>
-    <div className='flex items-center justify-between text-[11px] text-[#202020]'>
+    <div className='flex items-center justify-between text-[11px] text-olake-ink'>
       <span>/order</span>
-      <span className='text-[#8a8a8a]'>last 90 days</span>
+      <span className='text-olake-muted'>last 90 days</span>
     </div>
     <svg viewBox='0 0 240 76' className='mt-[12px] h-[76px] w-full' aria-hidden='true'>
       <path
@@ -123,18 +123,18 @@ const Maintenance = () => (
     </svg>
     <div className='mt-[8px] grid grid-cols-2 gap-[10px] text-[9px]'>
       <div>
-        <p className='text-[#8a8a8a]'>P95 Query Time</p>
-        <p className='mt-[2px] text-[11px] text-[#202020]'>0.9s</p>
+        <p className='text-olake-muted'>P95 Query Time</p>
+        <p className='mt-[2px] text-[11px] text-olake-ink'>0.9s</p>
       </div>
       <div>
-        <p className='text-[#8a8a8a]'>Table Size</p>
-        <p className='mt-[2px] text-[11px] text-[#202020]'>12.4 TB</p>
+        <p className='text-olake-muted'>Table Size</p>
+        <p className='mt-[2px] text-[11px] text-olake-ink'>12.4 TB</p>
       </div>
     </div>
   </Shell>
 )
 
-const ART: Record<FeatureArtKind, () => JSX.Element> = {
+const ART: Record<FeatureArtKind, () => React.JSX.Element> = {
   ingestion: Ingestion,
   lakehouse: Lakehouse,
   vpc: Vpc,

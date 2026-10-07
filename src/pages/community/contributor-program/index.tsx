@@ -1,29 +1,31 @@
 // src/pages/community/contributor-program/index.tsx
 import React, { useEffect, useState } from 'react'
-import Layout from '@theme/Layout'
 import Head from '@docusaurus/Head'
+import { serializeJsonLd } from '@site/src/components/JsonLd'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
-import clsx from 'clsx'
 import Link from '@docusaurus/Link'
 import {
-  FaGithub,
-  FaHandsHelping,
-} from 'react-icons/fa'
-import { LuUnplug } from 'react-icons/lu'
-import { FaFeather, FaMagnifyingGlass } from 'react-icons/fa6'
-import { AiOutlineDollarCircle } from 'react-icons/ai'
-import { LiaCodeBranchSolid } from 'react-icons/lia'
-import { BsStars } from 'react-icons/bs'
-import { FaLinkedin, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+  PiGithubLogo,
+  PiHandshake,
+  PiPlugsConnected,
+  PiFeather,
+  PiBug,
+  PiCurrencyCircleDollar,
+  PiGitBranch,
+  PiSparkle,
+  PiLinkedinLogo,
+  PiX
+} from 'react-icons/pi'
 
-
-import Button from '../../../components/community/improved/Button'
-import PageHeader from '../../../components/community/improved/PageHeader'
-import SectionHeader from '../../../components/community/improved/SectionHeader'
-import FeatureCard from '../../../components/community/improved/FeatureCard'
-// import StatCard from '../../../components/community/improved/StatCard'
-import SectionLayout from '../../../components/community/SectionLayout'
+import Button from '@site/src/components/landing/ui/Button'
+import Card from '@site/src/components/landing/ui/Card'
+import Section from '@site/src/components/landing/ui/Section'
+import SectionHeading from '@site/src/components/landing/ui/SectionHeading'
+import CommunityPage from '@site/src/components/community/lakeside/CommunityPage'
+import PageHero from '@site/src/components/community/lakeside/PageHero'
+import { Chip, SubHeading, Tick } from '@site/src/components/community/lakeside/primitives'
+import { cn } from '@site/src/lib/utils'
 
 const ContributorProgramPage = () => {
   const { siteConfig } = useDocusaurusContext()
@@ -46,61 +48,63 @@ const ContributorProgramPage = () => {
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: 'OLake',
-    alternateName: 'Datazip, Inc. (OLake project)',
-    url: 'https://olake.io/',
-    logo: 'https://olake.io/img/logo/olake-blue.svg',
-    sameAs: [
+    'name': 'OLake',
+    'alternateName': 'Datazip, Inc. (OLake project)',
+    'url': 'https://olake.io/',
+    'logo': 'https://olake.io/img/logo/olake-blue.svg',
+    'sameAs': [
       'https://github.com/datazip-inc/olake',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
     ],
-    address: {
+    'address': {
       '@type': 'PostalAddress',
-      streetAddress: '16192 COASTAL HWY',
-      addressLocality: 'LEWES',
-      addressRegion: 'DE',
-      postalCode: '19958',
-      addressCountry: 'US'
+      'streetAddress': '16192 COASTAL HWY',
+      'addressLocality': 'LEWES',
+      'addressRegion': 'DE',
+      'postalCode': '19958',
+      'addressCountry': 'US'
     }
   }
 
   const websiteSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    url: 'https://olake.io/',
-    name: 'Fastest Open Source Data Replication Tool',
-    description:
+    'url': 'https://olake.io/',
+    'name': 'Fastest Open Source Data Replication Tool',
+    'description':
       'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
-    publisher: {
+    'publisher': {
       '@type': 'Organization',
-      name: 'OLake'
+      'name': 'OLake'
     },
-    potentialAction: {
+    'potentialAction': {
       '@type': 'SearchAction',
-      target: 'https://olake.io/search?q={search_term_string}',
+      'target': 'https://olake.io/search?q={search_term_string}',
       'query-input': 'required name=search_term_string'
     }
   }
 
   const contributionTypes = [
     {
-      icon: <LuUnplug />,
+      icon: <PiPlugsConnected />,
       title: 'Build New Connectors',
-      description: "Create connectors to expand OLake's ecosystem. We provide tools and support to make it easy.",
+      description:
+        "Create connectors to expand OLake's ecosystem. We provide tools and support to make it easy.",
       points: '30-50',
       difficulty: 'Intermediate'
     },
     {
-      icon: <FaFeather />,
+      icon: <PiFeather />,
       title: 'Write Documentation',
-      description: 'Improve guides, write tutorials, and help others learn with clear documentation.',
+      description:
+        'Improve guides, write tutorials, and help others learn with clear documentation.',
       points: '10-20',
       difficulty: 'Beginner'
     },
     {
-      icon: <FaMagnifyingGlass />,
+      icon: <PiBug />,
       title: 'Fix Bugs & Improve',
       description: 'Squash bugs, optimize performance, and enhance existing features.',
       points: '5-30',
@@ -110,22 +114,19 @@ const ContributorProgramPage = () => {
 
   const benefits = [
     {
-      icon: <AiOutlineDollarCircle />,
+      icon: <PiCurrencyCircleDollar />,
       title: 'Rewards & Recognition',
-      description: 'Get paid for select contributions and earn recognition in our community.',
-      highlight: true
+      description: 'Get paid for select contributions and earn recognition in our community.'
     },
     {
-      icon: <LiaCodeBranchSolid />,
+      icon: <PiGitBranch />,
       title: 'Learning & Growth',
-      description: 'Level up your skills, learn from experts, and grow your professional network.',
-      highlight: false
+      description: 'Level up your skills, learn from experts, and grow your professional network.'
     },
     {
-      icon: <BsStars />,
+      icon: <PiSparkle />,
       title: 'Early Access',
-      description: 'Get beta access to new features, tools, and participate in product decisions.',
-      highlight: false
+      description: 'Get beta access to new features, tools, and participate in product decisions.'
     }
   ]
 
@@ -133,26 +134,27 @@ const ContributorProgramPage = () => {
     {
       name: 'Bronze',
       points: '0-49',
-      benefits: ['OLake stickers', 'Community badge', 'Slack recognition'],
-      color: 'from-orange-400 to-orange-600'
+      benefits: ['OLake stickers', 'Community badge', 'Slack recognition']
     },
     {
       name: 'Silver',
       points: '50-149',
-      benefits: ['OLake t-shirt', 'Featured contributor', 'Beta access', 'Monthly swag'],
-      color: 'from-gray-400 to-gray-600'
+      benefits: ['OLake t-shirt', 'Featured contributor', 'Beta access', 'Monthly swag']
     },
     {
       name: 'Gold',
       points: '150-499',
-      benefits: ['Premium swag kit', 'Internships', 'Mentorship access', 'Cash rewards'],
-      color: 'from-yellow-400 to-yellow-600'
+      benefits: ['Premium swag kit', 'Internships', 'Mentorship access', 'Cash rewards']
     },
     {
       name: 'Platinum',
       points: '500+',
-      benefits: ['Chance to get hired', 'Executive mentorship', 'Project leadership', 'Maximum rewards'],
-      color: 'from-purple-400 to-purple-600'
+      benefits: [
+        'Chance to get hired',
+        'Executive mentorship',
+        'Project leadership',
+        'Maximum rewards'
+      ]
     }
   ]
 
@@ -160,104 +162,108 @@ const ContributorProgramPage = () => {
     {
       number: '01',
       title: 'Read the Guide',
-      description: 'Start by reading our contributing guide to understand the process and requirements.',
+      description:
+        'Start by reading our contributing guide to understand the process and requirements.',
       link: '/docs/community/contributing'
     },
     {
       number: '02',
       title: 'Join Slack',
-      description: 'Connect with other contributors in our dedicated Slack channel for support and guidance.',
-      link: 'https://olake.io/slack'
+      description:
+        'Connect with other contributors in our dedicated Slack channel for support and guidance.',
+      link: 'https://olake.io/slack/'
     },
     {
       number: '03',
       title: 'Pick an Issue',
-      description: 'Browse open issues labeled "good first issue" or "help wanted" to find your first contribution.',
+      description:
+        'Browse open issues labeled "good first issue" or "help wanted" to find your first contribution.',
       link: 'https://github.com/datazip-inc/olake/issues'
     },
     {
       number: '04',
       title: 'Start Contributing',
-      description: 'Submit your pull request and earn points. Our maintainers will review and provide feedback.',
+      description:
+        'Submit your pull request and earn points. Our maintainers will review and provide feedback.',
       link: 'https://github.com/datazip-inc/olake/pulls'
     }
   ]
 
   const linkedinPosts = [
-    { embedId: 'urn:li:share:7324402000287215616', contributor: 'Aditya SwayamSiddha' },
+    { embedId: 'urn:li:share:7324402000287215616', contributor: 'Aditya SwayamSiddha' }
   ]
 
   const howToGetStarted = {
     '@type': 'ItemList',
-    name: 'How to Get Started',
-    itemListElement: steps.map((step, index) => ({
+    'name': 'How to Get Started',
+    'itemListElement': steps.map((step, index) => ({
       '@type': 'ListItem',
-      position: index + 1,
-      name: step.title,
-      item: resolveUrl(step.link)
+      'position': index + 1,
+      'name': step.title,
+      'item': resolveUrl(step.link)
     }))
   }
 
   const rewardTiersList = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'Reward Tiers',
-    url: canonicalUrl,
-    itemListElement: rewardTiers.map((tier, index) => ({
+    'name': 'Reward Tiers',
+    'url': canonicalUrl,
+    'itemListElement': rewardTiers.map((tier, index) => ({
       '@type': 'ListItem',
-      position: index + 1,
-      name: `${tier.name} (${tier.points} points)`,
-      description: tier.benefits.join(', ')
+      'position': index + 1,
+      'name': `${tier.name} (${tier.points} points)`,
+      'description': tier.benefits.join(', ')
     }))
   }
 
   const contributorProgramPageSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    url: canonicalUrl,
-    name: 'OLake Contributor Program',
-    description:
+    'url': canonicalUrl,
+    'name': 'OLake Contributor Program',
+    'description':
       'Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.',
-    isPartOf: {
+    'isPartOf': {
       '@type': 'WebSite',
-      url: 'https://olake.io/',
-      name: 'OLake'
+      'url': 'https://olake.io/',
+      'name': 'OLake'
     },
-    publisher: {
+    'publisher': {
       '@type': 'Organization',
-      name: 'OLake',
-      url: 'https://olake.io/',
-      logo: {
+      'name': 'OLake',
+      'url': 'https://olake.io/',
+      'logo': {
         '@type': 'ImageObject',
-        url: 'https://olake.io/img/logo/olake-blue.svg',
-        width: 32,
-        height: 32
+        'url': 'https://olake.io/img/logo/olake-blue.svg',
+        'width': 32,
+        'height': 32
       }
     },
-    mainEntity: howToGetStarted
+    'mainEntity': howToGetStarted
   }
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: [
+    'itemListElement': [
       {
         '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: 'https://olake.io/'
+        'position': 1,
+        'name': 'Home',
+        'item': 'https://olake.io/'
       },
       {
         '@type': 'ListItem',
-        position: 2,
-        name: 'Community',
-        item: 'https://olake.io/community/'
+        'position': 2,
+        'name': 'Community',
+        'item': 'https://olake.io/community/'
       },
       {
         '@type': 'ListItem',
-        position: 3,
-        name: 'Contributor Program',
-        item: canonicalUrl
+        'position': 3,
+        'name': 'Contributor Program',
+        'item': canonicalUrl
       }
     ]
   }
@@ -274,321 +280,307 @@ const ContributorProgramPage = () => {
   const [showLinkedInPanel, setShowLinkedInPanel] = useState(false)
 
   useEffect(() => {
-  // Check if window is defined (for SSR)
-  if (typeof window !== 'undefined') {
-    // Set initial state based on screen width
-    const handleResize = () => {
-      if (window.innerWidth >= 768) { // md breakpoint
-        setShowLinkedInPanel(true)
-      } else {
-        setShowLinkedInPanel(false)
+    // Check if window is defined (for SSR)
+    if (typeof window !== 'undefined') {
+      // Set initial state based on screen width
+      const handleResize = () => {
+        if (window.innerWidth >= 768) {
+          // md breakpoint
+          setShowLinkedInPanel(true)
+        } else {
+          setShowLinkedInPanel(false)
+        }
       }
+
+      // Set initial state
+      handleResize()
+
+      // Add resize listener
+      window.addEventListener('resize', handleResize)
+
+      // Cleanup
+      return () => window.removeEventListener('resize', handleResize)
     }
-    
-    // Set initial state
-    handleResize()
-    
-    // Add resize listener
-    window.addEventListener('resize', handleResize)
-    
-    // Cleanup
-    return () => window.removeEventListener('resize', handleResize)
-  }
-}, [])
+  }, [])
+
+  const SEO_DESCRIPTION =
+    'Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.'
 
   return (
-    <Layout
+    <CommunityPage
       title='OLake Contributor Program'
-      description='Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.'
+      description={SEO_DESCRIPTION}
+      activePath='/community'
+      hero={
+        <PageHero
+          badge='OLake Contributor Program'
+          title='Join the Contributor Program'
+          description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 10+ contributors making a difference."
+          actions={
+            <>
+              <Button
+                href='https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22'
+                size='lg'
+                external
+              >
+                <PiHandshake aria-hidden='true' /> Start Now
+              </Button>
+              <Button href='/docs/community/contributing' variant='secondary' size='lg'>
+                Read Contributing Guide
+              </Button>
+            </>
+          }
+        />
+      }
     >
       <Head>
         <meta property='og:type' content='website' />
         <meta property='og:title' content='OLake Contributor Program' />
-        <meta property='og:description' content='Join the OLake Contributor Program. Get rewards, recognition, and help shape the future of data lakehouse technology.' />
+        <meta property='og:description' content={SEO_DESCRIPTION} />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
-        <meta property='og:image' content='https://olake.io/img/logo/olake-blue.webp' />
+        <meta property='og:image' content='https://olake.io/img/logo/olake-og-card.png' />
         {jsonLdSchemas.map((schema) => (
-          <script
-            key={schema.id}
-            type='application/ld+json'
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify(schema.data)
-            }}
-          />
+          <script key={schema.id} type='application/ld+json'>
+            {serializeJsonLd(schema.data)}
+          </script>
         ))}
       </Head>
-      {/* Hero Section */}
-      <PageHeader
-        title={
-          <>
-            Join the{' '}
-            <span className="bg-gradient-to-r from-[#193ae6] to-purple-600 bg-clip-text text-transparent">
-              Contributor
-            </span>{' '}
-            Program
-          </>
-        }
-        subtitle="OLake Contributor Program"
-        description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 10+ contributors making a difference."
-        cta={
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Button
-              href="https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22"
-              size="lg"
-              external
-            >
-              <FaHandsHelping className="mr-2" /> Start Now
-            </Button>
-            <Button
-              href="/docs/community/contributing"
-              variant="outline"
-              size="lg"
-            >
-              Read Contributing Guide
-            </Button>
-          </div>
-        }
-      />
 
       {/* Contribution Types Section */}
-      <SectionLayout className="py-20 bg-gradient-to-br from-gray-900 to-blue-950">
-        <SectionHeader
-          title={<span className="text-white">Contribute in Multiple Ways</span>}
-          subtitle="Choose how you want to contribute based on your skills and interests"
+      <Section flush className='pt-[8px]'>
+        <SectionHeading
+          title='Contribute in Multiple Ways'
+          body='Choose how you want to contribute based on your skills and interests'
+          align='center'
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {contributionTypes.map((type, index) => (
-            <div
-              key={index}
-              className="group relative bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/20 transition-all duration-300"
+        <ul className='mt-[28px] grid grid-cols-1 gap-[12px] lg:mt-[44px] lg:grid-cols-3 lg:gap-[16px]'>
+          {contributionTypes.map((type) => (
+            <Card
+              as='li'
+              key={type.title}
+              className='flex flex-col px-[20px] py-[24px] lg:px-[28px] lg:py-[32px]'
             >
-              <div className="text-5xl mb-6 text-blue-400">
+              <span className='block text-[26px] text-olake-ink' aria-hidden='true'>
                 {type.icon}
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-3">
-                {type.title}
-              </h3>
-              <p className="text-white/80 mb-6">
+              </span>
+              <h3 className='mt-[16px] text-[20px] font-normal text-olake-ink'>{type.title}</h3>
+              <p className='mt-[8px] grow text-[14px] leading-[1.6] text-olake-text-2'>
                 {type.description}
               </p>
-              <div className="flex justify-between items-center">
-                <span className="text-blue-300 font-semibold">
-                  {type.points} points
-                </span>
-                <span className="text-xs bg-white/20 px-3 py-1 rounded-full text-white/90">
-                  {type.difficulty}
-                </span>
+              <div className='mt-[20px] flex items-center justify-between gap-[12px]'>
+                <span className='text-[14px] text-olake-ink'>{type.points} points</span>
+                <Chip>{type.difficulty}</Chip>
               </div>
-            </div>
+            </Card>
           ))}
-        </div>
-      </SectionLayout>
+        </ul>
+      </Section>
 
       {/* Program Description */}
-      <SectionLayout className="py-20">
-        <div className="max-w-4xl mx-auto">
-          <SectionHeader
-            title="Program Overview"
-            subtitle="Empowering contributors to shape the future of data engineering"
-            align="center"
-          />
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 md:p-12 shadow-xl border border-gray-200 dark:border-gray-700">
-            <div className="space-y-8">
-              <div>
-                <h3 className="text-2xl font-bold text-[#193ae6] dark:text-blue-400 mb-4">
-                  What is the Contributor Program?
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                  The OLake Contributor Program is a community collaboration initiative designed to improve
-                  the quality and expand the ecosystem of OLake connectors. We sponsor various tasks around
-                  features, usability, and reliability while empowering both veteran contributors and newcomers
-                  to make meaningful contributions to the project.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="text-2xl font-bold text-[#193ae6] dark:text-blue-400 mb-4">
-                  How it Works
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
-                  Getting started is simple. After reviewing our contributing guide, explore the good first issues and Join our Slack community:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-600 dark:text-gray-400 ml-4">
-                  <li>Get direct support from maintainers</li>
-                  <li>Collaborate with other contributors</li>
-                  <li>Access exclusive resources and documentation</li>
-                  <li>Participate in contributor-only events</li>
-                  <li>Track your contributions and rewards</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </SectionLayout>
-
-      {/* Benefits Section */}
-      <SectionLayout className="py-20 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500">
-        <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 md:p-16 shadow-2xl">
-          <SectionHeader
-            title="Why Join the Program?"
-            subtitle="Unlock exclusive benefits while making a real impact"
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {benefits.map((benefit, index) => (
-              <FeatureCard
-                key={index}
-                icon={benefit.icon}
-                title={benefit.title}
-                description={benefit.description}
-                highlight={benefit.highlight}
-              />
-            ))}
-          </div>
-        </div>
-      </SectionLayout>
-
-      {/* Reward Tiers */}
-      <SectionLayout className="py-20">
-        <SectionHeader
-          title="Reward Tiers"
-          subtitle="Earn points with every contribution and unlock amazing rewards"
+      <Section>
+        <SectionHeading
+          title='Program Overview'
+          body='Empowering contributors to shape the future of data engineering'
+          align='center'
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {rewardTiers.map((tier, index) => (
-            <div
-              key={index}
-              className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
-            >
-              <div className={`absolute inset-0 bg-gradient-to-br ${tier.color} opacity-10 rounded-2xl`} />
-              <div className="relative z-10">
-                <h3 className={`text-2xl font-bold mb-2 bg-gradient-to-r ${tier.color} bg-clip-text text-transparent`}>
-                  {tier.name}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  {tier.points} points
-                </p>
-                <ul className="space-y-2">
-                  {tier.benefits.map((benefit, idx) => (
-                    <li key={idx} className="flex items-start">
-                      <span className="text-green-500 mr-2">✓</span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        <Card className='mx-auto mt-[28px] max-w-[860px] p-[24px] lg:mt-[44px] lg:p-[40px]'>
+          <div className='flex flex-col gap-[32px]'>
+            <div>
+              <SubHeading as='h3'>What is the Contributor Program?</SubHeading>
+              <p className='mt-[12px] text-[14px] leading-[1.65] text-olake-text-2 lg:text-[15px]'>
+                The OLake Contributor Program is a community collaboration initiative designed to
+                improve the quality and expand the ecosystem of OLake connectors. We sponsor various
+                tasks around features, usability, and reliability while empowering both veteran
+                contributors and newcomers to make meaningful contributions to the project.
+              </p>
             </div>
-          ))}
-        </div>
 
-        <div className="text-center mt-12">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <div>
+              <SubHeading as='h3'>How it Works</SubHeading>
+              <p className='mt-[12px] text-[14px] leading-[1.65] text-olake-text-2 lg:text-[15px]'>
+                Getting started is simple. After reviewing our contributing guide, explore the good
+                first issues and Join our Slack community:
+              </p>
+              <ul className='mt-[12px] ml-[20px] list-disc text-[14px] leading-[1.6] text-olake-text-2 marker:text-olake-muted lg:text-[15px] [&>li]:list-disc [&>li+li]:mt-[8px]'>
+                <li>Get direct support from maintainers</li>
+                <li>Collaborate with other contributors</li>
+                <li>Access exclusive resources and documentation</li>
+                <li>Participate in contributor-only events</li>
+                <li>Track your contributions and rewards</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+      </Section>
+
+      {/* Benefits Section */}
+      <Section>
+        <SectionHeading
+          title='Why Join the Program?'
+          body='Unlock exclusive benefits while making a real impact'
+          align='center'
+        />
+
+        <ul className='mt-[28px] grid grid-cols-1 gap-[12px] lg:mt-[44px] lg:grid-cols-3 lg:gap-[16px]'>
+          {benefits.map((benefit) => (
+            <Card
+              as='li'
+              key={benefit.title}
+              className='px-[20px] py-[24px] lg:px-[28px] lg:py-[32px]'
+            >
+              <span className='block text-[26px] text-olake-ink' aria-hidden='true'>
+                {benefit.icon}
+              </span>
+              <h3 className='mt-[16px] text-[20px] font-normal text-olake-ink'>{benefit.title}</h3>
+              <p className='mt-[8px] text-[14px] leading-[1.6] text-olake-text-2'>
+                {benefit.description}
+              </p>
+            </Card>
+          ))}
+        </ul>
+      </Section>
+
+      {/* Reward Tiers */}
+      <Section>
+        <SectionHeading
+          title='Reward Tiers'
+          body='Earn points with every contribution and unlock amazing rewards'
+          align='center'
+        />
+
+        <ul className='mt-[28px] grid grid-cols-1 gap-[12px] md:grid-cols-2 lg:mt-[44px] lg:grid-cols-4 lg:gap-[16px]'>
+          {rewardTiers.map((tier) => (
+            <Card as='li' key={tier.name} className='px-[20px] py-[24px]'>
+              <h3 className='text-[20px] font-normal text-olake-ink'>{tier.name}</h3>
+              <p className='mt-[4px] text-[14px] text-olake-muted'>{tier.points} points</p>
+              <ul className='mt-[18px] flex flex-col gap-[10px]'>
+                {tier.benefits.map((benefit) => (
+                  <li
+                    key={benefit}
+                    className='flex items-start gap-[10px] text-[14px] leading-[1.5] text-olake-text-2'
+                  >
+                    <Tick />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </ul>
+
+        <div className='mt-[28px] flex flex-col items-center gap-[14px] text-center lg:mt-[40px]'>
+          <p className='text-[14px] text-olake-text-2'>
             See where you stand among our amazing contributors
           </p>
-          <Button href="/community/contributors" variant="outline">
+          <Button href='/community/contributors' variant='secondary' size='lg'>
             View Current Contributor Rankings →
           </Button>
         </div>
-      </SectionLayout>
+      </Section>
 
       {/* How to Get Started */}
-      <SectionLayout className="py-20 bg-gray-50 dark:bg-gray-900/50">
-        <SectionHeader
-          title="How to Get Started"
-          subtitle="Join the program in 4 simple steps"
+      <Section>
+        <SectionHeading
+          title='How to Get Started'
+          body='Join the program in 4 simple steps'
+          align='center'
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {steps.map((step, index) => (
-            <div key={index} className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#193ae6] to-purple-600 text-white text-2xl font-bold mb-4">
-                {step.number}
-              </div>
-              <h3 className="text-xl font-bold mb-2">{step.title}</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+        <ol className='mt-[28px] grid grid-cols-1 gap-[12px] md:grid-cols-2 lg:mt-[44px] lg:grid-cols-4 lg:gap-[16px]'>
+          {steps.map((step) => (
+            <Card as='li' key={step.number} className='flex flex-col px-[20px] py-[24px]'>
+              <span className='text-[13px] text-olake-muted'>{step.number}</span>
+              <h3 className='mt-[10px] text-[18px] font-normal text-olake-ink'>{step.title}</h3>
+              <p className='mt-[8px] grow text-[14px] leading-[1.6] text-olake-text-2'>
                 {step.description}
               </p>
               <Link
                 to={step.link}
-                className="text-[#193ae6] dark:text-blue-400 hover:underline font-medium"
+                className='mt-[16px] text-[14px] text-olake-blue hover:text-olake-blue-hover'
               >
                 Learn more →
               </Link>
-            </div>
+            </Card>
           ))}
-        </div>
-      </SectionLayout>
+        </ol>
+      </Section>
 
       {/* CTA Section */}
-      <SectionLayout className="py-20 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-gray-800 dark:to-gray-900">
-        <div className="text-center space-y-6">
-          <h2 className="text-4xl md:text-5xl font-bold">
+      <Section flush className='pb-[56px] lg:pb-[96px]'>
+        <div className='rounded-[16px] border border-solid border-olake-line bg-olake-surface px-[24px] py-[36px] text-left lg:px-[64px] lg:py-[56px]'>
+          <h2 className='max-w-[560px] text-[26px] leading-[1.15] font-normal tracking-[-0.01em] text-olake-ink lg:text-[40px]'>
             Ready to Make an Impact?
           </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Join hundreds of contributors who are shaping the future of data engineering.
-            Your contributions matter, and we can't wait to have you on board!
+          <p className='mt-[14px] max-w-[640px] text-[13px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
+            Join hundreds of contributors who are shaping the future of data engineering. Your
+            contributions matter, and we can&apos;t wait to have you on board!
           </p>
-          <div className="flex flex-wrap gap-4 justify-center pt-4">
+          <div className='mt-[22px] flex flex-wrap gap-[8px] lg:mt-[28px] lg:gap-[12px]'>
             <Button
-              href="https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22"
-              size="lg"
+              href='https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22'
+              size='lg'
               external
             >
-              <FaHandsHelping className="mr-2" /> Start Now
+              <PiHandshake aria-hidden='true' /> Start Now
             </Button>
             <Button
-              href="https://github.com/datazip-inc/olake"
-              variant="outline"
-              size="lg"
+              href='https://github.com/datazip-inc/olake'
+              variant='secondary'
+              size='lg'
               external
             >
-              <FaGithub className="mr-2" /> Explore on GitHub
+              <PiGithubLogo aria-hidden='true' /> Explore on GitHub
             </Button>
           </div>
         </div>
-      </SectionLayout>
+      </Section>
 
-
-
-      <div className={clsx(
-        "fixed right-0 top-24 z-40 transition-transform duration-300",
-        "hidden md:block", // Hide on mobile completely
-        showLinkedInPanel ? "translate-x-0" : "translate-x-full"
-      )}>
+      {/* Contributor Spotlights: side panel on desktop, modal on mobile */}
+      <div
+        className={cn(
+          'fixed top-24 right-0 z-40 transition-transform duration-300',
+          'hidden md:block', // Hide on mobile completely
+          showLinkedInPanel ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
         <button
+          type='button'
           onClick={() => setShowLinkedInPanel(!showLinkedInPanel)}
-          className="absolute -left-12 top-8 bg-[#0077B5] border-none text-white p-3 rounded-l-lg shadow-lg hover:bg-[#005885] transition-colors"
-          aria-label={showLinkedInPanel ? "Close LinkedIn feed" : "Open LinkedIn feed"}
+          className='absolute top-[32px] -left-[48px] flex h-[48px] w-[48px] cursor-pointer items-center justify-center rounded-l-[12px] border border-r-0 border-solid border-olake-line bg-olake-surface text-[24px] text-[#0077b5] shadow-[var(--olake-shadow-menu)]'
+          aria-label={showLinkedInPanel ? 'Close LinkedIn feed' : 'Open LinkedIn feed'}
         >
-          <FaLinkedin className="w-6 h-6" />
+          <PiLinkedinLogo aria-hidden='true' />
         </button>
 
-        <div className="w-[400px] h-[calc(100vh-8rem)] bg-white dark:bg-gray-800 shadow-2xl rounded-l-lg overflow-hidden">
-          <div className="p-4 bg-[#0077B5] text-white">
-            <h3 className="font-bold text-lg">Contributor Spotlights</h3>
-            <p className="text-sm opacity-90 mt-1">Success stories from our community</p>
+        <div className='h-[calc(100vh-8rem)] w-[400px] overflow-hidden rounded-l-[16px] border border-r-0 border-solid border-olake-line bg-olake-surface shadow-[var(--olake-shadow-menu)]'>
+          <div className='border-0 border-b border-solid border-olake-line px-[20px] py-[16px]'>
+            <h3 className='text-[16px] font-normal text-olake-ink'>Contributor Spotlights</h3>
+            <p className='mt-[2px] text-[13px] text-olake-muted'>
+              Success stories from our community
+            </p>
           </div>
-          <div className="overflow-y-auto h-[calc(100%-5rem)] p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+          <div className='flex h-[calc(100%-5rem)] flex-col gap-[16px] overflow-y-auto p-[16px]'>
             {linkedinPosts.map((post, index) => (
-              <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-0">
+              <div
+                key={post.embedId}
+                className='border-0 border-b border-solid border-olake-line pb-[16px] last:border-0'
+              >
                 <iframe
                   src={`https://www.linkedin.com/embed/feed/update/${post.embedId}`}
-                  height="400"
-                  width="100%"
-                  frameBorder="0"
+                  height='400'
+                  width='100%'
+                  frameBorder='0'
                   allowFullScreen
                   title={`Contributor Story ${index + 1}`}
-                  className="rounded"
-                  loading="lazy" // Lazy load for performance
+                  className='block rounded-[8px]'
+                  loading='lazy' // Lazy load for performance
                 />
                 {post.contributor && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 text-center">
+                  <p className='mt-[8px] text-center text-[13px] text-olake-muted'>
                     - {post.contributor}
                   </p>
                 )}
@@ -600,41 +592,50 @@ const ContributorProgramPage = () => {
 
       {/* Mobile-only floating button */}
       <button
+        type='button'
         onClick={() => setShowLinkedInPanel(!showLinkedInPanel)}
-        className="fixed bottom-6 border-none right-6 z-40 bg-[#0077B5] text-white p-4 rounded-full shadow-lg md:hidden"
-        aria-label="View contributor stories"
+        className='fixed right-[24px] bottom-[24px] z-40 flex h-[48px] w-[48px] cursor-pointer items-center justify-center rounded-full border border-solid border-olake-line bg-olake-surface text-[24px] text-[#0077b5] shadow-[var(--olake-shadow-menu)] md:hidden'
+        aria-label='View contributor stories'
       >
-        <FaLinkedin className="w-6 h-6"  />
+        <PiLinkedinLogo aria-hidden='true' />
       </button>
 
       {/* Mobile LinkedIn Modal */}
       {showLinkedInPanel && (
-        <div className="fixed inset-0 z-50 bg-black/50 md:hidden" onClick={() => setShowLinkedInPanel(false)}>
+        <div
+          className='fixed inset-0 z-50 bg-black/40 md:hidden'
+          onClick={() => setShowLinkedInPanel(false)}
+        >
           <div
-            className="fixed inset-x-4 bottom-4 top-20 bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden"
+            className='fixed inset-x-[16px] top-[80px] bottom-[16px] overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface'
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 bg-[#0077B5] text-white flex justify-between items-center">
-              <h3 className="font-bold text-lg">Contributor Spotlights</h3>
+            <div className='flex items-center justify-between border-0 border-b border-solid border-olake-line px-[16px] py-[12px]'>
+              <h3 className='text-[16px] font-normal text-olake-ink'>Contributor Spotlights</h3>
               <button
+                type='button'
                 onClick={() => setShowLinkedInPanel(false)}
-                className="bg-[#104663] text-white hover:bg-white/20 p-2 rounded border-none "
+                className='flex h-[32px] w-[32px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-olake-btn-border bg-olake-surface text-[16px] text-olake-btn-secondary'
+                aria-label='Close'
               >
-                ✕
+                <PiX aria-hidden='true' />
               </button>
             </div>
-            <div className="overflow-y-auto h-[calc(100%-4rem)] p-4 space-y-4">
+            <div className='flex h-[calc(100%-4rem)] flex-col gap-[16px] overflow-y-auto p-[16px]'>
               {linkedinPosts.map((post, index) => (
-                <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-0">
+                <div
+                  key={post.embedId}
+                  className='border-0 border-b border-solid border-olake-line pb-[16px] last:border-0'
+                >
                   <iframe
                     src={`https://www.linkedin.com/embed/feed/update/${post.embedId}`}
-                    height="350"
-                    width="100%"
-                    frameBorder="0"
+                    height='350'
+                    width='100%'
+                    frameBorder='0'
                     allowFullScreen
                     title={`Contributor Story ${index + 1}`}
-                    className="rounded"
-                    loading="lazy"
+                    className='block rounded-[8px]'
+                    loading='lazy'
                   />
                 </div>
               ))}
@@ -642,8 +643,7 @@ const ContributorProgramPage = () => {
           </div>
         </div>
       )}
-
-    </Layout>
+    </CommunityPage>
   )
 }
 

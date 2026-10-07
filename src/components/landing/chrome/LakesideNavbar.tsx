@@ -1,15 +1,28 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from '@docusaurus/Link'
-import { PiGithubLogo, PiSlackLogo } from 'react-icons/pi'
+import { useLocation } from '@docusaurus/router'
+import {
+  PiArrowRightBold,
+  PiArrowUpRight,
+  PiBookOpenText,
+  PiGithubLogo,
+  PiSlackLogo,
+  PiStackBold,
+  PiUsersThree,
+  PiChatsCircle
+} from 'react-icons/pi'
 import { cn } from '@site/src/lib/utils'
 import useGetReleases from '@site/src/hooks/useGetReleases'
+import Button from '../ui/Button'
 import {
   LAKESIDE_NAV,
   LAKESIDE_CTA,
   LAKESIDE_GITHUB,
   LAKESIDE_SLACK,
   type LakesideNavEntry,
-  type LakesideNavLink
+  type LakesideNavLink,
+  type MegaColumn,
+  type MegaMenu
 } from './navItems'
 
 /** 4231 -> "4.2k", matching the design's "1.4k+" pill. */
@@ -63,26 +76,208 @@ const Burger = ({ open }: { open: boolean }) => (
 const NavAnchor = ({
   link,
   className,
-  children
+  children,
+  onClick
 }: {
   link: LakesideNavLink
   className?: string
   children?: React.ReactNode
+  onClick?: () => void
 }) =>
   link.external ? (
-    <a href={link.href} target='_blank' rel='noopener noreferrer' className={className}>
+    <a href={link.href} target='_blank' rel='noopener noreferrer' className={className} onClick={onClick}>
       {children ?? link.label}
     </a>
   ) : (
-    <Link to={link.href} className={className}>
+    <Link to={link.href} className={className} onClick={onClick}>
       {children ?? link.label}
     </Link>
   )
+
+/** Whether the current path belongs to a nav entry (its own href or one of its children). */
+function entryIsActive(entry: LakesideNavEntry, pathname: string): boolean {
+  const norm = (p: string) => (p.length > 1 ? p.replace(/\/$/, '') : p)
+  const path = norm(pathname)
+  const hit = (href: string) => {
+    const h = norm(href)
+    return h === '/' ? path === '/' : path === h || path.startsWith(`${h}/`)
+  }
+  if (entry.href && hit(entry.href)) return true
+  return !!entry.items?.some((item) => hit(item.href))
+}
+
+const MEGA_ICON: Partial<Record<MegaColumn['icon'], ReactNode>> = {
+  learn: <PiBookOpenText size={18} aria-hidden='true' />,
+  customers: <PiUsersThree size={18} aria-hidden='true' />,
+  community: <PiChatsCircle size={18} aria-hidden='true' />
+}
+
+/**
+ * Product tile: the OLake mark on the brand blue with a small badge that says which product it is
+ * (an arrow for OLake Go's replication, stacked layers for OLake Fusion's table maintenance).
+ */
+function ProductTile({ product }: { product: 'go' | 'fusion' }) {
+  const Glyph = product === 'go' ? PiArrowRightBold : PiStackBold
+  return (
+    <span
+      aria-hidden='true'
+      className='relative flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] bg-olake-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]'
+    >
+      <img src='/img/landing/shared/olake-mark-small.svg' alt='' width={22} height={22} />
+      <span className='absolute -bottom-[5px] -right-[5px] flex h-[16px] w-[16px] items-center justify-center rounded-full border-[1.5px] border-solid border-olake-blue bg-olake-surface text-olake-blue dark:border-olake-blue-on-dark dark:text-olake-blue-on-dark'>
+        <Glyph size={10} />
+      </span>
+    </span>
+  )
+}
+
+const BAND_ICON: Record<MegaMenu['band']['icon'], ReactNode> = {
+  slack: <PiSlackLogo size={16} aria-hidden='true' />,
+  github: <PiGithubLogo size={16} aria-hidden='true' />,
+  arrow: <PiArrowUpRight size={16} aria-hidden='true' />
+}
+
+/** Wide panel under the pill: featured card, link columns, help band. */
+/** Icon or product tile, title and subtitle of a mega menu column. `linked` adds the hover arrow. */
+function ColumnHeader({ col, linked = false }: { col: MegaColumn; linked?: boolean }) {
+  return (
+    <>
+      {col.icon === 'go' || col.icon === 'fusion' ? (
+        <ProductTile product={col.icon} />
+      ) : (
+        <span className='flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[8px] bg-olake-surface-muted text-olake-ink'>
+          {MEGA_ICON[col.icon]}
+        </span>
+      )}
+      <span>
+        <span className='flex items-center gap-[4px] text-[14px] font-medium leading-[1.3] text-olake-ink group-hover:text-olake-blue dark:group-hover:text-olake-blue-on-dark'>
+          {col.title}
+          {linked && (
+            <PiArrowUpRight
+              size={13}
+              aria-hidden='true'
+              className='opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100'
+            />
+          )}
+        </span>
+        <span className='block text-[13px] leading-[1.4] text-olake-muted'>{col.subtitle}</span>
+      </span>
+    </>
+  )
+}
+
+function MegaPanel({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => void }) {
+  return (
+    <div className='overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface shadow-[var(--olake-shadow-menu)]'>
+      <div
+        className={cn(
+          'grid gap-[8px] p-[8px]',
+          mega.feature && 'grid-cols-[232px_1fr]'
+        )}
+      >
+        {mega.feature && (
+          <div className='lk-mega-feature flex flex-col justify-between rounded-[12px] p-[20px]'>
+          <div>
+            {mega.feature.eyebrow && (
+              <span className='text-[12px] font-medium uppercase tracking-[0.06em] text-olake-on-blue/80'>{mega.feature.eyebrow}</span>
+            )}
+            <p className='mb-0 mt-[8px] text-[20px] leading-[1.25] text-olake-on-blue'>{mega.feature.title}</p>
+            {mega.feature.text && (
+              <p className='mb-0 mt-[8px] text-[14px] leading-[1.5] text-olake-on-blue/85'>{mega.feature.text}</p>
+            )}
+          </div>
+          <NavAnchor
+            link={mega.feature.cta}
+            onClick={onNavigate}
+            className='mt-[24px] inline-flex items-center gap-[6px] text-[14px] font-medium text-olake-on-blue hover:text-white'
+          >
+            {mega.feature.cta.label}
+            <PiArrowUpRight size={14} aria-hidden='true' />
+          </NavAnchor>
+        </div>
+        )}
+        <div
+          className={cn(
+            'grid px-[12px] pb-[8px] pt-[12px]',
+            mega.columns.length === 2 ? 'grid-cols-2' : 'grid-cols-3',
+            !mega.feature && 'px-[16px] pt-[16px]'
+          )}
+        >
+          {mega.columns.map((col, i) => (
+            <div
+              key={col.title}
+              className={cn(
+                'px-[12px]',
+                i > 0 && 'border-0 border-l border-solid border-olake-line'
+              )}
+            >
+              <div className='mb-[8px] border-0 border-b border-solid border-olake-line pb-[12px]'>
+                {col.href ? (
+                  <NavAnchor
+                    link={{ label: col.title, href: col.href }}
+                    onClick={onNavigate}
+                    className='group -m-[6px] flex items-start gap-[10px] rounded-[10px] p-[6px] no-underline transition-colors hover:bg-olake-blue-tint hover:no-underline'
+                  >
+                    <ColumnHeader col={col} linked />
+                  </NavAnchor>
+                ) : (
+                  <div className='flex items-start gap-[10px]'>
+                    <ColumnHeader col={col} />
+                  </div>
+                )}
+              </div>
+              <ul className='m-0 list-none p-0'>
+                {col.links.map((link) => (
+                  <li key={link.href} className='m-0 p-0'>
+                    <NavAnchor
+                      link={link}
+                      onClick={onNavigate}
+                      className='block rounded-[8px] px-[8px] py-[7px] text-[14px] text-olake-text transition-colors hover:bg-olake-blue-tint hover:text-olake-blue'
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className='flex items-center justify-between gap-[16px] border-0 border-t border-solid border-olake-line bg-olake-surface-alt px-[24px] py-[14px]'>
+        <div>
+          <span className='block text-[14px] font-medium text-olake-ink'>{mega.band.title}</span>
+          <span className='block text-[13px] text-olake-muted'>{mega.band.text}</span>
+        </div>
+        <NavAnchor
+          link={mega.band.cta}
+          onClick={onNavigate}
+          className='inline-flex h-[34px] shrink-0 items-center gap-[6px] rounded-[8px] border border-solid border-olake-btn-border bg-olake-surface px-[12px] text-[13px] font-medium text-olake-btn-secondary transition-colors hover:bg-olake-surface-alt hover:text-olake-ink'
+        >
+          {BAND_ICON[mega.band.icon]}
+          {mega.band.cta.label}
+        </NavAnchor>
+      </div>
+    </div>
+  )
+}
 
 /** A desktop entry: a plain link, or a label that opens a dropdown panel. */
 function DesktopEntry({ entry, active }: { entry: LakesideNavEntry; active: boolean }) {
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Hover intent: the panel opens at once and closes 140ms after the pointer leaves, so moving
+  // diagonally toward it (or across the gap) never makes it flicker shut.
+  const openNow = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+  const closeSoon = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setOpen(false), 140)
+  }
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -98,7 +293,7 @@ function DesktopEntry({ entry, active }: { entry: LakesideNavEntry; active: bool
     }
   }, [open])
 
-  const tone = active ? 'text-[#202020]' : 'text-[#9b9b9b] hover:text-[#202020]'
+  const tone = active ? 'text-olake-ink' : 'text-olake-muted hover:text-olake-ink'
 
   if (!entry.items) {
     return (
@@ -111,9 +306,9 @@ function DesktopEntry({ entry, active }: { entry: LakesideNavEntry; active: bool
   return (
     <div
       ref={wrap}
-      className='relative'
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      className={entry.mega ? undefined : 'relative'}
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
     >
       <button
         type='button'
@@ -128,38 +323,111 @@ function DesktopEntry({ entry, active }: { entry: LakesideNavEntry; active: bool
         {entry.label}
         <Chevron />
       </button>
-      {open && (
-        <div className='absolute left-0 top-full z-20 pt-[10px]'>
-          <div className='min-w-[204px] rounded-[12px] border border-solid border-[#ececec] bg-white p-[6px] shadow-[0_12px_30px_-12px_rgba(16,24,64,0.24)]'>
+      {/* Always mounted (crawlable); fades and rises in, visibility flips after the fade out */}
+      <div
+        className={cn(
+          'absolute top-full z-20 pt-[10px] transition-[opacity,transform,visibility] duration-[160ms] ease-[var(--olake-ease-out)] motion-reduce:transition-none',
+          entry.mega ? 'inset-x-0' : 'left-0',
+          open ? 'visible translate-y-0 opacity-100' : 'invisible -translate-y-[4px] opacity-0'
+        )}
+      >
+        {entry.mega ? (
+          <div className='lk-mega'><MegaPanel mega={entry.mega} onNavigate={() => setOpen(false)} /></div>
+        ) : (
+          <div className='min-w-[204px] rounded-[12px] border border-solid border-olake-line bg-olake-surface p-[6px] shadow-[var(--olake-shadow-menu)]'>
             {entry.items.map((item) => (
               <NavAnchor
                 key={item.href}
                 link={item}
-                className='block rounded-[8px] px-[12px] py-[9px] text-[14px] text-[#393939] transition-colors hover:bg-[#f5f6fa] hover:text-[#0029ce]'
+                onClick={() => setOpen(false)}
+                className='block rounded-[8px] px-[12px] py-[9px] text-[14px] text-olake-text transition-colors hover:bg-olake-blue-tint hover:text-olake-blue'
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
 
-export interface LakesideNavbarProps {
-  /** Route the navbar should mark as current, e.g. "/". */
-  activePath?: string
+/**
+ * The pill is the page's "Main" navigation landmark. The bar variant already sits inside the
+ * theme's own `<nav aria-label='Main'>` (Navbar/Layout), so a second nav there would nest two
+ * landmarks with the same name; it renders a plain div instead.
+ */
+function NavLandmark({
+  isBar,
+  className,
+  children
+}: {
+  isBar: boolean
+  className: string
+  children: ReactNode
+}) {
+  return isBar ? (
+    <div className={`olake-nav-card ${className}`}>{children}</div>
+  ) : (
+    <nav aria-label='Main' className={className}>
+      {children}
+    </nav>
+  )
 }
 
-export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps) {
+export interface LakesideNavbarProps {
+  /** Route the navbar should mark as current, e.g. "/". Defaults to the live location in the bar variant. */
+  activePath?: string
+  /**
+   * `pill` is the floating card used over the landing hero. `bar` is the full-width sticky bar the
+   * theme renders on docs, blog and every other page (inside Docusaurus' `.navbar` wrapper).
+   */
+  variant?: 'pill' | 'bar'
+  /** Extra controls before the CTA in the bar variant: search and the color-mode toggle. */
+  trailing?: ReactNode
+  /** Bar variant: the burger drives Docusaurus' mobile sidebar (it also carries the docs menu). */
+  mobileSidebar?: { shown: boolean; toggle: () => void }
+}
+
+export default function LakesideNavbar({
+  activePath,
+  variant = 'pill',
+  trailing,
+  mobileSidebar
+}: LakesideNavbarProps) {
   const { stargazersCount } = useGetReleases()
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [ownDrawerOpen, setOwnDrawerOpen] = useState(false)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const { pathname } = useLocation()
+  const isBar = variant === 'bar'
+  const currentPath = activePath ?? pathname
+
+  const drawerOpen = mobileSidebar ? mobileSidebar.shown : ownDrawerOpen
+  const setDrawerOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    if (mobileSidebar) mobileSidebar.toggle()
+    else setOwnDrawerOpen(next)
+  }
+  // The theme's sidebar renders its own menu; only the pill keeps an in-component drawer.
+  const showOwnDrawer = !mobileSidebar && drawerOpen
+  // Docusaurus keeps the docs sidebar in the burger drawer up to 1279px, so the themed navbar keeps
+  // the burger until xl even though the links already show from lg.
+  const burgerCls = isBar ? 'xl:hidden' : 'lg:hidden'
+  const wideFlex = 'hidden lg:flex'
 
   return (
-    <header className='sticky top-0 z-40 w-full px-[16px] pt-[16px] lg:px-[24px] lg:pt-[26px]'>
-      <nav
-        aria-label='Main'
-        className='relative z-40 mx-auto flex h-[52px] w-full max-w-[1016px] items-center justify-between rounded-[16px] bg-white px-[16px] shadow-[0_8px_24px_-16px_rgba(16,24,64,0.35)] lg:h-[56px] lg:px-[24px]'
+    <header
+      className={cn(
+        'w-full px-[16px] lg:px-[24px]',
+        isBar
+          ? 'olake-bar pb-[12px] pt-[16px] lg:pt-[20px]'
+          : 'sticky top-0 z-40 pt-[16px] lg:pt-[26px]'
+      )}
+    >
+      <NavLandmark
+        isBar={isBar}
+        className={cn(
+          'relative z-40 mx-auto flex w-full items-center justify-between bg-olake-surface px-[16px]',
+          'h-[52px] max-w-[1016px] rounded-[16px] shadow-[var(--olake-shadow-nav)] lg:h-[56px] lg:px-[24px]',
+          isBar && 'border border-solid border-olake-line'
+        )}
       >
         <div className='flex items-center gap-2 lg:gap-7'>
           <button
@@ -167,24 +435,24 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
             aria-label={drawerOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={drawerOpen}
             onClick={() => setDrawerOpen((v) => !v)}
-            className='flex cursor-pointer items-center border-none bg-transparent p-0 text-[#202020] lg:hidden'
+            className={cn('flex cursor-pointer items-center border-none bg-transparent p-0 text-olake-ink', burgerCls)}
             style={{ margin: 0, padding: 0, minWidth: '20px', width: '20px', height: '20px' }}
           >
             <Burger open={drawerOpen} />
           </button>
-          <Link 
-            to='/' 
-            className='text-[16px] font-medium text-[#0029ce] leading-none'
+          <Link
+            to='/'
+            className='text-[16px] font-medium text-olake-blue leading-none dark:text-olake-blue-on-dark'
             style={{ margin: 0, padding: 0 }}
           >
             OLake
           </Link>
-          <div className='hidden items-center gap-[24px] lg:flex'>
-            {LAKESIDE_NAV.map((entry) => (
+          <div className={cn('items-center gap-[24px]', wideFlex)}>
+            {LAKESIDE_NAV.filter((entry) => !entry.mobileOnly).map((entry) => (
               <DesktopEntry
                 key={entry.label}
                 entry={entry}
-                active={!!entry.href && entry.href === activePath}
+                active={entryIsActive(entry, currentPath)}
               />
             ))}
           </div>
@@ -194,7 +462,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
           <Link
             to={LAKESIDE_SLACK.href}
             aria-label={LAKESIDE_SLACK.label}
-            className='hidden items-center text-[#202020] transition-colors hover:text-[#0029ce] lg:flex'
+            className={cn('items-center text-olake-ink transition-colors hover:text-olake-blue', wideFlex)}
           >
             <SlackMark />
           </Link>
@@ -202,30 +470,28 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
             href={LAKESIDE_GITHUB.href}
             target='_blank'
             rel='noopener noreferrer'
-            className='hidden items-center gap-[6px] text-[13px] text-[#717171] transition-colors hover:text-[#202020] lg:flex'
+            className={cn('items-center gap-[6px] text-[13px] text-olake-text-2 transition-colors hover:text-olake-ink', wideFlex)}
             aria-label={`OLake on GitHub, ${formatStars(stargazersCount)} stars`}
           >
             <GithubMark />
             <span>{formatStars(stargazersCount)}</span>
             <StarMark />
           </a>
-          <Link
-            to={LAKESIDE_CTA.href}
-            className='inline-flex h-[34px] items-center rounded-[8px] border border-solid border-[rgba(150,171,254,0.6)] bg-[#0029ce] px-[14px] text-[13px] font-medium text-[#e7e7e0] shadow-[0_2px_2px_0_rgba(16,24,64,0.14)] transition-all hover:bg-[#0021a3] hover:text-white'
-          >
+          {isBar && trailing}
+          <Button href={LAKESIDE_CTA.href} size='sm'>
             {LAKESIDE_CTA.label}
-          </Link>
+          </Button>
         </div>
-      </nav>
+      </NavLandmark>
 
-      {drawerOpen && (
+      {showOwnDrawer && (
         <>
           <div 
-            className='fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden' 
+            className='lk-backdrop fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden' 
             onClick={() => setDrawerOpen(false)} 
             aria-hidden='true'
           />
-          <div className='absolute left-[16px] right-[16px] top-[76px] z-40 mx-auto max-w-[1016px] rounded-[16px] border border-solid border-[#ececec] bg-white p-[10px] shadow-[0_16px_40px_-20px_rgba(16,24,64,0.4)] lg:hidden'>
+          <div className='lk-drawer absolute left-[16px] right-[16px] top-[76px] z-40 mx-auto max-w-[1016px] rounded-[16px] border border-solid border-olake-line bg-olake-surface p-[10px] shadow-[var(--olake-shadow-card-hover)] lg:hidden'>
             {LAKESIDE_NAV.map((entry) =>
             entry.items ? (
               <div key={entry.label}>
@@ -233,7 +499,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
                   type='button'
                   aria-expanded={openGroup === entry.label}
                   onClick={() => setOpenGroup((g) => (g === entry.label ? null : entry.label))}
-                  className='flex w-full cursor-pointer items-center justify-between border-none bg-transparent px-[12px] py-[11px] text-left text-[15px] text-[#202020]'
+                  className='flex w-full cursor-pointer items-center justify-between border-none bg-transparent px-[12px] py-[11px] text-left text-[15px] text-olake-ink'
                 >
                   {entry.label}
                   <Chevron />
@@ -244,7 +510,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
                       <NavAnchor
                         key={item.href}
                         link={item}
-                        className='block px-[12px] py-[9px] text-[14px] text-[#5d5d5d]'
+                        className='block px-[12px] py-[9px] text-[14px] text-olake-text-2'
                       />
                     ))}
                   </div>
@@ -254,18 +520,18 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
               <Link
                 key={entry.label}
                 to={entry.href!}
-                className='block px-[12px] py-[11px] text-[15px] text-[#202020]'
+                className='block px-[12px] py-[11px] text-[15px] text-olake-ink'
               >
                 {entry.label}
               </Link>
             )
           )}
-          <div className='mt-[6px] flex items-center gap-[10px] border-0 border-t border-solid border-[#ececec] px-[12px] pt-[12px]'>
+          <div className='mt-[6px] flex items-center gap-[10px] border-0 border-t border-solid border-olake-line px-[12px] pt-[12px]'>
             <a
               href={LAKESIDE_GITHUB.href}
               target='_blank'
               rel='noopener noreferrer'
-              className='inline-flex h-[34px] items-center gap-[6px] rounded-[8px] border border-solid border-[#bfbfbf] px-[12px] text-[13px] text-[#717171]'
+              className='inline-flex h-[34px] items-center gap-[6px] rounded-[8px] border border-solid border-olake-btn-border px-[12px] text-[13px] text-olake-text-2 transition-colors hover:bg-olake-surface-alt'
             >
               <GithubMark />
               {formatStars(stargazersCount)}
@@ -273,7 +539,7 @@ export default function LakesideNavbar({ activePath = '/' }: LakesideNavbarProps
             <Link
               to={LAKESIDE_SLACK.href}
               aria-label={LAKESIDE_SLACK.label}
-              className='inline-flex h-[34px] items-center justify-center rounded-[8px] border border-solid border-[#bfbfbf] px-[10px] text-[#717171]'
+              className='inline-flex h-[34px] items-center justify-center rounded-[8px] border border-solid border-olake-btn-border px-[10px] text-olake-text-2 transition-colors hover:bg-olake-surface-alt'
             >
               <SlackMark />
             </Link>

@@ -1,6 +1,7 @@
 import React from 'react'
 import Head from '@docusaurus/Head'
 
+import { serializeJsonLd } from '@site/src/components/JsonLd'
 export interface JsonLdSchema {
   id: string
   data: Record<string, unknown>
@@ -20,12 +21,8 @@ interface LandingSeoProps {
  * Shared SEO head block for the three landing pages, following the pattern
  * already used by src/pages/index.jsx and other pages in this repo.
  *
- * Note: as of this port, `<script type="application/ld+json"
- * dangerouslySetInnerHTML>` inside `<Head>` renders nothing in this site's
- * production build (verified with a minimal repro — pre-existing on
- * `master`, not introduced here; `about-us.jsx`'s identical block has the
- * same issue). Kept for consistency with the rest of the site and so it
- * starts working the moment that separate bug is fixed.
+ * The JSON-LD is passed as a string child via serializeJsonLd(). The earlier
+ * `<script dangerouslySetInnerHTML>` form rendered nothing inside `<Head>`.
  */
 export default function LandingSeo({
   title,
@@ -49,7 +46,7 @@ export default function LandingSeo({
       <meta property='og:site_name' content='OLake' />
       <meta property='og:locale' content='en_US' />
       <meta property='og:image' content={ogImage} />
-      <meta property='og:image:type' content='image/webp' />
+      <meta property='og:image:type' content='image/png' />
       <meta property='og:image:width' content='1200' />
       <meta property='og:image:height' content='630' />
 
@@ -59,11 +56,7 @@ export default function LandingSeo({
       <meta name='twitter:image' content={ogImage} />
 
       {jsonLdSchemas.map((schema) => (
-        <script
-          key={schema.id}
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema.data) }}
-        />
+        <script key={schema.id} type='application/ld+json'>{serializeJsonLd(schema.data)}</script>
       ))}
     </Head>
   )
