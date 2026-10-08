@@ -1,0 +1,250 @@
+---
+slug: etl-pipelines
+title: "ETL Pipelines: What They Are and How They Work (2026)"
+description: "ETL pipelines explained in plain words: the three steps, a worked example, where they break, ETL vs ELT, and when to pick each. Sourced and dated."
+tags: [etl, data-pipeline-tools, data-ingestion, thought-leadership]
+authors: [priyansh]
+image: /img/blog/cover/etl-pipelines-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+import quiz from '@site/src/data/quizzes/etl-pipelines.json';
+
+![ETL pipeline cover showing sources flowing through a transform step into a warehouse or data lake](/img/blog/cover/etl-pipelines-cover.webp)
+
+ETL (extract, transform, load) pipelines are easy to describe and easy to get wrong. An ETL pipeline is an automated process that extracts data from your source systems, transforms it (cleans and reshapes it), and loads it into a destination such as a data warehouse or data lake. In ELT (extract, load, transform) the same reshaping happens after the data lands instead of before.
+
+Facts below come from linked vendor, project and reference pages, read on October 1, 2026. We did not build or run a pipeline for this guide, and the one worked example uses invented rows. Several of the pages are from companies that sell cloud services or data tools, so their claims are reported as their claims and we have not tested them.
+
+<TLDR title='Key takeaways'>
+
+- **ETL** stands for extract, transform, load. IBM [describes it](https://www.ibm.com/think/topics/etl) as a data integration process that combines, cleans and organizes data from several sources and loads it into a warehouse or other target.
+- An ETL pipeline is the automated, repeatable version of that process. It's one kind of data pipeline, not the only kind.
+- The three steps don't always run in strict order. [Microsoft says](https://learn.microsoft.com/en-us/azure/architecture/data-guide/relational-data/etl) they often run in parallel to save time.
+- Our read: pipeline trouble often comes from reruns and changes, not from the three steps themselves. A retried load can write the same rows twice unless it's built to be safe to repeat.
+- ETL isn't dead. Microsoft and AWS list cases where each of ETL and ELT fits.
+
+</TLDR>
+
+## What is an ETL pipeline, in plain words?
+
+Picture a restaurant chain that wants one report on yesterday's sales. The orders sit in a database, the refunds sit in a spreadsheet, and the delivery sales come from an app. Somebody has to collect all three, fix the mismatches, and put the result in one place.
+
+An ETL pipeline automates that job, so nobody repeats it by hand each morning.
+
+First it extracts (copies) the data from each source. Then it transforms (cleans, reshapes and combines) that data. Last, it loads (writes) the result into a destination where people can query it.
+
+[AWS defines ETL](https://aws.amazon.com/what-is/etl/) as combining data from multiple sources into a large, central repository called a data warehouse, using business rules to clean and organize it first. Other sources widen the target a bit. [Google Cloud](https://cloud.google.com/learn/what-is-etl) also names a database, a data store or a data lake as destinations.
+
+Two ideas hide inside the word "pipeline". The process is automated, so it runs on a schedule or a trigger. And it's repeatable, so the same steps run again and again on fresh data.
+
+## The three steps of an ETL pipeline
+
+### Extract: copy the data out
+
+Extraction pulls records out of the source. Sources can be databases, files, web services (APIs) and event streams. Wikipedia's [ETL article](https://en.wikipedia.org/wiki/Extract,_transform,_load) adds that extraction usually includes a validation check, and that rows which fail the rules should ideally be rejected and reported back so someone can correct them.
+
+The hard part isn't copying. It's deciding what to copy each time.
+
+One common design is a first run that copies everything, which is called a full load. Later runs then copy only what's new or changed, which is called an incremental load. We'll get to how that works in a minute.
+
+### Transform: clean and reshape
+
+This is the step that makes ETL, well, ETL. Microsoft lists the usual operations as filtering, sorting, aggregating, joining, cleaning, deduplicating and validating data. In its description, the transformation applies business rules, using a specialised engine, often with staging tables that temporarily hold the data while it is processed.
+
+Google Cloud says extracted data is first loaded into a staging area, then cleaned and put into a common format, which typically means removing duplicate, incomplete or obviously wrong records.
+
+International Business Machines (IBM) adds one reason people still pick ETL. It says ETL can mask sensitive data while it's still in transit, before it reaches the destination. That matters if you'd rather not have private columns land anywhere they shouldn't, but it is IBM's claim and we did not test it.
+
+### Load: write it to the destination
+
+Loading writes the prepared data to its final home. That can be a data warehouse (a database built for reports and analysis), a data lake (cheap storage for files in many formats) or a regular database. [Estuary's guide](https://estuary.dev/blog/what-is-an-etl-pipeline/) notes that loads can be full (replace everything) or incremental (add or update only what changed).
+
+Microsoft says the three phases often overlap, so don't picture a strict assembly line. While data is still being extracted, a transformation can already work on what has arrived. Loading can start on prepared data too, instead of waiting for extraction to finish.
+
+## What surrounds the three steps
+
+A daily pipeline also needs something to schedule it and something to watch it.
+
+Microsoft splits the scheduling side into two ideas. Control flow decides the order of tasks, and a task can't start until the one before it has finished with a success, failure or completion result. Data flow is the movement and reshaping of the data inside one task.
+
+On the tooling side, [Estuary's guide](https://estuary.dev/blog/what-is-an-etl-pipeline/) names Apache Airflow, Dagster and Prefect as orchestrators, the programs that run the steps on a schedule. [Stripe's guide](https://stripe.com/resources/more/etl-pipeline) says to monitor job runtimes, row counts, error rates and freshness, and to set alerts for failures.
+
+## A worked illustration with invented rows
+
+This example is made up. The orders, amounts and dates are invented, and nobody ran it as a test. It only shows how the three steps and the counts fit together.
+
+Say a shop keeps orders in a table called `raw_orders`. Each row has an order number, an amount in cents, a status, a customer email and a last-updated time. The goal is a clean `sales` table the finance team can trust.
+
+An earlier run already loaded order 090 into it, so `sales` starts with one row.
+
+| order_id | amount_cents | status | email | updated_at |
+|---|---|---|---|---|
+| 090 | 3000 | paid | old@example.com | 2026-09-12 09:00 |
+| 101 | 2599 | paid | ana@example.com | 2026-09-30 10:02 |
+| 102 | 1000 | test | qa@example.com | 2026-09-30 11:15 |
+| 103 | 4500 | paid | raj@example.com | 2026-09-30 18:40 |
+
+Now say the last run finished at midnight on September 30. The pipeline remembers that time, and that remembered point is called a watermark. Here's each step.
+
+**Extract.** Read only the rows updated after the watermark. That skips order 090, which an earlier run already handled, so three rows are extracted: 101, 102 and 103.
+
+**Transform.** Reject the test order (102), turn cents into a dollar amount, and leave the email column behind so it never reaches the destination. One row is rejected and two pass.
+
+**Load.** Write the two passing rows into `sales` with an upsert. That's just "insert this row, or update it if the order number already exists".
+
+| Count | Rows | Which ones |
+|---|---|---|
+| Extracted | 3 | 101, 102, 103 |
+| Rejected by the transform | 1 | 102 (test order) |
+| Loaded into `sales` | 2 | 101 at 25.99, 103 at 45.00 |
+
+After the run, `sales` holds three rows: the old 090 plus the new 101 and 103.
+
+Now run the same window a second time. Because the load is an upsert, 101 and 103 are updated in place and `sales` still holds the same three rows. A plain insert could add them again.
+
+That repeat-safety is the idea behind the "where pipelines break" section. Two gaps show up even in this tiny case.
+
+First, a filter only decides what gets loaded. If order 101 is later changed to a test order, the next run extracts it and rejects it, so the old 101 row stays in `sales`. Removing it would take a separate delete or flag step.
+
+Second, think about when the remembered time moves forward. If it jumps to the end of the day before the load finishes and the load then fails, 101 and 103 are skipped on the next run. So the sensible order is to move it only after the load succeeds.
+
+Both points, and the counts above, are our reasoning from this invented example, not claims from a source. The counts rule is also specific to it: each row comes out once or is rejected. Joins and aggregations change row counts in other ways.
+
+## How pipelines pick up changes
+
+That watermark is the simplest way to run incremental loads. Microsoft's [Azure Data Factory docs](https://learn.microsoft.com/en-us/azure/data-factory/tutorial-incremental-copy-overview) describe a watermark as a column that holds the last updated time or an incrementing key. A delta load then copies the data between an old watermark and a new one.
+
+Here's the catch: a watermark needs a column that reliably moves forward.
+
+If a table has no such column, or someone forgets to update it, rows get missed. The query only sees rows that still exist, so it can't show you a row that was deleted. Our read: when deletes matter, the pipeline needs a different method.
+
+The same Microsoft page lists other methods. Change Tracking is a lightweight SQL Server feature that identifies inserted, updated or deleted data. For files, it describes filtering by last-modified date, and warns that scanning huge numbers of files to copy only a few is still slow.
+
+There's also a fuller approach that reads the database's own change log.
+
+## Three ways to build one (and what each costs you)
+
+Estuary's guide names three common routes. One caveat: Estuary sells a pipeline product, so treat its framing as one vendor's view.
+
+| Route | What it looks like | Strength | The catch |
+|---|---|---|---|
+| Code you write | Python with libraries such as pandas or SQLAlchemy, run by an orchestrator such as Airflow | Full control over every rule | You own retries, reruns and alerts yourself |
+| Managed platform | Built-in connectors, scheduling and schema change handling | Estuary says it is faster to stand up and has less to maintain (not tested by us) | You depend on what its connectors support, and you pay the vendor's price, so ask for both in writing |
+| Warehouse SQL | Raw data loaded first, then dbt-style models inside the warehouse | Raw data stays available, and analysts can edit the models | This is ELT, not ETL, and it needs a strong destination |
+
+Estuary says production needs four things beyond the three steps: a staging area, a scheduler, incremental loads and validation. Its validation list: schema checks, null thresholds and row-count reconciliation, which means comparing how many rows left the source with how many arrived.
+
+A cheap check is a row-count comparison after each load. Our read: when each row either passes or is rejected, compare extracted against rejected plus loaded (3 = 1 + 2 in the illustration). Comparing source rows to loaded rows would raise a false alarm whenever the transform drops something on purpose.
+
+## Where ETL pipelines break (and why it's rarely the three steps)
+
+Our read of the sources below: trouble usually starts outside the three steps, in reruns, late data, changing sources and silent errors. Four of these are worth knowing before you build or buy.
+
+**A rerun writes duplicates.** Orchestrators retry failed tasks. That's their job, and it's also where the trouble starts.
+
+The [Apache Airflow best practices](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html) say a task should produce the same outcome on every re-run. On top of that, they say you shouldn't use a plain insert during a re-run because it might lead to duplicate rows. The advice is to use an upsert instead.
+
+![Apache Airflow best practices page, Creating a task section, with the INSERT, partition and now() re-run rules](/img/blog/2026/10/airflow-best-practices-idempotent.webp)
+
+*Apache Airflow best practices, "Creating a task", October 2026.*
+
+That page also says to read and write in a specific partition, and never to read "the latest available data" in a task. Someone may update the input between re-runs, and then you get different outputs. It also warns against using the current time (`now()`) inside a task for critical computation, since that gives a different result on each run.
+
+![Diagram: a retried INSERT adds duplicate rows, while a retried UPSERT on one partition gives the same result](/img/blog/2026/10/etl-pipelines-rerun.webp)
+
+A task that gives the same result when run twice is called idempotent (a fancy word for "safe to repeat"). Microsoft uses the same word and says to design parallel work around partition boundaries such as date, tenant or shard key, to avoid write conflicts and allow idempotent retries.
+
+**Half-finished results.** The Airflow page says to treat tasks like transactions in a database, so a task never leaves incomplete results behind. Its example: don't leave incomplete data in file or object storage at the end of a task. Nobody wants to find half a file at 9 a.m.
+
+**Late or out-of-order data.** For streaming pipelines, Microsoft recommends checkpointing for at-least-once processing and idempotent transformations to handle duplicates. It also recommends watermarking for late-arriving events and out-of-order processing, and dead letter queues (a holding place) for messages that can't be processed.
+
+That streaming "watermarking" is a different idea from the remembered time in the worked illustration. The first deals with events that show up late. The second marks where the last batch stopped.
+
+**Delay by design.** Estuary says traditional batch processing is straightforward to implement but introduces delay by design. That suits a nightly report, less so fraud checks.
+
+## What people use ETL pipelines for
+
+Qlik lists data migration from legacy systems, centralizing data into one source of truth, enriching data by combining platforms, supporting privacy rules and preparing data sets for analytics. Stripe's guide adds examples built on joined data, such as marketing analytics that joins ad platforms, web data and customer records, and fraud detection that pulls together transaction, login and device data.
+
+## ETL pipeline vs data pipeline: not the same thing
+
+A data pipeline is the bigger idea: any automated movement of data from one place to another. [IBM lists four common types](https://www.ibm.com/think/topics/data-pipeline): batch, streaming, data integration and cloud-native.
+
+An ETL pipeline is a data pipeline that includes a transform step before loading. Not every data pipeline does that. [Qlik](https://www.qlik.com/us/etl/etl-pipeline) says a data pipeline may transform after loading (ELT) or not transform at all.
+
+[Informatica](https://www.informatica.com/resources/articles/what-is-etl-pipeline.html) says ETL pipelines run in batches while data pipelines work in real time. Google Cloud says streaming ETL pipelines now exist alongside batch ones, and IBM calls ETL with streaming technology "streaming ETL".
+
+So batch versus real time is a choice you make. It's not what separates ETL from other pipelines.
+
+## ETL vs ELT: which order fits you?
+
+ELT means extract, load, transform. The only difference, per Microsoft, is where the transformation happens. In ELT it runs inside the destination, using that system's own processing power instead of a separate engine.
+
+Microsoft's conditions are the clearest we found.
+
+| Choose ETL when | Choose ELT when |
+|---|---|
+| You need to move heavy transformations off a constrained target system | The target is a modern warehouse or lakehouse with elastic compute |
+| Complex business rules need a specialised transformation engine | You need to keep raw data for exploring or for future schema changes |
+| Regulatory or compliance rules require curated staging audits before loading | The transformation benefits from the target's native capabilities |
+
+Each side has limits. Microsoft says ELT only works well when the target is powerful enough to transform the data efficiently. IBM says ELT can lower upfront cost, but unpredictable data volumes can cause unexpected costs later, and unstructured data can take time to format inside the target.
+
+AWS says in its ETL vs ELT comparison that the two may be used together for complex analytics that use multiple data formats from varied sources. One more term you'll hear: a lakehouse is a data lake that adds table features such as reliable updates, so it can serve as an ELT target.
+
+## Two neighbours: reverse ETL and streaming
+
+People often mix these two up with ETL. Microsoft describes reverse ETL as moving transformed, modeled data from analytical systems such as a warehouse back into operational tools such as a customer relationship management (CRM) system, a marketing tool or a support system. It still follows extract, transform and load, only in the other direction.
+
+Microsoft contrasts real-time streaming with ETL and ELT, which it describes as operating on datasets in scheduled batches. Streaming instead processes data as it arrives, through a message broker or event hub and a stream processor. It suits cases where low latency is critical, such as fraud detection or live dashboards.
+
+Some sources use the phrase "streaming ETL", so how often a pipeline runs is a separate question from where the transformation happens.
+
+## So which should you pick?
+
+| Your situation | Likely fit | Why, and the catch |
+|---|---|---|
+| Nightly finance report, small data, rules must be audited | ETL | Microsoft lists audit-before-load as an ETL case. The pipeline needs its own engine and care. |
+| Cloud warehouse with plenty of compute, many analysts | ELT | Raw data stays available. IBM warns that cost can grow if volumes jump. |
+| Need results as events happen | Streaming | Microsoft lists extra reliability work, such as checkpoints and idempotent design. |
+| Pushing warehouse results into a CRM | Reverse ETL | Moves data the opposite way (Microsoft). |
+| Table with no reliable change column | Full reload or change log | A watermark needs a change column and cannot see deletes. |
+
+## A checklist before you trust a pipeline
+
+Run these questions on a pipeline you've inherited, or on a tool you're about to buy. Each one maps to a failure described above.
+
+- Does it copy everything once and then only changes, or work another way? How does it know what changed?
+- Can it see deletes, or only new and updated rows?
+- What happens if a run fails halfway? Can it be rerun without duplicates?
+- Where does raw data sit, and who can read it? Are sensitive columns masked before loading?
+- Who is alerted when a run fails or loads zero rows?
+- What does a late-arriving row do to yesterday's numbers?
+
+If a vendor can't answer these in its docs, the answer is "not published". Ask before you sign, and treat any latency, uptime, "no maintenance" or savings claim as unverified until you see it in the docs or in a test you ran.
+
+For an alert rule, here is our read of the illustration above. Alert when a run fails, when extracted does not equal rejected plus loaded, or when a run loads zero rows on a day you expect changes.
+
+## Conclusion
+
+An ETL pipeline is three steps wrapped in automation. What decides whether one is any good is how it finds changes, how it handles a failed run, and how fast someone learns that something broke.
+
+Go with ETL when you need to reshape or mask data before it lands, or when audit rules ask for it. Pick ELT when your destination is strong and you want to keep the raw data around. Plenty of teams end up using both.
+
+Last reviewed October 2026.
+
+<Quiz {...quiz} />
+
+## FAQs
+
+<Faq showHeading={false} data={[
+{question:"Q1. What is an ETL pipeline?", answer:"It's an automated process that copies data from your source systems, cleans and reshapes it, and loads it into a place built for analysis, such as a data warehouse. It runs on a schedule or a trigger, so nobody has to move the data by hand."},
+{question:"Q2. What does ETL stand for?", answer:"Extract, transform, load. Extract means copy from the source, transform means clean and reshape, and load means write to the destination. For a bit of history, IBM says the process was introduced in the 1970s and later became the main method for data warehousing projects."},
+{question:"Q3. What is the difference between an ETL pipeline and a data pipeline?", answer:"A data pipeline is any automated movement of data. An ETL pipeline is one kind, the kind that transforms data before loading it. Other kinds load first and transform later (ELT), stream data as it arrives, or simply copy data without changing it."},
+{question:"Q4. Is ETL batch or real time?", answer:"Not only batch. Batch is the traditional style, but Google Cloud says streaming ETL pipelines now exist, and IBM uses the term streaming ETL. Microsoft also notes that the three steps often run in parallel rather than one after another."},
+{question:"Q5. What is the difference between ETL and ELT?", answer:"It comes down to where the transformation happens. In ETL it runs before loading, in a separate engine. In ELT the raw data is loaded first and transformed inside the destination. Microsoft says that location is the only difference between them."},
+{question:"Q6. Is ETL outdated?", answer:"Not according to the sources we read. IBM says ETL remains popular because it works with legacy systems, can improve data quality and can mask sensitive data in transit. Microsoft and AWS also list cases where ETL fits better than ELT."},
+{question:"Q7. What are common ETL pipeline problems?", answer:"The usual suspects are duplicate rows after a retry, half-finished loads, missed deletes, late data and silent errors. Airflow's documentation advises making each task safe to re-run, using an upsert instead of a plain insert, and reading a specific partition rather than the latest data."}
+]} />
+
+<BlogCTA/>
