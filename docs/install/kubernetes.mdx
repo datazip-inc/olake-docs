@@ -391,70 +391,107 @@ global:
   #   - "nfs": NFS shared volume (DEPRECATED; currently the default)
   logFileStorageMode: "s3"  # Default is "nfs", recommended to use "s3"
 
-# S3 Log File Storage (used when global.logFileStorageMode is "s3")
+
+# S3 Log File Storage
+# Used only when global.logFileStorageMode is "s3"; ignored in "nfs" mode.
+# Pick one backend:
+#   - In-cluster MinIO: minio.enabled: true (default). Dev and quick starts only.
+#   - External S3:      minio.enabled: false, then configure `external` below.
 s3LogFileStorage:
-  # -- Enable in-cluster MinIO for S3 log storage.
-  #   - true: Deploy the built-in MinIO instance.
-  #   - false: Use hosted/external S3-compatible storage.
-  enabled: true
-
-  # -- S3-compatible endpoint.
-  # Auto-configured when enabled: true.
-  # Required when using an external S3-compatible service such as MinIO.
-  endpoint: ""
-
+  # -- Settings shared by MinIO and external S3
   bucket: "olake"
+  # -- Required by OLake. MinIO accepts any value; for AWS S3 use the bucket's region.
   region: "us-east-1"
+  # -- Optional key prefix inside the bucket
   prefix: ""
 
-  # -- Static credentials for external S3/MinIO/GCS S3 API.
-  # Leave empty when using IRSA or built-in MinIO.
-  existingSecret: ""
+  # -- In-cluster MinIO. Runs as a single pod, so it is a single point of failure.
+  # Not recommended for production; use `external` instead.
+  # Endpoint and credentials secret are managed by the chart.
+  minio:
+    enabled: true
+    auth:
+      # -- MinIO root credentials, also used by OLake as OLAKE_S3_* keys.
+      # Override rootPassword for any non-local environment.
+      rootUser: "olake"
+      rootPassword: "password"
 
-  auth:
-    # -- MinIO root credentials when enabled: true.
-    # These credentials are also used as OLAKE_S3_* credentials.
-    # Override rootPassword with a secure password for non-local environments.
-    rootUser: "olake"
-    rootPassword: "password"
+  # -- External S3 (AWS S3, GCS S3 API, external MinIO). Used only when minio.enabled is false.
+  # Credentials: set either existingSecret or role.enabled.
+  external:
+    # -- S3-compatible endpoint. Leave empty for AWS S3.
+    # Set for anything else, e.g. "https://storage.googleapis.com" or "http://minio.example.com:9000".
+    endpoint: ""
 
-```
+    # -- Secret with static credentials. Not needed when role.enabled is true.
+    # For GCS, use HMAC keys.
+    # kubectl create secret generic s3-log-file-storage-secret \
+    #   --from-literal=OLAKE_S3_ACCESS_KEY_ID=<your-access-key-id> \
+    #   --from-literal=OLAKE_S3_SECRET_ACCESS_KEY=<your-secret-access-key>
+    existingSecret: ""
 
-`s3LogFileStorage.enabled: true`, the chart deploys in-cluster MinIO and OLake Go uses that MinIO bucket automatically. **For external S3-compatible storage**, set `s3LogFileStorage.enabled: false` and configure the endpoint and credentials as required:
-
-```yaml
-global:
-  logFileStorageMode: "s3"
-
-s3LogFileStorage:
-  enabled: false
-  endpoint: ""  # or your S3-compatible endpoint
-  bucket: "my-olake-bucket"
-  region: "us-west-2"
-  prefix: "olake-logs/"
-  existingSecret: "my-s3-credentials"  # Kubernetes secret with access keys
+    # -- IAM role auth for AWS S3 (EKS IRSA or EKS Pod Identity) instead of a secret.
+    role:
+      enabled: false
+      # -- IRSA only; leave empty for EKS Pod Identity. Added to the worker and job
+      # service accounts.
+      # Example:
+      #   eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-s3-log-storage-role"
+      annotations: {}
+ 
 ```
 
 **Configuration Notes:**
 - `logFileStorageMode` must remain set to `s3` when S3 storage is enabled
-- For AWS S3, the `endpoint` can be left empty and for S3-compatible services configure `endpoint`
 
+To enable external S3 storage with Access Key ID and Secret Access Key authentication, configure the following:
 
 ```yaml
 s3LogFileStorage:
 
-  role:
-    # Use an IAM role for hosted S3 authentication; supports EKS IRSA and EKS Pod Identity.
-    # When true, existingSecret is not required.
-    enabled: true
-    # Required for EKS IRSA; leave empty when using EKS Pod Identity.
-    annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-s3-log-storage-role"
+  minio:
+    enabled: false
+
+  external:
+    endpoint: ""
+
+    existingSecret: ""
+```
+
+**Configuration Notes:**
+- Create the s3 credentials secret (required when using `existingSecret` above for external S3):
+  ```bash
+  kubectl create secret generic my-s3-credentials \
+    --from-literal=OLAKE_S3_ACCESS_KEY_ID=<access-key-id> \
+    --from-literal=OLAKE_S3_SECRET_ACCESS_KEY=<secret-access-key>
+  ```
+- For AWS S3, the `endpoint` can be left empty and for S3-compatible services configure `endpoint`
+
+To enable external S3 storage with IAM role authentication, configure the following:
+
+```yaml
+s3LogFileStorage:
+
+  minio:
+    enabled: false
+
+  external:
+    endpoint: ""
+
+    role:
+      enabled: true
+      # -- IRSA only; leave empty for EKS Pod Identity. Added to the worker and job
+      # service accounts.
+      # Example:
+      #   eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-s3-log-storage-role"
+      annotations:
+        eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-s3-log-storage-role"
 ```
 
 **Configuration Notes:**
 - Replace `123456789012` with the AWS account ID
 - Replace `olake-s3-log-storage-role` with the IAM role name
+- For AWS S3, the `endpoint` can be left empty and for S3-compatible services configure `endpoint`
 
 :::note
 For AWS S3 with IRSA (IAM Roles for Service Accounts), leave `existingSecret` empty and ensure the job service account is configured with the appropriate IAM role. 
@@ -462,7 +499,7 @@ For AWS S3 with IRSA (IAM Roles for Service Accounts), leave `existingSecret` em
 
 <details>
   <summary>IAM Policy for S3 Log File Storage</summary>
-  ```yaml
+  ```json
     {
       "Version": "2012-10-17",
       "Statement": [
@@ -470,8 +507,7 @@ For AWS S3 with IRSA (IAM Roles for Service Accounts), leave `existingSecret` em
               "Sid": "ListBucket",
               "Effect": "Allow",
               "Action": [
-                  "s3:ListBucket",
-                  "s3:GetEncryptionConfiguration"
+                  "s3:ListBucket"
               ],
               "Resource": [
                   "arn:aws:s3:::{BUCKET_NAME}"
@@ -500,10 +536,13 @@ Alternatively, you can delete objects with **S3 bucket lifecycle rules** (for ex
 
 </details>
 
-:::warning NFS Deprecation
-NFS storage is currently the default storage mode (`logFileStorageMode: "nfs"`), but it is **marked as deprecated** and will be removed at the end of 2026 and **S3 will become the default storage mode**.
-
-**For new deployments**, S3 storage is recommended.
+:::warning NFS Deprecation and Version Requirements
+- NFS storage is currently the default storage mode (`logFileStorageMode: "nfs"`), but it is **marked as deprecated** and will be removed at the end of 2026 and **S3 will become the default storage mode**. **For new deployments**, S3 storage is recommended.
+- For using S3 storage, the following versions are required:
+  - OLake Version **0.12.0 and above**.
+  - OLake UI **0.7.0 and above**.
+  - Helm chart **0.0.30 and above**.
+  - OLake worker **0.4.0 and above**.
 :::
 
 ### Persistent Storage Configuration (NFS - Deprecated)
