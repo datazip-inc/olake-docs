@@ -190,18 +190,6 @@ check \
 
 ---
 
-## Stream Configuration
-
-When **Upsert** is selected as ingestion mode for a stream(topic), a **Deduplication Key** must be configured in the **Stream Configuration** section. This key identifies which records represent the same entity in your Kafka topic, ensuring only the latest state is maintained in the destination rather than creating duplicate rows for each update.
-
-For example, if your topic receives multiple updates for `customer_id = 101`, the deduplication key ensures only the most recent version is stored, preventing duplicates of the same customer in your Iceberg table.
-
-- Multiple columns can be selected as deduplication keys
-- You can include **`_kafka_key`** and any columns from the message payload
-- Kafka Upsert ingestion mode only supports **Positional Deletes** as upsert type.
-
----
-
 ## Kafka General Information
 
 When OLake Go syncs data from Kafka topics to Iceberg, it transfers the complete message structure along with Kafka metadata. This ensures full traceability and context for each message.
@@ -240,38 +228,52 @@ OLake Go provides flexibility in how message values are stored:
 
 ---
 
+## Stream Configuration
+
+When **Upsert** is selected as ingestion mode for a stream(topic), a **Deduplication Key** must be configured in the **Stream Configuration** section. This key uniquely identifies which records represent the same entity in your Kafka topic, ensuring only the latest state is maintained in the destination. 
+:::info
+For **deduplication key** use a field that will not change or get modified to prevent duplicates.
+:::
+
+For example, if your topic receives multiple updates for `customer_id = 101`, the deduplication key ensures only the most recent version is stored, preventing duplicates of the same customer in your Iceberg table.
+
+- Multiple columns can be selected as deduplication keys
+- You can include **`_kafka_key`** and any columns from the message payload
+- Kafka Upsert ingestion mode only supports **Positional Deletes** as upsert type.
+
+:::caution Partition Count Changes
+Do not increase the number of partitions for a Kafka topic while an OLake Go sync job is running in Upsert mode. When partition count changes, messages with the same key will route to different partitions For example, a key that hashed to partition 2 with 6 partitions might hash to partition 8 with 12 partitions. Since existing messages remain in their original partitions while new messages route elsewhere, concurrent processing can lead to duplicate records or incorrect final state.
+:::
+
+---
+
 ## Upsert Behavior
 
 In **Upsert** mode, OLake Go uses the configured **Deduplication Key** to decide whether an incoming message is a new record, an update, or a delete. The operation depends on where the Deduplication Key comes from.
 
 ### Deduplication Key is `_kafka_key`
 
-|Scenario | Behavior |
-| --- | --- | 
+| Scenario | Behavior |
+| --- | --- |
+| Dedupe key is null or missing and the message value is present | The record gets **appended** |
+| Dedupe key is empty bytes and the message value is present | The record gets **upserted** (two messages with empty keys → one row) |
 | Dedupe key is present and the message value is present | The record gets **upserted** |
 | Dedupe key is present and the message value is null | The matching record is **deleted** |
-| Dedupe key is null and the message value is present | The sync fails because Iceberg does not support a null deduplication key |
-| Dedupe key is null and the message value is null | The sync fails because Iceberg does not support a null deduplication key |
-| Dedupe key is empty and the message value is present | The record gets **appended** |
-
-### Deduplication Key is a field in the message value
-
-|Scenario | Behavior |
-| --- | --- | 
-| Dedupe key is present and the message value is present | The record gets **upserted** |
-| Dedupe key is present and the message value is null | The record is **appended** |
-| Dedupe key is null and the message value is present | The sync fails because Iceberg does not support a null deduplication key |
-| Dedupe key is null and the message value is null | The sync fails because Iceberg does not support a null deduplication key |
+| Dedupe key is null/missing and the message value is null (tombstone) | The record is **skipped** |
 
 ### Multiple Deduplication Keys (including `_kafka_key` plus value fields)
 
-|Scenario | Behavior |
-| --- | --- | 
-| Atleast one non-null dedupe key is present and the message value is present | The record gets **upserted** |
-| Atleast one non-null dedupe key is present and the message value is null | The record is **appended** |
+| Scenario | Behavior |
+| --- | --- |
+| All configured dedupe key fields are missing/ JSON null/ mix of missing and null dedupe key fields | The sync **fails** |
+| Single dedupe key, which is from the message value | The record gets **upserted** |
+| One dedupe key field is an empty string | The record gets **upserted** |
+| Multiple dedupe key fields configured, at least one is non-null | The record gets **upserted** |
+| Conflict between dedupe key in message value and JSON value in key field (e.g. both having `id` as dedupe key) | The record gets **upserted** (body value takes precedence) |
 
 :::note
-If multiple deduplication keys are selected and at least one of the keys is non-null, for the sync will run successfully.
+- If multiple deduplication keys are selected and at least one of the keys is non-null, for the sync will run successfully.
+- Tombstone deletes are **only supported** for single deduplication key which is `_kafka_key`.
 :::
 
 ---
