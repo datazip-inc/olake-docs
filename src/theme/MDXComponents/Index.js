@@ -134,6 +134,7 @@ import StreamsConfiguration from '../../../docs/shared/streams/StreamsConfigurat
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
 import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
 import Faq from '../../components/olake/Faq';
+import Quiz from '../../components/blog/Quiz/Quiz';
 
 
 const MDXComponents = {
@@ -273,7 +274,8 @@ const MDXComponents = {
 
   OLakePathInfo,
   StreamSelectionExample,
-  Faq
+  Faq,
+  Quiz
 };
 
 export default MDXComponents;
