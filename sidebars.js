@@ -105,6 +105,15 @@ const docSidebar = {
       ],
     },
     { type: 'doc', id: 'understanding/terminologies/olake', label: 'Stream Properties' },
+    {
+      type: 'category',
+      label: 'Streams Config',
+      items: [
+        { type: 'doc', id: 'core/configs/streams', label: 'Streams v2 Reference' },
+        { type: 'doc', id: 'core/configs/streams-migration', label: 'Migrate to Streams v2' },
+        { type: 'doc', id: 'core/configs/streams-legacy', label: 'Streams v1 (Legacy)' },
+      ],
+    },
     { type: 'doc', id: 'getting-started/job-level-properties', label: 'Job-level Properties' },
     { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
 

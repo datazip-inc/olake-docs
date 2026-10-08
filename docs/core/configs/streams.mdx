@@ -1,0 +1,433 @@
+---
+title: "Streams v2: selected_streams.json and available_streams.json"
+seo_title: "OLake Streams v2: selected_streams.json and available_streams.json"
+description: "Configure OLake streams with selected_streams.json (you edit) and available_streams.json (read-only): fields, defaults, recipes, CLI flags, and errors."
+sidebar_label: Streams v2 config
+sidebar_position: 2
+---
+
+import StreamsFormatNotice from '@site/docs/shared/streams/StreamsFormatNotice.mdx';
+
+# Streams v2: `selected_streams.json` and `available_streams.json`
+
+<StreamsFormatNotice />
+
+<TLDR>
+
+- The old `streams.json` mixed settings you edit with machine-written metadata. Streams v2 separates them into two files, so edits are smaller and safer to review.
+- `selected_streams.json` is the file you edit. It lists the streams to sync and every per-stream setting.
+- `available_streams.json` is read-only. Discover writes it. It lists every table OLake found, with schema, keys, and defaults.
+- Pass both files together with `--selected-streams` and `--available-streams`.
+- Streams v1 (the legacy `streams.json` file) still works but is deprecated. See [Migrate from streams.json](/docs/core/configs/streams-migration) and the [legacy reference](/docs/core/configs/streams-legacy).
+- Available from OLake vX.Y.Z {/* TODO(STREAMS_V2_VERSION) */}.
+
+</TLDR>
+
+
+## How OLake creates the files (discover)
+
+Run `discover` to connect to the source and write the files.
+
+```bash title="First discover"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+discover \
+--config /mnt/config/source.json
+```
+
+Discover writes three files in the folder of `--config`:
+
+| File | Purpose |
+|---|---|
+| `selected_streams.json` | The streams to sync. All discovered streams are selected. |
+| `available_streams.json` | Everything OLake found in the source. Read-only. |
+| `streams.json` | Legacy single file, with the same settings. Scripts that still pass `--streams` keep working. |
+
+On a first discover, each `selected_streams.json` entry holds only `stream_name`, `partition_regex` (`""`), `sync_mode`, and `cursor_field` (only for `incremental`). For the Docker setup, see [Docker (CLI)](/docs/install/docker-cli).
+
+## `selected_streams.json`
+
+The top-level key is `selected_streams`. It maps each namespace (database or schema name) to a list of stream entries.
+
+```json title="selected_streams.json"
+{
+  "selected_streams": {
+    "public": [
+      {
+        "stream_name": "orders",
+        "sync_mode": "incremental",
+        "cursor_field": "updated_at",
+        "partition_regex": "/{created_at,year}",
+        "normalization": true,
+        "append_mode": false,
+        "destination_database": "analytics",
+        "destination_table": "orders_raw",
+        "filter_config": {
+          "logical_operator": "and",
+          "conditions": [
+            { "column": "status", "operator": "=", "value": "active" }
+          ]
+        },
+        "selected_columns": {
+          "columns": ["id", "status", "updated_at", "created_at"],
+          "sync_new_columns": true
+        }
+      },
+      {
+        "stream_name": "customers",
+        "sync_mode": "cdc",
+        "partition_regex": ""
+      }
+    ]
+  }
+}
+```
+
+### Field reference for `selected_streams.json`
+
+Every field below can be set on a stream entry in `selected_streams.json`. The **Docs** column links to the full explanation of that setting.
+
+| Field | Type | Required | If omitted | Docs |
+|---|---|---|---|---|
+| `stream_name` | string | Yes | Not applicable. Must match a `name` in `available_streams.json` under the same namespace. | [`available_streams.json`](#available_streamsjson) |
+| `sync_mode` | `full_refresh`, `incremental`, `cdc`, or `strict_cdc` | No | OLake uses `sync_mode` of the stream in `available_streams.json`. | [Sync modes](/docs/understanding/terminologies/olake#2-sync-modes) |
+| `cursor_field` | string, `primary` or `primary:secondary` | Only for `incremental` | OLake uses `cursor_field` from `available_streams.json`. | [Sync modes](/docs/understanding/terminologies/olake#2-sync-modes) |
+| `destination_database` | string | No | OLake uses `destination_database` from `available_streams.json`. If that is empty, it uses `iceberg_db` from the destination config, then the namespace. | [Destination database](/docs/understanding/terminologies/olake#destination-database) |
+| `destination_table` | string | No | OLake uses `destination_table` from `available_streams.json`, else the stream name. | [Destination database](/docs/understanding/terminologies/olake#destination-database) |
+| `partition_regex` | string | No (discover writes `""`) | No partitioning. | [Iceberg partitioning](/docs/writers/iceberg/partitioning), [Parquet partitioning](/docs/writers/parquet/partitioning) |
+| `normalization` | boolean | No | OLake uses `default_stream_properties.normalization` of the stream. | [Normalization](/docs/understanding/terminologies/olake#1-normalization) |
+| `append_mode` | boolean | No | OLake uses `default_stream_properties.append_mode`. | [Upsert vs append](/docs/understanding/terminologies/olake#7-modes-to-ingest-data-upsert-vs-append) |
+| `update_type` | `eq`, `pos`, or `dv` | No | OLake uses `default_stream_properties.update_type`, else `eq`. | [Upsert](/docs/understanding/terminologies/olake#upsert) |
+| `use_source_column_names` | boolean | No | `false`. OLake normalizes column names. | [Schema](/docs/understanding/terminologies/olake#4-schema) |
+| `chunk_column` | string | No | OLake picks the chunking column. | No dedicated page yet. |
+| `filter_config` | object: `logical_operator`, `conditions[]` of `column`, `operator`, `value` | No | No filter. Applies only when normalization is enabled. | [Data filter](/docs/understanding/terminologies/olake#3-data-filter) |
+| `filter` | string (legacy filter syntax) | No | No filter. Prefer `filter_config`. | [Data filter](/docs/understanding/terminologies/olake#3-data-filter) |
+| `selected_columns` | object: `columns` (list), `sync_new_columns` (boolean) | No | OLake syncs all columns. | [Schema](/docs/understanding/terminologies/olake#4-schema) |
+
+Notes on `update_type`:
+
+- The value must be one of the stream's `available_update_types`.
+- OLake ignores it when `append_mode` is `true`.
+- On a re-discover with `--target-query-engines`, discover clears an explicitly set `update_type` to `""` if those engines cannot read it, and logs a warning. Until you pick a value, `sync` and `clear-destination` skip that stream.
+
+## `available_streams.json`
+
+The top-level key is `streams`. It is a list of objects, each with one `stream`. Discover writes this file. Do not edit it. Pass it to `sync` as is.
+
+```json title="available_streams.json"
+{
+  "streams": [
+    {
+      "stream": {
+        "name": "orders",
+        "namespace": "public",
+        "type_schema": { "properties": { "...": "..." } },
+        "supported_sync_modes": ["cdc", "full_refresh", "incremental", "strict_cdc"],
+        "source_defined_primary_key": ["id"],
+        "available_cursor_fields": ["id", "updated_at", "created_at"],
+        "available_update_types": ["eq", "pos", "dv"],
+        "sync_mode": "cdc",
+        "destination_database": "postgres_mydb:public",
+        "destination_table": "orders",
+        "selectable_columns": ["_olake_id", "_olake_timestamp", "id", "status", "updated_at", "created_at"],
+        "default_stream_properties": {
+          "normalization": true,
+          "append_mode": false,
+          "update_type": "eq"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Field reference for `available_streams.json`
+
+All fields are read-only.
+
+| Field | Meaning |
+|---|---|
+| `name` | Table or collection name. |
+| `namespace` | Database or schema name. |
+| `type_schema` | Columns and types. Includes `destination_column_name` and `olake_column`. |
+| `supported_sync_modes` | Sync modes this stream supports. |
+| `source_defined_primary_key` | Primary key columns found in the source. |
+| `available_cursor_fields` | Columns you can use as `cursor_field`. |
+| `available_update_types` | Values you can use as `update_type`. |
+| `sync_mode`, `cursor_field`, `destination_database`, `destination_table` | Discovered defaults. Override them in `selected_streams.json`. |
+| `selectable_columns` | Columns you can list in `selected_columns.columns`. |
+| `default_stream_properties` | Defaults for `normalization`, `append_mode`, and `update_type`. |
+
+If `available_streams.json` has no streams, OLake fails with code `catalog.available_streams_empty`.
+
+## Precedence and selection rules
+
+**A value in `selected_streams.json` wins. If it is not set there, OLake uses the value in `available_streams.json` (or the stream's `default_stream_properties`).**
+
+This is why a converted or re-discovered setup still works when `sync_mode`, `cursor_field`, `destination_database`, and `destination_table` exist only in `available_streams.json`.
+
+Selection rules:
+
+- OLake syncs a stream only if it appears in `selected_streams.json`.
+- An empty `selected_streams` (`{}`, `null`, or a missing key) selects nothing. `sync` and `clear-destination` then fail with `catalog.no_valid_streams`.
+- A selected stream with no match in `available_streams.json` is skipped with a warning.
+- Re-discover does not add new tables to `selected_streams.json`. Add them by hand.
+- Re-discover drops entries whose table no longer exists in the source.
+
+## Common tasks
+
+Edit `selected_streams.json` for every task below. Never edit `available_streams.json`.
+
+:::note
+After you edit streams you already synced, you may need to clear their destination data. The `discover` command with `--difference-selected-streams` and `--difference-available-streams` compares two configurations and writes `difference_selected_streams.json` and `difference_available_streams.json`. These list the streams whose settings changed. Pass them to `clear-destination`. For legacy `streams.json`, use `--difference`, which writes `difference_streams.json`. See [Difference between two configurations](#difference-between-two-configurations).
+:::
+
+### Add or remove a stream
+
+Add an entry under its namespace to sync it. Delete the entry to stop syncing it.
+
+```json
+{ "stream_name": "payments", "sync_mode": "full_refresh", "partition_regex": "" }
+```
+
+To list the choices, read `name` in `available_streams.json`.
+
+### Change the sync mode
+
+Set `sync_mode` to one of the values in the stream's `supported_sync_modes`.
+
+```json
+{ "stream_name": "orders", "sync_mode": "full_refresh", "partition_regex": "" }
+```
+
+### Set the cursor for incremental sync
+
+Use `sync_mode: "incremental"` and pick a `cursor_field` from `available_cursor_fields`. Use `primary` or `primary:secondary`.
+
+```json
+{ "stream_name": "orders", "sync_mode": "incremental", "cursor_field": "updated_at", "partition_regex": "" }
+```
+
+### Rename the destination database or table
+
+```json
+{
+  "stream_name": "orders",
+  "destination_database": "analytics",
+  "destination_table": "orders_raw",
+  "partition_regex": ""
+}
+```
+
+Changing these on a stream you already synced writes to a new table. See [difference](#difference-between-two-configurations).
+
+### Partition a table
+
+Set `partition_regex`. Syntax and examples are in the [Iceberg partitioning](/docs/writers/iceberg/partitioning) and [Parquet partitioning](/docs/writers/parquet/partitioning) guides.
+
+```json
+{ "stream_name": "orders", "partition_regex": "/{created_at,year}" }
+```
+
+### Turn normalization on or off
+
+```json
+{ "stream_name": "orders", "normalization": false, "partition_regex": "" }
+```
+
+`filter_config` applies only when normalization is on.
+
+### Filter rows
+
+```json
+{
+  "stream_name": "orders",
+  "partition_regex": "",
+  "filter_config": {
+    "logical_operator": "and",
+    "conditions": [{ "column": "status", "operator": "=", "value": "active" }]
+  }
+}
+```
+
+See [Data filter](/docs/understanding/terminologies/olake#3-data-filter).
+
+### Select columns
+
+List the columns to sync. Pick them from `selectable_columns`. Set `sync_new_columns` to `true` to add new source columns on re-discover.
+
+```json
+{
+  "stream_name": "orders",
+  "partition_regex": "",
+  "selected_columns": {
+    "columns": ["id", "status", "updated_at"],
+    "sync_new_columns": true
+  }
+}
+```
+
+See [Column selection](/docs/understanding/terminologies/olake#4-schema).
+
+### Choose upsert or append, and the update type
+
+Set `append_mode` to `true` to append. Leave it `false` to upsert. For upsert, set `update_type` to `eq`, `pos`, or `dv`.
+
+```json
+{ "stream_name": "orders", "partition_regex": "", "append_mode": false, "update_type": "eq" }
+```
+
+### Run sync
+
+```bash title="sync"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+sync \
+--config /mnt/config/source.json \
+--destination /mnt/config/destination.json \
+--selected-streams /mnt/config/selected_streams.json \
+--available-streams /mnt/config/available_streams.json
+```
+
+Add `--state /mnt/config/state.json` to resume. For all flags, see [Commands and flags](/docs/community/commands-and-flags).
+
+### Clear destination data
+
+```bash title="clear-destination"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+clear-destination \
+--destination /mnt/config/destination.json \
+--selected-streams /mnt/config/selected_streams.json \
+--available-streams /mnt/config/available_streams.json
+```
+
+OLake clears data only for streams in `selected_streams.json`. If you pass `--state`, it clears state too.
+
+## Re-discover and keep your edits
+
+Pass both existing files to `discover`. OLake re-reads the source and rewrites the files in place.
+
+```bash title="Re-discover (merge)"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+discover \
+--config /mnt/config/source.json \
+--selected-streams /mnt/config/selected_streams.json \
+--available-streams /mnt/config/available_streams.json
+```
+
+OLake keeps:
+
+- Your `selected_streams.json` entries, only for tables that still exist.
+- Your `sync_mode`, `cursor_field`, and `destination_*` values from the old files.
+- Your column selection. It adds new columns when `sync_new_columns` is `true`.
+
+OLake does not select new tables. Add them by hand. It also rewrites the legacy `streams.json`.
+
+### Difference between two configurations
+
+Use `--difference-selected-streams` and `--difference-available-streams` to compare an old and a new configuration. This needs no source connection and no `--config`.
+
+```bash title="Difference"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+discover \
+--selected-streams /mnt/config/selected_streams.json \
+--available-streams /mnt/config/available_streams.json \
+--difference-selected-streams /mnt/config/new_selected_streams.json \
+--difference-available-streams /mnt/config/new_available_streams.json
+```
+
+OLake writes `difference_available_streams.json` and `difference_selected_streams.json` next to the old files. They list selected streams that are new, or whose settings changed in a way that needs a destination reset. These settings are:
+
+- `normalization`, `partition_regex`, `filter`, `filter_config`, `append_mode`, `use_source_column_names`
+- `destination_database`, `destination_table`, `sync_mode`
+- `cursor_field` (incremental only)
+- `update_type`, when it moves from `dv` to another type or from `pos` to `dv`
+
+The old side and the new side can each use either format. The output follows the new side: the new difference pair writes the two files above, and legacy `--difference` writes `difference_streams.json`.
+
+To reset only these streams, pass the two files to `clear-destination`:
+
+```bash title="Clear only the changed streams"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+clear-destination \
+--destination /mnt/config/destination.json \
+--state /mnt/config/state.json \
+--available-streams /mnt/config/difference_available_streams.json \
+--selected-streams /mnt/config/difference_selected_streams.json
+```
+
+## Troubleshooting
+
+OLake validates the flags before it runs. These are the errors you can see.
+
+| Situation | Error code | Message |
+|---|---|---|
+| You pass only one of `--available-streams` or `--selected-streams` | `config.incomplete_catalog_flag_pair` | `--available-streams and --selected-streams must be passed` |
+| You pass `--streams` together with both `--available-streams` and `--selected-streams` | `config.conflicting_catalog_flags` | `--streams cannot be combined with --available-streams/--selected-streams` |
+| `sync` or `clear-destination` has no streams flags | `config.flag_missing` | `--streams or --available-streams and --selected-streams not passed` |
+| You pass only one difference flag | `config.incomplete_difference_flag_pair` | `--difference-available-streams and --difference-selected-streams must be passed together` |
+| You pass `--difference` with the new difference pair | `config.conflicting_difference_flags` | `--difference cannot be combined with --difference-available-streams/--difference-selected-streams` |
+| `available_streams.json` has no streams | `catalog.available_streams_empty` | `available_streams file <path> has no streams[]` |
+| `selected_streams.json` selects no streams (`{}`, `null`, or missing key), or no selected stream is valid | `catalog.no_valid_streams` | `no valid streams found in catalog` |
+
+Other symptoms:
+
+- **Warning `Skipping; selected stream <ns>.<name> has no matching entry in the new available streams`** (difference). The stream is in `new_selected_streams.json` but not in `new_available_streams.json`, so it is left out of the difference. Add it to the new available file, or re-discover.
+- **Warning `Skipping; selected stream <ns>.<name> has no matching entry in streams[]. Rediscover or check the streams file.`** The stream is in `selected_streams.json` but not in `available_streams.json`. Check the namespace and `stream_name`, or re-discover.
+- **Stream skipped with `found invalid delete mode: update mode not set`.** A re-discover with `--target-query-engines` cleared `update_type` to `""`. `sync` and `clear-destination` skip that stream. Pick a value from the stream's `available_update_types`. The sync fails only if no valid streams are left.
+- **Warning `--streams is deprecated and will be removed in a future release; use --available-streams and --selected-streams instead`.** You use the legacy flag. Switch to the new flags.
+- **A new table is not syncing.** Re-discover does not select new tables. Add the stream to `selected_streams.json`.
+
+## FAQ
+
+### Which file do I edit, `selected_streams.json` or `available_streams.json`?
+
+Edit `selected_streams.json`. `available_streams.json` is read-only metadata that discover writes.
+
+### What happens if a setting is in both files?
+
+The value in `selected_streams.json` wins. OLake falls back to `available_streams.json` only when the setting is not set in `selected_streams.json`.
+
+### Does the legacy `streams.json` still work?
+
+Yes. `--streams` and `--catalog` still work for `discover`, `sync`, and `clear-destination`. OLake logs a deprecation warning. See the [legacy reference](/docs/core/configs/streams-legacy).
+
+Once you switch to `--selected-streams` and `--available-streams`, do not go back to `--streams`. Migration is one-way. See [Can I go back to `streams.json`?](/docs/core/configs/streams-migration#can-i-go-back-to-streamsjson)
+
+### Why did discover create three files?
+
+Discover writes `selected_streams.json`, `available_streams.json`, and `streams.json` with the same settings. Existing `--streams` scripts keep working, and moving to Streams v2 is only a flag change. After you switch, edit only `selected_streams.json` and do not go back to `--streams` (downgrade is not supported).
+
+### Do I need to migrate state?
+
+No. `state.json` is unchanged.
+
+### Do I need to do anything in the OLake UI?
+
+No. OLake UI converts jobs to Streams v2 when it starts and when you upgrade a source version. See [OLake UI users](/docs/core/configs/streams-migration#6-olake-ui-users).
+
+### Is `--catalog` the same as `--streams`?
+
+Yes. `--catalog` is a deprecated alias of `--streams`. Use `--selected-streams` and `--available-streams` instead.
+
+### Can I pass only one of the two files?
+
+No. Pass both `--selected-streams` and `--available-streams`, or neither. Otherwise OLake fails with `config.incomplete_catalog_flag_pair`.
+
+### Will discover select a table I just added to the source?
+
+No. Add it to `selected_streams.json` by hand.
+
+### Which OLake version adds these files?
+
+OLake vX.Y.Z {/* TODO(STREAMS_V2_VERSION) */} adds `--selected-streams` and `--available-streams`.
