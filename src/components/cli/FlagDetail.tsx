@@ -62,13 +62,13 @@ olakego/source-[SOURCE-TYPE]:latest \\
           <p><strong>Description:</strong></p>
           <div className="admonition admonition-warning alert alert--warning">
             <div className="admonition-content">
-              <p><strong>Deprecated.</strong> Still works and logs a warning. Also available as <code>--catalog</code> (alias). Deprecated — use <code>--selected-streams</code> and <code>--available-streams</code>. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link>.</p>
+              <p><strong>Deprecated.</strong> Still works and logs a warning. Also available as <code>--catalog</code> (alias). Use <code>--selected-streams</code> and <code>--available-streams</code> instead. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link> and the <Link to="/docs/core/configs/streams-legacy">Streams v1 reference</Link>.</p>
             </div>
           </div>
           <p>Specifies the path to the legacy <code>streams.json</code> file. This file is generated after the discover command. When used during discovery, this flag updates the existing <code>streams.json</code> and also writes <code>selected_streams.json</code> and <code>available_streams.json</code>:</p>
           <ul>
             <li>Keeps prior manual changes.</li>
-            <li>Adds new streams detected in the source database.</li>
+            <li>Adds new streams detected in the source database to <code>streams</code>, without selecting them. Add them to <code>selected_streams</code> by hand.</li>
             <li>Allows selecting which columns should be synced for each table.</li>
             <li>Allows updating the destination database name for each stream.</li>
           </ul>
@@ -404,7 +404,7 @@ Example:
           <p><strong>Description:</strong></p>
           <div className="admonition admonition-warning alert alert--warning">
             <div className="admonition-content">
-              <p><strong>Deprecated.</strong> Still works and logs a warning. Deprecated — use <code>--selected-streams</code> and <code>--available-streams</code>. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link>.</p>
+              <p><strong>Deprecated.</strong> Still works and logs a warning. Use <code>--difference-selected-streams</code> and <code>--difference-available-streams</code> instead. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link> and the <Link to="/docs/core/configs/streams-legacy">Streams v1 reference</Link>.</p>
             </div>
           </div>
           <ul>
@@ -438,7 +438,7 @@ Example:
             <li>Specifies the path to the new <code>available_streams.json</code> to compare against the old files.</li>
             <li>Must be passed together with <code>--difference-selected-streams</code>.</li>
             <li>Does not connect to the source, so <code>--config</code> is not needed.</li>
-            <li>Writes <code>difference_streams.json</code> next to the old files. It lists selected streams that are new or changed in a way that needs a destination reset.</li>
+            <li>Writes <code>difference_available_streams.json</code> and <code>difference_selected_streams.json</code> next to the old files. They list selected streams that are new or changed in a way that needs a destination reset. Pass them to <code>clear-destination</code> as <code>--available-streams</code> and <code>--selected-streams</code> to reset only those streams.</li>
             <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
           </ul>
         </>

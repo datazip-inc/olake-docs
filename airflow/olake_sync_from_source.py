@@ -84,7 +84,7 @@ with DAG(
         )
     )
     
-    # Streams config volume: Contains pre-generated selected_streams.json and available_streams.json
+    # Streams config volume: Contains pre-generated streams configuration
     streams_config_volume = k8s.V1Volume(
         name="streams-config-volume",
         config_map=k8s.V1ConfigMapVolumeSource(

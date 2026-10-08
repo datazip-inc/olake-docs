@@ -109,7 +109,7 @@ Notes on `update_type`:
 
 - The value must be one of the stream's `available_update_types`.
 - OLake ignores it when `append_mode` is `true`.
-- Discover can set it to `""` when the target query engines cannot read the old value. Sync then fails until you choose one.
+- On a re-discover with `--target-query-engines`, discover clears an explicitly set `update_type` to `""` if those engines cannot read it, and logs a warning. Until you pick a value, `sync` and `clear-destination` skip that stream.
 
 ## `available_streams.json`
 
@@ -170,7 +170,7 @@ This is why a converted or re-discovered setup still works when `sync_mode`, `cu
 Selection rules:
 
 - OLake syncs a stream only if it appears in `selected_streams.json`.
-- An empty `selected_streams` (`{}`) selects nothing.
+- An empty `selected_streams` (`{}`, `null`, or a missing key) selects nothing. `sync` and `clear-destination` then fail with `catalog.no_valid_streams`.
 - A selected stream with no match in `available_streams.json` is skipped with a warning.
 - Re-discover does not add new tables to `selected_streams.json`. Add them by hand.
 - Re-discover drops entries whose table no longer exists in the source.
@@ -178,6 +178,10 @@ Selection rules:
 ## Common tasks
 
 Edit `selected_streams.json` for every task below. Never edit `available_streams.json`.
+
+:::note
+After you edit streams you already synced, you may need to clear their destination data. The `discover` command with `--difference-selected-streams` and `--difference-available-streams` compares two configurations and writes `difference_selected_streams.json` and `difference_available_streams.json`. These list the streams whose settings changed. Pass them to `clear-destination`. For legacy `streams.json`, use `--difference`, which writes `difference_streams.json`. See [Difference between two configurations](#difference-between-two-configurations).
+:::
 
 ### Add or remove a stream
 
@@ -340,14 +344,27 @@ discover \
 --difference-available-streams /mnt/config/new_available_streams.json
 ```
 
-OLake writes `difference_streams.json` next to the old files. It lists selected streams that are new, or whose settings changed in a way that needs a destination reset. These settings are:
+OLake writes `difference_available_streams.json` and `difference_selected_streams.json` next to the old files. They list selected streams that are new, or whose settings changed in a way that needs a destination reset. These settings are:
 
-- `normalization`, `partition_regex`, `filter`, `append_mode`, `use_source_column_names`
+- `normalization`, `partition_regex`, `filter`, `filter_config`, `append_mode`, `use_source_column_names`
 - `destination_database`, `destination_table`, `sync_mode`
 - `cursor_field` (incremental only)
 - `update_type`, when it moves from `dv` to another type or from `pos` to `dv`
 
-The old side and the new side can each use either format.
+The old side and the new side can each use either format. The output follows the new side: the new difference pair writes the two files above, and legacy `--difference` writes `difference_streams.json`.
+
+To reset only these streams, pass the two files to `clear-destination`:
+
+```bash title="Clear only the changed streams"
+docker run --pull=always \
+-v "$HOME/PATH_TO_OLAKE_DIRECTORY:/mnt/config" \
+olakego/source-postgres:latest \
+clear-destination \
+--destination /mnt/config/destination.json \
+--state /mnt/config/state.json \
+--available-streams /mnt/config/difference_available_streams.json \
+--selected-streams /mnt/config/difference_selected_streams.json
+```
 
 ## Troubleshooting
 
@@ -356,16 +373,18 @@ OLake validates the flags before it runs. These are the errors you can see.
 | Situation | Error code | Message |
 |---|---|---|
 | You pass only one of `--available-streams` or `--selected-streams` | `config.incomplete_catalog_flag_pair` | `--available-streams and --selected-streams must be passed` |
-| You pass `--streams` with `--available-streams` or `--selected-streams` | `config.conflicting_catalog_flags` | `--streams cannot be combined with --available-streams/--selected-streams` |
+| You pass `--streams` together with both `--available-streams` and `--selected-streams` | `config.conflicting_catalog_flags` | `--streams cannot be combined with --available-streams/--selected-streams` |
 | `sync` or `clear-destination` has no streams flags | `config.flag_missing` | `--streams or --available-streams and --selected-streams not passed` |
-| You pass only one difference flag | `config.incomplete_difference_flag_pair` | `--difference-available-streams and --difference-selected-streams must be passed` |
+| You pass only one difference flag | `config.incomplete_difference_flag_pair` | `--difference-available-streams and --difference-selected-streams must be passed together` |
 | You pass `--difference` with the new difference pair | `config.conflicting_difference_flags` | `--difference cannot be combined with --difference-available-streams/--difference-selected-streams` |
 | `available_streams.json` has no streams | `catalog.available_streams_empty` | `available_streams file <path> has no streams[]` |
+| `selected_streams.json` selects no streams (`{}`, `null`, or missing key), or no selected stream is valid | `catalog.no_valid_streams` | `no valid streams found in catalog` |
 
 Other symptoms:
 
+- **Warning `Skipping; selected stream <ns>.<name> has no matching entry in the new available streams`** (difference). The stream is in `new_selected_streams.json` but not in `new_available_streams.json`, so it is left out of the difference. Add it to the new available file, or re-discover.
 - **Warning `Skipping; selected stream <ns>.<name> has no matching entry in streams[]. Rediscover or check the streams file.`** The stream is in `selected_streams.json` but not in `available_streams.json`. Check the namespace and `stream_name`, or re-discover.
-- **Sync fails on `update_type`.** Discover set it to `""`. Pick a value from the stream's `available_update_types`.
+- **Stream skipped with `found invalid delete mode: update mode not set`.** A re-discover with `--target-query-engines` cleared `update_type` to `""`. `sync` and `clear-destination` skip that stream. Pick a value from the stream's `available_update_types`. The sync fails only if no valid streams are left.
 - **Warning `--streams is deprecated and will be removed in a future release; use --available-streams and --selected-streams instead`.** You use the legacy flag. Switch to the new flags.
 - **A new table is not syncing.** Re-discover does not select new tables. Add the stream to `selected_streams.json`.
 
