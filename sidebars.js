@@ -156,6 +156,7 @@ const docSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'release/ingestion/v0.12.0',
         'release/ingestion/v0.11.0',
         'release/ingestion/v0.10.0',
         'release/ingestion/v0.9.0',
