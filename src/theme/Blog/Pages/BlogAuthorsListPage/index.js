@@ -12,7 +12,11 @@ import PageHeader from '@site/src/components/blog/PageHeader'
 const AUTHORS_DESCRIPTIONS = {
   blog: 'Meet the engineers and writers behind the OLake blog, and browse the posts each author has published.',
   'customer-stories':
-    'Meet the authors behind OLake customer stories and browse the case studies each of them has written.'
+    'Meet the authors behind OLake customer stories and browse the case studies each of them has written.',
+  learn:
+    'Meet the engineers and writers behind OLake Learn, and browse the plain-language explainers each author has published.',
+  compare:
+    'Meet the engineers and writers behind OLake Compare, and browse the comparisons each author has published.'
 }
 
 export default function BlogAuthorsListPage({ authors, sidebar }) {

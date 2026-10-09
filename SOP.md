@@ -86,6 +86,12 @@ olake-docs/
 │   ├── tags.yml         # Blog tag definitions
 │   └── YYYY-MM-DD-*.mdx # Blog post files
 │
+├── learn/                 # Plain-language explainers (/learn/<slug>/)
+│   └── YYYY-MM-DD-*.mdx # Explainer files (authors and tags come from blog/authors.yml and blog/tags.yml)
+│
+├── compare/               # Comparison, alternatives, pricing and best-of posts (/compare/<slug>/)
+│   └── YYYY-MM-DD-*.mdx # Post files (authors and tags come from blog/authors.yml and blog/tags.yml)
+│
 ├── docs/                 # Main documentation
 │   ├── getting-started/ # Onboarding guides
 │   ├── core/           # Core concepts

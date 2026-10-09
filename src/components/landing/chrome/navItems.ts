@@ -92,6 +92,8 @@ const RESOURCES_MEGA: MegaMenu = {
       icon: 'learn',
       links: [
         { label: 'Blog', href: '/blog' },
+        { label: 'Explainers', href: '/learn' },
+        { label: 'Comparisons', href: '/compare' },
         { label: 'Webinars & events', href: '/webinar' },
         { label: 'Documentation', href: '/docs' }
       ]
@@ -143,6 +145,8 @@ export const LAKESIDE_NAV: LakesideNavEntry[] = [
     mega: RESOURCES_MEGA,
     items: [
       { label: 'Blog', href: '/blog' },
+      { label: 'Learn', href: '/learn' },
+      { label: 'Compare', href: '/compare' },
       { label: 'Customer Stories', href: '/customer-stories' },
       { label: 'Webinars & Events', href: '/webinar' },
       { label: 'OLake Community', href: '/community' },

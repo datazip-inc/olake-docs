@@ -2,6 +2,12 @@ const blogPluginExports = require('@docusaurus/plugin-content-blog')
 
 const defaultBlogPlugin = blogPluginExports.default
 
+// Blog instances that share the authors file of another instance (learn-blog and compare-blog read blog/authors.yml).
+// Docusaurus builds a page for every author in the file, even one with no posts in the instance, so
+// the shared file would add an empty /learn/authors/<name>/ (or /compare/authors/<name>/) page for every blog author. For these
+// instances the authors list and the author pages keep only the authors who have posts there.
+const INSTANCES_HIDING_EMPTY_AUTHORS = new Set(['learn-blog', 'compare-blog'])
+
 /**
  * The archive page (src/theme/BlogArchivePage) only reads `date`, `permalink` and `title` of each
  * post, but the plugin hands the route the full metadata of every post (description, tags, authors,
@@ -114,6 +120,7 @@ function pickRelated(post, candidates) {
 
 async function blogPluginExtended(context, options) {
   const blogPluginInstance = await defaultBlogPlugin(context, options)
+  const hideEmptyAuthors = INSTANCES_HIDING_EMPTY_AUTHORS.has(options.id)
 
   return {
     ...blogPluginInstance,
@@ -160,6 +167,15 @@ async function blogPluginExtended(context, options) {
             // Post routes carry both `content` and `sidebar` modules
             if (route.modules && route.modules.content && relatedModules.has(route.path)) {
               route = { ...route, modules: { ...route.modules, related: relatedModules.get(route.path) } }
+            }
+            if (hideEmptyAuthors) {
+              const props = route.props || {}
+              // An author page of an author without posts in this instance
+              if (props.author && props.author.count === 0) return
+              // The authors list
+              if (Array.isArray(props.authors)) {
+                route = { ...route, props: { ...props, authors: props.authors.filter((a) => a.count > 0) } }
+              }
             }
             addRoute(slimListRoute(slimArchiveRoute(route), listModules))
           }
