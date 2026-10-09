@@ -212,7 +212,10 @@ The following columns are automatically included when syncing Kafka messages to 
 
 :::warning[Message Format Requirement]
 - The Kafka messages **must contain data in JSON or AVRO format**. 
-- If messages are null or empty, OLake Go will read the messages but **skip writing them to the destination**. For AVRO format, a **Confluence Schema Registry must be configured**—schema registry is mandatory only for AVRO data and if not provided OLake Go will consider the messages as JSON format.
+- For AVRO format, a Confluence Schema Registry must be configured—schema registry is mandatory only for AVRO data and if not provided OLake Go will consider the messages as JSON format.
+- **Null or empty messages** are handled based on the stream's ingestion mode:
+  - **Append:** the message is read but not written to the destination.
+  - **Upsert:** behavior depends on the configured **Deduplication Key** and whether the message value is null. See [Upsert Behavior](#upsert-behavior) for detailed scenarios.
 :::
 
 ### Normalization
@@ -222,6 +225,62 @@ OLake Go provides flexibility in how message values are stored:
 - **Normalization = `true`**: The payload in the `value` column is Level 0 flattened, and each nested field becomes a separate column in the destination table. This makes querying individual fields easier.
   
 - **Normalization = `false`**: The payload is stored as-is in the `value` column without flattening. The entire JSON object remains in a single column.
+
+---
+
+## Stream Configuration
+
+When **Upsert** is selected as ingestion mode for a stream(topic), a **Deduplication Key** must be configured in the **Stream Configuration** section. This key uniquely identifies which records represent the same entity in your Kafka topic, ensuring only the latest state is maintained in the destination. 
+:::info
+For **deduplication key** use a field that will not change or get modified to prevent duplicates.
+:::
+
+For example, if your topic receives multiple updates for `customer_id = 101`, the deduplication key ensures only the most recent version is stored, preventing duplicates of the same customer in your Iceberg table.
+
+- Multiple columns can be selected as deduplication keys
+- You can include **`_kafka_key`** and any columns from the message payload
+- Kafka Upsert ingestion mode only supports **Positional Deletes** as upsert type.
+
+:::caution Partition Count Changes
+Do not increase the number of partitions for a Kafka topic while an OLake Go sync job is running in Upsert mode. When partition count changes, messages with the same key will route to different partitions. For example, a key that hashed to partition 2 with 6 partitions might hash to partition 4 with 7 partitions. Since existing messages remain in their original partitions while new messages route elsewhere, concurrent processing can lead to duplicate records or incorrect final state.
+:::
+
+---
+
+## Upsert Behavior
+
+In **Upsert** mode, OLake Go uses the configured **Deduplication Key** to decide whether an incoming message is a new record, an update, or a delete. The operation depends on where the Deduplication Key comes from.
+
+### Deduplication Key is `_kafka_key`
+
+| Scenario | Behavior |
+| --- | --- |
+| Dedupe key is null or missing and the message value is present | The record gets **appended** |
+| Dedupe key is empty bytes and the message value is present | The record gets **upserted** |
+| Dedupe key is present and the message value is present | The record gets **upserted** |
+| Dedupe key is present and the message value is null | The matching record is **deleted** |
+| Dedupe key is null/missing and the message value is null (tombstone) | The record is **skipped** |
+
+### Multiple Deduplication Keys (including `_kafka_key` plus value fields)
+
+| Scenario | Behavior |
+| --- | --- |
+| All configured dedupe key fields are missing/ JSON null/ mix of missing and null dedupe key fields | The sync **fails** |
+| Single dedupe key, which is from the message value | The record gets **upserted** |
+| One dedupe key field is an empty string | The record gets **upserted** |
+| Multiple dedupe key fields configured, at least one is non-null | The record gets **upserted** |
+| Conflict between dedupe key in message value and JSON value in key field (e.g. both having `id` as dedupe key) | The record gets **upserted** (body value takes precedence) |
+
+:::note
+- If multiple deduplication keys are selected and at least one of the keys is non-null, for the sync will run successfully.
+- Tombstone deletes are **only supported** for single deduplication key which is `_kafka_key`.
+:::
+
+:::info[Version Requirements]
+For using Upsert mode in Kafka, the following version requirements must be met:
+- OLake Go Version **0.12.1 and above**
+- OLake UI Version **0.7.1 and above**
+:::
 
 ---
 
