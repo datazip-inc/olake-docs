@@ -6,6 +6,8 @@ import { useLocation } from '@docusaurus/router'
 import SectionHeading from '@site/src/components/landing/ui/SectionHeading'
 import Section from '@site/src/components/landing/ui/Section'
 import Card from '@site/src/components/landing/ui/Card'
+import Button from '@site/src/components/landing/ui/Button'
+import { PiArrowUpRight, PiCalendarBlank, PiClock, PiMapPin } from 'react-icons/pi'
 import CommunityPage from '@site/src/components/community/lakeside/CommunityPage'
 import PageHero from '@site/src/components/community/lakeside/PageHero'
 import { StatBand } from '@site/src/components/community/lakeside/primitives'
@@ -81,11 +83,36 @@ const useDynamicIframeHeight = (src) => {
   return { height, iframeRef }
 }
 
+// Events we register people for outside Livestorm. Each one shows under "Active Events" until
+// `endsAt` passes; when none is left, the Livestorm upcoming-events embed shows instead.
+const activeEvents = [
+  {
+    title: 'Hacktoberfest Hack Day Bengaluru x OLake',
+    description:
+      'A one-day, in-person hackathon at the OLake office in HSR Layout, focused on open-source AI. Pick one of two paths at check-in and build it solo: Ask OLake, a chat assistant for the OLake docs, or OLake MCP, an MCP server that lets an AI agent operate OLake. Open to working professionals and university students.',
+    date: 'Sunday, 18 October 2026',
+    time: '10:00 AM – 9:00 PM IST',
+    location: 'OLake office, HSR Layout, Bengaluru',
+    img: '/img/events/hacktoberfest-hack-day-bengaluru-2026.webp',
+    alt: 'Hacktoberfest 2026 Hack Day: Ask OLake, build an open-source AI assistant for OLake',
+    registerUrl: 'https://events.mlh.com/events/15468-hacktoberfest-hack-day-bengaluru-x-olake',
+    registerLabel: 'Register on MLH',
+    endsAt: '2026-10-18T21:00:00+05:30'
+  }
+]
+
 const WebinarsPage = () => {
   const { siteConfig } = useDocusaurusContext()
   const location = useLocation()
   const siteUrl = siteConfig?.url || 'https://olake.io'
   const canonicalUrl = `${siteUrl}${location.pathname}`
+  // Filtered after mount so the static build and the first render agree.
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => setNow(Date.now()), [])
+  const upcomingEvents = activeEvents.filter(
+    (event) => now === null || Date.parse(event.endsAt) > now
+  )
+
   // Use the dynamic iframe height hook
   const { height: iframeHeight, iframeRef } = useDynamicIframeHeight(
     'https://app.livestorm.co/datazip-inc/upcoming?limit=2'
@@ -447,25 +474,91 @@ const WebinarsPage = () => {
         <p className='text-center text-[15px] font-medium tracking-wide text-olake-muted lg:text-[16px]'>
           Active Events
         </p>
-        {/* The Livestorm embed draws its own 1px square frame at the iframe edge; the 1px negative margin
-            pushes it out of the Card's overflow clip so only the shared 16px outline shows. */}
-        <Card className='mt-[16px] w-full lg:mt-[20px]'>
-          <iframe
-            ref={iframeRef}
-            width='100%'
-            height={iframeHeight}
-            frameBorder='0'
-            src='https://app.livestorm.co/datazip-inc/upcoming?limit=2'
-            title='OLake by Datazip events | Livestorm'
-            className='-m-px block w-[calc(100%+2px)] max-w-none'
-            style={{
-              height: 'auto',
-              transition: 'height 0.3s ease-in-out',
-              border: 'none',
-              overflow: 'hidden'
-            }}
-          />
-        </Card>
+        {upcomingEvents.length > 0 ? (
+          // Same frame as the Livestorm embed: an "Upcoming events" heading row, then one row per event.
+          <Card className='mt-[16px] w-full lg:mt-[20px]'>
+            <h3 className='m-0 border-0 border-b border-solid border-olake-line px-[20px] py-[16px] text-[17px] font-semibold text-olake-ink lg:px-[24px] lg:py-[20px] lg:text-[18px]'>
+              Upcoming events
+            </h3>
+            <ul className='m-0 list-none p-0'>
+              {upcomingEvents.map((event) => (
+                <li
+                  key={event.registerUrl}
+                  className='flex flex-col gap-[16px] border-0 border-solid border-olake-line p-[12px] not-last:border-b md:flex-row md:items-center md:gap-[28px] lg:p-[16px]'
+                >
+                  <a
+                    href={event.registerUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    tabIndex={-1}
+                    aria-hidden='true'
+                    className='block shrink-0 md:w-[46%]'
+                  >
+                    <img
+                      src={event.img}
+                      alt={event.alt}
+                      width={1200}
+                      height={600}
+                      decoding='async'
+                      className='block aspect-[2/1] h-auto w-full rounded-[10px] border border-solid border-olake-line object-cover'
+                    />
+                  </a>
+                  <div className='flex flex-col px-[4px] pb-[4px] md:py-[8px] md:pr-[12px]'>
+                    <p className='text-[13px] font-medium tracking-wide text-olake-blue'>
+                      Hacktoberfest 2026 · In person
+                    </p>
+                    <h4 className='mt-[10px] text-[20px] leading-[1.3] font-normal text-olake-ink lg:text-[24px]'>
+                      {event.title}
+                    </h4>
+                    <ul className='mt-[14px] flex flex-col gap-[6px] text-[14px] text-olake-text-2'>
+                      <li className='flex items-center gap-[8px]'>
+                        <PiCalendarBlank aria-hidden='true' className='shrink-0 text-olake-muted' />
+                        <span>{event.date}</span>
+                      </li>
+                      <li className='flex items-center gap-[8px]'>
+                        <PiClock aria-hidden='true' className='shrink-0 text-olake-muted' />
+                        <span>{event.time}</span>
+                      </li>
+                      <li className='flex items-center gap-[8px]'>
+                        <PiMapPin aria-hidden='true' className='shrink-0 text-olake-muted' />
+                        <span>{event.location}</span>
+                      </li>
+                    </ul>
+                    <p className='mt-[14px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
+                      {event.description}
+                    </p>
+                    <div className='mt-[20px]'>
+                      <Button href={event.registerUrl} external>
+                        {event.registerLabel}
+                        <PiArrowUpRight aria-hidden='true' />
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : (
+          // The Livestorm embed draws its own 1px square frame at the iframe edge; the 1px negative margin
+          // pushes it out of the Card's overflow clip so only the shared 16px outline shows.
+          <Card className='mt-[16px] w-full lg:mt-[20px]'>
+            <iframe
+              ref={iframeRef}
+              width='100%'
+              height={iframeHeight}
+              frameBorder='0'
+              src='https://app.livestorm.co/datazip-inc/upcoming?limit=2'
+              title='OLake by Datazip events | Livestorm'
+              className='-m-px block w-[calc(100%+2px)] max-w-none'
+              style={{
+                height: 'auto',
+                transition: 'height 0.3s ease-in-out',
+                border: 'none',
+                overflow: 'hidden'
+              }}
+            />
+          </Card>
+        )}
       </Section>
 
       {/* Featured Events & Webinars Section */}
