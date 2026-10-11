@@ -159,6 +159,13 @@ async function blogPluginExtended(context, options) {
         })
       )
 
+      // Permalinks of the tags that have at least one post: a tag page is only built for those, so the
+      // category filter (src/components/blog/CategoryFilter) hides the chips of empty categories
+      // instead of linking to pages that do not exist.
+      params.actions.setGlobalData({
+        tagPermalinks: Object.values(params.content.blogTags || {}).map((tag) => tag.permalink)
+      })
+
       return blogPluginInstance.contentLoaded({
         ...params,
         actions: {

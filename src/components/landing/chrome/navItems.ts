@@ -145,8 +145,8 @@ export const LAKESIDE_NAV: LakesideNavEntry[] = [
     mega: RESOURCES_MEGA,
     items: [
       { label: 'Blog', href: '/blog' },
-      { label: 'Learn', href: '/learn' },
-      { label: 'Compare', href: '/compare' },
+      { label: 'Explainers', href: '/learn' },
+      { label: 'Comparisons', href: '/compare' },
       { label: 'Customer Stories', href: '/customer-stories' },
       { label: 'Webinars & Events', href: '/webinar' },
       { label: 'OLake Community', href: '/community' },
