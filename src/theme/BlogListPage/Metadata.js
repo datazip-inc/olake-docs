@@ -195,11 +195,13 @@ function BlogMetadata(props) {
   )
 }
 
-const CUSTOMER_STORIES_OG_IMAGE = 'https://olake.io/img/logo/olake-og-card.png'
+const LIST_OG_IMAGE = 'https://olake.io/img/logo/olake-og-card.png'
 
-// The customer stories list: a CollectionPage with the stories on the page, Open Graph and the
-// social card. (The blog's schemas above describe the blog, so they are not reused here.)
-function CustomerStoriesMetadata({ metadata, items }) {
+// The list of a blog instance that is not the main blog (customer stories, learn): a CollectionPage
+// with the posts on the page, Open Graph and the social card. (The blog's schemas above describe
+// the blog, so they are not reused here.) `instance.listTitle` overrides the <title> when the h1
+// ("Learn") is too short to be one.
+function InstanceListMetadata({ metadata, items, instance }) {
   const {
     siteConfig: { url: siteUrl }
   } = useDocusaurusContext()
@@ -207,13 +209,14 @@ function CustomerStoriesMetadata({ metadata, items }) {
   const location = useLocation()
   const isPaginationPage = /\/page\/\d+/.test(location.pathname)
   const pageNumber = Number(metadata.page) || Number(/\/page\/(\d+)/.exec(location.pathname)?.[1]) || 1
-  const title = pageNumber > 1 ? `${blogTitle} - Page ${pageNumber}` : blogTitle
+  const baseTitle = instance.listTitle ?? blogTitle
+  const title = pageNumber > 1 ? `${baseTitle} - Page ${pageNumber}` : baseTitle
   const listUrl = `${siteUrl}${permalink}`.replace(/\/?$/, '/')
 
   const collectionSchema = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
-    name: 'Customer Stories',
+    name: instance.label,
     description: blogDescription,
     url: listUrl,
     isPartOf: { '@type': 'WebSite', name: 'OLake', url: `${siteUrl}/` },
@@ -240,8 +243,8 @@ function CustomerStoriesMetadata({ metadata, items }) {
         <meta property='og:url' content={listUrl} />
         <meta property='og:site_name' content='OLake' />
         <meta property='og:locale' content='en_US' />
-        <meta property='og:image' content={CUSTOMER_STORIES_OG_IMAGE} />
-        <meta name='twitter:image' content={CUSTOMER_STORIES_OG_IMAGE} />
+        <meta property='og:image' content={LIST_OG_IMAGE} />
+        <meta name='twitter:image' content={LIST_OG_IMAGE} />
         {isPaginationPage && <meta name='robots' content='noindex, follow' />}
         <script type='application/ld+json'>{serializeJsonLd(collectionSchema)}</script>
       </Head>
@@ -250,6 +253,10 @@ function CustomerStoriesMetadata({ metadata, items }) {
 }
 
 export default function BlogListPageMetadata(props) {
-  const { key } = useBlogInstance()
-  return key === 'customer-stories' ? <CustomerStoriesMetadata {...props} /> : <BlogMetadata {...props} />
+  const instance = useBlogInstance()
+  return instance.key === 'blog' ? (
+    <BlogMetadata {...props} />
+  ) : (
+    <InstanceListMetadata {...props} instance={instance} />
+  )
 }

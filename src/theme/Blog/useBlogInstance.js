@@ -6,8 +6,8 @@ import { useLocation } from '@docusaurus/router'
  * works out which instance the current route belongs to so each page can get
  * its own title, description and h1.
  *
- * Instances (see docusaurus.config.js): olake-blog (/blog) and
- * customer-stories-blog (/customer-stories).
+ * Instances (see docusaurus.config.js): olake-blog (/blog), customer-stories-blog
+ * (/customer-stories), learn-blog (/learn) and compare-blog (/compare).
  */
 const INSTANCES = {
   blog: {
@@ -25,12 +25,34 @@ const INSTANCES = {
     phrase: 'OLake customer stories',
     titlePhrase: 'Customer Stories',
     topics: 'case studies from teams replicating databases to Apache Iceberg'
+  },
+  learn: {
+    label: 'Learn',
+    phrase: 'the OLake Learn section',
+    titlePhrase: 'Learn',
+    // <title> of the list page; its h1 stays the blogTitle ("Learn")
+    listTitle: 'Learn: Data Pipelines, CDC and Iceberg',
+    topics: 'plain-language explainers on data pipelines, CDC and Apache Iceberg'
+  },
+  compare: {
+    label: 'Compare',
+    phrase: 'the OLake Compare section',
+    titlePhrase: 'Compare',
+    // <title> of the list page; its h1 stays the blogTitle ("Compare")
+    listTitle: 'Compare: Alternatives, Pricing and Versus',
+    topics: 'alternatives, versus and pricing comparisons of data replication tools'
   }
 }
 
 export function getBlogInstanceKey(pathname) {
   if (pathname === '/customer-stories' || pathname.startsWith('/customer-stories/')) {
     return 'customer-stories'
+  }
+  if (pathname === '/learn' || pathname.startsWith('/learn/')) {
+    return 'learn'
+  }
+  if (pathname === '/compare' || pathname.startsWith('/compare/')) {
+    return 'compare'
   }
   return 'blog'
 }
