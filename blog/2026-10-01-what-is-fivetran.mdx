@@ -1,0 +1,319 @@
+---
+slug: what-is-fivetran
+title: "What Is Fivetran? How It Works, Cost and Fit (2026)"
+description: "What is Fivetran? A plain guide to how its syncs work, its connectors, dbt merger, Iceberg lake output, pricing model, limits and who should skip it."
+tags: [comparison, etl, data-pipeline-tools, data-ingestion, alternatives]
+authors: [priyansh]
+image: /img/blog/cover/what-is-fivetran-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+import quiz from '@site/src/data/quizzes/what-is-fivetran.json';
+
+![Sources flow through a managed sync service into a warehouse or data lake, shown as a three step pipeline](/img/blog/cover/what-is-fivetran-cover.webp)
+
+<TLDR title='Key takeaways'>
+
+Fivetran is a paid, managed service that copies data from apps, databases, files and event streams into a data warehouse or data lake, then keeps that copy fresh. You pick a source, a destination and a schedule, and Fivetran runs the rest. Billing is by monthly active rows (MAR), meaning the distinct rows synced in a calendar month.
+
+Teams that want hands-off pipelines (Fivetran's own pitch) are the likeliest fit. The bill follows usage, so you cannot know it until you estimate your changed rows. A fixed bill, self-hosting or open source code points elsewhere, and its lake output comes with rules to check first.
+
+- Fivetran is an ELT service. ELT means extract, load, then transform: it drops raw data into your destination, and you reshape it there.
+- A new connection copies everything once (the initial sync). After that, it moves only the changes, on a schedule.
+- Pricing is per connection, by monthly active rows (MAR). The pricing page prints no per-row rate, but the Service Consumption Table does.
+- The bill is usage-based, so it is hard to predict: it depends on how many distinct rows change in each connection each month. Estimate that before you sign.
+- For a lake, Fivetran writes and maintains the Iceberg tables. Its docs say not to change them from other tools, and they list gaps worth testing: position deletes, upkeep and transformations.
+
+</TLDR>
+
+Every Fivetran fact below comes from Fivetran's own pages, read between October 1 and October 7, 2026, with the page linked beside the claim. User quotes and the rows for other tools carry their own sources.
+
+Where a number isn't published, we say "not published". We did not run Fivetran, so this is a read of its documents, not a hands-on test. Claims about ease, speed or reliability are Fivetran's claims, and we did not test them.
+
+## What is Fivetran?
+
+Fivetran describes its [connectors](https://fivetran.com/docs/connectors) as pre-built, and says they sync data from applications, databases, event streams and files to a data warehouse or data lake. A connector is a ready-made piece of software for one kind of source, such as a customer relationship management (CRM) tool like Salesforce, or a database like PostgreSQL. The pricing page calls them "fully managed". Taken at its word, that means Fivetran runs them, not you.
+
+![Fivetran home page with the headline Automated data for autonomous agents and a data lake destination card showing Iceberg and Delta Lake](/img/blog/2026/10/what-is-fivetran-home.webp)
+
+*Fivetran home page, October 2026.*
+
+Two words will come up again and again. A **source** is where your data starts, such as a database or a business app. The **destination** is where Fivetran puts the copy, such as a data warehouse or a lake on cloud storage.
+
+Per its [transformations docs](https://fivetran.com/docs/transformations), Fivetran uses the extract, load, transform (ELT) model, so raw data stays available alongside transformed data. Fivetran loads the raw tables into a destination schema (a named folder inside the destination), and the transformations run in your destination.
+
+![Who does what with Fivetran: Fivetran runs connectors and loading, you own SQL models, source setup and cost checks](/img/blog/2026/10/what-is-fivetran-who-does-what.webp)
+
+## How a Fivetran sync works
+
+A sync is one run that moves data from a source to a destination. Fivetran's [sync overview](https://fivetran.com/docs/core-concepts/syncoverview) gives the order of events, and it's short.
+
+1. **Initial sync.** You have to run a historical sync before a connection is usable. The first one is the initial sync, and it copies all the data from the tables you selected.
+2. **Incremental sync.** Once the first run succeeds, the connection switches to incremental mode. Only data that was modified or added gets extracted, processed and loaded on schedule.
+3. **Re-sync.** Found a data integrity error? You can run a historical sync again. That's called a re-sync.
+
+![Fivetran sync overview documentation explaining the initial sync, incremental sync mode, re-sync and daily rollback sync](/img/blog/2026/10/fivetran-sync-overview.webp)
+
+*Fivetran's sync overview page, October 2026.*
+
+Fivetran uses cursors, markers of what it has already processed, so the next run can resume from that point. Its database docs say it also records the time of each row's last sync in a column called `_fivetran_synced`.
+
+### How often does it sync?
+
+Per the sync overview page, you can pick a fixed interval, a cron schedule (a standard way to write timed schedules, on Enterprise and Business Critical plans only), or manual runs through its API. Every six hours is the default, and you can't schedule syncs less often than once every 24 hours.
+
+Database connectors skip that default. Per the [database connector docs](https://fivetran.com/docs/connectors/databases), they sync new and changed data every 15 minutes. The pricing page, covered below, lists 15-minute syncs on Standard and 1-minute syncs on Enterprise.
+
+### How does it catch database changes?
+
+So how does it spot changes in a database?
+
+Fivetran uses the database's own change data capture (CDC) feature or a method of its own, depending on the database. CDC means reading the log where a database writes down every change, so you copy only what changed.
+
+The database docs go database by database. The native routes are the binary log (MySQL's record of changes) for MySQL and MariaDB, logical replication (PostgreSQL's built-in way to stream changes) for PostgreSQL, and change streams (MongoDB's feed of changes) for MongoDB. For SQL Server, they are its Change Data Capture or Change Tracking features.
+
+Teleport Sync is a separate, Fivetran-made method that doesn't read the change log. The [database docs](https://fivetran.com/docs/connectors/databases) recommend it when you can't or don't want to give Fivetran access to your change logs. Their stated limit: if you update large parts of a table between syncs, Teleport Sync may be unable to find the changes, and the connection re-syncs the entire table.
+
+### A documented failure: when the change log runs out
+
+Here's where things can go sideways, and the database docs say so plainly. Change logs expire, either by time or when the storage set aside for them fills up. If Fivetran falls behind for longer than the log is kept, the progress point is gone.
+
+Fivetran's docs say: "Expired change logs require a full source re-sync." For SQL databases, that page names schema changes in the source as the most common trigger for a full table re-sync. On a big table, plan for the extra load and the extra wait.
+
+### A worked example: one orders table
+
+Sometimes a tiny example beats a page of docs. The tables below are an illustration, not a test run: we built them from the columns Fivetran documents, and we did not run Fivetran.
+
+Per Fivetran's [PostgreSQL connector docs](https://fivetran.com/docs/connectors/databases/postgresql), with logical replication a `DELETE` in the source table updates the destination row with `_fivetran_deleted = TRUE`. The database docs say `_fivetran_synced` records when each row last synced.
+
+Source `orders` table at the first sync (T0), then at the next sync (T1):
+
+| Time | id | status |
+|---|---|---|
+| T0 | 1 | new |
+| T0 | 2 | new |
+| T0 | 3 | new |
+| T1 | 1 | new |
+| T1 | 2 | shipped |
+| T1 | 3 | (deleted in the source) |
+| T1 | 4 | new (inserted after T0) |
+
+Destination `orders` table after the T1 sync:
+
+| id | status | _fivetran_deleted | _fivetran_synced |
+|---|---|---|---|
+| 1 | new | false | T0 |
+| 2 | shipped | false | T1 |
+| 3 | new | true | T1 |
+| 4 | new | false | T1 |
+
+Order 3 is still in the destination. It's just flagged.
+
+So your queries have to filter it out. `SELECT count(*) FROM orders` returns 4 here, and adding `WHERE _fivetran_deleted = false` returns 3, which matches the source. Skip the filter and deleted orders show up in your reports.
+
+Now the billing angle. Fivetran's [usage-based pricing docs](https://fivetran.com/docs/usage-based-pricing) say a row is counted once per month, even if it syncs many times. And since January 1, 2026, [deletes count toward paid MAR](https://fivetran.com/docs/core-concepts/usage-based-pricing/pricing-updates/2026-pricing-updates) like any changed row.
+
+If the T1 changes all land in the same month after the initial sync, rows 2, 3 and 4 count as active that month, so that is 3 MAR. Row 1 doesn't count, because it never changed.
+
+Now picture the log window running out between T0 and T1. The changes could not be read, and per the database docs a full source re-sync is then needed. So plan for a full re-copy.
+
+## Fivetran connectors, by type
+
+How big is the catalog? Fivetran's [connector directory](https://www.fivetran.com/connectors) says it moves data from 750+ sources and activates back into 200+ destinations. That 200+ figure counts activation targets, such as CRMs and marketing tools (see Activations below), not warehouses or lakes.
+
+The connectors docs title and the pricing page both say 700+, so quote the page you used.
+
+The docs sort connectors into six groups: Applications, Databases, Events, Files, Functions and Logs. Database connectors read changes from the source database, so they need setup on your side, such as log retention and permissions.
+
+Source missing from the list? The docs describe a Connector SDK, which lets you write a custom connector in Python and run it on Fivetran's infrastructure. They also list a By Request Program for connectors not yet in the catalog.
+
+High-Volume Agent (HVA) connectors are a database group of their own. Fivetran's [HVA docs](https://fivetran.com/docs/connectors/databases/hva-connectors) list Db2 for i, Oracle, SQL Server and SAP (business software). The pricing page lists "enterprise database connectors" from the Enterprise plan up.
+
+## Transformations and the dbt merger
+
+Raw tables are rarely what your analysts want to query. Fivetran's transformations page lists two options. One is pre-built data models that turn raw tables into analytics-ready ones, and the other is a Fivetran-hosted dbt integration, plus dbt Cloud and Coalesce connections.
+
+(dbt, in case you're new to it, is a popular tool for writing SQL transformations.)
+
+All these jobs run in your destination. Up to 5,000 model runs a month are free. One limit to flag: the same page says "Fivetran-hosted Transformations for dbt do not support Managed Data Lake Service destinations", a point we return to below.
+
+On June 1, 2026, Fivetran [announced the completion of its merger with dbt Labs](https://www.fivetran.com/press/fivetran-dbt-labs-complete-merger-to-create-the-data-infrastructure-for-trusted-ai-agents). It was an all-stock deal first announced on October 13, 2025, and the combined company initially operates as Fivetran + dbt Labs.
+
+## Activations: sending data back out
+
+Most of this post is about data flowing in. Activations flips it: it sends data from the warehouse back out into business tools, such as a CRM. This is often called reverse ETL (ETL means extract, transform, load).
+
+Fivetran's pricing page lists 200+ managed activation destinations. Activations bill on monthly active rows too, with their own Free-plan allowance.
+
+## Managed Data Lake Service and Apache Iceberg
+
+Not everyone wants a warehouse. With [Managed Data Lake Service](https://fivetran.com/docs/destinations/managed-data-lake-service), Fivetran writes your data to cloud storage you own: Amazon S3, Azure Data Lake Storage or Google Cloud Storage. It writes Parquet files there and manages the table metadata and upkeep.
+
+Apache Iceberg is an open table format. The short version: it lets several query engines read the same files as ordinary tables.
+
+![Fivetran Managed Data Lake Service documentation describing Apache Iceberg tables on cloud storage](/img/blog/2026/10/fivetran-managed-data-lake-service.webp)
+
+*Fivetran's Managed Data Lake Service page, October 2026.*
+
+On the format, the docs say Fivetran always creates Iceberg metadata for these tables, and can optionally add Delta Lake metadata. The default catalog (the service that tracks your tables) is the Fivetran Catalog, built on Apache Polaris. Per the [catalog docs](https://fivetran.com/docs/destinations/managed-data-lake-service/metadata-catalogs), you can also connect AWS Glue and BigLake metastore for Iceberg tables, and Databricks Unity Catalog and OneLake for Delta Lake metadata.
+
+The [lake docs](https://fivetran.com/docs/destinations/managed-data-lake-service) list 12 compatible query engines, including Amazon Athena, BigQuery, Snowflake, Databricks and DuckDB. So, per its docs, reading the tables from other tools is the intended use.
+
+### What to check before you pick the lake destination
+
+Fivetran says it writes the files, keeps the catalog and runs table upkeep, so you don't build that yourself. We did not test how well it does this. The trade is control: you own the storage bucket, but Fivetran manages the tables in it.
+
+Fivetran's catalog docs are direct: "Do not modify these tables manually or by using any external catalog, as doing so may lead to data integrity issues." Read-only credentials are the default. So ask what your other tools can still do with these tables, using the documented limits below.
+
+| Topic | What the docs state | What to ask Fivetran |
+|---|---|---|
+| Deletes | "Fivetran does not support position deletes for Iceberg tables." The docs recommend avoiding any query that generates them. Position deletes are a way to record removed rows without rewriting files | Which queries in my engine create position deletes, and what happens to a source delete in the lake table? |
+| Other tools | Tables should not be changed from external catalogs, and the docs recommend against deleting metadata files | Can my tools write to these tables, or only read? |
+| Table upkeep | Table snapshots past the retention period are deleted, and at least the last 2 are kept (a snapshot is a saved table version). Orphan files, which no table points to, are moved on the second and fourth Saturdays of each month. The page does not mention compaction | Is compaction, which merges many small files into fewer large ones, done at all, and how often? |
+| Transformations | Fivetran-hosted dbt transformations do not support these destinations. The lake docs list Quickstart data models (Beta) and dbt projects on Lake Compute, a DuckDB-based engine | Which of these will run on my tables, and is Quickstart out of beta? |
+
+A missing upkeep task in the docs isn't proof the service lacks it. So treat the right-hand column as questions to put to Fivetran in a trial, using your own sync interval.
+
+## Deployment, security and compliance
+
+Where does your data actually get processed?
+
+The [deployment models page](https://fivetran.com/docs/deployment-models) describes two options. With SaaS, "data processing is handled entirely within the Fivetran cloud". Hybrid is for teams that "need to keep their data local for security or compliance reasons but still want to benefit from Fivetran managed service".
+
+The pricing page lists hybrid deployment as an Enterprise plan feature. We found no published source licence for the core service, so there is no open source version to download and run.
+
+For a security questionnaire, Fivetran's [security page](https://www.fivetran.com/security) lists System and Organization Controls (SOC) 1 and 2, plus International Organization for Standardization (ISO) 27001. It also lists a commitment to GDPR (EU privacy law) and CCPA (California privacy law). A business associate agreement signed by Fivetran covers HIPAA (US health privacy law).
+
+The page says Health Information Trust Alliance (HITRUST) certification, a healthcare security framework, comes with the Business Critical plan.
+
+## What does Fivetran cost?
+
+Fivetran counts MAR per connection. That one detail drives the examples below.
+
+A row counts once in a month however many times it changes. Some re-syncs are free, but re-synced rows that changed count toward paid MAR, per the [usage-based pricing docs](https://fivetran.com/docs/usage-based-pricing).
+
+The [pricing page](https://www.fivetran.com/pricing) lists four plans: Free, Standard, Enterprise and Business Critical.
+
+| Plan | What the pricing page lists | List rate for the first million MAR |
+|---|---|---|
+| Free | Up to 500,000 MAR for connections, 3,500 MAR for activations, 5,000 model runs | $0 |
+| Standard | 15-minute syncs, 700+ connectors, unlimited users, dbt Core integration | $495 per million, plus a $5 base |
+| Enterprise | Adds 1-minute syncs, enterprise database connectors, hybrid deployment | $661.67 per million, plus a $5 base |
+| Business Critical | Adds customer-managed keys, PCI DSS Level 1, private networking | $1,061.67 per million, plus a $5 base |
+
+One thing to flag: Fivetran publishes no single monthly price, and your bill follows usage. The pricing page prints no per-row rate for the paid plans, but Fivetran's [Service Consumption Table](https://www.fivetran.com/legal/service-consumption-table) does, in version 10, effective February 1, 2026.
+
+Those are list prices, before any annual-contract discount.
+
+![Fivetran pricing page with the Free, Standard, Enterprise and Business Critical plan cards and their included features](/img/blog/2026/10/fivetran-pricing-plans.webp)
+
+*Fivetran's pricing page, October 2026.*
+
+### How a bill is worked out
+
+The table prints one formula, and it's simple enough. Monthly spend for a connection is the base spend, plus your MAR above the threshold, times the incremental spend per million MAR. Partial millions are prorated, and each connection is priced on its own curve.
+
+For one Standard connection, the table's tiers are:
+
+- Up to 1 million MAR: $5 base, plus $495 per million.
+- From 1 million MAR: $500 base, plus $170 per extra million.
+- From 4 million MAR: $1,010 base, plus $58 per extra million.
+- From 16 million MAR: $19.70 per extra million.
+
+![Fivetran Service Consumption Table with incremental spend per million MAR and base spend for Standard, Enterprise and Business Critical connections](/img/blog/2026/10/fivetran-service-consumption-table-connections.webp)
+
+*Fivetran's Service Consumption Table, October 2026.*
+
+Let's put numbers on it. Here are three Standard-plan examples, with the arithmetic ours, from the rates in the screenshot. They are illustrations at list price, not quotes.
+
+| One connection, one month | Calculation | List price |
+|---|---|---|
+| 100,000 MAR | $5 + 0.1 x $495 | $54.50 |
+| 1 million MAR | $5 + 1 x $495 | $500 |
+| 5 million MAR | $1,010 + 1 x $58 | $1,068 |
+
+Sources: [Fivetran Service Consumption Table](https://www.fivetran.com/legal/service-consumption-table), version 10, with the arithmetic ours. Checked October 2026.
+
+The orders table above is far too small to bill like this, so take a separate, made-up workload. One connection has 109,000 distinct rows inserted, updated or deleted in a month, with no discount and no free re-syncs involved.
+
+On Standard that is $5 + 0.109 x $495, or about $59 (the exact figure is $58.955). On Enterprise, at $661.67 per million, it is $5 + 0.109 x $661.67, or about $77.
+
+Rates fall as volume grows, so cost per row drops with size. But each connection has its own curve, and you can't pool MAR across connections for a better rate.
+
+Now two more made-up setups with the same 4 million changed rows in total. One connection costs $1,010. Four connections with 1 million MAR each cost 4 x $500, or $2,000.
+
+There's more fine print: annual contracts, pay-as-you-go and the 2025 and 2026 billing changes each have dated rules.
+
+Your warehouse also sends its own invoice. Fivetran's destination docs say your provider may charge for the compute used when Fivetran loads data, and that sync frequency and data volume drive that cost.
+
+## Limits to know before you buy
+
+- **The bill depends on your change rates.** The rates are published, but the meter counts distinct rows changed, per connection, so you need to know those rates first. The pricing page offers a pricing estimator, which we did not use, and your order form is what binds you.
+- **Re-copies cost time.** For SQL databases, the docs name schema changes as the most common trigger for an automatic full table re-sync. An expired change log means a full source re-sync.
+- **No open source or self-run version.** We found no published source licence. Even the Hybrid model is described as a Fivetran managed service.
+
+## What practitioners say
+
+These are short quotes from public pages, opened on October 1 and 7, 2026. Each is one person's view, and a few quotes can't tell you how common any of these experiences are. We cite none from Fivetran's own customer pages.
+
+- **Cost.** A commenter on Hacker News, in the thread ["A16Z-backed data firms Fivetran, dbt Labs to merge in all-stock deal"](https://news.ycombinator.com/item?id=45573187) (October 2025), wrote "Fivetran is convenient but absurdly expensive."
+- **Sync problems.** A former user wrote in the Hacker News thread ["Fivetran to acquire Census"](https://news.ycombinator.com/item?id=43863587) (May 2025) of "regular (probably once every couple of months) issues with our ETL getting out of sync". The same comment says Fivetran ran the full re-syncs for no charge.
+- **Support.** A [PeerSpot](https://www.peerspot.com/products/fivetran-reviews) reviewer in November 2024 wrote "Vendor support is also slow to respond".
+
+One gap: we found no public user threads on its Iceberg lake destination, so we have no peer view on it.
+
+## Who Fivetran suits, and who should look elsewhere
+
+So, should you pick it?
+
+Fivetran is a reasonable choice when you have many SaaS and database sources and want someone else to run the connectors, and you have a budget for usage-based billing. That bill can swing with your change rates. Its pages also list things some other tools do not: the compliance items on its security page, the Oracle and SAP connectors, or one vendor for loading, dbt and reverse ETL. We did not audit those claims.
+
+Look elsewhere if you need a fixed monthly bill, want open source code, or need a destination Fivetran doesn't list. For a lake, look elsewhere if your other tools need to write to the tables Fivetran manages. [OLake Go](/docs/) writes Iceberg or Parquet to storage you choose, and several query engines read its tables (see the [engine compatibility page](/docs/understanding/compatibility-engines/)).
+
+### Test it against your own needs
+
+A trial or a quote call is the best check. Put these questions to Fivetran, and write down the answers.
+
+- **Capture method.** Which method does it use for each of your databases, and what must you switch on at the source?
+- **Recovery time.** How long would a full re-sync of your largest table take, and what does it do to your source database?
+- **Freshness.** A sync interval isn't a delivery promise, so ask how Fivetran measures the gap between a source change and a row you can query. The pricing page ties 1-minute syncs to Enterprise.
+- **Usage quote.** Work out monthly active rows per connection from your own change rates, price them with the Service Consumption Table, and ask Fivetran to check the result.
+- **Lake rules.** Run the lake table above past your query engine and transformation tool.
+- **Support.** Which response times apply to your plan? One reviewer above found it slow, and we did not test support.
+- **Where it runs.** Do rules force your data to stay in your network? Then Hybrid deployment is the one to look at.
+
+### Fivetran against five other options
+
+Maybe Fivetran isn't your tool. The table sets it beside five common options on one axis, how each bills, using each vendor's own pricing page as of September 30, 2026. For a fuller comparison, see the head-to-head posts below.
+
+| Option | How it bills | Source |
+|---|---|---|
+| Airbyte | Core is open source and self-managed, "always free" (you pay for servers and staff). Cloud bills in credits | [airbyte.com/pricing](https://airbyte.com/pricing) |
+| Hevo | Events: each record inserted, updated or deleted in the destination is 1 event. Free plan up to 1 million events a month | [hevodata.com/pricing](https://hevodata.com/pricing/) |
+| <img src="/img/logo/olake-blue.svg" alt="" height="20" style={{verticalAlign: 'middle', marginRight: '6px'}} />OLake Go | No licence fee: open source under Apache 2.0. You pay for your own servers and storage | [github.com/datazip-inc/olake](https://github.com/datazip-inc/olake) |
+| Matillion | Credits by task hour, not rows. Dollar prices not published | [matillion.com/pricing](https://www.matillion.com/pricing) |
+| Estuary Flow | $0.50 per GB moved, plus connector instances | [estuary.dev/pricing](https://estuary.dev/pricing/) |
+
+Debezium, an open source change data capture project under the Apache License 2.0, has no vendor price, and the real cost is the servers and staff you run it with, per its [license page](https://debezium.io/license/).
+
+## Conclusion
+
+By its own description, Fivetran is a managed copy service, with dbt, reverse ETL and an Iceberg lake destination around it. Before you sign, run the checklist above against your largest database table and your lake tools. Then get one quote from another option, so you have a price to compare.
+
+Want to check what you picked up? Try this quick quiz.
+
+<Quiz {...quiz} />
+
+## FAQs
+
+<Faq showHeading={false} data={[
+{question:"Q1. What is Fivetran in simple words?", answer:"Per Fivetran, it is a managed service that copies data from apps, databases, files and event streams into a data warehouse or lake, and keeps it current. You choose a source and a destination, and Fivetran runs the connector. The transformations then run in your destination, using pre-built data models or dbt."},
+{question:"Q2. Is Fivetran an ETL or an ELT tool?", answer:"ELT. Fivetran's transformations docs say it uses the ELT model, so your raw data is always available alongside your transformed data."},
+{question:"Q3. Is Fivetran free?", answer:"Partly. There's a Free plan, and per Fivetran's pricing page it covers up to 500,000 monthly active rows for connections, 3,500 for activations and 5,000 model runs a month. Paid plans bill on usage, with rates in the Service Consumption Table, for example $495 per million MAR on Standard for the first million. Because the bill follows monthly active rows, estimate yours before you sign."},
+{question:"Q4. How many connectors does Fivetran have?", answer:"The connector directory says 750+ sources, and the connectors docs and pricing page say 700+. Quote the page you used. The 200+ destinations in the directory are activation targets, not warehouses or lakes."},
+{question:"Q5. Does Fivetran support change data capture?", answer:"Per its docs, yes, for many databases. They list native routes such as the MySQL binary log, PostgreSQL logical replication, MongoDB change streams and SQL Server Change Data Capture, plus its own Teleport Sync. Its High-Volume Agent connectors cover Db2 for i, Oracle, SQL Server and SAP."},
+{question:"Q6. Did Fivetran merge with dbt Labs?", answer:"Yes. Fivetran announced the completion of the merger on June 1, 2026, and the combined company initially operates as Fivetran + dbt Labs. The all-stock deal was first announced on October 13, 2025."},
+{question:"Q7. Is Fivetran open source?", answer:"We found no published source licence for the core platform, so we treat it as closed source. Hybrid deployment lets data processing stay in your own network, but the docs describe it as a Fivetran managed service."},
+{question:"Q8. Can Fivetran write Apache Iceberg tables?", answer:"Yes, through Managed Data Lake Service on Amazon S3, Azure Data Lake Storage or Google Cloud Storage. Fivetran always creates Iceberg metadata for these tables. The docs say it does not support Iceberg position deletes and that you should not modify the tables from external catalogs, and its lake page does not mention compaction, so ask Fivetran about it."}
+]} />
+
+<BlogCTA/>
