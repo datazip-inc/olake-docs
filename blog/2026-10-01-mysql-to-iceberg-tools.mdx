@@ -1,0 +1,397 @@
+---
+slug: mysql-to-iceberg-tools
+title: "MySQL to Iceberg Tools: 8 Compared (2026)"
+description: "MySQL to Iceberg tools compared: eight options on binlog setup, catalogs, deletes, upkeep and price, with each tool's documented limits."
+tags: [comparison, iceberg, mysql, cdc, data-pipeline-tools, alternatives]
+authors: [priyansh]
+image: /img/blog/cover/mysql-to-iceberg-tools-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+import quiz from '@site/src/data/quizzes/mysql-to-iceberg-tools.json';
+
+![MySQL to Iceberg tools compared, showing a database flowing through a replication tool into Iceberg tables](/img/blog/cover/mysql-to-iceberg-tools-cover.webp)
+
+<TLDR title='Key takeaways'>
+
+Short version: none of these MySQL to Iceberg tools is best for everyone. They copy MySQL changes into Apache Iceberg using a technique called change data capture (CDC), and your pick depends on who will run it and what you already own.
+
+- Already on Kafka? Look at Kafka Connect.
+- On Flink? Try Flink CDC.
+- Want a vendor to run it for you? Fivetran, Airbyte and Estuary are the ones to check.
+
+Before you commit, ask three things. Which MySQL settings does the tool need, how does it write deletes, and who compacts the small files?
+
+- Most tools here read MySQL through its binary log (the binlog), in ROW format with a full row image.
+- The tools don't agree on the settings. Some tools, such as Supermetal, list `binlog_row_metadata=FULL` in their prerequisites, while the Debezium, Airbyte and Fivetran pages don't.
+- MySQL deletes old binlog files after a set time. Keep your tool down longer than that and you're taking a new snapshot.
+- Fivetran's lake destination doesn't support Iceberg position deletes, and Flink CDC's Iceberg sink needs a primary key. Good to know before you pick.
+
+</TLDR>
+
+Every fact about a tool comes from its own documentation or pricing page, read on 1 October 2026. Prices were re-read on 7 October 2026. When a page says nothing, we write "not stated" instead of guessing.
+
+We did not run the other tools, so any "easy", "fast" or "reliable" claim below about them is the vendor's, not ours. There are no user quotes either, because the public threads we found were about Postgres, SaaS sources or came from vendors, and we would rather print none.
+
+## What "MySQL to Iceberg" involves
+
+Picture it: your MySQL database is busy all day, and you want its changes sitting in cheap storage where query tools can read them as tables. That's the whole job. Two parts matter, how you read MySQL and how you write Iceberg.
+
+![MySQL changes travel through the binary log to a reader tool and land as Iceberg files in a catalog](/img/blog/2026/10/mysql-to-iceberg-tools-pipeline-steps.webp)
+
+**Reading MySQL.** MySQL writes down every change in its binary log, like a diary that never skips an entry. [Debezium's MySQL docs](https://debezium.io/documentation/reference/stable/connectors/mysql.html) call it a record of all operations in commit order, including schema changes. A CDC tool reads each entry and turns it into an insert, update or delete event.
+
+**Three settings decide what your tool can actually see.**
+
+First, `binlog_format` must be `ROW`, so the log holds the changed rows and not just the SQL text. Second, `binlog_row_image` set to `FULL` makes MySQL write every column of the row. Supermetal's docs say it's needed "to capture complete before and after row images".
+
+Third, `binlog_row_metadata` set to `FULL` adds column details to each event. Only some tools ask for this one, which is where the confusion starts.
+
+**The tool joins as a replica.** Fivetran's docs say "we connect to your database as a replica", and Flink CDC's docs say its reader joins the cluster as another server. That means most binlog readers here need their own unique server id and a user with replication privileges, as their docs describe. Fivetran calls it a replica ID, and Estuary has an advanced Node ID setting that it picks for you if you leave it unset.
+
+**GTID is optional in most docs.** A global transaction identifier (GTID) is just a label MySQL sticks on each transaction. Debezium says you don't need it, Supermetal recommends it for failover, and Flink CDC needs it for high availability.
+
+**Snapshot, then changes.** First the tool copies the rows that already exist. That's the initial snapshot. Then it reads the binlog from where the snapshot began, and Debezium's docs explain why that matters: MySQL purges binlogs after a set time.
+
+![A tool back before MySQL purges old logs resumes, while one out too long needs a new snapshot](/img/blog/2026/10/mysql-to-iceberg-tools-binlog-purge.webp)
+
+**Retention is the clock.** MySQL throws old logs away, and it won't wait for your tool. Debezium's docs say that if the saved position is gone, the connector fails and asks for a new snapshot, unless you set `snapshot.mode` to `when_needed`.
+
+Advice on how long to keep logs runs from 3 days at Supermetal to 10 days at Airbyte.
+
+**Writing Iceberg.** Apache Iceberg is a table format: Parquet data files plus metadata that lets engines such as Spark, Trino and Athena treat them as one table. A catalog keeps track of where each table's metadata lives, and many offer a REST (web API) interface. Every commit makes a new snapshot, which is just a saved version of the table.
+
+Updates and deletes get into Iceberg one of two ways. Either you rewrite data files, or you write delete files that mark old rows as removed.
+
+A tool that applies each change this way is said to upsert, meaning update or insert. Equality deletes match rows by key value, and positional deletes point at a file path and row position. Here's the catch: the kind you pick decides which query engines can read the result.
+
+Frequent commits leave lots of small files. Compaction rewrites them into fewer big ones, and old snapshots need expiring too.
+
+## How we picked
+
+We kept the rules simple. A tool made the list if its own docs show a MySQL source and an Apache Iceberg destination, or a documented route to one. Then we compared how each reads MySQL, how it writes updates, deletes and schema changes, who compacts, what the price is based on, and what the docs say it cannot do.
+
+One name you might expect is missing, Amazon Data Firehose. [AWS's launch post](https://aws.amazon.com/blogs/aws/replicate-changes-from-databases-to-apache-iceberg-tables-using-amazon-data-firehose/) for its database-to-Iceberg feature now says the preview ended on 30 September 2025 and the capability cannot be tried.
+
+Each tool's documented strengths and scope sit side by side in the tables below.
+
+## MySQL to Iceberg Tools at a Glance
+
+**Reading MySQL**
+
+| Tool | Binlog settings the docs list | Retention advice in docs |
+| --- | --- | --- |
+| Debezium Server with community Iceberg sink | ROW, row image FULL; row metadata not listed | Example of 10 days |
+| <img src="/img/logo/olake-blue.svg" alt="" height="20" style={{verticalAlign: 'middle', marginRight: '6px'}} />OLake Go (MySQL 5.7 or newer) | ROW, row image FULL, row metadata FULL listed | 7 days in the generic guide |
+| Kafka Connect: Debezium source plus Iceberg sink | Same as Debezium | Same as Debezium |
+| Flink CDC | Row image and metadata not stated on pages we read | Not stated |
+| Airbyte | ROW, row image FULL; row metadata not listed | 10 days recommended |
+| Fivetran (binary log method) | ROW; row image and metadata not listed | 1 day minimum, 7 recommended |
+| Estuary | ROW; row metadata listed only in the Aurora steps | At least 7 days |
+| Supermetal (MySQL 5.7 or newer) | ROW, row image FULL, row metadata FULL | 3 days recommended |
+
+**Table behaviour and price**
+
+| Tool | Updates and deletes | Schema changes | Compaction and cleanup | Pricing basis (read Oct 2026) |
+| --- | --- | --- | --- | --- |
+| Debezium Server sink | Append by default; upsert is a setting | New columns added by default | Not on the Debezium page; the sink's own FAQ says to run periodic maintenance | Free (Apache 2.0), you pay for servers |
+| <img src="/img/logo/olake-blue.svg" alt="" height="20" style={{verticalAlign: 'middle', marginRight: '6px'}} />OLake Go | Upsert with equality deletes, positional deletes or deletion vectors (v0.11.0 and later); or append | [Adds, drops and renames detected; type widening](/docs/features/schema/) | OLake Fusion (Lite, Medium, Full) | Free (Apache 2.0), you pay for servers |
+| Kafka Connect | CDC feature, fed by an experimental Debezium transform | Off by default | Not covered | No licence fee, you pay for Kafka and servers |
+| Flink CDC | Primary key required; at-least-once | MySQL source sends schema changes by default | Not described | Free, you pay for the Flink cluster |
+| Airbyte | Dedup mode: equality delete plus insert; or append | Add, drop, widen a column; never rewrites old files | Not described | Core free; Cloud on credits |
+| Fivetran | No position deletes; method not stated | Not stated | Daily snapshot cleanup; compaction not listed | Monthly active rows for connectors; no lake-specific rate found |
+| Estuary | Spark jobs merge updates; delete file type not stated | Not stated | Optional Glue optimizers, off by default | [$0.50 per GB moved plus connector instances](https://estuary.dev/pricing/), read 7 Oct 2026 |
+| Supermetal | Merge-on-read (equality by default, or positional) or append | No data type promotion; partition changes need a new table | You run it, with Spark or Trino | Compute based; Enterprise Self-Hosted "from $10K/ year", per its [pricing page](https://supermetal.io/pricing), read 7 Oct 2026 |
+
+Prices change often, so double-check the vendor's page before you budget. Estuary's and Supermetal's figures are quoted as the vendors print them.
+
+## The 8 tools, one at a time
+
+### 1. Debezium Server with the community Iceberg sink: best for Kafka-free Debezium
+
+![Debezium home page showing its headline and main navigation](/img/blog/2026/10/landing-debezium.webp)
+
+*Debezium home page, October 2026.*
+
+**At a glance:** Apache 2.0 · self-hosted · Java 21 · free licence
+
+Debezium is an open-source change reader. [Debezium Server's docs](https://debezium.io/documentation/reference/stable/operations/debezium-server.html) describe an Iceberg sink that consumes events from a source Debezium connector and calls it "a community-maintained, open-source project" kept in a separate repository.
+
+![Debezium MySQL docs section on enabling the binlog with server-id, log_bin, binlog_format ROW and binlog_row_image FULL](/img/blog/2026/10/mysql-to-iceberg-tools-debezium-binlog.webp)
+
+*Debezium's MySQL connector documentation, October 2026.*
+
+**What's good**
+
+- Its docs describe running Debezium's own MySQL reader without Kafka, which is the main reason to pick it.
+- The MySQL docs spell out the user privileges and cover Amazon RDS and Aurora, where the snapshot needs `LOCK TABLES`.
+
+**Where it falls short**
+
+- It's community maintained, not part of Debezium's core, and the Iceberg sink's docs page doesn't list supported catalogs. Its own [FAQ](https://memiiso.github.io/debezium-server-iceberg/faq/) says upsert tables need periodic jobs to compact data and rewrite delete files.
+- Upsert is off by default, so a fresh setup just appends every event (the sink's [configuration page](https://github.com/memiiso/debezium-server-iceberg/blob/master/docs/iceberg.md) lists the settings). Even once upsert is on, deleted rows are kept and marked unless you change a second setting.
+- On RDS the binlog stays off unless automated backups are on, and `binlog_row_value_options` must not be `PARTIAL_JSON`. Both come from the MySQL docs.
+
+### 2. OLake Go: best for a self-hosted MySQL to Iceberg job run from a UI
+
+<img src="/img/logo/olake-blue-with-text.svg" alt="OLake" height="32" style={{display: 'block', margin: '2px 0 14px'}} />
+
+![OLake home page showing its headline and main navigation](/img/blog/2026/10/landing-olake.webp)
+
+*OLake home page, October 2026.*
+
+**At a glance:** Apache 2.0 · self-hosted · UI or CLI · Iceberg or Parquet only
+
+OLake Go is open source under Apache 2.0 and copies databases into Iceberg tables on storage you control. It reads the binlog on MySQL 5.7 or newer and supports the MariaDB flavour as a CDC source (see the [MySQL connector page](/docs/connectors/mysql/)).
+
+It has four sync modes:
+
+- Full Refresh (`full_refresh`) copies every row.
+- Full Refresh + Incremental (`incremental`) copies rows past a cursor column, such as an updated-at timestamp.
+- Full Refresh + CDC (`cdc`) takes a snapshot, then reads the binlog.
+- CDC Only (`strict_cdc`) reads the binlog with no initial snapshot.
+
+**What's good**
+
+- Catalogs include Glue, JDBC, Hive and REST catalogs such as Lakekeeper and S3 Tables, on S3, MinIO, GCS or Azure Data Lake Storage Gen2.
+- You choose between equality deletes, positional deletes and deletion vectors, which lets you match your query engine, subject to the reader limits below.
+- Full loads use parallel chunking and automatic resume for failed runs, with setup guides for Aurora, RDS, Azure and Cloud SQL.
+- Compaction is covered too, as [OLake Fusion](/docs/fusion/compaction/types-of-compaction/), with Lite, Medium and Full types.
+
+**Good to know**
+
+- You run it on your own infrastructure, through the UI or the command line (see the [UI install guide](/docs/install/olake-ui/)).
+- Deletion vectors are an Iceberg v3 feature that the [v0.11.0 release notes](/docs/release/ingestion/v0.11.0/) add as a delete mode. Pick the delete mode that matches your query engine, and use the [engine compatibility page](/docs/understanding/compatibility-engines/) to see which engines read each one.
+- The [catalogs compatibility page](/docs/understanding/compatibility-catalogs/) lists Nessie and Polaris as REST catalogs with setup links.
+- The prerequisites list `binlog_row_metadata=FULL`, and the v0.10.0 [release notes](/docs/release/ingestion/v0.10.0/) say MySQL CDC also works without it.
+- MySQL `BINARY` columns written to Iceberg are tracked in an [open issue in the OLake repository](https://github.com/datazip-inc/olake/issues/1031), reported on v0.8.2.
+
+**Bottom line:** Pick OLake Go if you want a UI, a documented catalog list and no licence fee. Fivetran, Airbyte Cloud and Estuary suit teams that want a vendor to run the pipeline, and Kafka Connect suits several systems reading one change stream.
+
+![MySQL connector docs page listing binary logging prerequisites including ROW format, row image, row metadata and optional GTID](/img/blog/2026/10/mysql-to-iceberg-tools-olake-prereq.webp)
+
+*The OLake Go MySQL connector page, October 2026.*
+
+### 3. Kafka Connect with a Debezium source and the Iceberg sink: best for teams already on Kafka
+
+![Kafka Connect home page showing its headline and main navigation](/img/blog/2026/10/landing-kafka-connect.webp)
+
+*Kafka Connect home page, October 2026.*
+
+**At a glance:** you run Kafka and Kafka Connect · Iceberg sink from the Iceberg project · no licence fee
+
+[The Iceberg docs](https://iceberg.apache.org/docs/nightly/kafka-connect/) describe a Kafka Connect sink that writes Kafka data into Iceberg tables, and name Debezium source connectors as the way to bring database changes into Kafka. Debezium reads MySQL into Kafka topics, and the sink moves them on from there. Exactly-once delivery is a listed feature, and it relies on Kafka 2.5 or later.
+
+**What's good**
+
+- Many consumers can read the same Kafka topics, so the lake is just one of several readers.
+- Catalog examples include REST, Glue, Nessie and Hive, and one sink can write several tables.
+
+**Where it falls short**
+
+- Heads up: the Debezium transform that prepares change events is marked experimental in the Iceberg docs.
+- Table creation and schema evolution are off by default, and the page doesn't cover compaction.
+- You end up running three systems, not one.
+
+### 4. Flink CDC: best for teams that already run Flink
+
+![Apache Flink CDC home page showing its headline and main navigation](/img/blog/2026/10/landing-flink-cdc.webp)
+
+*Apache Flink CDC home page, October 2026.*
+
+**At a glance:** Apache 2.0 · runs on Apache Flink · Java 11 or newer · pipeline YAML
+
+Flink CDC has a MySQL pipeline source and an Iceberg pipeline sink, so both halves live in one project. The [MySQL source docs](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/pipeline-connectors/mysql/) describe a snapshot followed by the changes. The [Iceberg sink docs](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/pipeline-connectors/iceberg/) list automatic table creation, schema synchronisation, and batch or streaming writes.
+
+**What's good**
+
+- One tool covers both the snapshot and the change stream, and the snapshot is split into chunks of 8,096 rows by default.
+- Per the docs, unlike the Postgres source, the MySQL source sends schema change events by default, so the sink can follow table changes.
+
+**Where it falls short**
+
+- The MySQL JDBC driver isn't bundled, because its GPLv2 licence doesn't fit the project. You download `mysql-connector-java` 8.0.27 yourself and pass it with `--jar`.
+- The source table must have a primary key, and the Iceberg sink doesn't offer exactly-once semantics. It's at-least-once, so the docs lean on the primary key to make a repeated write give the same result.
+- Catalog types are Hadoop, Hive, Glue or a custom class. REST isn't stated, and each parallel reader needs its own server id.
+
+### 5. Airbyte: best for teams that want one tool for databases and SaaS apps
+
+![Airbyte home page showing its headline and main navigation](/img/blog/2026/10/landing-airbyte.webp)
+
+*Airbyte home page, October 2026.*
+
+**At a glance:** Core self-managed (Elastic License 2.0) · Cloud · Enterprise Flex hybrid · S3 Data Lake destination
+
+Airbyte's [MySQL source](https://docs.airbyte.com/integrations/sources/mysql) reads the binlog and recommends CDC over its cursor-based method. Its [S3 Data Lake destination](https://docs.airbyte.com/integrations/destinations/s3-data-lake) calls itself "official support for the Iceberg protocol on S3" and supports REST, Glue, Nessie and Polaris catalogs. The two live on separate docs pages.
+
+**What's good**
+
+- Airbyte's [connectors page](https://airbyte.com/connectors), read 7 October 2026, counts its connectors in the hundreds, so MySQL is one of many sources you can wire up.
+- The MySQL page lists the exact settings and suggests 10 days of retention.
+- Deduplication is documented as merge-on-read, meaning updates are written as delete files and applied when you query. Each update is an equality delete plus an insert. Core is free to self-host, and Cloud is credit based.
+
+**Where it falls short**
+
+- On Amazon RDS, the binlog retention parameter defaults to 0 hours. The docs say that means logs are removed at once, so you must raise it.
+- The destination never rewrites existing Iceberg data files, so only some schema changes work, and objects are written as JSON strings. The page doesn't describe compaction.
+- Core uses the Elastic License 2.0, which is NOT an open-source licence. Syncs run on a schedule, not as a continuous stream.
+
+### 6. Fivetran Managed Data Lake Service: best for hands-off, vendor-run pipelines
+
+**At a glance:** SaaS · writes Parquet to your S3, Azure or GCS bucket · Iceberg metadata always created · monthly active rows pricing
+
+[Fivetran's MySQL setup guide](https://fivetran.com/docs/connectors/databases/mysql/setup-guide) offers the binary log or Teleport Sync, and wants `binlog_format=ROW`. Its [Managed Data Lake Service docs](https://fivetran.com/docs/destinations/managed-data-lake-service) say your data stays in your cloud storage while Fivetran keeps the Iceberg metadata. We found no page that pairs the two, so treat Fivetran as a conditional candidate and ask it to confirm the combination.
+
+**What's good**
+
+- Fivetran's docs say it runs the pipeline and the table upkeep, including snapshot cleanup every day. We have not tested that.
+- Per its docs, your data stays in your own bucket, with a Fivetran Catalog built on Apache Polaris by default, or another supported catalog.
+
+**Where it falls short**
+
+- The lake docs say there's no support for Iceberg position deletes, and they don't say which delete method is used.
+- Teleport Sync, the alternative to the binary log, "disables large, rapidly changing tables if they fail to sync". Compaction isn't in the lake page's list of maintenance operations.
+- The destination runs as SaaS only. Fivetran's connector pricing counts monthly active rows, and we found no separate lake rate.
+
+**Ask Fivetran before you rely on it:** does the MySQL connector write to the Managed Data Lake Service, which delete method it uses, and what the lake destination adds to the monthly active rows bill.
+
+![Fivetran Managed Data Lake Service docs saying it always creates Apache Iceberg metadata for tables in your cloud storage](/img/blog/2026/10/mysql-to-iceberg-tools-fivetran-mdls.webp)
+
+*Fivetran's Managed Data Lake Service documentation, October 2026.*
+
+### 7. Estuary: best for AWS teams that want a vendor to run it
+
+![Estuary Flow home page showing its headline and main navigation](/img/blog/2026/10/landing-estuary.webp)
+
+*Estuary Flow home page, October 2026.*
+
+**At a glance:** Cloud, private or Bring Your Own Cloud (BYOC) · Business Source License · MySQL capture plus Iceberg materialization
+
+Estuary's [MySQL capture docs](https://docs.estuary.dev/reference/Connectors/capture-connectors/MySQL/) need `binlog_format=ROW` and a binlog expiry of at least 7 days. Its [Iceberg connector](https://docs.estuary.dev/reference/Connectors/materialization-connectors/apache-iceberg/) works differently: it "orchestrates Spark jobs running on your configured compute system to merge updates into materialized tables".
+
+**What's good**
+
+- One product documents both MySQL capture and Iceberg materialization, plus a hosted option, with MySQL setup steps for self-hosted, RDS, Aurora, Cloud SQL and Azure.
+- The docs describe catalog setups for Glue, Snowflake Open Catalog and Dremio Cloud.
+
+**Where it falls short**
+
+- The Iceberg connector needs an AWS EMR Serverless application you configure, an S3 staging bucket and IAM roles. That is three AWS pieces to set up before a first sync.
+- Today it supports only REST catalogs on Amazon S3 storage. GCP and Azure are planned.
+- Billing has two meters. Estuary's [pricing page](https://estuary.dev/pricing/) (read 7 October 2026) lists $0.50 per GB moved, plus connector instances: $100 a month each for the first six, $50 each after that. It also lists a free tier of 10 GB a month with 2 connector instances.
+
+**Ask Estuary before you rely on it:** how GB moved is counted for a busy MySQL table, since the bill has two meters.
+
+### 8. Supermetal: best for a single self-hosted agent priced on compute
+
+![Supermetal home page showing its headline and main navigation](/img/blog/2026/10/landing-supermetal.webp)
+
+*Supermetal home page, October 2026.*
+
+**At a glance:** Self-hosted, described by Supermetal as a single binary · Iceberg V3 or V2 · compute-based price · licence not stated
+
+Supermetal's [Iceberg target docs](https://docs.supermetal.io/docs/main/targets/iceberg/) say it writes Parquet to Iceberg through REST, Glue or S3 Tables catalogs on S3 or GCS. New tables default to Iceberg V3, and V2 is selectable for engines that lack V3 support. Its MySQL source reads the binlog and takes snapshots in parallel.
+
+**What's good**
+
+- You get merge-on-read by default (updates are written as delete files and applied at query time), or positional deletes only, per its docs.
+- The MySQL source works without GTID, so that's one less thing to turn on.
+- Pricing is compute based, and there's a free trial of 1,000 sync hours on that page. Its [pricing page](https://supermetal.io/pricing), read 7 October 2026, shows Enterprise Self-Hosted "from $10K/ year".
+
+**Where it falls short**
+
+- Data type promotion isn't supported yet, and changing partitioning needs a new table.
+- Compaction is on you, using Spark, Trino or a table service.
+- It asks for `binlog_row_metadata=FULL`, it's paid after the trial and the free pilot on its pricing page, and the pages we read don't state a licence.
+
+![Supermetal MySQL source docs listing binlog_format ROW, binlog_row_image FULL and binlog_row_metadata FULL as required settings](/img/blog/2026/10/mysql-to-iceberg-tools-supermetal-mysql.webp)
+
+*Supermetal's MySQL source documentation, October 2026.*
+
+## Also considered
+
+Three more names keep coming up in searches. They don't get a full entry.
+
+**RisingWave** is a streaming engine. Its [MySQL CDC docs](https://docs.risingwave.com/ingestion/sources/mysql/mysql-cdc) list MySQL 5.7, 8.0 and 8.4, plus MariaDB and TiDB, and ask for a unique server id. Its [Iceberg docs](https://docs.risingwave.com/iceberg/overview) describe automatic maintenance and a manual `VACUUM FULL` that compacts data files.
+
+Some compaction behaviour needs a licence, per its [release notes](https://docs.risingwave.com/changelog/release-notes). It fits if you also want to run SQL on the stream.
+
+**AWS Database Migration Service (DMS)** reads MySQL's row-based binary logs. Apache Iceberg isn't in its list of target endpoints, though Amazon S3 and Kafka are. So you'd have to build an extra step to reach Iceberg.
+
+**Upsolver** now sits inside Qlik as [Qlik Open Lakehouse](https://www.qlik.com/us/products/qlik-open-lakehouse), which Qlik says "writes data as fully spec-compliant Apache Iceberg tables". The pages we read don't say which databases it reads by log.
+
+![AWS DMS docs heading listing target endpoints including Amazon S3, Kinesis Data Streams and Apache Kafka, with no Iceberg entry](/img/blog/2026/10/mysql-to-iceberg-tools-dms-targets.webp)
+
+*AWS DMS target endpoints documentation, October 2026. Iceberg is not on the list.*
+
+## Which Route for Which Team
+
+Short answer: pick by what you already run, then read the "watch for" column before you get excited.
+
+![Which route fits: self-run tools for Kafka, Flink or fewer parts, and vendor-run or compute-priced options for hands-off teams](/img/blog/2026/10/mysql-to-iceberg-tools-which-route.webp)
+
+| Your situation | Look first at | Watch for |
+| --- | --- | --- |
+| You already run Kafka and several teams read changes | Kafka Connect with Debezium | Experimental transform; you run three systems |
+| You already run Flink | Flink CDC | Primary key needed; MySQL JDBC driver added by you |
+| You want a vendor to run it | Fivetran, Airbyte Cloud or Estuary | Position deletes, EMR Serverless, credits |
+| You want few moving parts | OLake Go or Debezium Server | Both run on your own servers |
+| You want one self-hosted agent and have a budget | Supermetal | Paid tier; no type promotion |
+
+<Quiz {...quiz} />
+
+## MariaDB notes
+
+MariaDB has a binlog like MySQL's, but tools treat it differently. Debezium and Estuary each have a separate MariaDB connector, and Flink CDC lists MariaDB 10.x with MySQL versions.
+
+Fivetran's connector list names MariaDB for the binary log method. Airbyte and Supermetal pages we read don't.
+
+## How to test before you commit
+
+This is a test plan, not results. Take each finalist for a spin on one table with real deletes, updates and a large text column.
+
+1. Run `DELETE FROM orders WHERE id = 1;`, then read the table from your engine. Pass: the row is gone.
+2. Update another column on a row with a large text value. Pass: the large value is intact, and `SHOW VARIABLES LIKE 'binlog_row_image';` returns FULL.
+3. Run `ALTER TABLE orders ADD COLUMN note VARCHAR(50);`. Pass: the tool carries it over, or fails loudly.
+4. In a test system, stop the tool for longer than your binlog retention, then run `SHOW BINARY LOGS;`. Make a few inserts, updates and deletes while the tool is stopped, then compare the source and Iceberg rows after it comes back. Pass: the tool says plainly that it needs a new snapshot, or the two sides match exactly. A silent gap in the data is a fail, full stop.
+5. After a day, query the Iceberg `files` metadata table, for example `SELECT file_path, file_size_in_bytes FROM my_catalog.my_db.orders.files;` in Spark. Lots of tiny files mean you need a compaction plan.
+
+## FAQs
+
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. What is the easiest way to replicate MySQL to Iceberg?",
+    answer: "A vendor-run service means less to operate yourself, such as Fivetran, Airbyte Cloud or Estuary, but each has limits in its docs and we have not tested any of them. Self-run tools put the operating work on your team. So ask yourself who'll carry the pager."
+  },
+  {
+    question: "Q2. Do I need Kafka to move MySQL changes into Iceberg?",
+    answer: "Nope. The Debezium Server Iceberg sink runs Debezium without Kafka, and Flink CDC, Airbyte, Fivetran, Estuary and Supermetal also read MySQL directly. Only the Kafka Connect route needs Kafka."
+  },
+  {
+    question: "Q3. Which MySQL settings do I need for CDC?",
+    answer: "Every set of MySQL source docs we read lists three things: binary logging on, binlog_format set to ROW and a user with replication privileges. A unique server id (a replica ID at Fivetran) is listed by all of them (an optional Node ID at Estuary), and most also want binlog_row_image set to FULL. Supermetal lists binlog_row_metadata set to FULL in its prerequisites, and Estuary lists it only in its Aurora steps."
+  },
+  {
+    question: "Q4. What happens if my tool is down longer than the binlog retention?",
+    answer: "That's the awkward one. MySQL purges old binlog files by age, and Debezium's docs say that if the saved position is gone, the connector fails and needs a new snapshot, unless snapshot.mode is when_needed. Rule of thumb: keep retention longer than your worst outage."
+  },
+  {
+    question: "Q5. How are deletes handled in MySQL CDC to Iceberg?",
+    answer: "It depends on the tool. Either it writes delete files (equality or positional) or it merges changes into rewritten data files, as Estuary does with Spark jobs. Debezium's Iceberg sink appends by default, Fivetran's lake destination doesn't support position deletes, and Flink CDC needs a primary key."
+  },
+  {
+    question: "Q6. Do I need to compact Iceberg tables?",
+    answer: "Yes, if you write often, because CDC leaves a trail of small files. Fivetran lists cleanup tasks, and Supermetal leaves it to you. The Debezium sink's FAQ also advises periodic maintenance jobs."
+  },
+  {
+    question: "Q7. Which of these tools have no licence fee?",
+    answer: "A few. Debezium Server and its sink, Kafka Connect with the Iceberg sink and Flink CDC carry no licence fee, and Airbyte Core is free under the Elastic License 2.0. You still pay for servers and people's time, though. Fivetran, Estuary and Supermetal charge for use, beyond any free tier, trial or pilot."
+  }
+]} />
+
+## Conclusion
+
+MySQL to Iceberg is really two jobs: reading a binlog safely and writing tables that stay fast. The tools differ most in the settings they demand, how they handle deletes, and who compacts the files, so test those on your own data first.
+
+One last tip: from day one, watch the tool's lag against your remaining retention. If the lag grows toward the retention window, the oldest logs MySQL keeps are closing in on the tool's saved position, so step in before they pass it.
+
+<BlogCTA/>
