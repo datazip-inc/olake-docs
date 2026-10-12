@@ -1,63 +1,52 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { PiArrowClockwise, PiChartBar, PiColumns, PiTable } from 'react-icons/pi'
-import Section from '../ui/Section'
-import SectionHeading from '../ui/SectionHeading'
-import Card from '../ui/Card'
+import React, { useRef, useState } from 'react'
 import { cn } from '@site/src/lib/utils'
-import {
-  GO_FEATURES,
-  GO_FEATURES_INTRO,
-  type GoFeatureArt
-} from '@site/src/data/landing/go/features'
-import FeatureVisual from './FeatureVisual'
-import { useFeatureCycle } from './useFeatureCycle'
+import { GO_FEATURES, GO_FEATURES_INTRO } from '@site/src/data/landing/go/features'
+import GoFeatureMock from './GoFeatureMock'
 
-const ICONS: Record<GoFeatureArt, React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>> = {
-  tiered: PiChartBar,
-  decay: PiTable,
-  chunk: PiColumns,
-  resume: PiArrowClockwise
-}
+const IMG = '/img/landing/go'
 
-/** The feature selector: four tabs on the left, the active capability's card on the right. */
+/**
+ * "Features": a pill tab strip over the blue feature card. The card keeps the job-editor picture
+ * for every tab; its heading and copy follow the selected capability.
+ */
 export default function GoFeatures() {
-  const { ref, active, progress, select } = useFeatureCycle(GO_FEATURES.length)
+  const [active, setActive] = useState(0)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
-  // The card slides in when the feature changes, but not on the first paint.
-  const [changed, setChanged] = useState(false)
-  const first = useRef(true)
-  useEffect(() => {
-    if (first.current) {
-      first.current = false
-      return
-    }
-    setChanged(true)
-  }, [active])
+
+  const select = (index: number) => {
+    setActive(index)
+    tabRefs.current[index]?.focus()
+  }
 
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
     const last = GO_FEATURES.length - 1
-    let next = index
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = index === last ? 0 : index + 1
-    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = index === 0 ? last : index - 1
-    else if (event.key === 'Home') next = 0
-    else if (event.key === 'End') next = last
+    if (event.key === 'ArrowRight') select(index === last ? 0 : index + 1)
+    else if (event.key === 'ArrowLeft') select(index === 0 ? last : index - 1)
+    else if (event.key === 'Home') select(0)
+    else if (event.key === 'End') select(last)
     else return
     event.preventDefault()
-    select(next)
-    tabRefs.current[next]?.focus()
   }
 
   const feature = GO_FEATURES[active]
-  const Icon = ICONS[feature.art]
 
   return (
-    <Section id='features' className='go-features-tint'>
-      <SectionHeading eyebrow={GO_FEATURES_INTRO.eyebrow} title={GO_FEATURES_INTRO.title} />
-      <div
-        ref={ref}
-        className='mt-[24px] grid grid-cols-1 gap-[20px] lg:mt-[44px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-[40px]'
-      >
-        <div role='tablist' aria-label={GO_FEATURES_INTRO.title} className='flex flex-col'>
+    <section id='features' className='px-[16px] pb-[48px] lg:px-[24px] lg:pb-[96px]'>
+      <div className='mx-auto max-w-[1018px] rounded-[20px] border border-solid border-olake-line-rule bg-olake-surface px-[12px] pt-[40px] pb-[12px] lg:rounded-[24px] lg:px-[19px] lg:pt-[70px] lg:pb-[20px]'>
+        <div className='px-[8px] text-center'>
+          <p className='text-[15px] leading-[1.3] text-olake-muted lg:text-[16px]'>
+            {GO_FEATURES_INTRO.eyebrow}
+          </p>
+          <h2 className='mx-auto mt-[10px] max-w-[596px] text-[30px] leading-[1.2] font-normal text-balance text-olake-ink lg:mt-[12px] lg:text-[48px] lg:leading-[56px]'>
+            {GO_FEATURES_INTRO.title}
+          </h2>
+        </div>
+
+        <div
+          role='tablist'
+          aria-label='OLake Go features'
+          className='mt-[28px] flex [scrollbar-width:none] overflow-x-auto lg:mt-[62px] lg:justify-center'
+        >
           {GO_FEATURES.map((item, i) => {
             const selected = i === active
             return (
@@ -72,60 +61,61 @@ export default function GoFeatures() {
                 aria-selected={selected}
                 aria-controls='go-feature-panel'
                 tabIndex={selected ? 0 : -1}
-                onClick={() => select(i)}
+                onClick={() => setActive(i)}
                 onKeyDown={(event) => onKeyDown(event, i)}
                 className={cn(
-                  'go-tab group cursor-pointer border-0 bg-transparent p-0 text-left',
-                  'rounded-[8px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue'
+                  'shrink-0 cursor-pointer rounded-[16px] border-0 px-[18px] py-[4px] text-[16px] leading-[1.3] whitespace-nowrap transition-colors',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue',
+                  selected
+                    ? 'bg-[#eeeeee] text-[rgba(0,0,0,0.88)]'
+                    : 'bg-transparent text-olake-muted hover:text-olake-ink'
                 )}
               >
-                <span
-                  className={cn(
-                    'block py-[16px] text-[17px] leading-[1.3] transition-colors lg:py-[22px] lg:text-[20px]',
-                    selected ? 'text-olake-ink' : 'text-olake-muted group-hover:text-olake-text'
-                  )}
-                >
-                  {item.title}
-                </span>
-                <span aria-hidden='true' className='block h-px w-full bg-olake-line-rule'>
-                  <span
-                    className='go-tab-fill block h-px w-full origin-left bg-olake-blue'
-                    style={{ transform: `scaleX(${selected ? progress / 100 : 0})` }}
-                  />
-                </span>
+                {item.tab}
               </button>
             )
           })}
         </div>
 
-        <Card className='flex flex-col'>
+        <div
+          role='tabpanel'
+          id='go-feature-panel'
+          aria-labelledby={`go-feature-tab-${feature.id}`}
+          className='relative isolate mt-[24px] flex flex-col overflow-hidden rounded-[24px] border border-solid border-[#f4f4f4] bg-(--go-blue-deep) shadow-[1px_2px_4px_0_rgba(0,0,0,0.05)] lg:mt-[47px] lg:block lg:h-[526px] lg:rounded-[30px]'
+        >
+          {/* Dithered blue field, anchored to the top right, and the blue glow at the bottom left */}
+          <img
+            src={`${IMG}/feature-cdc-background.png`}
+            alt=''
+            width={2384}
+            height={1000}
+            loading='lazy'
+            decoding='async'
+            className='pointer-events-none absolute top-[-41px] right-[-1px] -z-10 block h-[1107px] w-[2639px] max-w-none object-cover'
+          />
+          <img
+            src={`${IMG}/feature-glow.svg`}
+            alt=''
+            width={1112}
+            height={802}
+            loading='lazy'
+            decoding='async'
+            className='pointer-events-none absolute bottom-[-321px] left-[-391px] -z-10 block max-w-none'
+          />
+
           <div
-            role='tabpanel'
-            id='go-feature-panel'
-            aria-labelledby={`go-feature-tab-${feature.id}`}
-            className={cn('flex flex-1 flex-col', changed && 'go-card-in')}
             key={feature.id}
+            className='go-fade-in px-[24px] pt-[28px] lg:absolute lg:bottom-[63px] lg:left-[49px] lg:w-[323px] lg:p-0'
           >
-            <span
-              aria-hidden='true'
-              className='go-feature-tile m-[16px] mb-0 flex h-[40px] w-[40px] items-center justify-center rounded-[10px] text-olake-on-blue lg:mx-[24px] lg:mt-[24px]'
-            >
-              <Icon size={22} aria-hidden />
-            </span>
-            <div className='mt-[16px]'>
-              <FeatureVisual art={feature.art} />
-            </div>
-            <div className='flex-1 border-0 border-t border-solid border-olake-line px-[18px] pb-[22px] pt-[20px] lg:px-[36px] lg:pb-[30px] lg:pt-[26px]'>
-              <h3 className='text-[17px] font-normal leading-[1.3] text-olake-ink lg:text-[22px]'>
-                {feature.title}
-              </h3>
-              <p className='mt-[10px] min-h-[66px] text-[13px] leading-[1.6] text-olake-text-2 lg:text-[14px] lg:leading-[1.65]'>
-                {feature.body}
-              </p>
-            </div>
+            <h3 className='text-[22px] leading-[1.3] font-medium text-[#fdfdfc] lg:w-[258px] lg:text-[24px]'>
+              {feature.title}
+            </h3>
+            <p className='mt-[8px] text-[14px] leading-[1.3] text-white'>{feature.body}</p>
           </div>
-        </Card>
+
+          <GoFeatureMock className='mx-auto mt-[28px] mb-[16px] w-[calc(100%-32px)] lg:absolute lg:top-[52px] lg:right-[36px] lg:m-0 lg:w-[514px]' />
+        </div>
       </div>
-    </Section>
+    </section>
   )
 }

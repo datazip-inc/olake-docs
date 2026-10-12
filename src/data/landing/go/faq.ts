@@ -7,7 +7,9 @@ export interface GoFaq {
   a: string
 }
 
-export const GO_FAQ_TITLE = 'Frequently Asked Questions'
+export const GO_FAQ_EYEBROW = 'FAQs'
+
+export const GO_FAQ_TITLE = 'You might have some questions'
 
 export const GO_FAQS: GoFaq[] = [
   {
@@ -32,6 +34,6 @@ export const GO_FAQS: GoFaq[] = [
   },
   {
     q: 'What data platforms and tools does OLake Go integrate with?',
-    a: "As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery."
+    a: 'As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery.'
   }
 ]

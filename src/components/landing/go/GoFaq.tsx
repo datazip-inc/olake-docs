@@ -1,38 +1,34 @@
 import React, { useState } from 'react'
-import Section from '../ui/Section'
-import SectionHeading from '../ui/SectionHeading'
 import { cn } from '@site/src/lib/utils'
-import { GO_FAQS, GO_FAQ_TITLE } from '@site/src/data/landing/go/faq'
-
-const Plus = ({ open }: { open: boolean }) => (
-  <svg
-    width='14'
-    height='14'
-    viewBox='0 0 14 14'
-    fill='none'
-    aria-hidden='true'
-    className={cn('shrink-0 text-olake-muted transition-transform duration-200', open && 'rotate-45')}
-  >
-    <path d='M7 1v12M1 7h12' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' />
-  </svg>
-)
+import { GO_FAQS, GO_FAQ_EYEBROW, GO_FAQ_TITLE } from '@site/src/data/landing/go/faq'
 
 /**
- * Accordion, one answer open at a time. Answers stay in the DOM (hidden) so the text the FAQPage
- * JSON-LD describes is always on the page.
+ * Accordion, one answer open at a time (the first one to start with). Answers stay in the DOM
+ * (hidden) so the text the FAQPage JSON-LD describes is always on the page.
  */
 export default function GoFaq() {
-  const [open, setOpen] = useState<number | null>(null)
+  const [open, setOpen] = useState<number | null>(0)
 
   return (
-    <Section id='faq'>
-      <div className='grid grid-cols-1 gap-[24px] lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-[40px]'>
-        <SectionHeading title={GO_FAQ_TITLE} />
-        <ul className='border-0 border-t border-solid border-olake-line-rule'>
+    <section id='faq' className='px-[16px] pb-[72px] lg:px-[24px] lg:pb-[116px]'>
+      <div className='mx-auto max-w-[1018px] overflow-hidden rounded-[20px] border border-solid border-olake-line-rule bg-olake-surface'>
+        <div className='px-[20px] pt-[32px] lg:px-[32px] lg:pt-[39px]'>
+          <p className='text-[15px] leading-[1.3] text-olake-muted lg:text-[16px]'>
+            {GO_FAQ_EYEBROW}
+          </p>
+          <h2 className='mt-[8px] text-[26px] leading-[1.3] font-normal text-[#000e55] lg:text-[32px]'>
+            {GO_FAQ_TITLE}
+          </h2>
+        </div>
+
+        <ul className='mt-[16px] flex flex-col gap-[8px] lg:mt-[24px]'>
           {GO_FAQS.map((faq, i) => {
             const isOpen = open === i
             return (
-              <li key={faq.q} className='border-0 border-b border-solid border-olake-line-rule'>
+              <li
+                key={faq.q}
+                className='relative border-0 border-b border-solid border-olake-line-rule last:border-b-0'
+              >
                 <h3>
                   <button
                     type='button'
@@ -40,10 +36,25 @@ export default function GoFaq() {
                     aria-expanded={isOpen}
                     aria-controls={`go-faq-a-${i}`}
                     onClick={() => setOpen(isOpen ? null : i)}
-                    className='flex w-full cursor-pointer items-center justify-between gap-[16px] border-0 bg-transparent px-0 py-[18px] text-left text-[16px] font-normal leading-[1.4] text-olake-ink focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue lg:py-[22px] lg:text-[18px]'
+                    className={cn(
+                      'block w-full cursor-pointer border-0 bg-transparent pr-[52px] pl-[20px] text-left text-[16px] leading-[24px] font-normal text-[#2f2f2f] lg:pr-[120px] lg:pl-[40px] lg:text-[18px]',
+                      'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-olake-blue',
+                      isOpen ? 'pt-[24px] pb-0' : 'py-[24px] lg:py-[32px]'
+                    )}
                   >
                     {faq.q}
-                    <Plus open={isOpen} />
+                    {/* Centred on the whole item, so it sits between question and answer when open. */}
+                    <img
+                      src={`/img/landing/go/faq-arrow-${isOpen ? 'open' : 'closed'}.svg`}
+                      alt=''
+                      width={16}
+                      height={16}
+                      decoding='async'
+                      className={cn(
+                        'absolute top-1/2 right-[20px] block -translate-y-1/2 lg:right-[40px]',
+                        isOpen && '-scale-y-100'
+                      )}
+                    />
                   </button>
                 </h3>
                 <div
@@ -51,9 +62,9 @@ export default function GoFaq() {
                   role='region'
                   aria-labelledby={`go-faq-q-${i}`}
                   hidden={!isOpen}
-                  className={cn('go-reveal', !isOpen && 'hidden')}
+                  className={cn('go-fade-in', !isOpen && 'hidden')}
                 >
-                  <p className='max-w-[640px] pb-[22px] text-[14px] leading-[1.65] text-olake-text-2 lg:text-[15px]'>
+                  <p className='max-w-[858px] pt-[16px] pr-[52px] pb-[24px] pl-[20px] text-[15px] leading-[24px] text-[#626262] lg:pr-0 lg:pl-[40px] lg:text-[16px]'>
                     {faq.a}
                   </p>
                 </div>
@@ -62,6 +73,6 @@ export default function GoFaq() {
           })}
         </ul>
       </div>
-    </Section>
+    </section>
   )
 }
