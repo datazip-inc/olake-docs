@@ -119,39 +119,29 @@ const SourceList = ({ hidden }: { hidden?: boolean }) => (
 )
 
 /**
- * "Available Sources": a tab-shaped strip whose logos scroll past the label (paused on hover and for
- * reduced motion). From md up it follows the design, the label pinned left over a fade; below md the
- * label sits above a full-width row.
+ * "Available Sources": a tab-shaped strip whose logos scroll by (paused on hover and for reduced
+ * motion). From md up the label is pinned left and the logos run in their own lane after it, fading
+ * in past the label and out at the right edge as in the design; below md the label sits above a
+ * full-width lane.
  */
 function SourcesStrip() {
   return (
     <div className='go-marquee relative mx-auto flex w-[calc(100%-24px)] flex-col gap-[10px] overflow-hidden rounded-t-[16px] bg-[#f7f7f7] pt-[14px] pb-[24px] md:block md:h-[80px] md:w-[calc(100%-84px)] md:max-w-[934px] md:rounded-t-[20px] md:p-0'>
-      <p className='flex items-center justify-center gap-[9px] text-[16px] leading-[1.3] text-olake-muted md:absolute md:top-[calc(50%-4.5px)] md:left-[24px] md:z-20 md:-translate-y-1/2'>
-        <img
-          src={`${IMG}/sources-live-dot.svg`}
-          alt=''
-          width={20}
-          height={20}
-          decoding='async'
-          className='m-[-4px] block'
+      <p className='flex items-center justify-center gap-[9px] text-[16px] leading-[1.3] whitespace-nowrap text-olake-muted md:absolute md:top-[calc(50%-4.5px)] md:left-[24px] md:-translate-y-1/2'>
+        {/* The live dot: a 12px circle in a 4px halo */}
+        <span
+          aria-hidden='true'
+          className='block size-[12px] shrink-0 rounded-full bg-[#389e0d] shadow-[0_0_0_4px_rgba(125,217,87,0.33)]'
         />
         {GO_SOURCES_LABEL}
       </p>
-      <div className='relative h-[24px] [mask-image:linear-gradient(to_right,transparent,#000_40px,#000_calc(100%-40px),transparent)] md:absolute md:top-[23px] md:right-0 md:left-[114px] md:[mask-image:none]'>
+      <div className='relative h-[24px] [mask-image:linear-gradient(to_right,transparent,#000_40px,#000_calc(100%-40px),transparent)] md:absolute md:top-[23px] md:right-0 md:left-[199px] md:[mask-image:linear-gradient(to_right,transparent,#000_40px,#000_calc(100%-120px),transparent_calc(100%-41px))]'>
         {/* The strip's grey behind the logos lets the DB2 mark multiply onto it, as in the design. */}
         <div className='go-marquee-track bg-[#f7f7f7]'>
           <SourceList />
           <SourceList hidden />
         </div>
       </div>
-      <span
-        aria-hidden='true'
-        className='pointer-events-none absolute top-[-6px] left-[-25px] z-10 hidden h-[82px] w-[300px] bg-[linear-gradient(to_right,#f7f7f7_64.656%,rgba(247,247,247,0)_92.366%)] md:block'
-      />
-      <span
-        aria-hidden='true'
-        className='pointer-events-none absolute top-[-6px] right-0 z-10 hidden h-[82px] w-[130px] bg-[linear-gradient(to_left,#f7f7f7_31.479%,rgba(247,247,247,0)_92.366%)] md:block'
-      />
     </div>
   )
 }
