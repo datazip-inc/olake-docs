@@ -46,7 +46,9 @@ export default function BlogPostPageWrapper(props) {
   // FAQ text that no longer matches the page) are archived in drafts/seo/.
   const SECTIONS = {
     '/blog/': 'Blog',
-    '/customer-stories/': 'Customer Stories'
+    '/customer-stories/': 'Customer Stories',
+    '/learn/': 'Learn',
+    '/compare/': 'Compare'
   };
   const sectionPath = Object.keys(SECTIONS).find((p) => (metadata.permalink || '').startsWith(p));
   const breadcrumbSchema =

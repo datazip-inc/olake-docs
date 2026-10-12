@@ -25,7 +25,10 @@ const STRICT = args.includes('--strict')
 const QUIET = args.includes('--quiet')
 const onlyPaths = args.filter((a) => !a.startsWith('--'))
 
-const POST_DIRS = ['blog', 'customer-stories']
+const POST_DIRS = ['blog', 'customer-stories', 'learn', 'compare']
+// Author and tag definitions per post folder: learn and compare share the blog's files (see docusaurus.config.js)
+const AUTHOR_FILES = { learn: 'blog/authors.yml', compare: 'blog/authors.yml' }
+const TAG_FILES = { learn: 'blog/tags.yml', compare: 'blog/tags.yml' }
 const DOC_DIRS = ['docs']
 const TITLE_MAX = 70
 const DESC_MIN = 120
@@ -125,13 +128,13 @@ function lintMarkdown(file, kind) {
       add('warn', file, no, 'tldr-heading', 'summary written as a heading: use the <TLDR> component')
     }
     // absolute internal links with a file extension never resolve
-    if (/\]\(\/(?:docs|blog|customer-stories)[^)\s]*\.mdx?(?:[#)])/.test(ln)) {
+    if (/\]\(\/(?:docs|blog|customer-stories|learn|compare)[^)\s]*\.mdx?(?:[#)])/.test(ln)) {
       add('warn', file, no, 'link-extension', 'internal link ends in .md/.mdx: it resolves, but link to the route instead')
     }
     if (/\]\(\/blog\/\d{4}\/\d{2}\/\d{2}\//.test(ln)) {
       add('error', file, no, 'old-blog-url', 'old date-style /blog/YYYY/MM/DD/ URL: use the post slug')
     }
-    if (/https:\/\/olake\.io\/(?:docs|blog|customer-stories)\//.test(ln) && !/^\s*(?:import|export)\b/.test(ln)) {
+    if (/https:\/\/olake\.io\/(?:docs|blog|customer-stories|learn|compare)\//.test(ln) && !/^\s*(?:import|export)\b/.test(ln)) {
       add('warn', file, no, 'self-link', 'absolute olake.io link: prefer a relative /path/')
     }
     if (kind === 'post' && /<h1[\s>]/i.test(noInline)) {
@@ -209,8 +212,8 @@ function lintMarkdown(file, kind) {
 
 function lintPosts() {
   for (const dir of POST_DIRS) {
-    const authors = readYaml(path.join(ROOT, dir, 'authors.yml'))
-    const tagsDef = readYaml(path.join(ROOT, dir, 'tags.yml'))
+    const authors = readYaml(path.join(ROOT, AUTHOR_FILES[dir] ?? `${dir}/authors.yml`))
+    const tagsDef = readYaml(path.join(ROOT, TAG_FILES[dir] ?? `${dir}/tags.yml`))
     const slugs = new Map()
     for (const file of walk(path.join(ROOT, dir))) {
       if (onlyPaths.length && !onlyPaths.some((p) => path.join(ROOT, p) === file || file.startsWith(path.join(ROOT, p)))) continue
@@ -224,7 +227,7 @@ function lintPosts() {
       const as = Array.isArray(fm.authors) ? fm.authors : fm.authors ? [fm.authors] : []
       if (!as.length) add('error', file, 1, 'authors-missing', 'missing authors')
       for (const a of as) {
-        if (typeof a === 'string' && !(a in authors)) add('error', file, 1, 'author-unknown', `author "${a}" is not in ${dir}/authors.yml`)
+        if (typeof a === 'string' && !(a in authors)) add('error', file, 1, 'author-unknown', `author "${a}" is not in ${AUTHOR_FILES[dir] ?? `${dir}/authors.yml`}`)
       }
       // tags
       const tags = Array.isArray(fm.tags) ? fm.tags : []
@@ -232,7 +235,7 @@ function lintPosts() {
       const topicTags = tags.filter((t) => !CATEGORY_TAGS.has(t))
       if (topicTags.length > TAGS_MAX) add('error', file, 1, 'tags-count', `${topicTags.length} topic tags (max ${TAGS_MAX})`)
       for (const t of tags) {
-        if (typeof t === 'string' && !(t in tagsDef)) add('error', file, 1, 'tag-undefined', `tag "${t}" is not defined in ${dir}/tags.yml`)
+        if (typeof t === 'string' && !(t in tagsDef)) add('error', file, 1, 'tag-undefined', `tag "${t}" is not defined in ${TAG_FILES[dir] ?? `${dir}/tags.yml`}`)
       }
       // image
       if (!fm.image) add('error', file, 1, 'image-missing', 'missing image (used as the social card)')
