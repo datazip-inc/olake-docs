@@ -104,7 +104,7 @@ export default function GoProblem() {
         <p className='relative text-[15px] leading-[1.3] text-olake-muted lg:text-[16px]'>
           {GO_PROBLEM_INTRO.eyebrow}
         </p>
-        <h2 className='relative mt-[10px] max-w-[599px] text-[30px] leading-[1.2] font-normal text-balance text-olake-ink lg:mt-[12px] lg:text-[48px] lg:leading-[1.3]'>
+        <h2 className='relative mt-[10px] max-w-[599px] text-[30px] leading-[1.2] font-normal text-olake-ink lg:mt-[12px] lg:text-[48px] lg:leading-[1.3]'>
           {GO_PROBLEM_INTRO.title}
         </h2>
 

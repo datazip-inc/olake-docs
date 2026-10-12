@@ -72,7 +72,7 @@ export default function GoDashboardMock() {
           <div className='flex w-[301px] flex-col gap-[4px]'>
             <div className='flex items-center gap-[10px]'>
               <Icon name='dashboard-git-commit' w={19.047} />
-              <p className='text-[19.047px] leading-normal font-medium text-[#0a0a0a]'>Jobs</p>
+              <p className='text-[19.047px] leading-[24.5px] font-medium text-[#0a0a0a]'>Jobs</p>
             </div>
             <p className='text-[12px] leading-[17.46px] text-[rgba(0,0,0,0.45)]'>
               A list of all your jobs stacked at one place for you to see
@@ -92,7 +92,7 @@ export default function GoDashboardMock() {
             <span
               key={tab}
               className={cn(
-                'flex items-center justify-center py-[10.49px] text-[12.25px] leading-[16.811px] whitespace-nowrap',
+                'flex items-center justify-center py-[10.49px] text-[12.25px] leading-[19.25px] whitespace-nowrap',
                 i === 0
                   ? 'border-0 border-b-[1.748px] border-solid border-[#203fdd] font-medium text-[#203fdd]'
                   : 'text-[rgba(0,0,0,0.88)]'
