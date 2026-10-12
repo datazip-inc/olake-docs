@@ -2,12 +2,82 @@ import React, { useRef, useState } from 'react'
 import { cn } from '@site/src/lib/utils'
 import { GO_FEATURES, GO_FEATURES_INTRO } from '@site/src/data/landing/go/features'
 import GoFeatureMock from './GoFeatureMock'
+import { ChunkingMock, ResumableMock, SchemaMock } from './GoFeaturePanels'
 
 const IMG = '/img/landing/go'
 
+/** The dotted field shared by the last three tabs, placed and flipped as each of their frames has it. */
+const field = (className: string) => (
+  <img
+    src={`${IMG}/feature-background.png`}
+    alt=''
+    width={2172}
+    height={1000}
+    decoding='async'
+    className={cn(
+      'pointer-events-none absolute top-[-1px] -z-10 block h-[711px] w-[1545px] max-w-none object-cover',
+      className
+    )}
+  />
+)
+
 /**
- * "Features": a pill tab strip over the blue feature card. The card keeps the job-editor picture
- * for every tab; its heading and copy follow the selected capability.
+ * Each tab's picture (the design's go-1 to go-4 frames): the background field, where the copy sits
+ * from lg up (its top, and the body's width) and the editor panel with its lg position.
+ */
+const ART: Record<
+  string,
+  {
+    background: React.ReactNode
+    copyTop: number
+    bodyWidth: number
+    Mock: React.ComponentType<{ className?: string }>
+    mockClassName: string
+  }
+> = {
+  'cdc': {
+    background: (
+      <img
+        src={`${IMG}/feature-cdc-background.png`}
+        alt=''
+        width={2384}
+        height={1000}
+        loading='lazy'
+        decoding='async'
+        className='pointer-events-none absolute top-[-41px] right-[-1px] -z-10 block h-[1107px] w-[2639px] max-w-none object-cover'
+      />
+    ),
+    copyTop: 338,
+    bodyWidth: 323,
+    Mock: GoFeatureMock,
+    mockClassName: 'lg:top-[52px] lg:right-[36px] lg:w-[514px]'
+  },
+  'schema-evolution': {
+    background: field('right-[-281px]'),
+    copyTop: 338,
+    bodyWidth: 323,
+    Mock: SchemaMock,
+    mockClassName: 'lg:top-[67.3px] lg:right-[36.1px] lg:w-[514.1px]'
+  },
+  'parallel-chunking': {
+    background: field('right-[-129px] -scale-x-100'),
+    copyTop: 354,
+    bodyWidth: 288,
+    Mock: ChunkingMock,
+    mockClassName: 'lg:top-[67.3px] lg:right-[36.1px] lg:w-[514.1px]'
+  },
+  'resumable-syncs': {
+    background: field('right-[-129px] -scale-y-100'),
+    copyTop: 333,
+    bodyWidth: 288,
+    Mock: ResumableMock,
+    mockClassName: 'lg:top-[67.3px] lg:right-[36.1px] lg:w-[514.1px]'
+  }
+}
+
+/**
+ * "Features": a pill tab strip over the blue feature card. Each tab shows its own picture of the
+ * job editor; the heading and copy follow the selected capability.
  */
 export default function GoFeatures() {
   const [active, setActive] = useState(0)
@@ -29,6 +99,7 @@ export default function GoFeatures() {
   }
 
   const feature = GO_FEATURES[active]
+  const art = ART[feature.id]
 
   return (
     <section id='features' className='px-[16px] pb-[48px] lg:px-[24px] lg:pb-[96px]'>
@@ -83,16 +154,8 @@ export default function GoFeatures() {
           aria-labelledby={`go-feature-tab-${feature.id}`}
           className='relative isolate mt-[24px] flex flex-col overflow-hidden rounded-[24px] border border-solid border-[#f4f4f4] bg-(--go-blue-deep) shadow-[1px_2px_4px_0_rgba(0,0,0,0.05)] lg:mt-[47px] lg:block lg:h-[526px] lg:rounded-[30px]'
         >
-          {/* Dithered blue field, anchored to the top right, and the blue glow at the bottom left */}
-          <img
-            src={`${IMG}/feature-cdc-background.png`}
-            alt=''
-            width={2384}
-            height={1000}
-            loading='lazy'
-            decoding='async'
-            className='pointer-events-none absolute top-[-41px] right-[-1px] -z-10 block h-[1107px] w-[2639px] max-w-none object-cover'
-          />
+          {/* The tab's dotted field, and the blue glow at the bottom left that every tab shares */}
+          <React.Fragment key={`field-${feature.id}`}>{art.background}</React.Fragment>
           <img
             src={`${IMG}/feature-glow.svg`}
             alt=''
@@ -104,16 +167,28 @@ export default function GoFeatures() {
           />
 
           <div
-            key={feature.id}
-            className='go-fade-in px-[24px] pt-[28px] lg:absolute lg:bottom-[63px] lg:left-[49px] lg:w-[323px] lg:p-0'
+            key={`copy-${feature.id}`}
+            className='go-fade-in px-[24px] pt-[28px] lg:absolute lg:top-(--copy-top) lg:left-[49px] lg:w-[323px] lg:p-0'
+            style={{ '--copy-top': `${art.copyTop}px` } as React.CSSProperties}
           >
             <h3 className='text-[22px] leading-[1.3] font-medium text-[#fdfdfc] lg:w-[258px] lg:text-[24px]'>
               {feature.title}
             </h3>
-            <p className='mt-[8px] text-[14px] leading-[1.3] text-white'>{feature.body}</p>
+            <p
+              className='mt-[8px] text-[14px] leading-[1.3] text-white lg:max-w-(--body-width)'
+              style={{ '--body-width': `${art.bodyWidth}px` } as React.CSSProperties}
+            >
+              {feature.body}
+            </p>
           </div>
 
-          <GoFeatureMock className='mx-auto mt-[28px] mb-[16px] w-[calc(100%-32px)] lg:absolute lg:top-[52px] lg:right-[36px] lg:m-0 lg:w-[514px]' />
+          <art.Mock
+            key={`mock-${feature.id}`}
+            className={cn(
+              'go-fade-in mx-auto mt-[28px] mb-[16px] w-[calc(100%-32px)] lg:absolute lg:m-0',
+              art.mockClassName
+            )}
+          />
         </div>
       </div>
     </section>

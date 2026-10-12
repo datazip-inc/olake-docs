@@ -33,7 +33,7 @@ export const GO_FEATURES: GoFeature[] = [
   {
     id: 'resumable-syncs',
     tab: 'Resumable Syncs',
-    title: 'Stateful, Resumable Syncs',
+    title: 'Stateful Resumable Syncs',
     body: 'Syncs checkpoint their progress and resume automatically after crashes or network failures; never from scratch.'
   }
 ]
