@@ -571,6 +571,12 @@ const config = {
               '/iceberg/query-engine/starrocks/'
             ]
           },
+          // Posts that were published in /blog and moved to /compare and /learn: keep their old URLs working
+          { to: '/compare/what-is-fivetran', from: '/blog/what-is-fivetran' },
+          { to: '/compare/data-migration-tools', from: '/blog/data-migration-tools' },
+          { to: '/compare/database-to-iceberg-without-kafka', from: '/blog/database-to-iceberg-without-kafka' },
+          { to: '/compare/mysql-to-iceberg-tools', from: '/blog/mysql-to-iceberg-tools' },
+          { to: '/learn/etl-pipelines', from: '/blog/etl-pipelines' },
           // Duplicate blog tags merged into one each (apache-iceberg -> iceberg, data-lake -> lake)
           { to: '/blog/tags/iceberg', from: '/blog/tags/apache-iceberg' },
           { to: '/blog/tags/lake', from: '/blog/tags/data-lake' },
