@@ -36,17 +36,21 @@ export interface GoBenchmarkRow {
 }
 
 /**
- * State and table data of the OLake Go benchmark block. Unlike the home page's table, every
- * connector keeps its tab: the ones without published numbers show a "coming soon" panel.
+ * State and table data of the OLake Go benchmark block. Like the home page's table, a source only
+ * gets a tab in the modes it has published numbers for (Kafka and MSSQL have full-load numbers but
+ * no CDC ones), and switching to a mode the selected source lacks falls back to the first source
+ * that has them.
  */
 export function useGoBenchmark() {
-  const [activeConnector, setActiveConnector] = useState<ConnectorId>(GO_BENCHMARK_CONNECTORS[0])
+  const [selectedConnector, setActiveConnector] = useState<ConnectorId>(GO_BENCHMARK_CONNECTORS[0])
   const [mode, setMode] = useState<BenchmarkMode>('full_load')
 
   return useMemo(() => {
     const dataset = mode === 'cdc' ? CONNECTOR_CDC_BENCHMARKS : CONNECTOR_BENCHMARKS
-    const connectors = GO_BENCHMARK_CONNECTORS.map((id) => CONNECTORS.find((c) => c.id === id)!)
-    const connector = connectors.find((c) => c.id === activeConnector) ?? connectors[0]
+    const all = GO_BENCHMARK_CONNECTORS.map((id) => CONNECTORS.find((c) => c.id === id)!)
+    const withData = all.filter((c) => dataset[c.id]?.hasData)
+    const connectors = withData.length ? withData : all
+    const connector = connectors.find((c) => c.id === selectedConnector) ?? connectors[0]
     const bench = dataset[connector.id]
     const keys = competitorKeys(bench.rowsSynced.flink !== undefined)
 
@@ -76,5 +80,5 @@ export function useGoBenchmark() {
       hasData: bench.hasData,
       sourceName: connector.name
     }
-  }, [activeConnector, mode])
+  }, [selectedConnector, mode])
 }
