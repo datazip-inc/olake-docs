@@ -10,7 +10,7 @@ const IMG = '/img/landing/go'
 /** The dotted field shared by the last three tabs, placed and flipped as each of their frames has it. */
 const field = (className: string) => (
   <img
-    src={`${IMG}/feature-background.png`}
+    src={`${IMG}/feature-background.webp`}
     alt=''
     width={2172}
     height={1000}
@@ -25,7 +25,7 @@ const field = (className: string) => (
 /** The blue glow at the bottom left that every tab shares. */
 const Glow = () => (
   <img
-    src={`${IMG}/feature-glow.svg`}
+    src={`${IMG}/feature-glow.webp`}
     alt=''
     width={1112}
     height={802}
@@ -43,7 +43,7 @@ const ART: Record<string, ProductFeatureArt> = {
   'cdc': {
     background: (
       <img
-        src={`${IMG}/feature-cdc-background.png`}
+        src={`${IMG}/feature-cdc-background.webp`}
         alt=''
         width={2384}
         height={1000}

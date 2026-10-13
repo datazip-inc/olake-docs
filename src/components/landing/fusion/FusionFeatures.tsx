@@ -8,7 +8,7 @@ const IMG = '/img/landing/fusion'
 /** The dark wave every tab shares, mirrored as in the design. */
 const Field = () => (
   <img
-    src={`${IMG}/feature-background.png`}
+    src={`${IMG}/feature-background.webp`}
     alt=''
     width={2172}
     height={1000}
@@ -20,7 +20,7 @@ const Field = () => (
 /** The deep blue glow at the bottom left. */
 const Glow = () => (
   <img
-    src={`${IMG}/feature-glow.svg`}
+    src={`${IMG}/feature-glow.webp`}
     alt=''
     width={1112}
     height={802}

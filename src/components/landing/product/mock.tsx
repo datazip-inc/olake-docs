@@ -28,12 +28,12 @@ export function MockIcon({
 }) {
   return (
     <img
-      src={`/img/landing/${name}.svg`}
+      src={`/img/landing/${name}.webp`}
       alt=''
       width={w}
       height={h}
       decoding='async'
-      className={cn('block shrink-0', className)}
+      className={cn('block shrink-0 object-contain', className)}
     />
   )
 }

@@ -14,7 +14,7 @@ export default function FusionCta() {
         <>
           {/* A navy glow that softens the points under the heading */}
           <img
-            src={`${IMG}/cta-glow.svg`}
+            src={`${IMG}/cta-glow.webp`}
             alt=''
             width={1466}
             height={745}
@@ -23,7 +23,7 @@ export default function FusionCta() {
             className='pointer-events-none absolute top-[-211px] left-1/2 -z-20 block max-w-none -translate-x-1/2'
           />
           <img
-            src={`${IMG}/cta-quantity-skew.svg`}
+            src={`${IMG}/cta-quantity-skew.webp`}
             alt=''
             width={1330.33}
             height={886.886}

@@ -29,7 +29,7 @@ const LAYOUT: Record<
     art: [22, 65],
     image: (
       <img
-        src={`${IMG}/problem-small-files.svg`}
+        src={`${IMG}/problem-small-files.webp`}
         alt=''
         width={120}
         height={78}
@@ -45,7 +45,7 @@ const LAYOUT: Record<
     art: [410, 26],
     image: (
       <img
-        src={`${IMG}/problem-slower-queries.svg`}
+        src={`${IMG}/problem-slower-queries.webp`}
         alt=''
         width={156.923}
         height={102}
@@ -61,7 +61,7 @@ const LAYOUT: Record<
     art: [22, 26],
     image: (
       <img
-        src={`${IMG}/problem-invisible-costs.svg`}
+        src={`${IMG}/problem-invisible-costs.webp`}
         alt=''
         width={136}
         height={89}
@@ -80,7 +80,7 @@ const LAYOUT: Record<
     image: (
       <span className='flex h-[81px] w-[96px] items-center justify-center lg:h-[95px] lg:w-[112px]'>
         <img
-          src={`${IMG}/problem-compaction-debugging.svg`}
+          src={`${IMG}/problem-compaction-debugging.webp`}
           alt=''
           width={96.0688}
           height={113.353}

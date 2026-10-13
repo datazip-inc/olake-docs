@@ -59,7 +59,7 @@ export default function ProductFaq({
                     {faq.q}
                     {/* Centred on the whole item, so it sits between question and answer when open. */}
                     <img
-                      src={`/img/landing/product/faq-arrow-${isOpen ? 'open' : 'closed'}.svg`}
+                      src={`/img/landing/product/faq-arrow-${isOpen ? 'open' : 'closed'}.webp`}
                       alt=''
                       width={16}
                       height={16}

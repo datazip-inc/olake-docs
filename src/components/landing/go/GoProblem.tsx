@@ -7,7 +7,7 @@ const IMG = '/img/landing/go'
 const ART: Record<GoProblemArt, React.ReactNode> = {
   'slow-syncs': (
     <img
-      src={`${IMG}/problem-slow-syncs.svg`}
+      src={`${IMG}/problem-slow-syncs.webp`}
       alt=''
       width={121}
       height={79}
@@ -18,7 +18,7 @@ const ART: Record<GoProblemArt, React.ReactNode> = {
   ),
   'legacy-costs': (
     <img
-      src={`${IMG}/problem-legacy-etl-costs.svg`}
+      src={`${IMG}/problem-legacy-etl-costs.webp`}
       alt=''
       width={134}
       height={87.1}
@@ -30,7 +30,7 @@ const ART: Record<GoProblemArt, React.ReactNode> = {
   'cdc-breaks': (
     <>
       <img
-        src={`${IMG}/problem-cdc-pipeline.svg`}
+        src={`${IMG}/problem-cdc-pipeline.webp`}
         alt=''
         width={74.0245}
         height={48.1159}
@@ -41,7 +41,7 @@ const ART: Record<GoProblemArt, React.ReactNode> = {
       {/* The stale-source mark stands upright in the design: rotated a quarter turn in its 48 × 74 slot. */}
       <span className='absolute top-[29.39px] left-[33.99px] flex h-[74.024px] w-[48.116px] items-center justify-center'>
         <img
-          src={`${IMG}/problem-cdc-stale.svg`}
+          src={`${IMG}/problem-cdc-stale.webp`}
           alt=''
           width={74.0245}
           height={48.1159}
@@ -54,7 +54,7 @@ const ART: Record<GoProblemArt, React.ReactNode> = {
   ),
   'schema-drift': (
     <img
-      src={`${IMG}/problem-schema-drift.svg`}
+      src={`${IMG}/problem-schema-drift.webp`}
       alt=''
       width={120.291}
       height={78.1892}

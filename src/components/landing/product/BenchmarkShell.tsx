@@ -103,7 +103,7 @@ export default function BenchmarkShell({
         >
           {link.label}
           <img
-            src='/img/landing/product/link-arrow-square-out.svg'
+            src='/img/landing/product/link-arrow-square-out.webp'
             alt=''
             width={18}
             height={18}

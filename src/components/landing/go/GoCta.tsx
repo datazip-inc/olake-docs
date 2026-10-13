@@ -11,7 +11,7 @@ export default function GoCta() {
       art={
         // The dot wave, upside down as in the design, its top 267px showing under the buttons.
         <img
-          src='/img/landing/go/cta-dot-wave.svg'
+          src='/img/landing/go/cta-dot-wave.webp'
           alt=''
           width={1018}
           height={534.97}

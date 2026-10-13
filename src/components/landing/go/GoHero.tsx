@@ -15,7 +15,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   kafka: (
     <span className='block h-[17.306px] w-[10.656px] -scale-y-100'>
       <img
-        src={`${IMG}/source-kafka.png`}
+        src={`${IMG}/source-kafka.webp`}
         alt=''
         width={44}
         height={71}
@@ -27,7 +27,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   postgres: (
     <span className='relative block h-[20.8125px] w-[20.8125px]'>
       <img
-        src={`${IMG}/source-postgres.svg`}
+        src={`${IMG}/source-postgres.webp`}
         alt=''
         width={16.7779}
         height={17.2977}
@@ -38,7 +38,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   ),
   mysql: (
     <img
-      src={`${IMG}/source-mysql.svg`}
+      src={`${IMG}/source-mysql.webp`}
       alt=''
       width={20.8125}
       height={20.8125}
@@ -48,7 +48,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   ),
   mongodb: (
     <img
-      src={`${IMG}/source-mongodb.svg`}
+      src={`${IMG}/source-mongodb.webp`}
       alt=''
       width={20.8125}
       height={20.8125}
@@ -58,7 +58,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   ),
   s3: (
     <img
-      src={`${IMG}/source-s3.svg`}
+      src={`${IMG}/source-s3.webp`}
       alt=''
       width={23.6607}
       height={23.6607}
@@ -69,7 +69,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   mssql: (
     <span className='relative block h-[20px] w-[20px] overflow-hidden'>
       <img
-        src={`${IMG}/source-mssql.png`}
+        src={`${IMG}/source-mssql.webp`}
         alt=''
         width={120}
         height={67}
@@ -81,7 +81,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   db2: (
     <span className='relative block h-[24px] w-[27px] overflow-hidden mix-blend-multiply'>
       <img
-        src={`${IMG}/source-db2.png`}
+        src={`${IMG}/source-db2.webp`}
         alt=''
         width={160}
         height={93}
@@ -93,7 +93,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
   oracle: (
     <span className='relative block h-[21px] w-[21px] overflow-hidden'>
       <img
-        src={`${IMG}/source-oracle.png`}
+        src={`${IMG}/source-oracle.webp`}
         alt=''
         width={72}
         height={72}
@@ -152,7 +152,7 @@ const Background = () => (
     className='pointer-events-none absolute inset-x-0 top-0 -z-10 h-[810px] overflow-hidden'
   >
     <img
-      src={`${IMG}/hero-strata-lines.svg`}
+      src={`${IMG}/hero-strata-lines.webp`}
       alt=''
       width={1511.67}
       height={778.254}
@@ -160,7 +160,7 @@ const Background = () => (
       className='absolute top-[22px] left-1/2 block h-auto w-[max(1511.67px,105%)] max-w-none -translate-x-1/2'
     />
     <img
-      src={`${IMG}/hero-glow.svg`}
+      src={`${IMG}/hero-glow.webp`}
       alt=''
       width={2180}
       height={1580}

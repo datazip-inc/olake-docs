@@ -59,7 +59,7 @@ export default function ProductHero({
               )}
             >
               <img
-                src='/img/landing/product/icon-github.svg'
+                src='/img/landing/product/icon-github.webp'
                 alt=''
                 width={16}
                 height={16}

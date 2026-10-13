@@ -15,7 +15,7 @@ const Background = () => (
     className='pointer-events-none absolute inset-x-0 top-0 -z-10 h-[1116px] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_934px,transparent_1116px)]'
   >
     <img
-      src={`${IMG}/hero-contours.svg`}
+      src={`${IMG}/hero-contours.webp`}
       alt=''
       width={3294.52}
       height={2141.44}
@@ -23,7 +23,7 @@ const Background = () => (
       className='absolute top-[-791.39px] left-[calc(50%-8.26px)] block max-w-none -translate-x-1/2 -scale-y-100'
     />
     <img
-      src={`${IMG}/hero-glow.svg`}
+      src={`${IMG}/hero-glow.webp`}
       alt=''
       width={1766}
       height={1150}
