@@ -1,6 +1,6 @@
 import React from 'react'
 import { cn } from '@site/src/lib/utils'
-import { MockFit, MockIcon as Icon, STROKE } from './mock'
+import { MockFit, MockIcon as Icon, MockRail, STROKE } from '../product/mock'
 
 /**
  * The job editor inside the blue feature card: the stream list, the selected stream's settings and
@@ -91,7 +91,7 @@ export default function GoFeatureMock({ className }: { className?: string }) {
               </span>
             </div>
             <div className='flex h-full w-[15.154px] shrink-0 items-center justify-center border-0 border-l-[0.474px] border-solid border-[#d9d9d9] bg-white'>
-              <Icon name='feature-mock-search' w={7.57688} />
+              <Icon name='go/feature-mock-search' w={7.57688} />
             </div>
           </div>
           <div className='relative h-[17.048px] w-[154.852px] overflow-hidden rounded-[2.841px] border-[0.474px] border-solid border-[#d9d9d9] bg-white'>
@@ -102,7 +102,7 @@ export default function GoFeatureMock({ className }: { className?: string }) {
               DestinationDB
             </span>
             <Icon
-              name='feature-mock-pencil'
+              name='go/feature-mock-pencil'
               w={7.57688}
               className='absolute top-[4.26px] left-[141.59px]'
             />
@@ -119,7 +119,7 @@ export default function GoFeatureMock({ className }: { className?: string }) {
         >
           <span className='absolute top-[3.74px] left-[7.01px] flex items-center'>
             <span className='py-[2.148px]'>
-              <Icon name='feature-mock-checkbox' w={11.4562} />
+              <Icon name='go/feature-mock-checkbox' w={11.4562} />
             </span>
             <span className='px-[5.728px] text-[10px] leading-[14.6px] text-[rgba(0,0,0,0.88)]'>
               Payments
@@ -140,7 +140,7 @@ export default function GoFeatureMock({ className }: { className?: string }) {
                     'border-[0.409px] border-solid border-[#203fdd] bg-white shadow-[0_0.818px_0.818px_rgba(0,0,0,0.02),0_0.409px_1.226px_rgba(0,0,0,0.02),0_0.409px_0.409px_rgba(0,0,0,0.03)]'
                 )}
               >
-                <Icon name={segment.icon} w={6.54108} />
+                <Icon name={`go/${segment.icon}`} w={6.54108} />
                 <span
                   className={cn(
                     'truncate text-[5.723px] leading-[8.994px]',
@@ -169,22 +169,7 @@ export default function GoFeatureMock({ className }: { className?: string }) {
           </span>
         </span>
 
-        {/* Navigation rail */}
-        <div className='absolute top-[-0.68px] left-[-0.68px] h-[436px] w-[40px] overflow-hidden border-0 border-r-[0.676px] border-solid border-[#eaeaea] bg-white opacity-50'>
-          <div className='absolute top-[21.79px] left-[15.78px] flex w-[11.383px] flex-col items-center gap-[12.175px]'>
-            <Icon name='feature-mock-sidebar-toggle' w={10.8031} />
-            <div className='flex w-[13.774px] flex-col items-center gap-[13.528px]'>
-              <span className='flex w-full items-center justify-center overflow-hidden rounded-[3.241px] bg-[#f5f5f5] p-[2.161px]'>
-                <Icon name='feature-mock-sidebar-jobs' w={10.8031} />
-              </span>
-              <span className='flex w-full items-center overflow-hidden rounded-[3.241px] bg-white p-[2.161px]'>
-                <Icon name='feature-mock-sidebar-sparkle' w={9.45275} />
-              </span>
-              <Icon name='feature-mock-sidebar-settings' w={10.8031} />
-              <Icon name='feature-mock-sidebar-help' w={10.8031} />
-            </div>
-          </div>
-        </div>
+        <MockRail className='opacity-50' />
       </div>
 
       {/* The "Sync mode" picker */}

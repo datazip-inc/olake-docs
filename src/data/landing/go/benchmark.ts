@@ -77,10 +77,3 @@ export const GO_BENCHMARK_HOW = {
     }
   ]
 }
-
-/** The release strip on top of the section; the version comes from docusaurus.config.js. */
-export const GO_RELEASE_STRIP = {
-  eyebrow: 'Latest Release',
-  lead: 'We just released our',
-  cta: 'Read More'
-}

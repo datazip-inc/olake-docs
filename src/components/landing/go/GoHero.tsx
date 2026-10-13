@@ -1,6 +1,5 @@
 import React from 'react'
-import Button from '../ui/Button'
-import { cn } from '@site/src/lib/utils'
+import ProductHero from '../product/ProductHero'
 import {
   GO_HERO,
   GO_SOURCES,
@@ -146,85 +145,41 @@ function SourcesStrip() {
   )
 }
 
-const BUTTON = 'h-[36px] px-[10px] text-[16px] leading-[1.3]'
+/** The strata lines, cleared behind the copy by a soft white glow. */
+const Background = () => (
+  <div
+    aria-hidden='true'
+    className='pointer-events-none absolute inset-x-0 top-0 -z-10 h-[810px] overflow-hidden'
+  >
+    <img
+      src={`${IMG}/hero-strata-lines.svg`}
+      alt=''
+      width={1511.67}
+      height={778.254}
+      decoding='async'
+      className='absolute top-[22px] left-1/2 block h-auto w-[max(1511.67px,105%)] max-w-none -translate-x-1/2'
+    />
+    <img
+      src={`${IMG}/hero-glow.svg`}
+      alt=''
+      width={2180}
+      height={1580}
+      decoding='async'
+      className='absolute top-[-199.5px] left-[calc(50%-28.69px)] block max-w-none -translate-x-1/2'
+    />
+  </div>
+)
 
 /** Hero of the OLake Go page: strata background, copy, the two calls to action, sources and the product shot. */
 export default function GoHero() {
   return (
-    <section className='relative isolate overflow-hidden px-[16px] pt-[132px] pb-[72px] lg:px-[24px] lg:pt-[209px] lg:pb-[141px]'>
-      {/* Background: the strata lines, cleared behind the copy by a soft white glow. */}
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 -z-10 h-[810px] overflow-hidden'
-      >
-        <img
-          src={`${IMG}/hero-strata-lines.svg`}
-          alt=''
-          width={1511.67}
-          height={778.254}
-          decoding='async'
-          className='absolute top-[22px] left-1/2 block h-auto w-[max(1511.67px,105%)] max-w-none -translate-x-1/2'
-        />
-        <img
-          src={`${IMG}/hero-glow.svg`}
-          alt=''
-          width={2180}
-          height={1580}
-          decoding='async'
-          className='absolute top-[-199.5px] left-[calc(50%-28.69px)] block max-w-none -translate-x-1/2'
-        />
-      </div>
-
-      <div className='mx-auto w-full max-w-[1018px]'>
-        <div className='mx-auto max-w-[664px] text-center'>
-          <p className='text-[15px] leading-[1.3] text-olake-muted lg:text-[16px]'>
-            {GO_HERO.eyebrow}
-          </p>
-          <h1 className='mt-[10px] text-[34px] leading-[1.2] font-normal text-balance text-olake-ink sm:text-[40px] lg:mt-[12px] lg:text-[48px] lg:leading-[1.3]'>
-            {GO_HERO.headline}
-          </h1>
-          <p className='mx-auto mt-[14px] max-w-[468px] text-[15px] leading-[1.4] text-olake-ink lg:text-[16px] lg:leading-[1.3]'>
-            {GO_HERO.body}
-          </p>
-          <div className='mt-[32px] flex items-center justify-center gap-[16px] lg:mt-[42px]'>
-            <Button
-              href={GO_HERO.primary.href}
-              external
-              className={cn(
-                BUTTON,
-                'rounded-[10px] border-[rgba(150,171,254,0.6)] bg-(--go-blue) text-[#fcfcfb] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] hover:border-[rgba(150,171,254,0.6)] hover:bg-(--go-blue-hover)'
-              )}
-            >
-              <img
-                src={`${IMG}/icon-github.svg`}
-                alt=''
-                width={16}
-                height={16}
-                decoding='async'
-                className='block'
-              />
-              {GO_HERO.primary.label}
-            </Button>
-            <Button
-              href={GO_HERO.secondary.href}
-              variant='secondary'
-              className={cn(
-                BUTTON,
-                'border-[#d0d0d0] bg-transparent text-[#565656] hover:bg-olake-surface hover:text-olake-ink'
-              )}
-            >
-              {GO_HERO.secondary.label}
-            </Button>
-          </div>
-        </div>
-
-        <div className='mt-[56px] lg:mt-[89px]'>
-          <SourcesStrip />
-          <div className='relative -mt-[8px] md:-mt-[15px]'>
-            <GoDashboardMock />
-          </div>
+    <ProductHero copy={GO_HERO} background={<Background />} className='lg:pt-[209px]'>
+      <div className='mt-[56px] lg:mt-[89px]'>
+        <SourcesStrip />
+        <div className='relative -mt-[8px] md:-mt-[15px]'>
+          <GoDashboardMock />
         </div>
       </div>
-    </section>
+    </ProductHero>
   )
 }

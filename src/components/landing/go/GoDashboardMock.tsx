@@ -1,6 +1,6 @@
 import React from 'react'
 import { cn } from '@site/src/lib/utils'
-import { MockFit, MockIcon as Icon, STROKE } from './mock'
+import { MockFit, MockIcon as Icon, STROKE } from '../product/mock'
 
 /**
  * The OLake Go "Jobs" screen under the hero, drawn at its design size (1018 × 471) and scaled to
@@ -59,7 +59,7 @@ const ROW_TEXT = 'whitespace-nowrap text-[11.782px] leading-[20.197px]'
 
 export default function GoDashboardMock() {
   return (
-    <MockFit width={1018} height={471} className='mx-auto' innerClassName='go-dashboard-fade'>
+    <MockFit width={1018} height={471} fade={[293, 470.6]} className='mx-auto'>
       <div
         className={cn(
           'relative h-[652px] w-[1018px] overflow-hidden rounded-[16px] bg-[#fefefd] shadow-[0_0_19px_0_rgba(0,0,0,0.04)]',
@@ -71,7 +71,7 @@ export default function GoDashboardMock() {
         <div className='absolute top-[20px] left-[88px] flex w-[865px] items-center justify-between'>
           <div className='flex w-[301px] flex-col gap-[4px]'>
             <div className='flex items-center gap-[10px]'>
-              <Icon name='dashboard-git-commit' w={19.047} />
+              <Icon name='go/dashboard-git-commit' w={19.047} />
               <p className='text-[19.047px] leading-[24.5px] font-medium text-[#0a0a0a]'>Jobs</p>
             </div>
             <p className='text-[12px] leading-[17.46px] text-[rgba(0,0,0,0.45)]'>
@@ -79,7 +79,7 @@ export default function GoDashboardMock() {
             </p>
           </div>
           <span className='flex h-[31.745px] items-center justify-center gap-[6.349px] rounded-[6.349px] bg-[#0029ce] px-[12.698px] py-[3.175px]'>
-            <Icon name='dashboard-plus' w={12.698} />
+            <Icon name='go/dashboard-plus' w={12.698} />
             <span className='text-[12.698px] leading-[19.047px] whitespace-nowrap text-[#f0f0f0]'>
               Create job
             </span>
@@ -128,7 +128,7 @@ export default function GoDashboardMock() {
               style={{ top: `${142.25 + i * 49.71}px` }}
             >
               <Icon
-                name='dashboard-row-actions'
+                name='go/dashboard-row-actions'
                 w={69.008}
                 h={20.408}
                 className='absolute top-0 left-[22.93px]'
@@ -142,11 +142,11 @@ export default function GoDashboardMock() {
                 {row.name}
               </span>
               <span className='absolute top-0 left-[260.03px] flex items-center'>
-                <Icon name='dashboard-row-source' w={20.197} />
+                <Icon name='go/dashboard-row-source' w={20.197} />
                 <span className={cn('text-black', ROW_TEXT)}>{row.source}</span>
               </span>
               <span className='absolute top-0 left-[415.92px] flex items-center gap-[8.416px]'>
-                <Icon name='dashboard-row-destination' w={16.831} />
+                <Icon name='go/dashboard-row-destination' w={16.831} />
                 <span className={cn('text-black', ROW_TEXT)}>{row.destination}</span>
               </span>
               <span
@@ -158,7 +158,7 @@ export default function GoDashboardMock() {
                 {row.lastSync}
               </span>
               <span className='absolute top-[-0.96px] left-[724.77px] flex items-center gap-[3.691px] rounded-[3.691px] bg-[#f6ffed] px-[7.382px] py-[0.923px]'>
-                <Icon name='dashboard-row-check' w={11.073} />
+                <Icon name='go/dashboard-row-check' w={11.073} />
                 <span className='text-[11.073px] leading-[18.455px] whitespace-nowrap text-[#389e0d]'>
                   {row.status}
                 </span>
@@ -177,7 +177,7 @@ export default function GoDashboardMock() {
           )}
         >
           <Icon
-            name='dashboard-highlight-actions'
+            name='go/dashboard-highlight-actions'
             w={13.27}
             h={1.99}
             className='absolute top-[29.23px] left-[62.37px]'
@@ -186,13 +186,13 @@ export default function GoDashboardMock() {
             Table_name_test_1
           </span>
           <span className='absolute top-[19.5px] left-[270.59px] flex h-[22px] w-[78.432px] items-center'>
-            <Icon name='dashboard-highlight-source' w={21.232} />
+            <Icon name='go/dashboard-highlight-source' w={21.232} />
             <span className='text-[12.385px] leading-[21.232px] whitespace-nowrap text-black'>
               MongoDB
             </span>
           </span>
           <span className='absolute top-[19.5px] left-[426.68px] flex h-[22px] w-[90.34px] items-center gap-[8.847px]'>
-            <Icon name='dashboard-highlight-destination' w={17.693} />
+            <Icon name='go/dashboard-highlight-destination' w={17.693} />
             <span className='text-[12.385px] leading-[21.232px] whitespace-nowrap text-black'>
               Amazon S3
             </span>
@@ -201,7 +201,7 @@ export default function GoDashboardMock() {
             21 hours ago
           </span>
           <span className='absolute top-[20.38px] left-[732.14px] flex h-[20.469px] w-[69.009px] items-center gap-[3.539px] rounded-[3.539px] bg-[#f6ffed] px-[7.077px] py-[0.885px]'>
-            <Icon name='dashboard-highlight-check' w={10.616} />
+            <Icon name='go/dashboard-highlight-check' w={10.616} />
             <span className='text-[10.616px] leading-[17.693px] whitespace-nowrap text-[#52c41a]'>
               Success
             </span>
@@ -211,16 +211,16 @@ export default function GoDashboardMock() {
         {/* Navigation rail */}
         <div className='absolute top-[-1px] left-[-1px] h-[1024px] w-[59px] overflow-hidden border-0 border-r border-solid border-[#eaeaea] bg-white'>
           <div className='absolute top-[32.22px] left-[23.34px] flex w-[16.83px] flex-col items-center gap-[18px]'>
-            <Icon name='dashboard-sidebar-toggle' w={15.972} />
+            <Icon name='go/dashboard-sidebar-toggle' w={15.972} />
             <div className='flex w-[20.364px] flex-col items-center gap-[20px]'>
               <span className='flex w-full items-center justify-center overflow-hidden rounded-[4.792px] bg-[#f5f5f5] p-[3.194px]'>
-                <Icon name='dashboard-sidebar-jobs' w={15.972} />
+                <Icon name='go/dashboard-sidebar-jobs' w={15.972} />
               </span>
               <span className='flex w-full items-center overflow-hidden rounded-[4.792px] bg-white p-[3.194px]'>
-                <Icon name='dashboard-sidebar-sparkle' w={13.976} />
+                <Icon name='go/dashboard-sidebar-sparkle' w={13.976} />
               </span>
-              <Icon name='dashboard-sidebar-settings' w={15.972} />
-              <Icon name='dashboard-sidebar-help' w={15.972} />
+              <Icon name='go/dashboard-sidebar-settings' w={15.972} />
+              <Icon name='go/dashboard-sidebar-help' w={15.972} />
             </div>
           </div>
         </div>

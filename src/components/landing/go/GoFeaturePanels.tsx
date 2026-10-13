@@ -1,6 +1,6 @@
 import React from 'react'
 import { cn } from '@site/src/lib/utils'
-import { MockFit, MockIcon as Icon, STROKE } from './mock'
+import { MockFit, MockIcon as Icon, STROKE } from '../product/mock'
 
 /**
  * The job-editor panels of the Schema Evolution, Parallel Chunking and Resumable Syncs tabs (the
@@ -39,7 +39,7 @@ function Panel({
               </span>
             </div>
             <div className='flex h-full w-[19.059px] shrink-0 items-center justify-center border-0 border-l-[0.596px] border-solid border-[#d9d9d9] bg-white'>
-              <Icon name='feature-panel-search' w={9.52956} />
+              <Icon name='go/feature-panel-search' w={9.52956} />
             </div>
           </div>
           <div className='relative h-[21.442px] w-[194.76px] overflow-hidden rounded-[3.574px] border-[0.596px] border-solid border-[#d9d9d9] bg-white'>
@@ -50,7 +50,7 @@ function Panel({
               DestinationDB
             </span>
             <Icon
-              name='feature-panel-pencil'
+              name='go/feature-panel-pencil'
               w={9.52956}
               className='absolute top-[5.36px] left-[178.08px]'
             />
@@ -62,16 +62,16 @@ function Panel({
         {/* Navigation rail */}
         <div className='absolute top-[-159.32px] left-[-0.85px] h-[548.364px] w-[50.309px] overflow-hidden border-0 border-r-[0.851px] border-solid border-[#eaeaea] bg-white opacity-50'>
           <div className='absolute top-[178.33px] left-[19.84px] flex w-[14.317px] flex-col items-center gap-[15.313px]'>
-            <Icon name='feature-panel-sidebar-toggle' w={13.5873} />
+            <Icon name='go/feature-panel-sidebar-toggle' w={13.5873} />
             <div className='flex w-[17.324px] flex-col items-center gap-[17.014px]'>
               <span className='flex w-full items-center justify-center overflow-hidden rounded-[4.076px] bg-[#f5f5f5] p-[2.717px]'>
-                <Icon name='feature-panel-sidebar-jobs' w={13.5873} />
+                <Icon name='go/feature-panel-sidebar-jobs' w={13.5873} />
               </span>
               <span className='flex w-full items-center overflow-hidden rounded-[4.076px] bg-white p-[2.717px]'>
-                <Icon name='feature-panel-sidebar-sparkle' w={11.8889} />
+                <Icon name='go/feature-panel-sidebar-sparkle' w={11.8889} />
               </span>
-              <Icon name='feature-panel-sidebar-settings' w={13.5873} />
-              <Icon name='feature-panel-sidebar-help' w={13.5873} />
+              <Icon name='go/feature-panel-sidebar-settings' w={13.5873} />
+              <Icon name='go/feature-panel-sidebar-help' w={13.5873} />
             </div>
           </div>
         </div>
@@ -131,7 +131,7 @@ export function SchemaMock({ className }: { className?: string }) {
                     : 'opacity-30'
                 )}
               >
-                <Icon name={tab.icon} w={12.7068} />
+                <Icon name={`go/${tab.icon}`} w={12.7068} />
                 <span
                   className={cn(
                     'truncate text-[11.118px] leading-[17.472px]',
@@ -152,13 +152,13 @@ export function SchemaMock({ className }: { className?: string }) {
             </span>
           </div>
           <div className='flex h-full w-[25.414px] shrink-0 items-center justify-center border-0 border-l-[0.794px] border-solid border-[#d9d9d9] bg-white'>
-            <Icon name='feature-schema-search' w={12.7068} />
+            <Icon name='go/feature-schema-search' w={12.7068} />
           </div>
         </div>
 
         <div className='absolute top-[133.65px] left-[15.33px] flex w-[354.996px] items-center gap-[23.031px] rounded-t-[3.177px] bg-[#f5f5f5] px-[12.707px] py-[9.53px] text-[9.53px] leading-[17.472px] whitespace-nowrap text-[rgba(128,128,128,0.88)]'>
           <span className='py-[2.383px]'>
-            <Icon name='feature-schema-checkbox-all' w={12.7068} />
+            <Icon name='go/feature-schema-checkbox-all' w={12.7068} />
           </span>
           <span className='w-[77.83px] truncate px-[6.353px]'>Column name</span>
           <span className='px-[6.353px]'>Destination Column</span>
@@ -175,7 +175,7 @@ export function SchemaMock({ className }: { className?: string }) {
             style={{ top: 206.17 + i * 36.255 }}
           >
             <span className='py-[2.383px]'>
-              <Icon name='feature-schema-checkbox' w={12.7068} />
+              <Icon name='go/feature-schema-checkbox' w={12.7068} />
             </span>
             <span className='w-[61.151px] shrink-0 px-[6.353px] text-[9.53px] leading-[17.472px] whitespace-nowrap text-[rgba(0,0,0,0.88)]'>
               {column}
@@ -191,7 +191,7 @@ export function SchemaMock({ className }: { className?: string }) {
       {/* The highlighted column, lifted over the list */}
       <div className='absolute top-[231.46px] left-[91.58px] flex w-[373.621px] items-center gap-[27.583px] rounded-[7.197px] border-[0.836px] border-solid border-[#d9d9d9] bg-white px-[13.373px] py-[10.03px]'>
         <span className='py-[2.508px]'>
-          <Icon name='feature-schema-checkbox-highlight' w={13.3735} />
+          <Icon name='go/feature-schema-checkbox-highlight' w={13.3735} />
         </span>
         <span className='w-[64.36px] shrink-0 px-[6.687px] text-[10.03px] leading-[18.389px] whitespace-nowrap text-[rgba(0,0,0,0.88)]'>
           User_ID
@@ -266,7 +266,7 @@ export function ChunkingMock({ className }: { className?: string }) {
           </span>
           <span className='absolute top-[23.59px] left-[11.32px] flex items-center gap-[2.83px] text-[7px] leading-normal whitespace-nowrap text-[#878787]'>
             {chunk.done}
-            <Icon name='feature-chunking-dot' w={1.88689} />
+            <Icon name='go/feature-chunking-dot' w={1.88689} />
             {chunk.rate}
           </span>
           <span className='absolute top-[41.06px] left-[11.06px] block h-[2px] w-[355px] overflow-hidden bg-[#eaeaea]'>
@@ -289,7 +289,7 @@ export function ChunkingMock({ className }: { className?: string }) {
         </span>
         <span className='absolute top-[25px] left-[12px] flex items-center gap-[3px] text-[7px] leading-normal whitespace-nowrap text-[#878787]'>
           750K / 1M
-          <Icon name='feature-chunking-dot-lg' w={2} />
+          <Icon name='go/feature-chunking-dot-lg' w={2} />
           25K rows/s
         </span>
         <span className='absolute top-[44px] left-[12px] block h-[2px] w-[357px] overflow-hidden bg-[#eaeaea]'>
@@ -318,7 +318,7 @@ function CheckpointCard({ table, top, muted }: { table: string; top: number; mut
     >
       <div className='absolute top-[11px] left-[12px] flex w-[129px] flex-col gap-[3px] leading-normal'>
         <span className='flex items-start gap-[4px] text-[9px] whitespace-nowrap text-black'>
-          <Icon name='feature-resumable-table' w={12} />
+          <Icon name='go/feature-resumable-table' w={12} />
           {table}
         </span>
         <span className='text-[7px] text-[#878787]'>Checkpoint restored · Snapshot resumed</span>
@@ -396,13 +396,13 @@ function CheckpointCard({ table, top, muted }: { table: string; top: number; mut
         </React.Fragment>
       ))}
       <Icon
-        name='feature-resumable-check-circle'
+        name='go/feature-resumable-check-circle'
         w={10}
         className='absolute top-[143px] left-[13px]'
       />
-      <Icon name='feature-resumable-plugs' w={10} className='absolute top-[168px] left-[13px]' />
+      <Icon name='go/feature-resumable-plugs' w={10} className='absolute top-[168px] left-[13px]' />
       <Icon
-        name='feature-resumable-arrow-ccw'
+        name='go/feature-resumable-arrow-ccw'
         w={10}
         className='absolute top-[195px] left-[13px]'
       />
