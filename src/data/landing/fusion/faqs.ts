@@ -4,7 +4,9 @@ export interface Faq {
   a: string
 }
 
-export const FAQ_TITLE = 'Frequently Asked Questions'
+export const FAQ_EYEBROW = 'FAQs'
+
+export const FAQ_TITLE = 'You might have some questions'
 
 export const FAQS: Faq[] = [
   {

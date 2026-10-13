@@ -1,31 +1,38 @@
 import React from 'react'
-import Button from '../ui/Button'
-import Section from '../ui/Section'
+import ProductCta from '../product/ProductCta'
 import { FUSION_CTA } from '@site/src/data/landing/fusion/cta'
 
-/** Closing call to action: headline and button beside the iceberg picture. */
+const IMG = '/img/landing/fusion'
+
+/** Closing call to action of the OLake Fusion page: the navy card with skewed data points under the buttons. */
 export default function FusionCta() {
   return (
-    <Section flush className='pb-[56px] lg:pb-[96px]'>
-      <div className='grid overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface lg:grid-cols-2'>
-        <div className='flex flex-col items-start justify-center px-[24px] py-[36px] lg:px-[64px] lg:py-[56px]'>
-          <h2 className='mb-0 max-w-[420px] text-[26px] font-normal leading-[1.15] tracking-[-0.01em] text-olake-ink lg:text-[40px]'>
-            {FUSION_CTA.title}
-          </h2>
-          <Button href={FUSION_CTA.cta.href} className='mt-[22px] lg:mt-[28px]'>
-            {FUSION_CTA.cta.label}
-          </Button>
-        </div>
-        <img
-          src={FUSION_CTA.image.src}
-          alt=''
-          width={FUSION_CTA.image.width}
-          height={FUSION_CTA.image.height}
-          loading='lazy'
-          decoding='async'
-          className='block h-[200px] w-full object-cover lg:h-full lg:min-h-[280px]'
-        />
-      </div>
-    </Section>
+    <ProductCta
+      {...FUSION_CTA}
+      className='bg-[#0a0923]'
+      art={
+        <>
+          {/* A navy glow that softens the points under the heading */}
+          <img
+            src={`${IMG}/cta-glow.svg`}
+            alt=''
+            width={1466}
+            height={745}
+            loading='lazy'
+            decoding='async'
+            className='pointer-events-none absolute top-[-211px] left-1/2 -z-20 block max-w-none -translate-x-1/2'
+          />
+          <img
+            src={`${IMG}/cta-quantity-skew.svg`}
+            alt=''
+            width={1330.33}
+            height={886.886}
+            loading='lazy'
+            decoding='async'
+            className='pointer-events-none absolute bottom-[-509px] left-[calc(50%+1.8px)] -z-10 block max-w-none -translate-x-1/2 -rotate-[0.61deg]'
+          />
+        </>
+      }
+    />
   )
 }

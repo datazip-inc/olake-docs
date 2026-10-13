@@ -32,13 +32,16 @@ export default function ProductFeatures({
   idPrefix,
   intro,
   features,
-  art
+  art,
+  className
 }: {
   /** Prefix of the tab and panel ids, e.g. 'go-feature'. */
   idPrefix: string
   intro: { eyebrow: string; title: string }
   features: ProductFeature[]
   art: Record<string, ProductFeatureArt>
+  /** Section overrides, e.g. the gap to the next section. */
+  className?: string
 }) {
   const [active, setActive] = useState(0)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -63,7 +66,10 @@ export default function ProductFeatures({
   const panelId = `${idPrefix}-panel`
 
   return (
-    <section id='features' className='px-[16px] pb-[48px] lg:px-[24px] lg:pb-[96px]'>
+    <section
+      id='features'
+      className={cn('px-[16px] pb-[48px] lg:px-[24px] lg:pb-[96px]', className)}
+    >
       <div className='mx-auto max-w-[1018px] rounded-[20px] border border-solid border-olake-line-rule bg-olake-surface px-[12px] pt-[40px] pb-[12px] lg:rounded-[24px] lg:px-[19px] lg:pt-[70px] lg:pb-[20px]'>
         <div className='px-[8px] text-center'>
           <p className='text-[15px] leading-[1.3] text-olake-muted lg:text-[16px]'>
