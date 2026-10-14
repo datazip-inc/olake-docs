@@ -9,7 +9,6 @@ import {
 } from 'react-icons/ai'
 import {
   PiArrowCounterClockwise,
-  PiArrowDownBold,
   PiArrowRight,
   PiArrowSquareOut,
   PiArrowsInCardinal,
@@ -344,16 +343,6 @@ export const MOCK_ICONS: Record<
     icon: PiCheckCircle,
     color: '#52c41a',
     viewBox: '1.45 1.45 252.69 252.69'
-  },
-  'product/faq-arrow-closed': {
-    icon: PiArrowDownBold,
-    color: '#939393',
-    viewBox: '0 0 256 256'
-  },
-  'product/faq-arrow-open': {
-    icon: PiArrowDownBold,
-    color: '#333333',
-    viewBox: '0 0 256 256'
   },
   'product/icon-github': {
     icon: PiGithubLogo,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { cn } from '@site/src/lib/utils'
-import { MockIcon } from './mock'
+import { PiArrowDownBold } from 'react-icons/pi'
 
 export interface ProductFaqItem {
   q: string
@@ -59,12 +59,13 @@ export default function ProductFaq({
                   >
                     {faq.q}
                     {/* Centred on the whole item, so it sits between question and answer when open. */}
-                    <MockIcon
-                      name={`product/faq-arrow-${isOpen ? 'open' : 'closed'}`}
-                      w={16}
+                    <PiArrowDownBold
+                      aria-hidden='true'
+                      focusable='false'
+                      size={16}
                       className={cn(
                         'absolute top-1/2 right-[20px] block -translate-y-1/2 lg:right-[40px]',
-                        isOpen && '-scale-y-100'
+                        isOpen ? '-scale-y-100 text-[#333]' : 'text-[#939393]'
                       )}
                     />
                   </button>
@@ -74,7 +75,7 @@ export default function ProductFaq({
                   role='region'
                   aria-labelledby={`${idPrefix}-q-${i}`}
                   hidden={!isOpen}
-                  className={cn('product-fade-in', !isOpen && 'hidden')}
+                  className='product-fade-in'
                 >
                   <p className='max-w-[858px] pt-[16px] pr-[52px] pb-[24px] pl-[20px] text-[15px] leading-[24px] text-[#626262] lg:pr-0 lg:pl-[40px] lg:text-[16px]'>
                     {faq.a}

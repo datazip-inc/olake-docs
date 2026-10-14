@@ -128,10 +128,7 @@ export default function ProductFeatures({
                 id={`${idPrefix}-panel-${item.id}`}
                 aria-labelledby={`${idPrefix}-tab-${item.id}`}
                 hidden={!selected}
-                className={cn(
-                  'product-fade-in px-[24px] pt-[28px] lg:absolute lg:top-(--copy-top) lg:left-[49px] lg:w-[323px] lg:p-0',
-                  !selected && 'hidden'
-                )}
+                className='product-fade-in px-[24px] pt-[28px] lg:absolute lg:top-(--copy-top) lg:left-[49px] lg:w-[323px] lg:p-0'
                 style={{ '--copy-top': `${art[item.id].copyTop}px` } as React.CSSProperties}
               >
                 <h3 className='text-[22px] leading-[1.3] font-medium text-[#fdfdfc] lg:w-[258px] lg:text-[24px]'>
