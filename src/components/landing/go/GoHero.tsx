@@ -1,123 +1,17 @@
 import React from 'react'
 import ProductHero from '../product/ProductHero'
 import Glow from '../product/Glow'
-import {
-  GO_HERO,
-  GO_SOURCES,
-  GO_SOURCES_LABEL,
-  type GoSourceId
-} from '@site/src/data/landing/go/hero'
+import { GO_HERO, GO_SOURCES, GO_SOURCES_LABEL } from '@site/src/data/landing/go/hero'
 import GoDashboardMock from './GoDashboardMock'
+import { GO_LOGOS } from './logos'
 
 const IMG = '/img/landing/go'
-
-/** Each source's logo as the design places it: some are SVGs at their own size, the rest are cropped PNGs. */
-const LOGOS: Record<GoSourceId, React.ReactNode> = {
-  kafka: (
-    <span className='block h-[17.306px] w-[10.656px] -scale-y-100'>
-      <img
-        src={`${IMG}/source-kafka.webp`}
-        alt=''
-        width={44}
-        height={71}
-        loading='lazy'
-        decoding='async'
-        className='block h-full w-full object-cover'
-      />
-    </span>
-  ),
-  postgres: (
-    <span className='relative block h-[20.8125px] w-[20.8125px]'>
-      <img
-        src={`${IMG}/source-postgres.webp`}
-        alt=''
-        width={16.7779}
-        height={17.2977}
-        loading='lazy'
-        decoding='async'
-        className='absolute top-[8.49%] left-[8.48%] block'
-      />
-    </span>
-  ),
-  mysql: (
-    <img
-      src={`${IMG}/source-mysql.webp`}
-      alt=''
-      width={20.8125}
-      height={20.8125}
-      loading='lazy'
-      decoding='async'
-      className='block'
-    />
-  ),
-  mongodb: (
-    <img
-      src={`${IMG}/source-mongodb.webp`}
-      alt=''
-      width={20.8125}
-      height={20.8125}
-      loading='lazy'
-      decoding='async'
-      className='block'
-    />
-  ),
-  s3: (
-    <img
-      src={`${IMG}/source-s3.webp`}
-      alt=''
-      width={23.6607}
-      height={23.6607}
-      loading='lazy'
-      decoding='async'
-      className='block'
-    />
-  ),
-  mssql: (
-    <span className='relative block h-[20px] w-[20px] overflow-hidden'>
-      <img
-        src={`${IMG}/source-mssql.webp`}
-        alt=''
-        width={120}
-        height={67}
-        loading='lazy'
-        decoding='async'
-        className='absolute top-0 left-[-42.62%] block h-full w-[184.43%] max-w-none'
-      />
-    </span>
-  ),
-  db2: (
-    <span className='relative block h-[24px] w-[27px] overflow-hidden mix-blend-multiply'>
-      <img
-        src={`${IMG}/source-db2.webp`}
-        alt=''
-        width={160}
-        height={93}
-        loading='lazy'
-        decoding='async'
-        className='absolute top-[-9.38%] left-[-41.67%] block h-[119.97%] w-[184.46%] max-w-none'
-      />
-    </span>
-  ),
-  oracle: (
-    <span className='relative block h-[21px] w-[21px] overflow-hidden'>
-      <img
-        src={`${IMG}/source-oracle.webp`}
-        alt=''
-        width={72}
-        height={72}
-        loading='lazy'
-        decoding='async'
-        className='absolute top-[0.72%] left-[0.71%] block h-[100.33%] w-[100.33%] max-w-none object-cover'
-      />
-    </span>
-  )
-}
 
 const SourceList = ({ hidden }: { hidden?: boolean }) => (
   <ul aria-hidden={hidden || undefined} className='flex shrink-0 items-center gap-[32px] pr-[32px]'>
     {GO_SOURCES.map((source) => (
       <li key={source.id} className='flex shrink-0 items-center gap-[9px]'>
-        {LOGOS[source.id]}
+        <img {...GO_LOGOS[source.id]} alt='' loading='lazy' decoding='async' className='block' />
         <span className='text-[16px] leading-[1.3] whitespace-nowrap text-[#231f20]'>
           {source.name}
         </span>
@@ -144,8 +38,7 @@ function SourcesStrip() {
         {GO_SOURCES_LABEL}
       </p>
       <div className='relative h-[24px] [mask-image:linear-gradient(to_right,transparent,#000_40px,#000_calc(100%-40px),transparent)] md:absolute md:top-[23px] md:right-0 md:left-[199px] md:[mask-image:linear-gradient(to_right,transparent,#000_40px,#000_calc(100%-120px),transparent_calc(100%-41px))]'>
-        {/* The strip's grey behind the logos lets the DB2 mark multiply onto it, as in the design. */}
-        <div className='go-marquee-track bg-[#f7f7f7]'>
+        <div className='go-marquee-track'>
           <SourceList />
           <SourceList hidden />
         </div>

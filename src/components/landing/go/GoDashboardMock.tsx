@@ -1,6 +1,7 @@
 import React from 'react'
 import { cn } from '@site/src/lib/utils'
 import { MockFit, MockIcon as Icon, STROKE } from '../product/mock'
+import { GO_LOGOS } from './logos'
 
 /**
  * The OLake Go "Jobs" screen under the hero, drawn at its design size (1018 × 471) and scaled to
@@ -19,31 +20,36 @@ const COLUMNS = [
   { label: 'Last sync status', className: 'flex-1' }
 ]
 
-/**
- * The mark of each source and destination a job can name: the artwork of the hero's sources strip,
- * so a row's logo always matches its label. `scale` enlarges artwork that sits small in its canvas
- * (the S3 bucket fills 62% of it) so every mark reads at about the same size.
- */
-const LOGOS = {
-  'MySQL': { src: 'go/source-mysql' },
-  'PostgreSQL': { src: 'go/source-postgres' },
-  'MongoDB': { src: 'go/source-mongodb' },
-  'Oracle': { src: 'go/source-oracle' },
-  'Amazon S3': { src: 'go/source-s3', scale: 1.2 },
-  'Apache Iceberg': { src: 'go/destination-iceberg' }
-} as const satisfies Record<string, { src: string; scale?: number }>
+/** Each source and destination a job can name, and its logo (shared with the hero's sources strip). */
+const ENDPOINT_LOGO = {
+  'MySQL': 'mysql',
+  'PostgreSQL': 'postgres',
+  'MongoDB': 'mongodb',
+  'Oracle': 'oracle',
+  'Amazon S3': 's3',
+  'Apache Iceberg': 'iceberg'
+} as const
 
-type Endpoint = keyof typeof LOGOS
+type Endpoint = keyof typeof ENDPOINT_LOGO
 
-/** A logo in a square slot of `size` px, so sources and destinations line up and size alike. */
+/** A logo fitted into a square slot of `size` px, so sources and destinations line up. */
 function Logo({ name, size }: { name: Endpoint; size: number }) {
-  const logo: { src: string; scale?: number } = LOGOS[name]
+  const { src, width, height } = GO_LOGOS[ENDPOINT_LOGO[name]]
+  const fit = size / Math.max(width, height)
   return (
     <span
       className='flex shrink-0 items-center justify-center'
       style={{ width: size, height: size }}
     >
-      <Icon name={logo.src} w={size * (logo.scale ?? 1)} />
+      <img
+        src={src}
+        alt=''
+        width={width * fit}
+        height={height * fit}
+        loading='lazy'
+        decoding='async'
+        className='block'
+      />
     </span>
   )
 }
