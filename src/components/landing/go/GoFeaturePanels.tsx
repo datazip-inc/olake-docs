@@ -289,7 +289,7 @@ export function ChunkingMock({ className }: { className?: string }) {
         </span>
         <span className='absolute top-[25px] left-[12px] flex items-center gap-[3px] text-[7px] leading-normal whitespace-nowrap text-[#878787]'>
           750K / 1M
-          <Icon name='go/feature-chunking-dot-lg' w={2} />
+          <Icon name='go/feature-chunking-dot' w={2} />
           25K rows/s
         </span>
         <span className='absolute top-[44px] left-[12px] block h-[2px] w-[357px] overflow-hidden bg-[#eaeaea]'>

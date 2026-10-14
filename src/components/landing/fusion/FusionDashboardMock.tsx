@@ -340,7 +340,7 @@ export default function FusionDashboardMock() {
                           </span>
                         </span>
                       }
-                      trailing={<Icon name='dashboard-caret-open' w={11.3125} />}
+                      trailing={<Icon name='dashboard-caret' w={11.3125} />}
                       className='rounded-[4.242px]'
                     />
                     <div className='flex w-full items-end gap-[14.141px] px-[11.313px] py-[5.656px]'>

@@ -516,7 +516,7 @@ export function ConfigMock({ className }: { className?: string }) {
           <span className='flex w-[110.495px] flex-col gap-[4.911px]'>
             <Label>
               Job Start Time <span className='text-[rgba(0,0,0,0.45)]'>(12H UTC)</span>
-              <Icon name='feature-config-info' w={8.59406} />
+              <Icon name='feature-config-question' w={8.59406} />
             </Label>
             <span className='flex items-center gap-[4.911px]'>
               <Select value='1' className='w-[36.218px]' />
