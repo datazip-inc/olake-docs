@@ -76,9 +76,7 @@ export function useGoBenchmark() {
       competitors: keys.map((key) => TOOLS[key].name),
       olakeSub: TOOLS.olake.description ?? '',
       caption: goBenchmarkCaption(mode, bench.rowsSynced.olake, connector.name),
-      rows,
-      hasData: bench.hasData,
-      sourceName: connector.name
+      rows
     }
   }, [selectedConnector, mode])
 }

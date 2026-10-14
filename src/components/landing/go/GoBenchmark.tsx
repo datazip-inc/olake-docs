@@ -117,116 +117,99 @@ export default function GoBenchmark() {
           </div>
         </div>
 
-        {t.hasData ? (
-          <div className={cn(RULE, 'overflow-x-auto border-y lg:pr-[45px]')}>
-            <table className='w-full min-w-[800px] table-fixed border-collapse border-0 text-left'>
-              <colgroup>
-                {COLUMNS.map((width, i) => (
-                  <col key={i} style={{ width }} />
+        <div className={cn(RULE, 'overflow-x-auto border-y lg:pr-[45px]')}>
+          <table className='w-full min-w-[800px] table-fixed border-collapse border-0 text-left'>
+            <colgroup>
+              {COLUMNS.map((width, i) => (
+                <col key={i} style={{ width }} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr className='h-[60px] border-0 bg-transparent'>
+                <th
+                  className={cn(
+                    RULE,
+                    'border-r bg-transparent px-[20px] py-0 align-middle text-[14px] leading-[1.3] font-normal text-olake-muted-on-dark lg:pl-[41px]'
+                  )}
+                >
+                  Metrics
+                </th>
+                <th
+                  className={cn(
+                    RULE,
+                    'border-r bg-transparent px-[8px] py-0 text-center align-middle leading-[1.3] font-normal'
+                  )}
+                >
+                  <span className='block text-[14px] text-olake-blue-on-dark'>
+                    OLake<span className='sr-only'> </span>
+                    <span className='font-light'>Go</span>
+                  </span>
+                  <span className='block text-[12px] text-olake-muted-on-dark'>{t.olakeSub}</span>
+                </th>
+                {t.competitors.map((name, i) => (
+                  <th
+                    key={name}
+                    className={cn(
+                      RULE,
+                      'bg-transparent px-[8px] py-0 text-center align-middle text-[14px] leading-[1.3] font-normal text-olake-muted-on-dark',
+                      i < t.competitors.length - 1 && 'border-r'
+                    )}
+                  >
+                    {name}
+                  </th>
                 ))}
-              </colgroup>
-              <thead>
-                <tr className='h-[60px] border-0 bg-transparent'>
-                  <th
+              </tr>
+            </thead>
+            <tbody>
+              {t.rows.map((row, r) => {
+                const cell = 'px-[8px] pt-[29px] pb-0 align-top text-[14px] leading-[1.3]'
+                return (
+                  <tr
+                    key={row.label}
                     className={cn(
-                      RULE,
-                      'border-r bg-transparent px-[20px] py-0 align-middle text-[14px] leading-[1.3] font-normal text-olake-muted-on-dark lg:pl-[41px]'
+                      'border-0 bg-transparent',
+                      // Rows keep the design's 74px pitch even when a figure takes two lines;
+                      // the last one runs on to the table's bottom rule.
+                      r === t.rows.length - 1 ? 'h-[170px]' : 'h-[74px]'
                     )}
                   >
-                    Metrics
-                  </th>
-                  <th
-                    className={cn(
-                      RULE,
-                      'border-r bg-transparent px-[8px] py-0 text-center align-middle leading-[1.3] font-normal'
-                    )}
-                  >
-                    <span className='block text-[14px] text-olake-blue-on-dark'>
-                      OLake<span className='sr-only'> </span>
-                      <span className='font-light'>Go</span>
-                    </span>
-                    <span className='block text-[12px] text-olake-muted-on-dark'>{t.olakeSub}</span>
-                  </th>
-                  {t.competitors.map((name, i) => (
                     <th
-                      key={name}
                       className={cn(
                         RULE,
-                        'bg-transparent px-[8px] py-0 text-center align-middle text-[14px] leading-[1.3] font-normal text-olake-muted-on-dark',
-                        i < t.competitors.length - 1 && 'border-r'
+                        cell,
+                        'border-r bg-transparent pl-[20px] text-left font-normal text-white lg:pl-[41px]'
                       )}
                     >
-                      {name}
+                      {row.label}
+                      {row.note && (
+                        <span className='mt-[8px] block max-w-[133px] text-[12px] leading-[1.3] text-olake-muted-on-dark'>
+                          {row.note}
+                        </span>
+                      )}
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {t.rows.map((row, r) => {
-                  const cell = 'px-[8px] pt-[29px] pb-0 align-top text-[14px] leading-[1.3]'
-                  return (
-                    <tr
-                      key={row.label}
-                      className={cn(
-                        'border-0 bg-transparent',
-                        // Rows keep the design's 74px pitch even when a figure takes two lines;
-                        // the last one runs on to the table's bottom rule.
-                        r === t.rows.length - 1 ? 'h-[170px]' : 'h-[74px]'
-                      )}
-                    >
-                      <th
+                    <td className={cn(RULE, cell, 'border-r text-center text-white')}>
+                      <Figure value={row.olake} />
+                    </td>
+                    {row.competitors.map((value, i) => (
+                      <td
+                        key={`${row.label}-${t.competitors[i]}`}
                         className={cn(
                           RULE,
                           cell,
-                          'border-r bg-transparent pl-[20px] text-left font-normal text-white lg:pl-[41px]'
+                          'text-center',
+                          row.highlight ? 'text-olake-blue-on-dark' : 'text-olake-muted-on-dark',
+                          i < row.competitors.length - 1 && 'border-r'
                         )}
                       >
-                        {row.label}
-                        {row.note && (
-                          <span className='mt-[8px] block max-w-[133px] text-[12px] leading-[1.3] text-olake-muted-on-dark'>
-                            {row.note}
-                          </span>
-                        )}
-                      </th>
-                      <td className={cn(RULE, cell, 'border-r text-center text-white')}>
-                        <Figure value={row.olake} />
+                        <Figure value={value} />
                       </td>
-                      {row.competitors.map((value, i) => (
-                        <td
-                          key={`${row.label}-${t.competitors[i]}`}
-                          className={cn(
-                            RULE,
-                            cell,
-                            'text-center',
-                            row.highlight ? 'text-olake-blue-on-dark' : 'text-olake-muted-on-dark',
-                            i < row.competitors.length - 1 && 'border-r'
-                          )}
-                        >
-                          <Figure value={value} />
-                        </td>
-                      ))}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div
-            className={cn(
-              RULE,
-              'flex flex-col items-center border-y px-[24px] py-[56px] text-center lg:py-[96px]'
-            )}
-          >
-            <p className='text-[16px] leading-[1.3] text-white lg:text-[20px]'>
-              {t.sourceName} benchmarks coming soon
-            </p>
-            <p className='mt-[8px] max-w-[420px] text-[13px] leading-[1.6] text-olake-muted-on-dark lg:text-[14px]'>
-              We&apos;re running head-to-head {t.sourceName} ingestion tests now. Check back shortly
-              for the full comparison.
-            </p>
-          </div>
-        )}
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </BenchmarkShell>
   )
