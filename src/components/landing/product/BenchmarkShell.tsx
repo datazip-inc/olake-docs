@@ -2,6 +2,7 @@ import React from 'react'
 import Link from '@docusaurus/Link'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { cn } from '@site/src/lib/utils'
+import { MockIcon } from './mock'
 
 /** Rules on the dark section. It goes first in cn(): a later border-0 would drop the side classes. */
 export const RULE = 'border-0 border-solid border-olake-line-dark'
@@ -102,15 +103,7 @@ export default function BenchmarkShell({
           )}
         >
           {link.label}
-          <img
-            src='/img/landing/product/link-arrow-square-out.webp'
-            alt=''
-            width={18}
-            height={18}
-            loading='lazy'
-            decoding='async'
-            className='block'
-          />
+          <MockIcon name='product/link-arrow-square-out' w={18} />
         </Link>
       </div>
     </section>

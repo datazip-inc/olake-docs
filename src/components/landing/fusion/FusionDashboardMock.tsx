@@ -42,9 +42,9 @@ const NavItem = ({
 )
 
 /** The caret drawn pointing right (the design rotates its down caret a quarter turn). */
-const CaretRight = ({ name = 'dashboard-caret' }: { name?: string }) => (
+const CaretRight = () => (
   <span className='flex size-[11.313px] items-center justify-center'>
-    <Icon name={name} w={11.3125} className='size-[11.313px] -rotate-90' />
+    <Icon name='dashboard-caret' w={11.3125} className='size-[11.313px] -rotate-90' />
   </span>
 )
 
@@ -377,17 +377,10 @@ export default function FusionDashboardMock() {
                   <span className='text-[8.484px] leading-[15.555px] font-medium text-[rgba(0,0,0,0.45)]'>
                     System
                   </span>
+                  {/* The design hides these two items' carets, so they are left out. */}
                   <div className='flex w-full flex-col gap-[5.656px]'>
-                    <NavItem
-                      icon='dashboard-nav-settings'
-                      label='Settings'
-                      trailing={<CaretRight name='dashboard-caret-system' />}
-                    />
-                    <NavItem
-                      icon='dashboard-nav-help'
-                      label='Help & Support'
-                      trailing={<CaretRight name='dashboard-caret-system' />}
-                    />
+                    <NavItem icon='dashboard-nav-settings' label='Settings' />
+                    <NavItem icon='dashboard-nav-help' label='Help & Support' />
                   </div>
                 </div>
               </div>

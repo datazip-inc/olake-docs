@@ -1,6 +1,7 @@
 import React from 'react'
 import Button from '../ui/Button'
 import { cn } from '@site/src/lib/utils'
+import { MockIcon } from './mock'
 
 export interface ProductHeroCopy {
   eyebrow: string
@@ -58,14 +59,7 @@ export default function ProductHero({
                 'rounded-[10px] border-[rgba(150,171,254,0.6)] bg-(--product-blue) text-[#fcfcfb] shadow-[0_2px_2px_0_rgba(0,0,0,0.14)] hover:border-[rgba(150,171,254,0.6)] hover:bg-(--product-blue-hover)'
               )}
             >
-              <img
-                src='/img/landing/product/icon-github.webp'
-                alt=''
-                width={16}
-                height={16}
-                decoding='async'
-                className='block'
-              />
+              <MockIcon name='product/icon-github' w={16} />
               {copy.primary.label}
             </Button>
             <Button

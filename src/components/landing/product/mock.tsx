@@ -1,5 +1,6 @@
 import React from 'react'
 import { cn } from '@site/src/lib/utils'
+import { MOCK_ICONS } from './mockIcons'
 
 /**
  * Shared pieces of the product mock-ups (the hero dashboards and the feature-card editors of the
@@ -12,8 +13,10 @@ export const STROKE =
   "after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:border-solid after:content-['']"
 
 /**
- * An exported icon at its own size (`h` defaults to `w`). `name` is its path under /img/landing
- * without the extension, e.g. `go/dashboard-plus` or `product/mock-sidebar-help`.
+ * An icon at its own size (`h` defaults to `w`), drawn inline from react-icons (see MOCK_ICONS).
+ * `name` is the design export's path under /img/landing without the extension, e.g.
+ * `go/dashboard-plus` or `product/mock-sidebar-help`; a name with no react-icon (the checkboxes)
+ * loads that exported image, lazily.
  */
 export function MockIcon({
   name,
@@ -26,12 +29,28 @@ export function MockIcon({
   h?: number
   className?: string
 }) {
+  const spec = MOCK_ICONS[name]
+  if (spec) {
+    const { icon: Glyph, color, viewBox, rotate } = spec
+    // max-w-full lets a squeezed icon shrink into its box the way the exported images did.
+    return (
+      <Glyph
+        aria-hidden='true'
+        focusable='false'
+        viewBox={viewBox}
+        color={color}
+        className={cn('block max-w-full shrink-0', className)}
+        style={{ width: w, height: h, transform: rotate ? `rotate(${rotate}deg)` : undefined }}
+      />
+    )
+  }
   return (
     <img
       src={`/img/landing/${name}.webp`}
       alt=''
       width={w}
       height={h}
+      loading='lazy'
       decoding='async'
       className={cn('block shrink-0 object-contain', className)}
     />

@@ -20,6 +20,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
         alt=''
         width={44}
         height={71}
+        loading='lazy'
         decoding='async'
         className='block h-full w-full object-cover'
       />
@@ -32,6 +33,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
         alt=''
         width={16.7779}
         height={17.2977}
+        loading='lazy'
         decoding='async'
         className='absolute top-[8.49%] left-[8.48%] block'
       />
@@ -43,6 +45,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
       alt=''
       width={20.8125}
       height={20.8125}
+      loading='lazy'
       decoding='async'
       className='block'
     />
@@ -53,6 +56,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
       alt=''
       width={20.8125}
       height={20.8125}
+      loading='lazy'
       decoding='async'
       className='block'
     />
@@ -63,6 +67,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
       alt=''
       width={23.6607}
       height={23.6607}
+      loading='lazy'
       decoding='async'
       className='block'
     />
@@ -74,6 +79,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
         alt=''
         width={120}
         height={67}
+        loading='lazy'
         decoding='async'
         className='absolute top-0 left-[-42.62%] block h-full w-[184.43%] max-w-none'
       />
@@ -86,6 +92,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
         alt=''
         width={160}
         height={93}
+        loading='lazy'
         decoding='async'
         className='absolute top-[-9.38%] left-[-41.67%] block h-[119.97%] w-[184.46%] max-w-none'
       />
@@ -98,6 +105,7 @@ const LOGOS: Record<GoSourceId, React.ReactNode> = {
         alt=''
         width={72}
         height={72}
+        loading='lazy'
         decoding='async'
         className='absolute top-[0.72%] left-[0.71%] block h-[100.33%] w-[100.33%] max-w-none object-cover'
       />

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { cn } from '@site/src/lib/utils'
+import { MockIcon } from './mock'
 
 export interface ProductFaqItem {
   q: string
@@ -58,12 +59,9 @@ export default function ProductFaq({
                   >
                     {faq.q}
                     {/* Centred on the whole item, so it sits between question and answer when open. */}
-                    <img
-                      src={`/img/landing/product/faq-arrow-${isOpen ? 'open' : 'closed'}.webp`}
-                      alt=''
-                      width={16}
-                      height={16}
-                      decoding='async'
+                    <MockIcon
+                      name={`product/faq-arrow-${isOpen ? 'open' : 'closed'}`}
+                      w={16}
                       className={cn(
                         'absolute top-1/2 right-[20px] block -translate-y-1/2 lg:right-[40px]',
                         isOpen && '-scale-y-100'
