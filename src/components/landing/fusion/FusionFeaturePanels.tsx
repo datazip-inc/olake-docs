@@ -408,7 +408,7 @@ export function DecayMock({ className }: { className?: string }) {
           style={{ top: step.top }}
         >
           <Icon
-            name={step.done ? 'feature-decay-active' : 'feature-decay-done'}
+            name={step.done ? 'feature-decay-done' : 'feature-decay-pending'}
             w={29.0909}
             className='absolute top-[18.18px] left-[16.36px]'
           />

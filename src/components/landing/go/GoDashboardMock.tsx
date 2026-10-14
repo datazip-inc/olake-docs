@@ -19,12 +19,50 @@ const COLUMNS = [
   { label: 'Last sync status', className: 'flex-1' }
 ]
 
+/**
+ * The mark of each source and destination a job can name: the artwork of the hero's sources strip,
+ * so a row's logo always matches its label.
+ */
+const LOGOS = {
+  'MySQL': 'go/source-mysql',
+  'PostgreSQL': 'go/source-postgres',
+  'MongoDB': 'go/source-mongodb',
+  'Oracle': 'go/source-oracle',
+  'Amazon S3': 'go/source-s3',
+  'Apache Iceberg': 'go/destination-iceberg'
+} as const
+
+type Endpoint = keyof typeof LOGOS
+
+/** A "Last sync status" tag: Success is green with a check, Failed red, Pending orange. */
+const STATUS = {
+  Success: {
+    icon: 'go/dashboard-row-check',
+    className: 'bg-[#f6ffed] text-[#389e0d]'
+  },
+  Failed: {
+    icon: 'product/status-failed',
+    className: 'bg-[#fff1f0] text-[#cf1322]'
+  },
+  Pending: {
+    icon: 'product/status-running',
+    className: 'bg-[#fff7e6] text-[#d46b08]'
+  }
+} as const
+
 /** The rows under the highlighted one; the last two sit in the fade. */
-const ROWS = [
+const ROWS: {
+  name: string
+  source: Endpoint
+  destination: Endpoint
+  lastSync: string
+  status: keyof typeof STATUS
+  opacity: string
+}[] = [
   {
     name: 'Table_name_test_3',
     source: 'MySQL',
-    destination: 'Dropbox',
+    destination: 'Apache Iceberg',
     lastSync: '2 days ago',
     status: 'Failed',
     opacity: 'opacity-70'
@@ -32,7 +70,7 @@ const ROWS = [
   {
     name: 'Table_name_test_4',
     source: 'PostgreSQL',
-    destination: 'Google Drive',
+    destination: 'Amazon S3',
     lastSync: '1 day ago',
     status: 'Success',
     opacity: 'opacity-70'
@@ -40,15 +78,15 @@ const ROWS = [
   {
     name: 'Table_name_test_5',
     source: 'MongoDB',
-    destination: 'OneDrive',
+    destination: 'Apache Iceberg',
     lastSync: '3 days ago',
     status: 'Pending',
     opacity: 'opacity-40'
   },
   {
     name: 'Table_name_test_6',
-    source: 'SQLite',
-    destination: 'Box',
+    source: 'Oracle',
+    destination: 'Amazon S3',
     lastSync: '4 hours ago',
     status: 'Failed',
     opacity: 'opacity-40'
@@ -141,12 +179,12 @@ export default function GoDashboardMock() {
               >
                 {row.name}
               </span>
-              <span className='absolute top-0 left-[260.03px] flex items-center'>
-                <Icon name='go/dashboard-row-source' w={20.197} />
+              <span className='absolute top-0 left-[260.03px] flex items-center gap-[6.3px]'>
+                <Icon name={LOGOS[row.source]} w={20.197} />
                 <span className={cn('text-black', ROW_TEXT)}>{row.source}</span>
               </span>
               <span className='absolute top-0 left-[415.92px] flex items-center gap-[8.416px]'>
-                <Icon name='go/dashboard-row-destination' w={16.831} />
+                <Icon name={LOGOS[row.destination]} w={16.831} />
                 <span className={cn('text-black', ROW_TEXT)}>{row.destination}</span>
               </span>
               <span
@@ -157,9 +195,14 @@ export default function GoDashboardMock() {
               >
                 {row.lastSync}
               </span>
-              <span className='absolute top-[-0.96px] left-[724.77px] flex items-center gap-[3.691px] rounded-[3.691px] bg-[#f6ffed] px-[7.382px] py-[0.923px]'>
-                <Icon name='go/dashboard-row-check' w={11.073} />
-                <span className='text-[11.073px] leading-[18.455px] whitespace-nowrap text-[#389e0d]'>
+              <span
+                className={cn(
+                  'absolute top-[-0.96px] left-[724.77px] flex items-center gap-[3.691px] rounded-[3.691px] px-[7.382px] py-[0.923px]',
+                  STATUS[row.status].className
+                )}
+              >
+                <Icon name={STATUS[row.status].icon} w={11.073} />
+                <span className='text-[11.073px] leading-[18.455px] whitespace-nowrap'>
                   {row.status}
                 </span>
               </span>
@@ -185,14 +228,14 @@ export default function GoDashboardMock() {
           <span className='absolute top-[30.5px] left-[129.16px] -translate-y-1/2 text-[12.385px] leading-[21.232px] whitespace-nowrap text-[rgba(0,0,0,0.88)]'>
             Table_name_test_1
           </span>
-          <span className='absolute top-[19.5px] left-[270.59px] flex h-[22px] w-[78.432px] items-center'>
-            <Icon name='go/dashboard-highlight-source' w={21.232} />
+          <span className='absolute top-[19.5px] left-[270.59px] flex h-[22px] items-center gap-[6.6px]'>
+            <Icon name={LOGOS.MongoDB} w={21.232} />
             <span className='text-[12.385px] leading-[21.232px] whitespace-nowrap text-black'>
               MongoDB
             </span>
           </span>
           <span className='absolute top-[19.5px] left-[426.68px] flex h-[22px] w-[90.34px] items-center gap-[8.847px]'>
-            <Icon name='go/dashboard-highlight-destination' w={17.693} />
+            <Icon name={LOGOS['Amazon S3']} w={17.693} />
             <span className='text-[12.385px] leading-[21.232px] whitespace-nowrap text-black'>
               Amazon S3
             </span>

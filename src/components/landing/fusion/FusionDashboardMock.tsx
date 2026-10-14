@@ -51,19 +51,19 @@ const CaretRight = ({ name = 'dashboard-caret' }: { name?: string }) => (
 const STATUS = {
   success: {
     label: 'Success',
-    icon: 'dashboard-status-success',
+    icon: 'fusion/dashboard-status-success',
     className: 'bg-[#f6ffed] text-[#52c41a]',
     left: 103.23
   },
   running: {
     label: 'Running',
-    icon: 'dashboard-status-running',
+    icon: 'product/status-running',
     className: 'bg-[#fff7e6] text-[#fa8c16]',
     left: 103.93
   },
   failed: {
     label: 'Failed',
-    icon: 'dashboard-status-failed',
+    icon: 'product/status-failed',
     className: 'bg-[#fff1f0] text-[#f5222d]',
     left: 108.18
   }
@@ -286,7 +286,7 @@ export default function FusionDashboardMock() {
                             )}
                             style={{ left: status.left }}
                           >
-                            <Icon name={status.icon} w={11.3125} />
+                            <MockIcon name={status.icon} w={11.3125} />
                             {status.label}
                           </span>
                           <ViewButton left={588.96} />
