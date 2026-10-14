@@ -1,14 +1,11 @@
-/** OLake Fusion FAQ, in display order. Answers are plain text. */
-export interface Faq {
-  q: string
-  a: string
-}
+import type { ProductFaqItem } from '@site/src/components/landing/product/ProductFaq'
 
 export const FAQ_EYEBROW = 'FAQs'
 
 export const FAQ_TITLE = 'You might have some questions'
 
-export const FAQS: Faq[] = [
+/** OLake Fusion FAQ, in display order. Answers are plain text. */
+export const FAQS: ProductFaqItem[] = [
   {
     q: 'What is OLake Fusion?',
     a: 'OLake Fusion is a self-hosted open-source software that keeps your lakehouse tables efficient, compact, and query-ready as your data continuously grows. As Iceberg tables evolve through ingestion, updates, and deletes, they accumulate small files, delete files, and excess metadata, all of which degrade query performance and increase storage overhead over time. Fusion manages that for you automatically.'

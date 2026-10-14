@@ -1,17 +1,12 @@
-/** "Features": the four capabilities behind the tab strip. `tab` is the pill label, `title` the card heading. */
-export interface GoFeature {
-  id: string
-  tab: string
-  title: string
-  body: string
-}
+import type { ProductFeature } from '@site/src/components/landing/product/ProductFeatures'
 
+/** "Features": the four capabilities behind the tab strip on the OLake Go page. */
 export const GO_FEATURES_INTRO = {
   eyebrow: 'Features',
   title: 'Experience the most seamless workflow'
 }
 
-export const GO_FEATURES: GoFeature[] = [
+export const GO_FEATURES: ProductFeature[] = [
   {
     id: 'cdc',
     tab: 'CDC',
