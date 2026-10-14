@@ -2,7 +2,6 @@ import React from 'react'
 import ProductFeatures, { type ProductFeatureArt } from '../product/ProductFeatures'
 import Glow from '../product/Glow'
 import { FEATURES, FEATURES_INTRO } from '@site/src/data/landing/fusion/features'
-import { ConfigMock, DecayMock, HostedMock, TieredMock } from './FusionFeaturePanels'
 
 const IMG = '/img/landing/fusion'
 
@@ -41,7 +40,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 332,
     bodyWidth: 323,
-    Mock: TieredMock,
+    image: {
+      src: `${IMG}/feature-tiered.webp`,
+      alt: 'OLake Fusion tables, with the last run of each compaction tier',
+      width: 507,
+      height: 437.4
+    },
     mockClassName: MOCK
   },
   decay: {
@@ -49,7 +53,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 377,
     bodyWidth: 323,
-    Mock: DecayMock,
+    image: {
+      src: `${IMG}/feature-decay.webp`,
+      alt: 'OLake Fusion maintenance steps completed on a table',
+      width: 507,
+      height: 437.4
+    },
     mockClassName: MOCK
   },
   config: {
@@ -57,7 +66,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 395,
     bodyWidth: 323,
-    Mock: ConfigMock,
+    image: {
+      src: `${IMG}/feature-config.webp`,
+      alt: 'OLake Fusion cleanup schedule settings',
+      width: 507,
+      height: 437.4
+    },
     mockClassName: MOCK
   },
   hosted: {
@@ -65,7 +79,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 395,
     bodyWidth: 323,
-    Mock: HostedMock,
+    image: {
+      src: `${IMG}/feature-hosted.webp`,
+      alt: 'OLake Fusion deployment running on your own infrastructure',
+      width: 507,
+      height: 437.4
+    },
     mockClassName: MOCK
   }
 }

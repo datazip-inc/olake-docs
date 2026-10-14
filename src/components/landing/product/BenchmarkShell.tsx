@@ -2,7 +2,7 @@ import React from 'react'
 import Link from '@docusaurus/Link'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { cn } from '@site/src/lib/utils'
-import { MockIcon } from './mock'
+import { PiArrowSquareOut } from 'react-icons/pi'
 
 /** Rules on the dark section. It goes first in cn(): a later border-0 would drop the side classes. */
 export const RULE = 'border-0 border-solid border-olake-line-dark'
@@ -103,7 +103,12 @@ export default function BenchmarkShell({
           )}
         >
           {link.label}
-          <MockIcon name='product/link-arrow-square-out' w={18} />
+          <PiArrowSquareOut
+            aria-hidden='true'
+            focusable='false'
+            size={18}
+            className='block text-white'
+          />
         </Link>
       </div>
     </section>

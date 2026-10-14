@@ -2,7 +2,6 @@ import React from 'react'
 import ProductHero from '../product/ProductHero'
 import Glow from '../product/Glow'
 import { HERO } from '@site/src/data/landing/fusion/hero'
-import FusionDashboardMock from './FusionDashboardMock'
 
 const IMG = '/img/landing/fusion'
 
@@ -44,7 +43,18 @@ export default function FusionHero({ headline }: { headline: string }) {
       className='lg:pt-[257px] lg:pb-[150px]'
     >
       <div className='mt-[48px] lg:mt-[58px]'>
-        <FusionDashboardMock />
+        {/* The run-metrics card reaches 75px past the 1018px screen: below 1200px the whole picture
+            is fitted to the width; from 1200px up it is drawn full size, so the card hangs past
+            the 1018px column the way the design has it. */}
+        <img
+          src={`${IMG}/hero-dashboard.webp`}
+          alt='OLake Fusion run history dashboard'
+          width={1093}
+          height={510}
+          fetchPriority='high'
+          decoding='async'
+          className='block h-auto w-full max-w-[1093px] min-[1200px]:w-[1093px] min-[1200px]:max-w-none'
+        />
       </div>
     </ProductHero>
   )

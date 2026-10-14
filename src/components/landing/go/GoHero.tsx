@@ -2,7 +2,6 @@ import React from 'react'
 import ProductHero from '../product/ProductHero'
 import Glow from '../product/Glow'
 import { GO_HERO, GO_SOURCES, GO_SOURCES_LABEL } from '@site/src/data/landing/go/hero'
-import GoDashboardMock from './GoDashboardMock'
 import { GO_LOGOS } from './logos'
 
 const IMG = '/img/landing/go'
@@ -80,7 +79,15 @@ export default function GoHero() {
       <div className='mt-[56px] lg:mt-[89px]'>
         <SourcesStrip />
         <div className='relative -mt-[8px] md:-mt-[15px]'>
-          <GoDashboardMock />
+          <img
+            src={`${IMG}/hero-dashboard.webp`}
+            alt='OLake Go jobs dashboard'
+            width={1018}
+            height={471}
+            fetchPriority='high'
+            decoding='async'
+            className='mx-auto block h-auto w-full max-w-[1018px]'
+          />
         </div>
       </div>
     </ProductHero>

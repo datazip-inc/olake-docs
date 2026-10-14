@@ -12,14 +12,15 @@ export interface ProductFeature {
 
 /**
  * A tab's picture (one design frame): the background field, the glow at the bottom left, where the
- * copy sits from lg up (its top, and the body's width) and the editor mock-up with its lg position.
+ * copy sits from lg up (its top, and the body's width) and the product screenshot (`image`, at its
+ * display size) with its lg position.
  */
 export interface ProductFeatureArt {
   background: React.ReactNode
   glow: React.ReactNode
   copyTop: number
   bodyWidth: number
-  Mock: React.ComponentType<{ className?: string }>
+  image: { src: string; alt: string; width: number; height: number }
   mockClassName: string
 }
 
@@ -144,12 +145,19 @@ export default function ProductFeatures({
             )
           })}
 
-          <frame.Mock
+          <img
             key={`mock-${features[active].id}`}
+            src={frame.image.src}
+            alt={frame.image.alt}
+            width={frame.image.width}
+            height={frame.image.height}
+            loading='lazy'
+            decoding='async'
             className={cn(
-              'product-fade-in mx-auto mt-[28px] mb-[16px] w-[calc(100%-32px)] lg:absolute lg:m-0',
+              'product-fade-in mx-auto mt-[28px] mb-[16px] block h-auto w-[calc(100%-32px)] lg:absolute lg:m-0',
               frame.mockClassName
             )}
+            style={{ maxWidth: frame.image.width }}
           />
         </div>
       </div>

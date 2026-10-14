@@ -3,8 +3,6 @@ import { cn } from '@site/src/lib/utils'
 import ProductFeatures, { type ProductFeatureArt } from '../product/ProductFeatures'
 import Glow from '../product/Glow'
 import { GO_FEATURES, GO_FEATURES_INTRO } from '@site/src/data/landing/go/features'
-import GoFeatureMock from './GoFeatureMock'
-import { ChunkingMock, ResumableMock, SchemaMock } from './GoFeaturePanels'
 
 const IMG = '/img/landing/go'
 
@@ -57,7 +55,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 338,
     bodyWidth: 323,
-    Mock: GoFeatureMock,
+    image: {
+      src: `${IMG}/feature-cdc.webp`,
+      alt: 'OLake Go job editor, choosing the sync mode of a stream',
+      width: 514,
+      height: 438
+    },
     mockClassName: 'lg:top-[52px] lg:right-[36px] lg:w-[514px]'
   },
   'schema-evolution': {
@@ -65,7 +68,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 338,
     bodyWidth: 323,
-    Mock: SchemaMock,
+    image: {
+      src: `${IMG}/feature-schema-evolution.webp`,
+      alt: 'OLake Go stream schema, mapping source columns to the destination',
+      width: 514.1,
+      height: 391.4
+    },
     mockClassName: 'lg:top-[67.3px] lg:right-[36.1px] lg:w-[514.1px]'
   },
   'parallel-chunking': {
@@ -73,7 +81,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 354,
     bodyWidth: 288,
-    Mock: ChunkingMock,
+    image: {
+      src: `${IMG}/feature-parallel-chunking.webp`,
+      alt: 'OLake Go splitting a large table into chunks synced in parallel',
+      width: 514.1,
+      height: 391.4
+    },
     mockClassName: 'lg:top-[67.3px] lg:right-[36.1px] lg:w-[514.1px]'
   },
   'resumable-syncs': {
@@ -81,7 +94,12 @@ const ART: Record<string, ProductFeatureArt> = {
     glow: <FeatureGlow />,
     copyTop: 333,
     bodyWidth: 288,
-    Mock: ResumableMock,
+    image: {
+      src: `${IMG}/feature-resumable-syncs.webp`,
+      alt: 'OLake Go sync resuming from its last checkpoint',
+      width: 514.1,
+      height: 391.4
+    },
     mockClassName: 'lg:top-[67.3px] lg:right-[36.1px] lg:w-[514.1px]'
   }
 }
