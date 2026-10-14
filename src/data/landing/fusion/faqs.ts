@@ -4,7 +4,7 @@ export const FAQ_EYEBROW = 'FAQs'
 
 export const FAQ_TITLE = 'You might have some questions'
 
-/** OLake Fusion FAQ, in display order. Answers are plain text. */
+/** OLake Fusion FAQ, in display order. Answers are plain text; the page's FAQPage JSON-LD (seo.ts) is built from it. */
 export const FAQS: ProductFaqItem[] = [
   {
     q: 'What is OLake Fusion?',

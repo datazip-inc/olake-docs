@@ -4,10 +4,7 @@ export const GO_FAQ_EYEBROW = 'FAQs'
 
 export const GO_FAQ_TITLE = 'You might have some questions'
 
-/**
- * The visible FAQ. The FAQPage JSON-LD in src/data/landing/seo.ts (GO_SEO) mirrors these questions
- * and answers word for word: keep the two in sync when either changes.
- */
+/** The visible FAQ, in display order. The page's FAQPage JSON-LD (seo.ts) is built from it. */
 export const GO_FAQS: ProductFaqItem[] = [
   {
     q: 'How to get started?',
