@@ -350,6 +350,226 @@ function DesktopEntry({ entry, active }: { entry: LakesideNavEntry; active: bool
   )
 }
 
+/** A desktop panel's blue card, set as the first block of the menu's group. */
+function MenuFeature({
+  feature,
+  className,
+  onNavigate
+}: {
+  feature: NonNullable<MegaMenu['feature']>
+  className?: string
+  onNavigate: () => void
+}) {
+  return (
+    <div
+      className={cn(
+        'lk-mega-feature flex flex-col justify-between rounded-[12px] p-[16px]',
+        className
+      )}
+    >
+      <div>
+        <p className='mb-0 text-[18px] leading-[1.3] text-olake-on-blue'>{feature.title}</p>
+        {feature.text && (
+          <p className='mt-[8px] mb-0 text-[14px] leading-[1.5] text-olake-on-blue/85'>
+            {feature.text}
+          </p>
+        )}
+      </div>
+      <NavAnchor
+        link={feature.cta}
+        onClick={onNavigate}
+        className='mt-[22px] inline-flex items-center gap-[6px] text-[15px] font-medium text-olake-on-blue hover:text-white'
+      >
+        {feature.cta.label}
+        <PiArrowUpRight size={14} aria-hidden='true' />
+      </NavAnchor>
+    </div>
+  )
+}
+
+/** A desktop panel's column: its header, a rule, then its links (two to a row on phones). */
+function MenuColumn({
+  col,
+  divided,
+  onNavigate
+}: {
+  col: MegaColumn
+  divided: boolean
+  onNavigate: () => void
+}) {
+  const header = 'flex items-start gap-[12px]'
+  return (
+    <div
+      className={cn(
+        'mx-[8px] md:mx-0',
+        divided && 'md:border-0 md:border-l md:border-solid md:border-olake-line md:pl-[8px]'
+      )}
+    >
+      <div className='border-0 border-b border-solid border-olake-line pb-[14px]'>
+        {col.href ? (
+          <NavAnchor
+            link={{ label: col.title, href: col.href }}
+            onClick={onNavigate}
+            className={cn(header, 'group no-underline hover:no-underline')}
+          >
+            <ColumnHeader col={col} linked />
+          </NavAnchor>
+        ) : (
+          <div className={header}>
+            <ColumnHeader col={col} />
+          </div>
+        )}
+      </div>
+      <ul className='m-0 grid list-none grid-cols-2 p-0 pt-[5px] md:grid-cols-1'>
+        {col.links.map((link) => (
+          <li key={link.href} className='m-0 p-0'>
+            <NavAnchor
+              link={link}
+              onClick={onNavigate}
+              className='flex h-[44px] items-center text-[16px] text-olake-text transition-colors hover:text-olake-blue'
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * An opened group of the phone and tablet menu: the same feature card, columns and help band as
+ * its desktop panel. Phones stack them; tablets set two columns beside the card (Products) or three
+ * under it (Resources).
+ */
+function MenuGroup({ mega, onNavigate }: { mega: MegaMenu; onNavigate: () => void }) {
+  const beside = mega.columns.length <= 2
+  return (
+    <div className='pb-[16px]'>
+      <div
+        className={cn(
+          'grid gap-[24px] md:gap-x-[16px]',
+          beside ? 'md:grid-cols-[249px_1fr_1fr]' : 'md:grid-cols-3'
+        )}
+      >
+        {mega.feature && (
+          <MenuFeature
+            feature={mega.feature}
+            className={beside ? undefined : 'md:col-span-3'}
+            onNavigate={onNavigate}
+          />
+        )}
+        {mega.columns.map((col, i) => (
+          <MenuColumn key={col.title} col={col} divided={i > 0} onNavigate={onNavigate} />
+        ))}
+      </div>
+      <div className='mt-[16px] flex flex-wrap items-center justify-between gap-[12px] rounded-[12px] border border-solid border-olake-line bg-olake-surface-alt px-[16px] py-[14px]'>
+        <div>
+          <span className='block text-[15px] font-medium text-olake-ink'>{mega.band.title}</span>
+          <span className='block text-[13px] text-olake-muted'>{mega.band.text}</span>
+        </div>
+        <NavAnchor
+          link={mega.band.cta}
+          onClick={onNavigate}
+          className='inline-flex h-[44px] shrink-0 items-center gap-[8px] rounded-[10px] border border-solid border-olake-btn-border bg-olake-surface px-[16px] text-[15px] font-medium text-olake-ink transition-colors hover:bg-olake-surface-alt'
+        >
+          {BAND_ICON[mega.band.icon]}
+          {mega.band.cta.label}
+        </NavAnchor>
+      </div>
+    </div>
+  )
+}
+
+const MENU_FOOT_BUTTON =
+  'inline-flex h-[44px] items-center justify-center gap-[8px] rounded-[10px] border border-solid border-olake-btn-border bg-olake-surface text-[15px] font-medium text-olake-ink transition-colors hover:bg-olake-surface-alt'
+
+/**
+ * The phone and tablet menu, a panel under the pill: the navbar's entries as an accordion, one group
+ * open at a time. On phones the community links and the call to action sit in a footer pinned to
+ * the panel's bottom (tablets keep them in the pill), and a long group scrolls inside the panel.
+ */
+function MobileMenu({ stars, onNavigate }: { stars: string; onNavigate: () => void }) {
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const entries = LAKESIDE_NAV.filter((entry) => !entry.mobileOnly)
+  return (
+    <div
+      id='lk-mobile-menu'
+      className='lk-drawer absolute inset-x-[12px] top-[80px] z-40 mx-auto flex max-h-[calc(100dvh-92px)] max-w-[1016px] flex-col overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface shadow-[var(--olake-shadow-card-hover)] md:inset-x-[20px] md:max-h-[calc(100dvh-100px)] lg:hidden'
+    >
+      <ul className='m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-[13px] py-[6px] md:px-[15px]'>
+        {entries.map((entry, i) => {
+          const open = openGroup === entry.label
+          const groupId = `lk-menu-${entry.label.toLowerCase()}`
+          const row =
+            'mx-[8px] flex h-[52px] w-[calc(100%-16px)] items-center justify-between text-[17px] text-olake-ink md:text-[18px]'
+          return (
+            <li
+              key={entry.label}
+              className={cn(
+                'relative m-0 p-0',
+                i < entries.length - 1 &&
+                  "after:absolute after:inset-x-[8px] after:bottom-0 after:h-px after:bg-olake-line after:content-['']"
+              )}
+            >
+              {entry.mega ? (
+                <>
+                  <button
+                    type='button'
+                    aria-expanded={open}
+                    aria-controls={groupId}
+                    onClick={() => setOpenGroup(open ? null : entry.label)}
+                    className={cn(row, 'cursor-pointer border-none bg-transparent p-0 text-left')}
+                  >
+                    {entry.label}
+                    <span className={cn('flex transition-transform', open && 'rotate-180')}>
+                      <Chevron />
+                    </span>
+                  </button>
+                  <div id={groupId} hidden={!open}>
+                    <MenuGroup mega={entry.mega} onNavigate={onNavigate} />
+                  </div>
+                </>
+              ) : (
+                <Link
+                  to={entry.href!}
+                  onClick={onNavigate}
+                  className={cn(row, 'hover:text-olake-blue')}
+                >
+                  {entry.label}
+                </Link>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <div className='shrink-0 border-0 border-t border-solid border-olake-line bg-olake-surface-alt p-[12px] md:hidden'>
+        <div className='grid grid-cols-2 gap-[10px]'>
+          <Link to={LAKESIDE_SLACK.href} onClick={onNavigate} className={MENU_FOOT_BUTTON}>
+            <SlackMark />
+            Slack
+          </Link>
+          <a
+            href={LAKESIDE_GITHUB.href}
+            target='_blank'
+            rel='noopener noreferrer'
+            aria-label={`Star ${stars} on GitHub`}
+            className={MENU_FOOT_BUTTON}
+          >
+            <GithubMark />
+            Star
+            <span className='font-normal text-olake-muted'>{stars}</span>
+          </a>
+        </div>
+        <Button
+          href={LAKESIDE_CTA.href}
+          className='mt-[10px] h-[48px] w-full rounded-[10px] text-[16px] font-medium'
+        >
+          {LAKESIDE_CTA.label}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 /**
  * The pill is the page's "Main" navigation landmark. The bar variant already sits inside the
  * theme's own `<nav aria-label='Main'>` (Navbar/Layout), so a second nav there would nest two
@@ -395,7 +615,7 @@ export default function LakesideNavbar({
 }: LakesideNavbarProps) {
   const { stargazersCount } = useGetReleases()
   const [ownDrawerOpen, setOwnDrawerOpen] = useState(false)
-  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const burgerRef = useRef<HTMLButtonElement>(null)
   const { pathname } = useLocation()
   const isBar = variant === 'bar'
   const currentPath = activePath ?? pathname
@@ -410,7 +630,47 @@ export default function LakesideNavbar({
   // Docusaurus keeps the docs sidebar in the burger drawer up to 1279px, so the themed navbar keeps
   // the burger until xl even though the links already show from lg.
   const burgerCls = isBar ? 'xl:hidden' : 'lg:hidden'
-  const wideFlex = 'hidden lg:flex'
+  // Slack and GitHub: the pill shows them from tablets up (its phone menu has them in its footer).
+  const wideFlex = isBar ? 'hidden lg:flex' : 'hidden md:flex'
+
+  // While the pill's menu is open: the page behind stays put, and Escape, a route change or growing
+  // to the desktop layout (where the menu is hidden) closes it.
+  useEffect(() => {
+    if (!showOwnDrawer) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    // Escape hands focus back to the menu button, since the menu it was in goes away.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setOwnDrawerOpen(false)
+      burgerRef.current?.focus()
+    }
+    const desktop = window.matchMedia('(min-width: 1024px)')
+    const onDesktop = () => desktop.matches && setOwnDrawerOpen(false)
+    document.addEventListener('keydown', onKey)
+    desktop.addEventListener('change', onDesktop)
+    return () => {
+      document.body.style.overflow = previous
+      document.removeEventListener('keydown', onKey)
+      desktop.removeEventListener('change', onDesktop)
+    }
+  }, [showOwnDrawer])
+  useEffect(() => setOwnDrawerOpen(false), [pathname])
+
+  const burger = (
+    <button
+      ref={burgerRef}
+      type='button'
+      aria-label={drawerOpen ? 'Close menu' : 'Open menu'}
+      aria-expanded={drawerOpen}
+      aria-controls={showOwnDrawer ? 'lk-mobile-menu' : undefined}
+      onClick={() => setDrawerOpen((v) => !v)}
+      className={cn('flex cursor-pointer items-center border-none bg-transparent p-0 text-olake-ink', burgerCls)}
+      style={{ margin: 0, padding: 0, minWidth: '20px', width: '20px', height: '20px' }}
+    >
+      <Burger open={drawerOpen} />
+    </button>
+  )
 
   return (
     <header
@@ -418,36 +678,30 @@ export default function LakesideNavbar({
         'w-full px-[16px] lg:px-[24px]',
         isBar
           ? 'olake-bar pb-[12px] pt-[16px] lg:pt-[20px]'
-          : 'sticky top-0 z-40 pt-[16px] lg:pt-[26px]'
+          : 'sticky top-0 z-40 px-[12px] pt-[12px] md:px-[20px] lg:pt-[26px]'
       )}
     >
       <NavLandmark
         isBar={isBar}
         className={cn(
           'relative z-40 mx-auto flex w-full items-center justify-between bg-olake-surface px-[16px]',
-          'h-[52px] max-w-[1016px] rounded-[16px] shadow-[var(--olake-shadow-nav)] lg:h-[56px] lg:px-[24px]',
-          isBar && 'border border-solid border-olake-line'
+          'max-w-[1016px] rounded-[16px] shadow-[var(--olake-shadow-nav)] lg:h-[56px] lg:px-[24px]',
+          isBar ? 'h-[52px] border border-solid border-olake-line' : 'h-[56px] px-[18px] md:px-[24px]'
         )}
       >
         <div className='flex items-center gap-2 lg:gap-7'>
-          <button
-            type='button'
-            aria-label={drawerOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen((v) => !v)}
-            className={cn('flex cursor-pointer items-center border-none bg-transparent p-0 text-olake-ink', burgerCls)}
-            style={{ margin: 0, padding: 0, minWidth: '20px', width: '20px', height: '20px' }}
-          >
-            <Burger open={drawerOpen} />
-          </button>
+          {isBar && burger}
           <Link
             to='/'
-            className='text-[16px] font-medium text-olake-blue leading-none dark:text-olake-blue-on-dark'
+            className={cn(
+              'font-medium text-olake-blue leading-none dark:text-olake-blue-on-dark',
+              isBar ? 'text-[16px]' : 'text-[20px] lg:text-[16px]'
+            )}
             style={{ margin: 0, padding: 0 }}
           >
             OLake
           </Link>
-          <div className={cn('items-center gap-[24px]', wideFlex)}>
+          <div className='hidden items-center gap-[24px] lg:flex'>
             {LAKESIDE_NAV.filter((entry) => !entry.mobileOnly).map((entry) => (
               <DesktopEntry
                 key={entry.label}
@@ -478,73 +732,22 @@ export default function LakesideNavbar({
             <StarMark />
           </a>
           {isBar && trailing}
-          <Button href={LAKESIDE_CTA.href} size='sm'>
+          {/* On phones the open menu carries the call to action in its footer */}
+          <Button href={LAKESIDE_CTA.href} size='sm' className={!isBar && drawerOpen ? 'max-md:hidden' : undefined}>
             {LAKESIDE_CTA.label}
           </Button>
+          {!isBar && burger}
         </div>
       </NavLandmark>
 
       {showOwnDrawer && (
         <>
-          <div 
-            className='lk-backdrop fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden' 
-            onClick={() => setDrawerOpen(false)} 
+          <div
+            className='lk-backdrop fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden'
+            onClick={() => setDrawerOpen(false)}
             aria-hidden='true'
           />
-          <div className='lk-drawer absolute left-[16px] right-[16px] top-[76px] z-40 mx-auto max-w-[1016px] rounded-[16px] border border-solid border-olake-line bg-olake-surface p-[10px] shadow-[var(--olake-shadow-card-hover)] lg:hidden'>
-            {LAKESIDE_NAV.map((entry) =>
-            entry.items ? (
-              <div key={entry.label}>
-                <button
-                  type='button'
-                  aria-expanded={openGroup === entry.label}
-                  onClick={() => setOpenGroup((g) => (g === entry.label ? null : entry.label))}
-                  className='flex w-full cursor-pointer items-center justify-between border-none bg-transparent px-[12px] py-[11px] text-left text-[15px] text-olake-ink'
-                >
-                  {entry.label}
-                  <Chevron />
-                </button>
-                {openGroup === entry.label && (
-                  <div className='pb-[6px] pl-[12px]'>
-                    {entry.items.map((item) => (
-                      <NavAnchor
-                        key={item.href}
-                        link={item}
-                        className='block px-[12px] py-[9px] text-[14px] text-olake-text-2'
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link
-                key={entry.label}
-                to={entry.href!}
-                className='block px-[12px] py-[11px] text-[15px] text-olake-ink'
-              >
-                {entry.label}
-              </Link>
-            )
-          )}
-          <div className='mt-[6px] flex items-center gap-[10px] border-0 border-t border-solid border-olake-line px-[12px] pt-[12px]'>
-            <a
-              href={LAKESIDE_GITHUB.href}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='inline-flex h-[34px] items-center gap-[6px] rounded-[8px] border border-solid border-olake-btn-border px-[12px] text-[13px] text-olake-text-2 transition-colors hover:bg-olake-surface-alt'
-            >
-              <GithubMark />
-              {formatStars(stargazersCount)}
-            </a>
-            <Link
-              to={LAKESIDE_SLACK.href}
-              aria-label={LAKESIDE_SLACK.label}
-              className='inline-flex h-[34px] items-center justify-center rounded-[8px] border border-solid border-olake-btn-border px-[10px] text-olake-text-2 transition-colors hover:bg-olake-surface-alt'
-            >
-              <SlackMark />
-            </Link>
-          </div>
-        </div>
+          <MobileMenu stars={formatStars(stargazersCount)} onNavigate={() => setDrawerOpen(false)} />
         </>
       )}
     </header>
