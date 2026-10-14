@@ -10,7 +10,7 @@ const SourceList = ({ hidden }: { hidden?: boolean }) => (
   <ul aria-hidden={hidden || undefined} className='flex shrink-0 items-center gap-[32px] pr-[32px]'>
     {GO_SOURCES.map((source) => (
       <li key={source.id} className='flex shrink-0 items-center gap-[9px]'>
-        <img {...GO_LOGOS[source.id]} alt='' loading='lazy' decoding='async' className='block' />
+        <img {...GO_LOGOS[source.id]} alt='' decoding='async' className='block' />
         <span className='text-[16px] leading-[1.3] whitespace-nowrap text-[#231f20]'>
           {source.name}
         </span>
