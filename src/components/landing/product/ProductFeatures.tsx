@@ -25,8 +25,10 @@ export interface ProductFeatureArt {
 
 /**
  * "Features": a pill tab strip over the blue feature card. Each tab shows its own picture of the
- * product; the heading and copy follow the selected capability. Arrow keys, Home and End move
- * between tabs.
+ * product; the heading and copy follow the selected capability. Every capability's heading and copy
+ * stay in the DOM (the inactive ones hidden), as ProductFaq keeps its answers; only the selected
+ * tab's picture is rendered, since the text is cheap and the picture is not. Arrow keys, Home and
+ * End move between tabs.
  */
 export default function ProductFeatures({
   idPrefix,
@@ -61,9 +63,7 @@ export default function ProductFeatures({
     event.preventDefault()
   }
 
-  const feature = features[active]
-  const frame = art[feature.id]
-  const panelId = `${idPrefix}-panel`
+  const frame = art[features[active].id]
 
   return (
     <section
@@ -97,7 +97,7 @@ export default function ProductFeatures({
                 role='tab'
                 id={`${idPrefix}-tab-${item.id}`}
                 aria-selected={selected}
-                aria-controls={panelId}
+                aria-controls={`${idPrefix}-panel-${item.id}`}
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setActive(i)}
                 onKeyDown={(event) => onKeyDown(event, i)}
@@ -115,33 +115,40 @@ export default function ProductFeatures({
           })}
         </div>
 
-        <div
-          role='tabpanel'
-          id={panelId}
-          aria-labelledby={`${idPrefix}-tab-${feature.id}`}
-          className='relative isolate mt-[24px] flex flex-col overflow-hidden rounded-[24px] border border-solid border-[#f4f4f4] bg-(--product-blue-deep) shadow-[1px_2px_4px_0_rgba(0,0,0,0.05)] lg:mt-[47px] lg:block lg:h-[526px] lg:rounded-[30px]'
-        >
-          <React.Fragment key={`field-${feature.id}`}>{frame.background}</React.Fragment>
+        <div className='relative isolate mt-[24px] flex flex-col overflow-hidden rounded-[24px] border border-solid border-[#f4f4f4] bg-(--product-blue-deep) shadow-[1px_2px_4px_0_rgba(0,0,0,0.05)] lg:mt-[47px] lg:block lg:h-[526px] lg:rounded-[30px]'>
+          <React.Fragment key={`field-${features[active].id}`}>{frame.background}</React.Fragment>
           {frame.glow}
 
-          <div
-            key={`copy-${feature.id}`}
-            className='product-fade-in px-[24px] pt-[28px] lg:absolute lg:top-(--copy-top) lg:left-[49px] lg:w-[323px] lg:p-0'
-            style={{ '--copy-top': `${frame.copyTop}px` } as React.CSSProperties}
-          >
-            <h3 className='text-[22px] leading-[1.3] font-medium text-[#fdfdfc] lg:w-[258px] lg:text-[24px]'>
-              {feature.title}
-            </h3>
-            <p
-              className='mt-[8px] text-[14px] leading-[1.3] whitespace-pre-line text-white lg:max-w-(--body-width)'
-              style={{ '--body-width': `${frame.bodyWidth}px` } as React.CSSProperties}
-            >
-              {feature.body}
-            </p>
-          </div>
+          {features.map((item, i) => {
+            const selected = i === active
+            return (
+              <div
+                key={item.id}
+                role='tabpanel'
+                id={`${idPrefix}-panel-${item.id}`}
+                aria-labelledby={`${idPrefix}-tab-${item.id}`}
+                hidden={!selected}
+                className={cn(
+                  'product-fade-in px-[24px] pt-[28px] lg:absolute lg:top-(--copy-top) lg:left-[49px] lg:w-[323px] lg:p-0',
+                  !selected && 'hidden'
+                )}
+                style={{ '--copy-top': `${art[item.id].copyTop}px` } as React.CSSProperties}
+              >
+                <h3 className='text-[22px] leading-[1.3] font-medium text-[#fdfdfc] lg:w-[258px] lg:text-[24px]'>
+                  {item.title}
+                </h3>
+                <p
+                  className='mt-[8px] text-[14px] leading-[1.3] whitespace-pre-line text-white lg:max-w-(--body-width)'
+                  style={{ '--body-width': `${art[item.id].bodyWidth}px` } as React.CSSProperties}
+                >
+                  {item.body}
+                </p>
+              </div>
+            )
+          })}
 
           <frame.Mock
-            key={`mock-${feature.id}`}
+            key={`mock-${features[active].id}`}
             className={cn(
               'product-fade-in mx-auto mt-[28px] mb-[16px] w-[calc(100%-32px)] lg:absolute lg:m-0',
               frame.mockClassName
