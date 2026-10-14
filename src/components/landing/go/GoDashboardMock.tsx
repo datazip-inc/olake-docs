@@ -21,18 +21,32 @@ const COLUMNS = [
 
 /**
  * The mark of each source and destination a job can name: the artwork of the hero's sources strip,
- * so a row's logo always matches its label.
+ * so a row's logo always matches its label. `scale` enlarges artwork that sits small in its canvas
+ * (the S3 bucket fills 62% of it) so every mark reads at about the same size.
  */
 const LOGOS = {
-  'MySQL': 'go/source-mysql',
-  'PostgreSQL': 'go/source-postgres',
-  'MongoDB': 'go/source-mongodb',
-  'Oracle': 'go/source-oracle',
-  'Amazon S3': 'go/source-s3',
-  'Apache Iceberg': 'go/destination-iceberg'
-} as const
+  'MySQL': { src: 'go/source-mysql' },
+  'PostgreSQL': { src: 'go/source-postgres' },
+  'MongoDB': { src: 'go/source-mongodb' },
+  'Oracle': { src: 'go/source-oracle' },
+  'Amazon S3': { src: 'go/source-s3', scale: 1.2 },
+  'Apache Iceberg': { src: 'go/destination-iceberg' }
+} as const satisfies Record<string, { src: string; scale?: number }>
 
 type Endpoint = keyof typeof LOGOS
+
+/** A logo in a square slot of `size` px, so sources and destinations line up and size alike. */
+function Logo({ name, size }: { name: Endpoint; size: number }) {
+  const logo: { src: string; scale?: number } = LOGOS[name]
+  return (
+    <span
+      className='flex shrink-0 items-center justify-center'
+      style={{ width: size, height: size }}
+    >
+      <Icon name={logo.src} w={size * (logo.scale ?? 1)} />
+    </span>
+  )
+}
 
 /** A "Last sync status" tag: Success is green with a check, Failed red, Pending orange. */
 const STATUS = {
@@ -180,11 +194,11 @@ export default function GoDashboardMock() {
                 {row.name}
               </span>
               <span className='absolute top-0 left-[260.03px] flex items-center gap-[6.3px]'>
-                <Icon name={LOGOS[row.source]} w={20.197} />
+                <Logo name={row.source} size={20.197} />
                 <span className={cn('text-black', ROW_TEXT)}>{row.source}</span>
               </span>
-              <span className='absolute top-0 left-[415.92px] flex items-center gap-[8.416px]'>
-                <Icon name={LOGOS[row.destination]} w={16.831} />
+              <span className='absolute top-0 left-[415.92px] flex items-center gap-[5.05px]'>
+                <Logo name={row.destination} size={20.197} />
                 <span className={cn('text-black', ROW_TEXT)}>{row.destination}</span>
               </span>
               <span
@@ -229,13 +243,13 @@ export default function GoDashboardMock() {
             Table_name_test_1
           </span>
           <span className='absolute top-[19.5px] left-[270.59px] flex h-[22px] items-center gap-[6.6px]'>
-            <Icon name={LOGOS.MongoDB} w={21.232} />
+            <Logo name='MongoDB' size={21.232} />
             <span className='text-[12.385px] leading-[21.232px] whitespace-nowrap text-black'>
               MongoDB
             </span>
           </span>
-          <span className='absolute top-[19.5px] left-[426.68px] flex h-[22px] w-[90.34px] items-center gap-[8.847px]'>
-            <Icon name={LOGOS['Amazon S3']} w={17.693} />
+          <span className='absolute top-[19.5px] left-[426.68px] flex h-[22px] items-center gap-[5.3px]'>
+            <Logo name='Amazon S3' size={21.232} />
             <span className='text-[12.385px] leading-[21.232px] whitespace-nowrap text-black'>
               Amazon S3
             </span>
