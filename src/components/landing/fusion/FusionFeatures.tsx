@@ -13,6 +13,7 @@ const Field = () => (
     alt=''
     width={2172}
     height={1000}
+    loading='lazy'
     decoding='async'
     className='pointer-events-none absolute top-[-41px] right-[-1px] -z-10 block h-[638px] w-[1386px] max-w-none -scale-x-100 object-cover'
   />

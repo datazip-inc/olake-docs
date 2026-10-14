@@ -15,6 +15,7 @@ const field = (className: string) => (
     alt=''
     width={2172}
     height={1000}
+    loading='lazy'
     decoding='async'
     className={cn(
       'pointer-events-none absolute top-[-1px] -z-10 block h-[711px] w-[1545px] max-w-none object-cover',
