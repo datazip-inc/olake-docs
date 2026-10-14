@@ -1,5 +1,6 @@
 import React from 'react'
 import ProductHero from '../product/ProductHero'
+import Glow from '../product/Glow'
 import {
   GO_HERO,
   GO_SOURCES,
@@ -159,13 +160,14 @@ const Background = () => (
       decoding='async'
       className='absolute top-[22px] left-1/2 block h-auto w-[max(1511.67px,105%)] max-w-none -translate-x-1/2'
     />
-    <img
-      src={`${IMG}/hero-glow.webp`}
-      alt=''
+    <Glow
       width={2180}
       height={1580}
-      decoding='async'
-      className='absolute top-[-199.5px] left-[calc(50%-28.69px)] block max-w-none -translate-x-1/2'
+      rx={811.5}
+      ry={511.5}
+      blur={139.25}
+      color='#fffefe'
+      className='top-[-199.5px] left-[calc(50%-28.69px)] -translate-x-1/2'
     />
   </div>
 )

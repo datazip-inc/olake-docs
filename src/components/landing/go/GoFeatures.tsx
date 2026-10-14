@@ -1,6 +1,7 @@
 import React from 'react'
 import { cn } from '@site/src/lib/utils'
 import ProductFeatures, { type ProductFeatureArt } from '../product/ProductFeatures'
+import Glow from '../product/Glow'
 import { GO_FEATURES, GO_FEATURES_INTRO } from '@site/src/data/landing/go/features'
 import GoFeatureMock from './GoFeatureMock'
 import { ChunkingMock, ResumableMock, SchemaMock } from './GoFeaturePanels'
@@ -23,15 +24,15 @@ const field = (className: string) => (
 )
 
 /** The blue glow at the bottom left that every tab shares. */
-const Glow = () => (
-  <img
-    src={`${IMG}/feature-glow.webp`}
-    alt=''
+const FeatureGlow = () => (
+  <Glow
     width={1112}
     height={802}
-    loading='lazy'
-    decoding='async'
-    className='pointer-events-none absolute bottom-[-321px] left-[-391px] -z-10 block max-w-none'
+    rx={360}
+    ry={205}
+    blur={98}
+    color='#0301ff'
+    className='bottom-[-321px] left-[-391px] -z-10'
   />
 )
 
@@ -52,7 +53,7 @@ const ART: Record<string, ProductFeatureArt> = {
         className='pointer-events-none absolute top-[-41px] right-[-1px] -z-10 block h-[1107px] w-[2639px] max-w-none object-cover'
       />
     ),
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 338,
     bodyWidth: 323,
     Mock: GoFeatureMock,
@@ -60,7 +61,7 @@ const ART: Record<string, ProductFeatureArt> = {
   },
   'schema-evolution': {
     background: field('right-[-281px]'),
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 338,
     bodyWidth: 323,
     Mock: SchemaMock,
@@ -68,7 +69,7 @@ const ART: Record<string, ProductFeatureArt> = {
   },
   'parallel-chunking': {
     background: field('right-[-129px] -scale-x-100'),
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 354,
     bodyWidth: 288,
     Mock: ChunkingMock,
@@ -76,7 +77,7 @@ const ART: Record<string, ProductFeatureArt> = {
   },
   'resumable-syncs': {
     background: field('right-[-129px] -scale-y-100'),
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 333,
     bodyWidth: 288,
     Mock: ResumableMock,

@@ -1,5 +1,6 @@
 import React from 'react'
 import ProductFeatures, { type ProductFeatureArt } from '../product/ProductFeatures'
+import Glow from '../product/Glow'
 import { FEATURES, FEATURES_INTRO } from '@site/src/data/landing/fusion/features'
 import { ConfigMock, DecayMock, HostedMock, TieredMock } from './FusionFeaturePanels'
 
@@ -18,15 +19,15 @@ const Field = () => (
 )
 
 /** The deep blue glow at the bottom left. */
-const Glow = () => (
-  <img
-    src={`${IMG}/feature-glow.webp`}
-    alt=''
+const FeatureGlow = () => (
+  <Glow
     width={1112}
     height={802}
-    loading='lazy'
-    decoding='async'
-    className='pointer-events-none absolute bottom-[-321px] left-[-391px] -z-10 block max-w-none'
+    rx={360}
+    ry={205}
+    blur={98}
+    color='#05039c'
+    className='bottom-[-321px] left-[-391px] -z-10'
   />
 )
 
@@ -36,7 +37,7 @@ const MOCK = 'lg:top-[52.22px] lg:right-[42.07px] lg:w-[507px]'
 const ART: Record<string, ProductFeatureArt> = {
   tiered: {
     background: <Field />,
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 332,
     bodyWidth: 323,
     Mock: TieredMock,
@@ -44,7 +45,7 @@ const ART: Record<string, ProductFeatureArt> = {
   },
   decay: {
     background: <Field />,
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 377,
     bodyWidth: 323,
     Mock: DecayMock,
@@ -52,7 +53,7 @@ const ART: Record<string, ProductFeatureArt> = {
   },
   config: {
     background: <Field />,
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 395,
     bodyWidth: 323,
     Mock: ConfigMock,
@@ -60,7 +61,7 @@ const ART: Record<string, ProductFeatureArt> = {
   },
   hosted: {
     background: <Field />,
-    glow: <Glow />,
+    glow: <FeatureGlow />,
     copyTop: 395,
     bodyWidth: 323,
     Mock: HostedMock,

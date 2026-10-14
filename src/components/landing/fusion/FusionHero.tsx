@@ -1,5 +1,6 @@
 import React from 'react'
 import ProductHero from '../product/ProductHero'
+import Glow from '../product/Glow'
 import { HERO } from '@site/src/data/landing/fusion/hero'
 import FusionDashboardMock from './FusionDashboardMock'
 
@@ -22,13 +23,14 @@ const Background = () => (
       decoding='async'
       className='absolute top-[-791.39px] left-[calc(50%-8.26px)] block max-w-none -translate-x-1/2 -scale-y-100'
     />
-    <img
-      src={`${IMG}/hero-glow.webp`}
-      alt=''
+    <Glow
       width={1766}
       height={1150}
-      decoding='async'
-      className='absolute top-[-48px] left-1/2 block max-w-none -translate-x-1/2'
+      rx={679}
+      ry={371}
+      blur={102}
+      color='#fff'
+      className='top-[-48px] left-1/2 -translate-x-1/2'
     />
   </div>
 )
