@@ -1,10 +1,37 @@
 import React, { useState } from 'react'
+import Link from '@docusaurus/Link'
 import { cn } from '@site/src/lib/utils'
 import { PiArrowDownBold } from 'react-icons/pi'
 
 export interface ProductFaqItem {
   q: string
+  /** Plain text; the page's FAQPage JSON-LD uses it as is. */
   a: string
+  /** Phrases of `a` to show as links, in the order they appear. */
+  links?: { text: string; href: string }[]
+}
+
+/** An answer with its `links` phrases turned into links. */
+function Answer({ text, links = [] }: Pick<ProductFaqItem, 'links'> & { text: string }) {
+  const parts: React.ReactNode[] = []
+  let rest = text
+  for (const link of links) {
+    const at = rest.indexOf(link.text)
+    if (at < 0) continue
+    parts.push(
+      rest.slice(0, at),
+      <Link
+        key={link.href}
+        to={link.href}
+        className='text-olake-blue underline underline-offset-[3px] hover:text-olake-blue-hover'
+      >
+        {link.text}
+      </Link>
+    )
+    rest = rest.slice(at + link.text.length)
+  }
+  parts.push(rest)
+  return <>{parts}</>
 }
 
 /**
@@ -78,7 +105,7 @@ export default function ProductFaq({
                   className='product-fade-in'
                 >
                   <p className='max-w-[858px] pt-[16px] pr-[52px] pb-[24px] pl-[20px] text-[15px] leading-[24px] text-[#626262] lg:pr-0 lg:pl-[40px] lg:text-[16px]'>
-                    {faq.a}
+                    <Answer text={faq.a} links={faq.links} />
                   </p>
                 </div>
               </li>
