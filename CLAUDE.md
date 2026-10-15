@@ -1,0 +1,19 @@
+# olake-docs
+
+Docusaurus site for olake.io. Build with `npm run build`; local checks are `npm run lint:content`, `npm run typecheck` and a `CI=true` build. Commit and push only when asked.
+
+## Integration ("X to Y") pages: docs/integrations/
+
+One page per (source, query engine) pair, each backed by a pipeline that was actually run. The data layer and shared blocks keep the pages consistent; the page itself holds only what is unique to the pair.
+
+- **Matrix:** `src/data/integrations/pairs.ts`. Add the pair there first, then `node scripts/integrations/scaffold.mjs <source> <engine>`. Never add a page without a pair.
+- **Facts:** `src/data/integrations/{sources,catalogs,engines,people}.ts`. Engine facts (catalogs read, delete formats, versions) carry the vendor page and the check date. Fix facts there, never inline on a page.
+- **Shared blocks:** `docs/shared/integrations/**` (source prerequisites and connection steps, catalog setup and writer config, job creation, engine connection and query snippets), registered in `docs/shared/integrations/registry.ts` and rendered with `<I.Partial id="..." />`. Partials have no front matter and no H1.
+- **Components:** `src/components/integrations/` (byline, "How we tested this", compatibility strip, delete-format table, catalog tabs, FAQ with FAQPage JSON-LD, HowTo JSON-LD, related links). They read the page's `integration:` front matter; the body never repeats it.
+- **Unique per page:** front matter (title 52 characters or fewer, `seo_title`, a unique 120 to 160 character description, `keywords`, the `integration` block with author, reviewer, tested run and FAQ), the intro and short answer, the methods table, the mechanism section with a mermaid diagram, the per-pair gotchas, data types, cost, troubleshooting with real error text, "when not to use this", and the screenshots from the run.
+- **Catalog order everywhere:** AWS Glue, Polaris, Lakekeeper, then vendor-native (`rank` in `catalogs.ts`).
+- **Tabs:** `<I.CatalogTabs>` (groupId `catalog`, `?catalog=` in the URL), `groupId="engine"` for the cross-engine section, `groupId="interface"` for UI versus CLI. No other groupIds.
+- **Checks:** `node scripts/integrations/check.mjs` (front matter against the matrix, partial ids, own-words versus shared words, uniqueness, unlisted state), then `npm run lint:content -- docs/integrations docs/shared/integrations`, `npm run typecheck`, `CI=true npm run build`. A page stays `unlisted: true` until its pair is `live` in `pairs.ts` and every check passes.
+- **After a shared change** (`docs/shared/integrations/**`, `src/data/integrations/**`): run `node scripts/integrations/check.mjs --report`, rebuild, and re-read every page the report lists.
+- **Writing rules:** no em dashes or curly quotes, paragraphs of three sentences at most, acronyms expanded on first use, every number from the run or from a dated source, OLake Go's limits stated plainly, no "best" or "fastest" without a source.
+- Renaming or removing a page needs a redirect in `docusaurus.config.js` in the same change.
