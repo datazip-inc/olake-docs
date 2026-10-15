@@ -3,12 +3,16 @@ import {
   CONNECTORS,
   CONNECTOR_BENCHMARKS,
   CONNECTOR_CDC_BENCHMARKS,
-  CONNECTOR_METRIC_LABELS,
   TOOLS,
   type BenchmarkMode,
   type ConnectorId
 } from '@site/src/data/benchmarkData'
-import { GO_BENCHMARK_COST_NOTE } from '@site/src/data/landing/go/benchmark'
+import {
+  GO_BENCHMARK_CONNECTORS,
+  GO_BENCHMARK_COST_NOTE,
+  GO_BENCHMARK_METRIC_LABELS,
+  goBenchmarkCaption
+} from '@site/src/data/landing/go/benchmark'
 
 /** Row order of the table, top to bottom. */
 const METRICS = ['rowsSynced', 'elapsedTime', 'speed', 'comparison', 'cost'] as const
@@ -27,21 +31,26 @@ export interface GoBenchmarkRow {
   note?: string
   olake: string
   competitors: string[]
-  /** The comparison row is tinted. */
+  /** The comparison row is set in blue. */
   highlight: boolean
 }
 
 /**
- * State and table data of the OLake Go benchmark block. Unlike the home page's table, every
- * connector keeps its tab: the ones without published numbers show a "coming soon" panel.
+ * State and table data of the OLake Go benchmark block. Like the home page's table, a source only
+ * gets a tab in the modes it has published numbers for (Kafka and MSSQL have full-load numbers but
+ * no CDC ones), and switching to a mode the selected source lacks falls back to the first source
+ * that has them.
  */
 export function useGoBenchmark() {
-  const [activeConnector, setActiveConnector] = useState<ConnectorId>(CONNECTORS[0].id)
+  const [selectedConnector, setActiveConnector] = useState<ConnectorId>(GO_BENCHMARK_CONNECTORS[0])
   const [mode, setMode] = useState<BenchmarkMode>('full_load')
 
   return useMemo(() => {
     const dataset = mode === 'cdc' ? CONNECTOR_CDC_BENCHMARKS : CONNECTOR_BENCHMARKS
-    const connector = CONNECTORS.find((c) => c.id === activeConnector) ?? CONNECTORS[0]
+    const all = GO_BENCHMARK_CONNECTORS.map((id) => CONNECTORS.find((c) => c.id === id)!)
+    const withData = all.filter((c) => dataset[c.id]?.hasData)
+    const connectors = withData.length ? withData : all
+    const connector = connectors.find((c) => c.id === selectedConnector) ?? connectors[0]
     const bench = dataset[connector.id]
     const keys = competitorKeys(bench.rowsSynced.flink !== undefined)
 
@@ -49,27 +58,25 @@ export function useGoBenchmark() {
       const row = bench[metric] as unknown as Record<string, string | undefined>
       const isComparison = metric === 'comparison'
       return {
-        label: CONNECTOR_METRIC_LABELS[metric],
+        label: GO_BENCHMARK_METRIC_LABELS[metric],
         note: metric === 'cost' ? GO_BENCHMARK_COST_NOTE : undefined,
         // OLake is the baseline of the comparison row, so it shows a dash instead of a multiplier.
-        olake: isComparison ? '–' : (row.olake ?? '-'),
+        olake: isComparison ? '-' : (row.olake ?? '-'),
         competitors: keys.map((key) => row[key] ?? '-'),
         highlight: isComparison
       }
     })
 
     return {
-      connectors: CONNECTORS.map(({ id, name }) => ({ id, name })),
+      connectors: connectors.map(({ id, name }) => ({ id, name })),
       activeConnector: connector.id,
       setActiveConnector,
       mode,
       setMode,
       competitors: keys.map((key) => TOOLS[key].name),
-      olakeLabel: 'OLake Go',
       olakeSub: TOOLS.olake.description ?? '',
-      rows,
-      hasData: bench.hasData,
-      sourceName: connector.name
+      caption: goBenchmarkCaption(mode, bench.rowsSynced.olake, connector.name),
+      rows
     }
-  }, [activeConnector, mode])
+  }, [selectedConnector, mode])
 }

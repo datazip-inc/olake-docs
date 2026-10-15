@@ -5,6 +5,8 @@
 export const GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake'
 export const FUSION_GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake-fusion'
 export const SLACK_URL = '/slack/'
+const GO_QUICKSTART = '/docs/getting-started/quickstart/'
+const FUSION_QUICKSTART = '/docs/fusion/getting-started/quickstart/'
 export const PRICING_LINK = { label: 'Pricing', href: '/contact/' }
 
 export interface LakesideNavLink {
@@ -44,7 +46,7 @@ export interface LakesideNavEntry {
 const PRODUCTS_MEGA: MegaMenu = {
   feature: {
     title: 'Replicate, then maintain',
-    cta: { label: 'Try OLake Go', href: '/docs/getting-started/quickstart/' }
+    cta: { label: 'Try OLake Go', href: GO_QUICKSTART }
   },
   columns: [
     {
@@ -54,7 +56,7 @@ const PRODUCTS_MEGA: MegaMenu = {
       href: '/olake-go',
       links: [
         { label: 'Documentation', href: '/docs' },
-        { label: 'Quickstart', href: '/docs/getting-started/quickstart/' },
+        { label: 'Quickstart', href: GO_QUICKSTART },
         { label: 'GitHub', href: GITHUB_REPO_URL, external: true }
       ]
     },
@@ -65,7 +67,7 @@ const PRODUCTS_MEGA: MegaMenu = {
       href: '/olake-fusion',
       links: [
         { label: 'Documentation', href: '/docs/fusion/getting-started/overview' },
-        { label: 'Quickstart', href: '/docs/fusion/getting-started/quickstart/' },
+        { label: 'Quickstart', href: FUSION_QUICKSTART },
         { label: 'GitHub', href: FUSION_GITHUB_REPO_URL, external: true }
       ]
     }
@@ -164,10 +166,12 @@ export const LAKESIDE_NAV: LakesideNavEntry[] = [
   { label: PRICING_LINK.label, href: PRICING_LINK.href }
 ]
 
-export const LAKESIDE_CTA: LakesideNavLink = {
-  label: "Try, It's Free",
-  href: '/docs/getting-started/quickstart/'
-}
+const LAKESIDE_CTA: LakesideNavLink = { label: "Try, It's Free", href: GO_QUICKSTART }
+const FUSION_CTA: LakesideNavLink = { ...LAKESIDE_CTA, href: FUSION_QUICKSTART }
+
+/** The navbar's call to action: OLake Fusion's quickstart on Fusion pages, OLake Go's elsewhere. */
+export const lakesideCta = (pathname: string): LakesideNavLink =>
+  /^\/(olake-fusion|docs\/fusion)(\/|$)/.test(pathname) ? FUSION_CTA : LAKESIDE_CTA
 
 export const LAKESIDE_GITHUB: LakesideNavLink = {
   label: 'GitHub',

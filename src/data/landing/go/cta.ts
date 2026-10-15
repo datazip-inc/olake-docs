@@ -1,5 +1,7 @@
+/** The blue "Get in touch" card above the FAQ. */
 export const GO_CTA = {
-  title: 'Start replicating to Iceberg today!',
-  cta: { label: "Try, it's free!", href: '/docs/getting-started/quickstart/' },
-  image: { src: '/img/landing/shared/iceberg-backdrop.webp', width: 1280, height: 720 }
+  eyebrow: 'Get in touch',
+  title: 'Achieve Sub-Second Data Ingestion',
+  primary: { label: 'Get Started', href: '/docs/getting-started/quickstart/' },
+  secondary: { label: 'Request Callback', href: '/contact/' }
 }

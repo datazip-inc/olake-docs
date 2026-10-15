@@ -1,15 +1,11 @@
-/**
- * The visible FAQ. The FAQPage JSON-LD in src/data/landing/seo.ts (GO_SEO) mirrors these questions
- * and answers word for word: keep the two in sync when either changes.
- */
-export interface GoFaq {
-  q: string
-  a: string
-}
+import type { ProductFaqItem } from '@site/src/components/landing/product/ProductFaq'
 
-export const GO_FAQ_TITLE = 'Frequently Asked Questions'
+export const GO_FAQ_EYEBROW = 'FAQs'
 
-export const GO_FAQS: GoFaq[] = [
+export const GO_FAQ_TITLE = 'You might have some questions'
+
+/** The visible FAQ, in display order. The page's FAQPage JSON-LD (seo.ts) is built from it. */
+export const GO_FAQS: ProductFaqItem[] = [
   {
     q: 'How to get started?',
     a: 'Check the Quickstart Guide. With a single Docker command you can spin up OLake Go and access the UI.'
@@ -32,6 +28,6 @@ export const GO_FAQS: GoFaq[] = [
   },
   {
     q: 'What data platforms and tools does OLake Go integrate with?',
-    a: "As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery."
+    a: 'As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery.'
   }
 ]
