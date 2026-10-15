@@ -5,7 +5,7 @@
 export const GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake'
 export const FUSION_GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake-fusion'
 export const SLACK_URL = '/slack/'
-const GO_QUICKSTART = '/docs/getting-started/quickstart/'
+export const GO_QUICKSTART = '/docs/getting-started/quickstart/'
 const FUSION_QUICKSTART = '/docs/fusion/getting-started/quickstart/'
 export const PRICING_LINK = { label: 'Pricing', href: '/contact/' }
 
