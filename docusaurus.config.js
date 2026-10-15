@@ -1,4 +1,5 @@
 const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriority-rehype-plugin')
+const externalLinksNofollowRehypePlugin = require('./src/plugins/external-links-nofollow-rehype-plugin')
 const imageDimensionsRemarkPlugin = require('./src/plugins/image-dimensions-remark-plugin')
 const releaseNotesRemarkPlugin = require('./src/plugins/release-notes-remark-plugin')
 const fs = require('fs')
@@ -448,7 +449,7 @@ const config = {
         onUntruncatedBlogPosts: 'ignore',
         editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
-        rehypePlugins: [imageFetchPriorityRehypePlugin],
+        rehypePlugins: [imageFetchPriorityRehypePlugin, externalLinksNofollowRehypePlugin],
         // Adds width/height to local images so they reserve space (no layout shift)
         beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
       }
@@ -486,7 +487,7 @@ const config = {
         onUntruncatedBlogPosts: 'ignore',
         editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
         remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
-        rehypePlugins: [imageFetchPriorityRehypePlugin],
+        rehypePlugins: [imageFetchPriorityRehypePlugin, externalLinksNofollowRehypePlugin],
         // Adds width/height to local images so they reserve space (no layout shift)
         beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
       }
