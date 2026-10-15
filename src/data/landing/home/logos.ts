@@ -24,14 +24,6 @@ export const TRUSTED_LOGOS: TrustedLogo[] = [
     maxW: '140px'
   },
   {
-    src: '/img/landing/v2/logo-ibm.webp',
-    name: 'IBM',
-    w: 322,
-    h: 120,
-    maxH: '30px',
-    maxW: '90px'
-  },
-  {
     src: '/img/landing/v2/logo-qualcomm.webp',
     name: 'Qualcomm',
     w: 653,
@@ -46,14 +38,6 @@ export const TRUSTED_LOGOS: TrustedLogo[] = [
     h: 88,
     maxH: '28px',
     maxW: '150px'
-  },
-  {
-    src: '/img/landing/v2/logo-redhat.webp',
-    name: 'Red Hat',
-    w: 508,
-    h: 120,
-    maxH: '30px',
-    maxW: '130px'
   },
   {
     src: '/img/landing/v2/logo-sumitomo-electric.webp',
@@ -94,14 +78,6 @@ export const TRUSTED_LOGOS: TrustedLogo[] = [
     h: 120,
     maxH: '18px',
     maxW: '140px'
-  },
-  {
-    src: '/img/landing/v2/logo-taboola.webp',
-    name: 'Taboola',
-    w: 496,
-    h: 120,
-    maxH: '28px',
-    maxW: '120px'
   },
   {
     src: '/img/landing/v2/logo-fetch.webp',

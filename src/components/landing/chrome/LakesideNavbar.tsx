@@ -16,7 +16,7 @@ import useGetReleases from '@site/src/hooks/useGetReleases'
 import Button from '../ui/Button'
 import {
   LAKESIDE_NAV,
-  LAKESIDE_CTA,
+  lakesideCta,
   LAKESIDE_GITHUB,
   LAKESIDE_SLACK,
   type LakesideNavEntry,
@@ -399,6 +399,7 @@ export default function LakesideNavbar({
   const { pathname } = useLocation()
   const isBar = variant === 'bar'
   const currentPath = activePath ?? pathname
+  const cta = lakesideCta(currentPath)
 
   const drawerOpen = mobileSidebar ? mobileSidebar.shown : ownDrawerOpen
   const setDrawerOpen = (next: boolean | ((v: boolean) => boolean)) => {
@@ -478,8 +479,8 @@ export default function LakesideNavbar({
             <StarMark />
           </a>
           {isBar && trailing}
-          <Button href={LAKESIDE_CTA.href} size='sm'>
-            {LAKESIDE_CTA.label}
+          <Button href={cta.href} size='sm'>
+            {cta.label}
           </Button>
         </div>
       </NavLandmark>
