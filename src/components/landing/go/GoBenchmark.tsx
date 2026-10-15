@@ -100,7 +100,7 @@ export default function GoBenchmark() {
               ))}
             </div>
             <div
-              className='flex items-center gap-[20px] overflow-x-auto'
+              className='flex w-full flex-wrap items-center gap-x-[20px] gap-y-[10px] md:w-auto'
               role='group'
               aria-label='Source'
             >
