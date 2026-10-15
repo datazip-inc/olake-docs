@@ -1,10 +1,28 @@
 import type { JsonLdSchema } from '@site/src/components/landing/seo/LandingSeo'
+import type { ProductFaqItem } from '@site/src/components/landing/product/ProductFaq'
+import { GO_FAQS } from './go/faq'
+import { FAQS as FUSION_FAQS } from './fusion/faqs'
 
 const SITE_URL = 'https://olake.io'
 // The design's helmet references https://olake.io/olake-go-og.png / olake-fusion-og.png,
 // neither of which ships in the bundle or exists in this repo. Falling back to the
 // existing site OG image rather than a broken reference.
 const FALLBACK_OG_IMAGE = `${SITE_URL}/img/logo/olake-og-card.png`
+
+// FAQPage JSON-LD built from the FAQ a page shows, so the markup always matches the visible
+// questions and answers word for word, as Google requires.
+const faqPageSchema = (faqs: ProductFaqItem[]): JsonLdSchema => ({
+  id: 'faq-page',
+  data: {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(({ q, a }) => ({
+      '@type': 'Question',
+      name: q,
+      acceptedAnswer: { '@type': 'Answer', text: a }
+    }))
+  }
+})
 
 export const GO_SEO = {
   title: 'OLake Go — Fastest Open-Source Data Replication to Apache Iceberg & S3',
@@ -29,63 +47,7 @@ export const GO_SEO = {
         publisher: { '@type': 'Organization', name: 'Datazip', url: SITE_URL }
       }
     },
-    {
-      // Must mirror the visible FAQ on /olake-go (the `faqs` array in
-      // src/data/landing/go/faq.ts) word for word. Google requires FAQ markup to
-      // match what the page shows; keep the two in sync when either changes.
-      id: 'faq-page',
-      data: {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: 'How to get started?',
-            acceptedAnswer: { '@type': 'Answer', text: 'Check the Quickstart Guide. With a single Docker command you can spin up OLake Go and access the UI.' }
-          },
-          {
-            '@type': 'Question',
-            name: 'Is OLake Go really open source?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. OLake Go is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1K+ developers) and use it freely without hidden costs.'
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'Is there any enterprise plan?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "We're actively working on providing enterprise support, from professional assistance and pilot programs to helping teams scale OLake Go in production. You can reach out at hello@olake.io to learn more."
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'How can I contribute?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Join our Slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.'
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'Why should I use OLake Go?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'OLake Go makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction, all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
-            }
-          },
-          {
-            '@type': 'Question',
-            name: 'What data platforms and tools does OLake Go integrate with?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery."
-            }
-          }
-        ]
-      }
-    }
+    faqPageSchema(GO_FAQS)
   ] as JsonLdSchema[]
 }
 
@@ -171,6 +133,7 @@ export const FUSION_SEO = {
         url: `${SITE_URL}/olake-fusion/`,
         publisher: { '@type': 'Organization', name: 'Datazip', url: SITE_URL }
       }
-    }
+    },
+    faqPageSchema(FUSION_FAQS)
   ] as JsonLdSchema[]
 }

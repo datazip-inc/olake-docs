@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
-import Link from '@docusaurus/Link'
-import SectionHeading from '../ui/SectionHeading'
+import React from 'react'
 import { cn } from '@site/src/lib/utils'
+import BenchmarkShell, { FOCUS_ON_DARK as FOCUS, RULE } from '../product/BenchmarkShell'
 import {
-  GO_BENCHMARK_INFO,
+  GO_BENCHMARK_HOW,
   GO_BENCHMARK_INTRO,
   GO_BENCHMARK_LINK,
   GO_BENCHMARK_MODES,
@@ -11,250 +10,207 @@ import {
 } from '@site/src/data/landing/go/benchmark'
 import { useGoBenchmark } from './useGoBenchmark'
 
-const ExternalMark = () => (
-  <svg
-    width='16'
-    height='16'
-    viewBox='0 0 24 24'
-    fill='none'
-    stroke='currentColor'
-    strokeWidth='2'
-    strokeLinecap='round'
-    strokeLinejoin='round'
-    aria-hidden='true'
-  >
-    <path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' />
-    <polyline points='15 3 21 3 21 9' />
-    <line x1='10' y1='14' x2='21' y2='3' />
-  </svg>
-)
-
-const Chevron = ({ open }: { open: boolean }) => (
-  <svg
-    width='12'
-    height='8'
-    viewBox='0 0 10 6'
-    fill='none'
-    aria-hidden='true'
-    className={cn('shrink-0 text-olake-muted transition-transform', open && 'rotate-180')}
-  >
-    <path d='M1 1L5 5L9 1' stroke='currentColor' strokeWidth='1.3' strokeLinecap='round' />
-  </svg>
-)
-
-const FOCUS =
-  'focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-olake-blue-on-dark'
-
-const BenchLink = ({ className }: { className?: string }) => (
-  <Link
-    to={GO_BENCHMARK_LINK.href}
+/** Mode and source switches: 12px labels with a 24px tall hit area. */
+const Switch = ({
+  pressed,
+  onClick,
+  children
+}: {
+  pressed: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) => (
+  <button
+    type='button'
+    aria-pressed={pressed}
+    onClick={onClick}
     className={cn(
-      'inline-flex items-center gap-[6px] text-[14px] text-olake-blue-on-dark transition-colors hover:text-olake-blue-on-dark-hover lg:text-[15px]',
+      '-my-[4px] shrink-0 cursor-pointer border-0 bg-transparent px-0 py-[4px] text-[12px] leading-[1.3] transition-colors',
       FOCUS,
-      className
+      pressed ? 'text-white' : 'text-olake-muted-on-dark hover:text-olake-line-strong'
     )}
   >
-    {GO_BENCHMARK_LINK.label}
-    <ExternalMark />
-  </Link>
+    {children}
+  </button>
 )
 
-/** The "OLake Advantage" block: the dark benchmark card with mode and source switching, and the "how" disclosure. */
+/** "7.5 hours (failed sync)" reads as the figure with its remark on a smaller second line. */
+const Figure = ({ value }: { value: string }) => {
+  const at = value.indexOf(' (')
+  if (at < 0) return <>{value}</>
+  return (
+    <>
+      {value.slice(0, at)}
+      <span className='block text-[12px]'>{value.slice(at + 1)}</span>
+    </>
+  )
+}
+
+/** Column widths of the design's table (198, 172, 147, 148, 147 and 145 of its 957px); it leaves 45px free on the right. */
+const COLUMNS = ['20.69%', '17.97%', '15.36%', '15.47%', '15.36%', '15.15%']
+
+/**
+ * "Benchmarks": the dark full-bleed section with the latest-release strip, the comparison table
+ * (switchable between full load and CDC and across sources), how OLake Go gets there, and a bar
+ * linking to the full benchmarks.
+ */
 export default function GoBenchmark() {
   const t = useGoBenchmark()
-  const [infoOpen, setInfoOpen] = useState(false)
-
   return (
-    <section id='benchmarks' className='px-0 pb-0 pt-[24px] lg:pt-[40px]'>
-      <div className='mx-auto w-full max-w-[1016px]'>
-        <div className='px-[20px] lg:px-[34px]'>
-          <SectionHeading
-            eyebrow={GO_BENCHMARK_INTRO.eyebrow}
-            title={GO_BENCHMARK_INTRO.title}
-            body={GO_BENCHMARK_SUMMARY.map((part, i) =>
-              part.strong ? (
-                <strong key={i} className='font-medium text-olake-ink'>
-                  {part.text}
-                </strong>
-              ) : (
-                <React.Fragment key={i}>{part.text}</React.Fragment>
-              )
-            )}
-            className='[&_p:last-child]:max-w-[640px]'
-          />
-        </div>
-
-        <div className='lakeside-benchmark-panel mt-[24px] p-[12px] lg:mt-[32px] lg:p-[14px]'>
-          <div className='overflow-hidden rounded-[16px] bg-olake-surface-dark-2'>
-            <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between lg:px-[28px] lg:pt-[22px] lg:pb-[14px]'>
-              <div className='flex items-center gap-[16px] px-[20px] pb-[14px] pt-[22px] lg:p-0'>
-                {GO_BENCHMARK_MODES.map((m) => (
-                  <button
-                    key={m.id}
-                    type='button'
-                    onClick={() => t.setMode(m.id)}
-                    aria-pressed={t.mode === m.id}
-                    className={cn(
-                      'cursor-pointer border-none bg-transparent p-0 text-[14px] transition-colors lg:text-[15px]',
-                      FOCUS,
-                      t.mode === m.id
-                        ? 'text-olake-on-blue'
-                        : 'text-olake-muted-on-dark hover:text-olake-line-strong'
-                    )}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <BenchLink className='hidden lg:inline-flex' />
+    <BenchmarkShell
+      release
+      eyebrow={GO_BENCHMARK_INTRO.eyebrow}
+      title={GO_BENCHMARK_INTRO.title}
+      summary={GO_BENCHMARK_SUMMARY.map((part, i) =>
+        part.muted ? (
+          <span key={i} className='text-olake-muted-on-dark'>
+            {part.text}
+          </span>
+        ) : (
+          <React.Fragment key={i}>{part.text}</React.Fragment>
+        )
+      )}
+      how={{
+        title: GO_BENCHMARK_HOW.title,
+        body: (
+          <div className='flex flex-col gap-[16px]'>
+            {GO_BENCHMARK_HOW.items.map((item) => (
+              <p key={item.term} className='max-w-[476px]'>
+                <span className='text-[#e5e5e5]'>{item.term}</span> / {item.body}
+              </p>
+            ))}
+          </div>
+        )
+      }}
+      link={GO_BENCHMARK_LINK}
+    >
+      <div className={cn(RULE, 'mt-[33px] border-t')}>
+        <div className='px-[20px] pt-[36px] lg:pt-[43px] lg:pr-[45px] lg:pl-[41px]'>
+          <h3 className='text-[18px] leading-[1.3] font-normal text-[#fdfdfc] lg:text-[20px]'>
+            {t.caption[0]}
+            <br />
+            {t.caption[1]}
+          </h3>
+          <div className='mt-[28px] flex flex-wrap items-center justify-between gap-x-[24px] gap-y-[12px] pb-[18px] lg:mt-[39px]'>
+            <div className='flex items-center gap-[16px]' role='group' aria-label='Load type'>
+              {GO_BENCHMARK_MODES.map((m) => (
+                <Switch key={m.id} pressed={t.mode === m.id} onClick={() => t.setMode(m.id)}>
+                  {m.label}
+                </Switch>
+              ))}
             </div>
-
-            <div className='flex items-center gap-[14px] overflow-x-auto border-0 border-t border-solid border-olake-line-dark px-[20px] py-[14px] lg:px-[28px]'>
+            <div
+              className='flex w-full flex-wrap items-center gap-x-[20px] gap-y-[10px] md:w-auto'
+              role='group'
+              aria-label='Source'
+            >
               {t.connectors.map((c) => (
-                <button
+                <Switch
                   key={c.id}
-                  type='button'
+                  pressed={t.activeConnector === c.id}
                   onClick={() => t.setActiveConnector(c.id)}
-                  aria-pressed={t.activeConnector === c.id}
-                  className={cn(
-                    'shrink-0 cursor-pointer border-none bg-transparent p-0 text-[14px] transition-colors lg:text-[15px]',
-                    FOCUS,
-                    t.activeConnector === c.id
-                      ? 'text-olake-on-blue'
-                      : 'text-olake-muted-on-dark hover:text-olake-line-strong'
-                  )}
                 >
                   {c.name}
-                </button>
-              ))}
-            </div>
-
-            {t.hasData ? (
-              <div className='overflow-x-auto'>
-                <table className='w-full min-w-[720px] border-0 border-collapse border-none text-left'>
-                  <thead>
-                    <tr className='border-0 border-y border-solid border-olake-line-dark bg-transparent'>
-                      <th className='w-[210px] border-0 border-r border-solid border-olake-line-dark bg-transparent px-[20px] py-[16px] text-[14px] font-normal text-olake-muted-on-dark lg:px-[28px] lg:text-[15px]'>
-                        Metrics
-                      </th>
-                      <th className='border-0 border-x border-solid border-olake-line-dark bg-transparent px-[16px] py-[14px] text-center font-normal'>
-                        <span className='block text-[14px] text-olake-blue-on-dark lg:text-[15px]'>
-                          {t.olakeLabel}
-                        </span>
-                        <span className='block text-[12px] text-olake-muted-on-dark lg:text-[13px]'>
-                          {t.olakeSub}
-                        </span>
-                      </th>
-                      {t.competitors.map((name) => (
-                        <th
-                          key={name}
-                          className='border-0 border-r border-solid border-olake-line-dark bg-transparent px-[16px] py-[16px] text-center text-[14px] font-normal text-olake-muted-on-dark lg:text-[15px]'
-                        >
-                          {name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {t.rows.map((row) => (
-                      <tr
-                        key={row.label}
-                        className='border-0 border-b border-solid border-olake-line-dark bg-transparent'
-                      >
-                        <th className='border-0 border-r border-solid border-olake-line-dark bg-transparent px-[20px] py-[18px] text-left align-top font-normal lg:px-[28px]'>
-                          <span className='block text-[14px] text-olake-line-strong lg:text-[15px]'>
-                            {row.label}
-                          </span>
-                          {row.note && (
-                            <span className='mt-[6px] block max-w-[170px] text-[12px] leading-[1.45] text-olake-muted-on-dark lg:text-[13px]'>
-                              {row.note}
-                            </span>
-                          )}
-                        </th>
-                        <td className='border-0 border-x border-solid border-olake-line-dark px-[16px] py-[18px] text-center align-top text-[14px] text-olake-on-blue lg:text-[15px]'>
-                          {row.olake}
-                        </td>
-                        {row.competitors.map((value, i) => (
-                          <td
-                            key={`${row.label}-${t.competitors[i]}`}
-                            className={cn(
-                              'border-0 border-r border-solid border-olake-line-dark px-[16px] py-[18px] text-center align-top text-[14px] lg:text-[15px]',
-                              row.highlight
-                                ? 'text-olake-blue-on-dark'
-                                : 'text-olake-line-strong/80'
-                            )}
-                          >
-                            {value}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className='flex flex-col items-center border-0 border-t border-solid border-olake-line-dark px-[24px] py-[48px] text-center lg:py-[64px]'>
-                <img
-                  src='/img/landing/shared/olake-mark-small.svg'
-                  alt=''
-                  width={28}
-                  height={28}
-                  loading='lazy'
-                  decoding='async'
-                  className='block h-[28px] w-[28px]'
-                />
-                <p className='mt-[16px] text-[16px] text-olake-on-blue lg:text-[20px]'>
-                  {t.sourceName} benchmarks coming soon
-                </p>
-                <p className='mt-[8px] max-w-[420px] text-[13px] leading-[1.6] text-olake-muted-on-dark lg:text-[14px]'>
-                  We&apos;re running head-to-head {t.sourceName} ingestion tests now. Check back
-                  shortly for the full comparison.
-                </p>
-              </div>
-            )}
-
-            <div className='flex items-center justify-center border-0 border-t border-solid border-olake-line-dark py-[20px] lg:hidden'>
-              <BenchLink />
-            </div>
-          </div>
-
-          <div className='mt-[12px] overflow-hidden rounded-[16px] border border-solid border-olake-line bg-olake-surface'>
-            <button
-              type='button'
-              aria-expanded={infoOpen}
-              aria-controls='go-benchmark-info'
-              onClick={() => setInfoOpen((open) => !open)}
-              className='flex w-full cursor-pointer items-center gap-[12px] border-0 bg-transparent px-[16px] py-[16px] text-left text-olake-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-olake-blue lg:px-[24px]'
-            >
-              <img
-                src={GO_BENCHMARK_INFO.icon.src}
-                alt=''
-                width={GO_BENCHMARK_INFO.icon.width}
-                height={GO_BENCHMARK_INFO.icon.height}
-                loading='lazy'
-                decoding='async'
-                className='block h-[28px] w-[28px] shrink-0 rounded-[8px]'
-              />
-              <span className='flex-1 text-[15px] lg:text-[16px]'>{GO_BENCHMARK_INFO.title}</span>
-              <Chevron open={infoOpen} />
-            </button>
-            <div
-              id='go-benchmark-info'
-              hidden={!infoOpen}
-              className={cn(
-                'go-reveal flex-col gap-[10px] border-0 border-t border-solid border-olake-line px-[16px] py-[16px] text-[13px] leading-[1.6] text-olake-text-2 lg:px-[24px] lg:text-[14px]',
-                infoOpen ? 'flex' : 'hidden'
-              )}
-            >
-              {GO_BENCHMARK_INFO.items.map((item) => (
-                <p key={item.term}>
-                  <span className='font-medium text-olake-ink'>{item.term}</span> {item.body}
-                </p>
+                </Switch>
               ))}
             </div>
           </div>
         </div>
+
+        <div className={cn(RULE, 'overflow-x-auto border-y lg:pr-[45px]')}>
+          <table className='w-full min-w-[800px] table-fixed border-collapse border-0 text-left'>
+            <colgroup>
+              {COLUMNS.map((width, i) => (
+                <col key={i} style={{ width }} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr className='h-[60px] border-0 bg-transparent'>
+                <th
+                  className={cn(
+                    RULE,
+                    'border-r bg-transparent px-[20px] py-0 align-middle text-[14px] leading-[1.3] font-normal text-olake-muted-on-dark lg:pl-[41px]'
+                  )}
+                >
+                  Metrics
+                </th>
+                <th
+                  className={cn(
+                    RULE,
+                    'border-r bg-transparent px-[8px] py-0 text-center align-middle leading-[1.3] font-normal'
+                  )}
+                >
+                  <span className='block text-[14px] text-olake-blue-on-dark'>
+                    OLake<span className='sr-only'> </span>
+                    <span className='font-light'>Go</span>
+                  </span>
+                  <span className='block text-[12px] text-olake-muted-on-dark'>{t.olakeSub}</span>
+                </th>
+                {t.competitors.map((name, i) => (
+                  <th
+                    key={name}
+                    className={cn(
+                      RULE,
+                      'bg-transparent px-[8px] py-0 text-center align-middle text-[14px] leading-[1.3] font-normal text-olake-muted-on-dark',
+                      i < t.competitors.length - 1 && 'border-r'
+                    )}
+                  >
+                    {name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {t.rows.map((row, r) => {
+                const cell = 'px-[8px] pt-[29px] pb-0 align-top text-[14px] leading-[1.3]'
+                return (
+                  <tr
+                    key={row.label}
+                    className={cn(
+                      'border-0 bg-transparent',
+                      // Rows keep the design's 74px pitch even when a figure takes two lines;
+                      // the last one runs on to the table's bottom rule.
+                      r === t.rows.length - 1 ? 'h-[170px]' : 'h-[74px]'
+                    )}
+                  >
+                    <th
+                      className={cn(
+                        RULE,
+                        cell,
+                        'border-r bg-transparent pl-[20px] text-left font-normal text-white lg:pl-[41px]'
+                      )}
+                    >
+                      {row.label}
+                      {row.note && (
+                        <span className='mt-[8px] block max-w-[133px] text-[12px] leading-[1.3] text-olake-muted-on-dark'>
+                          {row.note}
+                        </span>
+                      )}
+                    </th>
+                    <td className={cn(RULE, cell, 'border-r text-center text-white')}>
+                      <Figure value={row.olake} />
+                    </td>
+                    {row.competitors.map((value, i) => (
+                      <td
+                        key={`${row.label}-${t.competitors[i]}`}
+                        className={cn(
+                          RULE,
+                          cell,
+                          'text-center',
+                          row.highlight ? 'text-olake-blue-on-dark' : 'text-olake-muted-on-dark',
+                          i < row.competitors.length - 1 && 'border-r'
+                        )}
+                      >
+                        <Figure value={value} />
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </section>
+    </BenchmarkShell>
   )
 }

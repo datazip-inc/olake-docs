@@ -1,38 +1,24 @@
-/**
- * "The silent tax": four short statements about what happens to Iceberg tables without maintenance.
- * Words listed in `emphasis` render large, bold and in the ink colour. The other words cycle through
- * the size, weight and colour recipe in SilentTax.tsx, so each sentence reads as a cloud of words.
- * `big` words get the emphasis size without the emphasis style; `recipeAt` makes a word use the
- * recipe slot of another position (word index -> slot).
- */
-export interface ProblemCard {
-  words: string[]
-  emphasis: string[]
-  big?: string[]
-  recipeAt?: Record<number, number>
+/** "Problem Statement": the four pain points OLake Fusion removes, each with its line illustration. */
+export type FusionProblemArt = 'small-files' | 'slower-queries' | 'invisible-costs' | 'debugging'
+
+export interface FusionProblem {
+  label: string
+  title: string
+  art: FusionProblemArt
 }
 
-export const PROBLEMS_EYEBROW = 'The silent tax'
+export const PROBLEM_INTRO = {
+  eyebrow: 'Problem Statement',
+  title: 'Small files distracting from the bigger objective?'
+}
 
-export const PROBLEMS_CLOSING = 'Set a schedule, Fusion will handle the rest.'
-
-export const PROBLEMS: ProblemCard[] = [
+export const PROBLEMS: FusionProblem[] = [
+  { label: 'Problem I', title: 'Small files pile up faster than you notice', art: 'small-files' },
+  { label: 'Problem II', title: 'Queries get slower every month', art: 'slower-queries' },
   {
-    words: ['Small', 'files', 'PILE UP', 'faster', 'than', 'you', 'notice'],
-    emphasis: ['Small', 'files', 'PILE UP']
+    label: 'Problem III',
+    title: 'Problems aren’t visible until they’re expensive',
+    art: 'invisible-costs'
   },
-  {
-    words: ['Queries', 'get', 'SLOWER', 'every', 'day'],
-    emphasis: ['Queries', 'get', 'SLOWER']
-  },
-  {
-    words: ['Problems', "aren't", 'visible', 'until', "they're", 'expensive'],
-    emphasis: ['Problems', 'expensive'],
-    recipeAt: { 4: 2 }
-  },
-  {
-    words: ['Compaction', 'becomes', 'a', 'debugging', 'issue'],
-    emphasis: ['Compaction'],
-    big: ['debugging']
-  }
+  { label: 'Problem IV', title: 'Compaction jobs become debugging issues', art: 'debugging' }
 ]
