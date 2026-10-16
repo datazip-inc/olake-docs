@@ -1,0 +1,241 @@
+---
+slug: iceberg-interoperability-row-index
+title: "One Table, Every Engine: What It Takes to Make Iceberg Interoperable"
+description: "Why CDC pipelines write Iceberg tables only Spark can read, what the Iceberg spec's delete rules actually say, and how a durable per-stream row index lets OLake write positional deletes and deletion vectors at commit time."
+tags: [olake, iceberg, delete-formats, interoperability, lakehouse]
+authors: [ankit]
+image: /img/blog/cover/interoperability-blog.png
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Iceberg interoperability row index cover image](/img/blog/cover/interoperability-blog.png)
+
+OLake helps companies adopt Apache Iceberg, moving operational databases into an open table format without handing the data to a proprietary warehouse on the way in.
+
+This post is about one word in that sentence: open.
+
+An Iceberg table should be readable by any engine that implements the spec. A table written by a CDC pipeline usually isn't. It is readable by Spark, and often by nothing else your company already pays for.
+
+Iceberg is not at fault. The cause is a single decision the writer makes about how to record a deleted row, usually made without the information needed to make it well.
+
+---
+
+## The promise, and the thing that breaks it
+
+A table format describes a table as files in object storage. Iceberg's metadata says which data files make up the table right now, what schema they follow, how they are partitioned, and which rows have been deleted. Data is Parquet, Avro or ORC. Metadata is JSON and Avro. Nothing needs a running service to interpret.
+
+So the table is not owned by whoever wrote it. Land data once, then query it from Spark, Trino, Snowflake, DuckDB, all against the same bytes. No per-engine copy, no per-engine pipeline, no argument about which of four numbers is right.
+
+That is the promise, and it is worth real money. But "every engine" is not something the spec can hand you. It depends on the overlap between what engines have actually built. The spec is one document; the engines are a dozen codebases at a dozen levels of maturity. Write something a reader has not implemented and you get a table that reader cannot query.
+
+Sometimes it fails loudly, which is the good case. The bad case is an engine that returns rows you deleted.
+
+Interoperability is the deliverable here. A pipeline that ingests fast into a table only Databricks can read has delivered a Databricks table stored in Parquet, plus the operational cost of manifests, snapshot expiry and compaction. You took on the work and kept the lock-in.
+
+---
+
+## Deletes decide who can read your table
+
+### Three ways to say a row is gone
+
+Change data capture (CDC) is mostly updates and deletes. Iceberg lets you record a deletion without rewriting the data file holding the row: you write a small side file that readers apply at scan time. There are three ways to write it, and they differ in how much the writer must know about where the row physically sits.
+
+All three are part of Iceberg's merge-on-read (MOR) strategy: the writer records the deletion on the side and the reader merges it with the data at scan time, instead of copy-on-write rewriting the whole data file up front.
+
+**Equality delete.** "Any row where `id = 42` is deleted." Needs the key value, nothing else.
+
+**Positional delete.** "Row 118,431 of `data/00007-abc.parquet` is deleted." Needs the exact file and the row's position inside it, its ordinal.
+
+**Deletion vector.** Added in format version 3, where it replaces positional deletes outright: v3 tables no longer write positional delete files, and a new vector must absorb any positional deletes already present for that data file. Same information, better container: one bitmap per data file, stored in a Puffin file (Iceberg's format for blobs like this), marking every deleted ordinal at once instead of a new delete file per batch.
+
+![Equality deletes, positional deletes and deletion vectors in Iceberg](/img/blog/2026/5/deletes-in-iceberg.png)
+
+### Equality deletes are cheap to write and expensive to read
+
+This has nothing to do with implementation quality. It falls out of the spec's scan-planning rules.
+
+A **deletion vector** applies to a data file when the file's path matches the vector's `referenced_data_file` and the partitions match. The vector names its file. Planning a scan over a thousand files is a thousand lookups.
+
+A **positional delete file** works the same way, matched by `referenced_data_file`.
+
+An **equality delete** has no file reference at all. It applies when the partitions match and the data file's sequence number, the counter Iceberg bumps on each commit, is lower than the delete's. So it covers everything written before it in that partition, and that is the whole scope. The delete file does not know which data files hold the rows it removes, and has no way to say.
+
+So the reader applies every equality delete to every older data file in the partition, matching on values. One equality delete against a thousand candidate files means comparing the key against a thousand files. The min/max column statistics Iceberg stores prune some of them, but pruning starts from a set that is the whole partition. For the other two formats that set has one member by construction.
+
+A second rule compounds it. Equality deletes written under an unpartitioned spec apply **globally**, to every data file in the table. Most CDC destinations are unpartitioned until somebody partitions them, so in practice every equality delete is a global delete. This is also why Dremio shows up as unsupported in the matrix below: Dremio skips global equality deletes.
+
+Why write them at all, then? Because the writer does not know where the row is, and finding out costs something. Equality deletes are what you emit when you have no index.
+
+### The other two formats need an index
+
+Positional deletes and vectors are nearly free to read. A sorted list of ordinals, or a bitmap, applied to one named file. No value comparison. Vectors go further and collapse many small delete files into one bitmap per data file, which is why the spec requires a new vector to absorb any existing positional deletes for that file.
+
+All that convenience is paid for at write time, with one question the format cannot answer: for this key, which file and which ordinal?
+
+Nothing in Iceberg's metadata maps a key to a row position. There is no API for it and no cheap derivation. Answering it from the table means scanning data files. If you want the lookup, you maintain it.
+
+The scale is easy to underestimate. The index is not "the rows I am about to write." It is every live row in the table, because any of them could be the target of the next update. Replicate a 300 million row table and you need a 300 million entry index before the first positional delete, and you need it still there tomorrow, in a different process, on a different machine.
+
+### Who can read what, and why one bad file decides it
+
+Which engine reads which delete format, as of September 2026:
+
+<div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '2rem 0 2.5rem'}}>
+
+| Engine | Equality | Positional | Deletion vectors |
+|:---:|:---:|:---:|:---:|
+| Apache Spark | ✓ | ✓ | ✓ |
+| Apache Flink | ✓ | ✓ | ✓ |
+| Trino | ✓ | ✓ | ✓ |
+| DuckDB | ✓ | ✓ | ✓ |
+| ClickHouse | ✓ | ✓ | ✓ |
+| Presto | ✓ | ✓ | — |
+| StarRocks | ✓ | ✓ | — |
+| Apache Hive | ✓ | ✓ | — |
+| AWS Athena | ✓ | ✓ | — |
+| Google BigQuery | ✓ | ✓ | — ¹ |
+| Snowflake | **—** | ✓ | ✓ |
+| Dremio | **—** ² | ✓ | — ³ |
+| Databricks | **—** | **—** | ✓ |
+
+<div style={{fontSize: '0.82em', lineHeight: 1.5, opacity: 0.7, marginTop: '0.9rem'}}>
+
+¹ Vectors in Preview only. ² Skips global equality deletes, which is what an unpartitioned table produces. ³ Vectors in Dremio Cloud only.
+
+</div>
+
+</div>
+
+Two rows matter most. Snowflake does not read equality deletes at all. Databricks reads neither equality nor positional deletes, only vectors. Both names show up on a lot of enterprise lists, and between them they rule out the format streaming writers emit by default.
+
+Here is what makes it unforgiving. A reader must resolve **every** delete format present in the table. There is no partial credit, because the only available fallback is to ignore a delete file it cannot parse, and ignoring one means returning deleted rows. A good engine fails the query instead.
+
+So a table that is 99% positional deletes and 1% equality deletes is, to Snowflake, exactly as unreadable as one that is 100% equality deletes. Proportion is irrelevant. One unsupported delete file decides it.
+
+### Catalog bottlenecks
+
+The engine is only half of it. The catalog, the service that tracks which tables exist and accepts commits to them, also decides what you are allowed to write, and that is product policy rather than anything in the spec. A managed REST catalog can happily accept table creation and appends while rejecting other operations outright.
+
+<div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '2rem 0 2.5rem'}}>
+
+| Catalog | Equality deletes | Positional deletes | Deletion vectors | Branches | Governance |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| Project Nessie | Yes | Yes | Yes | Yes | Limited |
+| Hive Metastore | Yes | Yes | Yes | Limited | Limited |
+| AWS Glue | Yes | Yes | Yes | Limited | Yes |
+| Apache Polaris | Yes | Yes | Yes | Limited | Yes |
+| Snowflake Horizon | **No** | Yes | Yes | **No** | Strong |
+| Databricks Unity | **No** | **No** | Yes | **No** | Strong |
+
+<div style={{fontSize: '0.82em', lineHeight: 1.5, opacity: 0.7, marginTop: '0.9rem'}}>
+
+The two catalogs with the strongest governance are the two that accept the least. Both refuse equality deletes, and neither will create branches.
+
+</div>
+
+</div>
+
+The last two columns show the trade. The open catalogs take anything and govern little. The managed ones govern properly and narrow what you may write, which is a reasonable product decision that happens to collide with how most CDC pipelines write.
+
+Snowflake Horizon is the one we hit directly, it requires access delegation, and in our experience it will not accept equality-delete writes or let you create branches.
+
+---
+
+## What open source offers today
+
+Before building anything we went looking for something we could adopt instead. We worked through the open-source tools that write Iceberg tables, the CDC connectors and the table-maintenance jobs, checking what each one does when it has to delete a row.
+
+Nothing writes the readable formats directly. The closest anything comes is recent: a maintenance task that landed in Apache Iceberg's Flink module in June 2026, and even that repairs tables after the fact rather than writing them correctly in the first place.
+
+### Why none of them can
+
+Writing a positional delete or a deletion vector for a row you did not just write means answering one question: which file, which ordinal. That needs a durable index of the whole table, and no open-source ingestion tool keeps one.
+
+So the formats every engine can read are the formats nothing open source will write for you.
+
+### Flink repairs the table afterwards, on v3 only
+
+One offering gets close. Iceberg's Flink integration ships a `convertEqualityDeletes` maintenance task. The sink keeps writing equality deletes, and a separate job rewrites them into deletion vectors later.
+
+The task repairs a table after the fact instead of writing it correctly, and it converts to vectors specifically, so it runs on **format version 3 only**. On v2 there is nothing on offer, and v3 brings its own problems, starting with Athena rejecting those tables outright.
+
+### The repair needs branches, which some catalogs refuse
+
+To do the rewrite, the job needs exactly what the sink lacked: a row-position index, which it keeps in Flink state with RocksDB recommended as the backend.
+
+It also needs two branches. The sink writes to a staging branch, and the job commits data files plus vectors to the target branch readers query. Where a catalog will not create branches, as Horizon and Unity will not, the remedy simply does not work. It is missing on the catalogs whose own query engines most need it.
+
+### One compaction and the index is gone
+
+Before each run the job checks who else wrote to the table, by walking back through recent snapshots looking for its own marker. Find one it did not write, and it has to assume the index is stale, because another writer may have moved the files it points at. It cannot tell which entries went bad, so it throws away all of them and reads the whole table again. Compaction is such a commit, so the index is rebuilt from scratch on whatever cadence compaction runs.
+
+## What we built
+
+### You declare the readers, OLake picks the format
+
+We turned the question around. Instead of picking a delete format and hoping readers cope, you declare which engines will read the table. OLake works out what it is allowed to write.
+
+Writable formats are ordered cheapest first: equality, positional, vector. Equality needs no index. Positional needs a full key-to-location index. Vectors need that same index plus a v3 table. OLake checks that list against what every declared engine can read, keeps only the formats all of them handle, and picks the cheapest survivor. If nothing survives, it tells you at configuration time.
+
+The behavior falls out of the data:
+
+- **All Spark.** Equality deletes. No index, no bootstrap scan, no volume, nothing extra to operate. You do not pay for a problem you do not have.
+- **Add Snowflake.** Equality drops out. Positional is selected and the index comes online.
+- **Add Databricks.** Positional drops out too. Vectors are selected and the table moves to v3.
+- **Databricks and Dremio together.** Empty. You hear about it at configuration time, not from a wrong dashboard six weeks later.
+
+All three formats (equality, positional and deletion vector) are live today.
+
+### Index storage: how OLake maintains it
+
+Two of the three formats need the same primitive: given an `olake_id`, the primary-key field OLake generates, return the data file and ordinal where that row lives. The access pattern is narrow. Point lookups, no range scans, no query language, one entry per live row. Hundreds of millions of keys is normal.
+
+A key-value store covers that. Three constraints decided which one.
+
+It has to be **embedded**, because the sync is one Go binary in a container and a separate index service is another thing to deploy, secure and have fail. It has to be **crash-consistent**, because sync pods get killed routinely and a torn index does not fail loudly, it writes positional deletes against wrong rows. And it has to be **pure Go**, because we cross-compile for several platforms from one build. Last one rules out RocksDB, which is the obvious pick and the one Iceberg's docs recommend.
+
+We use **Pebble**, a pure-Go LSM store written as a RocksDB replacement for CockroachDB, pinned at 2.1.6. Same durability model, no cgo, and its crash-recovery path gets harder use under a distributed SQL database than anything we would build a test harness for. That recovery path is load-bearing here: Pebble rebuilds from its write-ahead log at open, so a hard pod kill leaves a volume it can recover from rather than a corrupt index.
+
+![How OLake maintains the row index in Pebble](/img/blog/2026/5/pebble-db-in-olake.png)
+
+**Each stream has its own index.** One Pebble store per stream, in its own directory, holding two logical tables:
+
+- **Paths.** File path to file ID. Written once per data file.
+- **Rows.** `olake_id` to file ID and ordinal. Written once per live row.
+
+A lookup hits the rows table, gets a file ID, and resolves the path from the paths table. Separating them is what keeps the index small, below. Keeping stores separate means one stream's corruption or compaction storm cannot reach another's, and a single index can be dropped and rebuilt without touching the rest.
+
+**How the index gets used.** One update makes it concrete. A CDC record arrives changing David's contact from `+01` to `+02`.
+
+![How OLake writes a positional delete directly](/img/blog/2026/5/example-for-positional-write.png)
+
+OLake looks up David's `olake_id` in the index and gets back `s3://a.parquet`, position 1. That is enough to emit a positional delete naming that file and ordinal, alongside the new data file carrying the updated row. A writer without the index knows only the key, so it can emit nothing better than `id = 2 is deleted`, an equality delete that Snowflake and Databricks will not read.
+
+**Keeping it small.** The naive row entry stores the full file path. Object-storage paths run 100 to 200 bytes, and a few thousand of them get repeated across hundreds of millions of rows, so almost the whole index is duplicated strings.
+
+Two things remove that. Each path is **interned** on first sight, stored once in the paths table against a 64-bit ID, and the row entry holds the ID instead. Both halves of the row entry are then written as **uvarints**: seven bits of value per byte, the eighth bit saying whether another byte follows, so small numbers cost small bytes. File ID 3 and ordinal 118,431 take one and three bytes instead of a fixed sixteen.
+
+A 110 to 210 byte entry becomes two to six. At 2 billion records that is a ~9 GB index instead of ~30 GB.
+
+**Keeping it correct.** A sync writes two things: the Iceberg commit and the index. A crash can land between them, so neither order is trusted blindly.
+
+- **Iceberg committed, index not.** The next sync reconciles forward from the index's recorded snapshot to the table's current one, applying only what changed.
+- **Iceberg commit never happened.** The index entries from the failed run are rewritten on the next sync.
+
+Either way the index converges on the committed state of the table. A stale index is never treated as current, because it would write positional deletes against rows that moved.
+
+**Compaction updates the index in place.** When the table is compacted, OLake reads only the newly added data files and updates the index entries for the records in them. Removed files are ignored, because compaction does not drop records: it merges delete files into data files, so every live row still exists, just at a new file and ordinal. Flink's converter throws away its whole index at this point instead.
+
+**Storage for Pebble.** Pebble needs a real filesystem, so the index lives on a block volume attached to the sync pod rather than on shared network storage, where file locking is unreliable and an LSM store's habit of rewriting data during compaction gets expensive. In the Helm chart you set the volume size per job, and a job only gets a volume when its index is actually required, meaning only when the declared engines forced positional deletes or vectors.
+
+### The result
+
+With the index in the write path, OLake writes positional deletes on a v2 table or vectors on a v3 one, whichever the declared readers resolve, and the table is correct for all of them the moment it is committed. No staging branch, no maintenance job, no window.
+
+For tables that arrive with the problem already there, the same index drives a one-time repair during reconciliation, before the first record of the sync is written: existing equality delete files are rewritten as positional deletes and the sync proceeds from a clean state.
+
+Every table is readable by the engines you declared when you created the job, which is the difference between a stack that is interoperable and one that is only open on paper.
+
+---
+<BlogCTA/>
