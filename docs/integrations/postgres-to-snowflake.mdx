@@ -79,27 +79,28 @@ The honest summary: Openflow is simpler when Snowflake is the only reader and yo
 ## How Postgres CDC reaches Snowflake here
 
 ```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 40}}}%%
 flowchart TB
   subgraph pg["Postgres"]
-    direction LR
-    T[(customers, orders)] --> WAL[write-ahead log] --> SLOT[replication slot, pgoutput]
+    T[(customers, orders)]
+    SLOT[write-ahead log, read through the replication slot with pgoutput]
+    T ~~~ SLOT
   end
   subgraph olake["OLake Go"]
-    direction LR
-    SNAP[first sync: chunked snapshot] --> W[Iceberg writer: Parquet data files + Puffin deletion vectors]
-    CDC[later syncs: c / u / d events] --> W
+    W[Iceberg writer]
   end
   subgraph sf["Snowflake"]
-    direction LR
-    H[Horizon catalog, Iceberg REST API] -. vends storage credentials .-> S[(Snowflake-managed storage)]
+    H[Horizon catalog, Iceberg REST API]
+    S[(Snowflake-managed storage)]
   end
-  T --> SNAP
-  SLOT --> CDC
-  W -- "1. PUT data and DV files" --> S
-  W -- "2. commit snapshot" --> H
-  H --> Q1[Snowflake SQL]
-  H --> Q2[DuckDB]
-  H --> Q3[Spark]
+  R[Query engines: Snowflake SQL, DuckDB, Spark]
+  T -- "first sync: chunked snapshot" --> W
+  SLOT -- "later syncs: inserts, updates, deletes" --> W
+  H -. "1. vended storage credentials" .-> W
+  W -- "2. Parquet data files and deletion vectors" --> S
+  W -- "3. commit snapshot" --> H
+  H -- "table metadata and read credentials" --> R
+  S -- "data and delete files" --> R
 ```
 
 Two things happen in order. The first sync reads each table in parallel chunks and writes Parquet data files. A replication slot pins the write-ahead log (WAL) position from before that snapshot started.
