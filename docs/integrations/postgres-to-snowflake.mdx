@@ -56,13 +56,13 @@ OLake Go captures Postgres changes with logical replication and commits them as 
 - **Pick deletion vectors, never equality deletes.** Snowflake cannot read equality delete files. Set the job's target query engine to Snowflake and OLake Go hides the formats Snowflake cannot open.
 - The same tables open from DuckDB and Spark through the same Horizon endpoint, and all three engines returned identical rows in the run on this page.
 - **Watch `numeric` columns.** OLake Go maps Postgres `numeric` to Iceberg `double`, which Snowflake shows as `FLOAT`.
-- A Snowflake service user needs an authentication policy before its programmatic access token works; the SQL below includes it.
+- A Snowflake service user needs a network policy, or an authentication policy that waives it, before its programmatic access token works; the SQL below sets the second.
 
 </TLDR>
 
 **The short answer.** To replicate Postgres to Snowflake with change data capture (CDC), run OLake Go with Postgres logical replication as the source and the Snowflake Horizon catalog as the Iceberg destination. One sync snapshots the tables; every later sync replays inserts, updates and deletes from the write-ahead log. Snowflake, DuckDB and Spark then query one copy of the data, in an open format.
 
-## Four ways to move Postgres data to Snowflake
+## Five ways to move Postgres data to Snowflake
 
 | Method | Freshness | Deletes and updates | Open format | What you run | Cost model | Where it falls short |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ Each sync ends with one commit to Horizon. OLake Go uploads the files with short
 Three Postgres details decide whether this stays healthy:
 
 - **The slot holds WAL until OLake Go reads it.** If the job is paused for a week, Postgres keeps a week of WAL on disk. Set `max_slot_wal_keep_size` so a stalled slot is invalidated before the disk fills, and alert on `pg_replication_slots.wal_status`.
-- **Updates and deletes need a replica identity.** A table with a primary key is fine. A table without one needs `ALTER TABLE ... REPLICA IDENTITY FULL`, or its updates arrive without the old key and cannot be matched.
+- **Updates and deletes need a replica identity.** A primary key is enough unless the table has large text or JSON values: an `UPDATE` that leaves one unchanged writes `__olake_unavailable_value__` in its place, so give those tables `REPLICA IDENTITY FULL` too. Once a table without one is in the publication, Postgres rejects every `UPDATE` and `DELETE` on it until you run `ALTER TABLE ... REPLICA IDENTITY FULL`.
 - **Long snapshots and `wal_sender_timeout`.** On big tables, the default 60-second sender timeout can drop the replication connection mid-snapshot. The setup guides below set it to `0`.
 
 ## What you need
@@ -263,12 +263,12 @@ OLake Go maps Postgres types to Iceberg types, and Snowflake maps Iceberg types 
 | --- | --- | --- | --- |
 | `int`, `serial`, `smallint` | `int` | `NUMBER(10,0)` | |
 | `bigint`, `bigserial` | `long` | `NUMBER(19,0)` | |
-| `numeric`, `decimal`, `real`, `float4` | `double` | `FLOAT` | **Exact decimals become binary floats.** `orders.amount` summed to `10234.24` in every engine on this page, but `0.1 + 0.2` style rounding applies. Round at query time, or keep money in integer cents in Postgres. |
+| `numeric`, `decimal`, `real`, `float4` | `double` | `FLOAT` | **Exact decimals become binary floats.** `amount` for the placed orders summed to `10234.24` in every engine on this page, but `0.1 + 0.2` style rounding applies. Round at query time, or keep money in integer cents in Postgres. |
 | `double precision` | `double` | `FLOAT` | |
 | `boolean` | `boolean` | `BOOLEAN` | |
 | `date`, `timestamp`, `timestamptz` | `timestamptz` (UTC) | `TIMESTAMP_LTZ(6)` | `date` gains a midnight UTC time. Timestamps without a zone are read as UTC, so set the session zone before comparing. |
 | `text`, `varchar`, `char` | `string` | `VARCHAR` | |
-| `json`, `jsonb`, `uuid`, `xml`, arrays, ranges, `inet` | `string` | `VARCHAR` | Parse `jsonb` with `PARSE_JSON()` in Snowflake, or flatten it before the sync with OLake Go's level-1 normalization. |
+| `json`, `jsonb`, `uuid`, `xml`, arrays, ranges, `inet` | `string` | `VARCHAR` | Parse `jsonb` with `PARSE_JSON()` in Snowflake. |
 
 Postgres types in the table come from the [Postgres connector reference](/docs/connectors/postgres/#data-type-mapping); the Snowflake side from Snowflake's [Iceberg data types](https://docs.snowflake.com/en/user-guide/tables-iceberg-data-types) page (checked 2026-10-14).
 
@@ -311,7 +311,13 @@ Run the `curl` exchange from the catalog setup; it returns the same error Snowfl
 
 ### 4. Snowflake shows stale rows or fails on a table synced with equality deletes
 
-A job created without a target query engine defaults to **Equality Deletes**, which Snowflake cannot read. Edit the job's streams and switch the upsert type to **Positional Deletes** or **Deletion Vector**. On the next sync OLake Go rewrites the existing equality deletes into the new format. Going the other way, from deletion vectors back to a v2 format, clears the destination table, because Iceberg cannot downgrade a table from v3 to v2.
+```text
+Malformed request: Creating a snapshot with equality delete files is not allowed for Horizon accounts
+```
+
+Horizon refuses equality delete files, so the sync fails and retries while Snowflake keeps the last good snapshot. The OLake UI does not offer **Equality Deletes** for a Horizon destination, but the OLake CLI defaults `update_type` to `eq`, so set it in `streams.json`.
+
+To recover, switch the stream to **Positional Deletes** and sync again. **Deletion Vector** does not work here, because Horizon rejects upgrading an existing table from Iceberg v2 to v3. The reverse is refused too (OLake Go stops with "format-version 3, which forbids positional delete files"), so choose the format before the first sync.
 
 ## Read the same tables from DuckDB and Spark
 
@@ -351,7 +357,7 @@ Everything above applies to hosted Postgres; only the `wal_level` step changes.
 - **You need transformations before the data lands.** OLake Go is extract and load only. Use Openflow or a managed ELT tool with built-in transforms, or land the raw tables and transform in Snowflake with dbt.
 - **You need sub-second latency.** Each OLake Go sync is a batch of changes committed as one snapshot. Snowpipe Streaming or a Kafka path is built for that.
 - **Your Snowflake account is on Azure and DuckDB is a reader.** DuckDB attaches REST catalogs backed by S3, S3 Tables and Google Cloud Storage only, so pick Spark or Trino as the second engine there.
-- **Tables have no primary key and cannot get `REPLICA IDENTITY FULL`.** Inserts replicate; updates and deletes do not.
+- **Tables have no primary key and cannot get `REPLICA IDENTITY FULL`.** Inserts replicate; Postgres rejects updates and deletes on them once they are in the publication.
 - **The source is Oracle, DB2 or S3.** Those OLake Go connectors have full refresh and incremental modes but no log-based CDC today.
 
 ## FAQs
