@@ -3,11 +3,10 @@ import { useIntegration } from './useIntegration'
 import { renderInline } from './inline'
 
 /**
- * "How we tested this": the run behind the page, from front matter. Drafting with AI help is
- * stated plainly; what makes the page trustworthy is the named person who ran and checked it.
+ * "How we tested this": the run behind the page, from front matter.
  */
 export default function HowWeTested() {
-  const { frontMatter, author, reviewer } = useIntegration()
+  const { frontMatter } = useIntegration()
   const t = frontMatter.tested
   if (!t) return null
   return (
@@ -22,10 +21,6 @@ export default function HowWeTested() {
         </li>
         <li>Read back with {t.engines.join(', ')}.</li>
         {t.summary ? <li>{renderInline(t.summary)}</li> : null}
-        <li>
-          Drafted with AI help. {author ? `${author.name} ran the pipeline and wrote the page` : 'The pipeline was run by the author'}
-          {reviewer ? `; ${reviewer.name} checked every command, number and screenshot.` : '.'}
-        </li>
       </ul>
     </aside>
   )

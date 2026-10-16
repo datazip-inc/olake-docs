@@ -77,8 +77,6 @@ import * as I from '@site/src/components/integrations';
 
 TODO: two or three sentences that answer the query. Name the catalog and say why ${engine.label} can read the result.
 
-<I.IntegrationByline />
-
 <TLDR title='Key takeaways'>
 
 - TODO: four to six bullets that each stand alone.
@@ -174,6 +172,8 @@ TODO
 <I.IntegrationJsonLd />
 
 <BlogCTA />
+
+<I.IntegrationByline />
 `
 
 fs.mkdirSync(path.dirname(file), { recursive: true })

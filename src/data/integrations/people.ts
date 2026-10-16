@@ -19,7 +19,7 @@ export const PEOPLE: Record<string, Person> = {
   shubham: {
     id: 'shubham',
     name: 'Shubham Satish Baldava',
-    title: 'Co-founder and OLake maintainer',
+    title: 'Co-founder',
     avatar: '/img/authors/shubham.webp',
     page: '/blog/authors/shubham/',
     linkedin: 'shubham-baldava',
@@ -28,7 +28,7 @@ export const PEOPLE: Record<string, Person> = {
   nayan: {
     id: 'nayan',
     name: 'Nayan Joshi',
-    title: 'OLake maintainer',
+    title: 'Data Engineer',
     avatar: '/img/authors/nayan.webp',
     page: '/blog/authors/nayan/'
   },

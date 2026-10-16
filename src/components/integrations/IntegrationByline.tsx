@@ -4,61 +4,47 @@ import useBaseUrl from '@docusaurus/useBaseUrl'
 import { useIntegration } from './useIntegration'
 import type { Person } from '@site/src/data/integrations'
 
-function PersonChip({ person, role }: { person: Person | undefined; role: string }) {
-  const avatar = useBaseUrl(person?.avatar ?? '')
+function PersonBox({ person, label }: { person: Person | undefined; label: string }) {
+  const photo = useBaseUrl(person?.avatar ?? '')
   if (!person) return null
-  const body = (
-    <>
+  return (
+    <div className='flex items-center gap-[12px] rounded-[8px] border border-solid border-olake-line bg-olake-surface px-[12px] py-[8px] leading-[1.35]'>
       <img
-        src={avatar}
+        src={photo}
         alt=''
-        width={28}
-        height={28}
+        width={40}
+        height={40}
         loading='lazy'
         decoding='async'
-        className='h-[28px] w-[28px] rounded-full object-cover'
+        className='h-[40px] w-[40px] flex-none rounded-[6px] object-cover'
+        style={{ margin: 0 }}
       />
-      <span className='flex flex-col leading-tight'>
-        <span className='text-[12px] text-olake-muted'>{role}</span>
-        <span className='text-[14px] font-medium text-olake-ink'>{person.name}</span>
-      </span>
-    </>
+      <div className='min-w-0'>
+        <span className='block text-[12px] text-olake-muted'>{label}</span>
+        <span className='block text-[14px] font-medium text-olake-ink'>
+          {person.page ? (
+            <Link to={person.page} className='text-olake-ink'>
+              {person.name}
+            </Link>
+          ) : (
+            person.name
+          )}
+        </span>
+        <span className='block text-[12px] text-olake-muted'>{person.title}</span>
+      </div>
+    </div>
   )
-  const className = 'flex items-center gap-[10px] no-underline'
-  return person.page ? (
-    <Link to={person.page} className={className}>
-      {body}
-    </Link>
-  ) : (
-    <span className={className}>{body}</span>
-  )
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
 }
 
 /**
- * Under the title: who wrote the page, who checked it, and when the pipeline was last run. Every
- * value comes from the `integration:` front matter, so the byline cannot drift from the page.
+ * At the end of the page: who wrote the page and who tested it, from the `integration:` front matter.
  */
 export default function IntegrationByline() {
-  const { author, reviewer, frontMatter } = useIntegration()
-  const tested = frontMatter.tested
+  const { author, reviewer } = useIntegration()
   return (
-    <div className='olake-integration-byline my-[20px] flex flex-wrap items-center gap-x-[28px] gap-y-[12px] border-y border-solid border-olake-line py-[12px]'>
-      <PersonChip person={author} role='Written and tested by' />
-      <PersonChip person={reviewer} role='Technical review' />
-      {tested ? (
-        <span className='flex flex-col leading-tight'>
-          <span className='text-[12px] text-olake-muted'>Last tested</span>
-          <span className='text-[14px] font-medium text-olake-ink'>
-            {formatDate(tested.date)} on OLake Go {tested.olake}
-          </span>
-        </span>
-      ) : null}
+    <div className='olake-integration-byline my-[24px] grid gap-[8px] rounded-[12px] border border-solid border-olake-line bg-olake-surface-alt p-[8px] sm:grid-cols-2'>
+      <PersonBox person={author} label='Written by' />
+      <PersonBox person={reviewer} label='Tested by' />
     </div>
   )
 }
