@@ -11,7 +11,7 @@ import StreamsFormatNotice from '@site/docs/shared/streams/StreamsFormatNotice.m
 
 # Docker (CLI)
 
-Docker CLI can be installed and executed using the official Docker images. Each supported source driver has a dedicated image available on the [OLake DockerHub page](https://hub.docker.com/u/olakego).
+Docker CLI can be installed and executed using the official Docker images. Each supported source driver has a dedicated image available on the [OLake Go Docker Hub page](https://hub.docker.com/u/olakego).
 
 ## Prerequisites
 
@@ -88,15 +88,15 @@ discover \
 
 This command writes three files in the config folder:
 
-- `selected_streams.json`: the streams to sync and their settings. This is the file you edit.
-- `available_streams.json`: every stream OLake found, with schema and metadata. Do not edit it.
-- `streams.json`: Streams v1, the legacy single-file format. See [Streams v1 reference](/docs/core/configs/streams-legacy).
+- `selected_streams.json`: It lists the streams to sync and their settings. This is the file you edit.
+- `available_streams.json`: It lists every stream OLake Go finds after running the discover command. This file is not supposed to be edited.
+- `streams.json`: Single file with your stream selections and per-stream settings. See [Streams v1 reference](/docs/core/configs/streams-legacy).
 
-On a first run, OLake selects every discovered stream.
+On a first run, OLake Go selects every discovered stream.
 
 ### Re-discover and keep your edits
 
-Pass both existing files to refresh them from the source. OLake keeps your `selected_streams.json` entries.
+Pass both existing files to refresh them from the source. OLake Go keeps your `selected_streams.json` entries.
 
 ```bash title="re-discover command"
 docker run --pull=always \
@@ -116,6 +116,13 @@ New tables are not selected automatically. Add them to `selected_streams.json` b
   <summary><code>--config</code> <Badge variant="required">required</Badge></summary>
 
 <FlagDetail flag="config" mode="docker" command="discover" />
+
+</details>
+
+<details>
+  <summary><code>--streams</code> <Badge variant="optional">deprecated</Badge></summary>
+
+To learn more about this flag, see the [Streams v1 (legacy) reference](/docs/core/configs/streams-legacy).
 
 </details>
 
@@ -155,6 +162,13 @@ New tables are not selected automatically. Add them to `selected_streams.json` b
 </details>
 
 <details>
+  <summary><code>--target-query-engines</code> <Badge variant="optional">optional</Badge></summary>
+
+<FlagDetail flag="target-query-engines" mode="docker" command="discover" />
+
+</details>
+
+<details>
   <summary><code>--difference-selected-streams</code> <Badge variant="optional">optional</Badge></summary>
 
 <FlagDetail flag="difference-selected-streams" mode="docker" command="discover" />
@@ -169,18 +183,9 @@ New tables are not selected automatically. Add them to `selected_streams.json` b
 </details>
 
 <details>
-  <summary><code>--streams</code> <Badge variant="optional">deprecated</Badge></summary>
-
-Use `--selected-streams` and `--available-streams` instead. `--streams` still works and logs a warning.
-
-<FlagDetail flag="streams" mode="docker" command="discover" />
-
-</details>
-
-<details>
   <summary><code>--difference</code> <Badge variant="optional">deprecated</Badge></summary>
 
-Use `--difference-selected-streams` and `--difference-available-streams` instead.
+To learn more about this flag, see the [Streams v1 (legacy) reference](/docs/core/configs/streams-legacy).
 
 <FlagDetail flag="difference" mode="docker" command="discover" />
 
@@ -196,8 +201,117 @@ Use `--difference-selected-streams` and `--difference-available-streams` instead
 
 Two files describe your streams. Discover writes both.
 
-- **`selected_streams.json`**: you edit this file. It lists the streams to sync and every per-stream setting.
-- **`available_streams.json`**: read-only. It holds the schema, sync modes, keys, and defaults OLake found.
+- **`selected_streams.json`**: It lists the streams to sync and their settings. This is the file you edit.
+- **`available_streams.json`**: It lists every stream OLake Go finds after running the discover command. This file is not supposed to be edited.
+- **`streams.json`**: Single file with your stream selections and per-stream settings. This `streams.json` has been **deprecated**. See [Streams v1 reference](/docs/core/configs/streams-legacy).
+
+### 1. Selected Streams
+
+The top-level key is `selected_streams`. It maps each namespace (database or schema name) to a list of stream entries.
+
+```json title="selected_streams.json"
+{
+  "selected_streams": {
+    "public": [
+      {
+        "stream_name": "orders",
+        "sync_mode": "incremental",
+        "cursor_field": "updated_at",
+        "partition_regex": "/{created_at,year}",
+        "normalization": true,
+        "update_type": "eq",
+        "append_mode": false,
+        "destination_database": "analytics",
+        "destination_table": "orders_raw",
+        "filter_config": {
+          "logical_operator": "and",
+          "conditions": [
+            { "column": "status", "operator": "=", "value": "active" }
+          ]
+        },
+        "selected_columns": {
+          "columns": ["id", "status", "updated_at", "created_at"],
+          "sync_new_columns": true
+        }
+      },
+      {
+        "stream_name": "customers",
+        "sync_mode": "cdc",
+        "partition_regex": ""
+      }
+    ]
+  }
+}
+```
+
+#### Details about all the fields mentioned in selected streams
+
+| Field | Type | Required | If omitted | Docs |
+|---|---|---|---|---|
+| `stream_name` | string | Yes | Not applicable. Must match a `name` in `available_streams.json` under the same namespace. | [`available_streams.json`](#available_streamsjson) |
+| `sync_mode` | `full_refresh`, `incremental`, `cdc`, or `strict_cdc` | No | OLake Go uses `sync_mode` of the stream in `available_streams.json`. | [Sync modes](/docs/understanding/terminologies/olake#2-sync-modes) |
+| `cursor_field` | string, `primary` or `primary:secondary` | Only for `incremental` | OLake Go uses `cursor_field` from `available_streams.json`. | [Sync modes](/docs/understanding/terminologies/olake#2-sync-modes) |
+| `destination_database` | string | No | OLake Go uses `destination_database` from `available_streams.json`. If that is empty, it uses `iceberg_db` from the destination config, then the namespace. | [Destination database](/docs/understanding/terminologies/olake#destination-database) |
+| `destination_table` | string | No | OLake Go uses `destination_table` from `available_streams.json`, else the stream name. | [Destination database](/docs/understanding/terminologies/olake#destination-database) |
+| `partition_regex` | string | No (discover writes `""`) | No partitioning. | [Iceberg partitioning](/docs/writers/iceberg/partitioning), [Parquet partitioning](/docs/writers/parquet/partitioning) |
+| `normalization` | boolean | No | OLake Go uses `default_stream_properties.normalization` of the stream. | [Normalization](/docs/understanding/terminologies/olake#1-normalization) |
+| `append_mode` | boolean | No | OLake Go uses `default_stream_properties.append_mode`. | [Upsert vs append](/docs/understanding/terminologies/olake#7-modes-to-ingest-data-upsert-vs-append) |
+| `update_type` | `eq`, `pos`, or `dv` | No | OLake Go uses `default_stream_properties.update_type`, else `eq`. | [Upsert](/docs/understanding/terminologies/olake#upsert) |
+| `use_source_column_names` | boolean | No | `false`. OLake Go normalizes column names. | [Schema](/docs/understanding/terminologies/olake#4-schema) |
+| `chunk_column` | string | No | OLake Go picks the chunking column. | No dedicated page yet. |
+| `filter_config` | object: `logical_operator`, `conditions[]` of `column`, `operator`, `value` | No | No filter. Applies only when normalization is enabled. | [Data filter](/docs/understanding/terminologies/olake#3-data-filter) |
+| `filter` | string (legacy filter syntax) | No | No filter. Prefer `filter_config`. | [Data filter](/docs/understanding/terminologies/olake#3-data-filter) |
+| `selected_columns` | object: `columns` (list), `sync_new_columns` (boolean) | No | OLake Go syncs all columns. | [Schema](/docs/understanding/terminologies/olake#4-schema) |
+
+### 2. Available Streams
+
+The top-level key is `streams`: a list of objects, each with one `stream` that describes a table OLake Go found from the source. Discover writes and refreshes this file. This file is not supposed to be edited.
+
+```json title="available_streams.json"
+{
+  "streams": [
+    {
+      "stream": {
+        "name": "orders",
+        "namespace": "public",
+        "type_schema": { "properties": { "...": "..." } },
+        "supported_sync_modes": ["cdc", "full_refresh", "incremental", "strict_cdc"],
+        "source_defined_primary_key": ["id"],
+        "available_cursor_fields": ["id", "updated_at", "created_at"],
+        "available_update_types": ["eq", "pos", "dv"],
+        "sync_mode": "cdc",
+        "destination_database": "postgres_mydb:public",
+        "destination_table": "orders",
+        "selectable_columns": ["_olake_id", "_olake_timestamp", "id", "status", "updated_at", "created_at"],
+        "default_stream_properties": {
+          "normalization": true,
+          "append_mode": false,
+          "update_type": "eq"
+        }
+      }
+    }
+  ]
+}
+```
+
+#### Details about all the fields mentioned in available streams
+
+| Field | Meaning |
+|---|---|
+| `name` | Table or collection name. |
+| `namespace` | Database or schema name. |
+| `type_schema` | Columns and types. Includes `destination_column_name` and `olake_column`. |
+| `supported_sync_modes` | Sync modes this stream supports. |
+| `source_defined_primary_key` | Primary key columns found in the source. |
+| `available_cursor_fields` | Columns you can use as `cursor_field`. |
+| `available_update_types` | Values you can use as `update_type`. |
+| `sync_mode`, `cursor_field`, `destination_database`, `destination_table` | Discovered defaults. Override them in `selected_streams.json`. |
+| `selectable_columns` | Columns you can list in `selected_columns.columns`. |
+| `default_stream_properties` | Defaults for `normalization`, `append_mode`, and `update_type`. |
+
+If `available_streams.json` has no streams, OLake Go fails with code `catalog.available_streams_empty`.
+
+---
 
 A stream syncs only if it appears in `selected_streams.json`. Here is a small example:
 
@@ -232,9 +346,13 @@ A stream syncs only if it appears in `selected_streams.json`. Here is a small ex
 
 ***What's Next***: Once `selected_streams.json` is configured, start the sync.
 
+---
+
 ## Sync
 
 The Sync section describes how to start the sync process using the configuration files. It also explains how to run sync with a state file when operating in Incremental (Bookmark/cursor) or CDC mode.
+
+<StreamsFormatNotice />
 
 ### Sync command {/* #sync-command */}
 
@@ -251,7 +369,7 @@ sync \
 --destination /mnt/config/destination.json
 ```
 
-Pass `--selected-streams` and `--available-streams` together.
+Pass `--selected-streams` and `--available-streams` together, or use `--streams` with `streams.json` instead.
 
 #### Available flags
 
@@ -277,6 +395,13 @@ Pass `--selected-streams` and `--available-streams` together.
 </details>
 
 <details>
+  <summary><code>--streams</code> <Badge variant="optional">deprecated</Badge></summary>
+
+To learn more about this flag, see the [Streams v1 (legacy) reference](/docs/core/configs/streams-legacy).
+
+</details>
+
+<details>
   <summary><code>--destination</code> <Badge variant="required">required</Badge></summary>
 
 <FlagDetail flag="destination" mode="docker" command="sync" />
@@ -294,15 +419,6 @@ Pass `--selected-streams` and `--available-streams` together.
   <summary><code>--discover-schema</code> <Badge variant="optional">optional</Badge></summary>
 
 <FlagDetail flag="discover-schema" mode="docker" command="sync" />
-
-</details>
-
-<details>
-  <summary><code>--streams</code> <Badge variant="optional">deprecated</Badge></summary>
-
-Use `--selected-streams` and `--available-streams` instead. `--streams` still works and logs a warning. Do not combine it with the new flags.
-
-<FlagDetail flag="streams" mode="docker" command="sync" />
 
 </details>
 
@@ -364,7 +480,7 @@ This folder is created in the same directory as the configuration files.
 "fatal": "\033[31m", // Red
 ```
 
-**With this, the sync setup using the OLake CLI is complete, from configuring source and destination to reviewing key outputs such as stats and logs.**
+**With this, the sync setup using the OLake Go CLI is complete, from configuring source and destination to reviewing key outputs such as stats and logs.**
 
 :::info
 For a complete reference of all available commands and their flags (used to configure stream-level properties) see the [Commands and Flags](/docs/community/commands-and-flags) guide.

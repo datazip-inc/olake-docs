@@ -56,22 +56,45 @@ olakego/source-[SOURCE-TYPE]:latest \\
         docker: `--config /mnt/config/source.json`
       }
     },
+    // streams: {
+    //   description: (
+    //     <>
+    //       <p><strong>Description:</strong></p>
+    //       <div className="admonition admonition-warning alert alert--warning">
+    //         <div className="admonition-content">
+    //           <p><strong>Deprecated.</strong> Still works and logs a warning. Also available as <code>--catalog</code> (alias). Use <code>--selected-streams</code> and <code>--available-streams</code> instead. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link> and the <Link to="/docs/core/configs/streams-legacy">Streams v1 reference</Link>.</p>
+    //         </div>
+    //       </div>
+    //       <p>Specifies the path to the legacy <code>streams.json</code> file. This file is generated after the discover command. When used during discovery, this flag updates the existing <code>streams.json</code> and also writes <code>selected_streams.json</code> and <code>available_streams.json</code>:</p>
+    //       <ul>
+    //         <li>Keeps prior manual changes.</li>
+    //         <li>Adds new streams detected in the source database to <code>streams</code>, without selecting them. Add them to <code>selected_streams</code> by hand.</li>
+    //         <li>Allows selecting which columns should be synced for each table.</li>
+    //         <li>Allows updating the destination database name for each stream.</li>
+    //       </ul>
+    //     </>
+    //   ),
+    //   usage: {
+    //     'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --streams [PATH_TO_STREAMS_FILE]`,
+    //     docker: `--streams /mnt/config/streams.json`
+    //   }
+    // },
     streams: {
       description: (
         <>
           <p><strong>Description:</strong></p>
-          <div className="admonition admonition-warning alert alert--warning">
-            <div className="admonition-content">
-              <p><strong>Deprecated.</strong> Still works and logs a warning. Also available as <code>--catalog</code> (alias). Use <code>--selected-streams</code> and <code>--available-streams</code> instead. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link> and the <Link to="/docs/core/configs/streams-legacy">Streams v1 reference</Link>.</p>
-            </div>
-          </div>
-          <p>Specifies the path to the legacy <code>streams.json</code> file. This file is generated after the discover command. When used during discovery, this flag updates the existing <code>streams.json</code> and also writes <code>selected_streams.json</code> and <code>available_streams.json</code>:</p>
+          <p>Specifies the path to the streams.json file. This file is generated after the discover command. When used during discovery, this flag updates the existing streams.json:</p>
           <ul>
             <li>Keeps prior manual changes.</li>
-            <li>Adds new streams detected in the source database to <code>streams</code>, without selecting them. Add them to <code>selected_streams</code> by hand.</li>
+            <li>Adds new streams detected in the source database.</li>
             <li>Allows selecting which columns should be synced for each table.</li>
             <li>Allows updating the destination database name for each stream.</li>
           </ul>
+          <div className="admonition admonition-info alert alert--info">
+            <div className="admonition-content">
+              <p>➡️ You must learn about <code>streams.json</code> configuration. Refer to the <Link to="/docs/install/docker-cli#streams-config">Streams Config</Link> guide.</p>
+            </div>
+          </div>
         </>
       ),
       usage: {
@@ -317,7 +340,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
             </tbody>
           </table>
 
-          <p><strong>What's Next</strong>: The state file is automatically created and updated during sync operations. You can manually specify a state file using the <Link to="/docs/community/commands-and-flags#5-state"><code>--state</code></Link> flag to resume from a previous synchronization point.</p>
+          <p><strong>What's Next</strong>: The state file is automatically created and updated during sync operations. You can manually specify a state file using the <Link to="/docs/community/commands-and-flags#6-state"><code>--state</code></Link> flag to resume from a previous synchronization point.</p>
         </>
       ),
       usage: {
@@ -380,6 +403,24 @@ Example:
       usage: {
         'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --max-discover-threads [NUMBER_OF_THREADS]`,
         docker: `--max-discover-threads 100`
+      }
+    },
+    'target-query-engines': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Applies only to the discover command.</li>
+            <li>Comma-separated list of query engines you plan to use to read synced Iceberg tables (for example <code>trino</code>, <code>databricks</code>, <code>spark</code>).</li>
+            <li>Discover limits each stream&apos;s <code>available_update_types</code> in <code>available_streams.json</code> to delete formats those engines can read. With multiple engines, only formats supported by <strong>all</strong> listed engines are included (the intersection).</li>
+            <li>Use this when editing <code>selected_streams.json</code> so <code>update_type</code> choices match your query engines. </li>
+            <li>To know more about the behavior of this flag, see <Link to="/docs/getting-started/job-level-properties/#target-query-engines">Target Query Engines</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] discover --config [PATH_TO_CONFIG_FILE] --target-query-engines trino,databricks,spark`,
+        docker: `--target-query-engines trino,databricks,spark`
       }
     },
     'discover-schema': {
@@ -488,6 +529,26 @@ Example:
 olakego/source-[SOURCE-TYPE]:latest \\
 spec \\
 --destination-type iceberg`
+      }
+    },
+    'available-query-engines': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Used with the <Link to="/docs/community/commands-and-flags#2-spec"><code>spec</code></Link> command.</li>
+            <li>Prints the query engine identifiers OLake Go supports (for example <code>trino</code>, <code>databricks</code>, <code>spark</code>).</li>
+            <li>Use these values in the comma-separated list for <code>--target-query-engines</code> on <code>discover</code> so delete format options match what your engines can read.</li>
+            <li>For which delete formats each engine supports, see <Link to="/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine">Delete format support by query engine</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] spec --available-query-engines`,
+        docker: `docker run --pull=always \\
+olakego/source-[SOURCE-TYPE]:latest \\
+spec \\
+--available-query-engines`
       }
     },
     'encryption-key': {
