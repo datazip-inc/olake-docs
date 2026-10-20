@@ -1,4 +1,5 @@
 const imageFetchPriorityRehypePlugin = require('./src/plugins/image-fetchpriority-rehype-plugin')
+const externalLinksNofollowRehypePlugin = require('./src/plugins/external-links-nofollow-rehype-plugin')
 const imageDimensionsRemarkPlugin = require('./src/plugins/image-dimensions-remark-plugin')
 const releaseNotesRemarkPlugin = require('./src/plugins/release-notes-remark-plugin')
 const fs = require('fs')
@@ -131,13 +132,15 @@ const config = {
           lastmod: 'date',
           // changefreq/priority are ignored by Google, so they are left at the plugin defaults.
           // The patterns must be prefixed with /** because tags, authors and archive pages live
-          // under each blog instance (/blog/tags, /customer-stories/tags, ...).
+          // under each blog instance (/blog/tags, /customer-stories/tags, /learn/tags, /compare/tags, ...).
           ignorePatterns: [
             '/**/tags/**',
             '/**/authors/**',
             // Blog archive pages only. A broader /**/archive/** would also hide /docs/archive/.
             '/blog/archive/**',
             '/customer-stories/archive/**',
+            '/learn/archive/**',
+            '/compare/archive/**',
             '/search/**',
             '/docs/shared/**',
             '/webinar/**-confirmation/**',
@@ -413,6 +416,82 @@ const config = {
         beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
       }
     ],
+
+    [
+      './src/plugins/blog-plugin',
+      {
+        path: 'learn',
+        id: 'learn-blog',
+        // Real last-modified dates (from git) for the sitemap lastmod and the page metadata
+        showLastUpdateTime: true,
+        editLocalizedFiles: false,
+        blogTitle: 'Learn',
+        feedOptions: { title: 'OLake Learn' },
+        blogDescription:
+          'Plain-language explainers from the OLake team on data pipelines, change data capture, Apache Iceberg and the data lakehouse.',
+        blogSidebarCount: 'ALL',
+        blogSidebarTitle: 'Learn',
+        routeBasePath: 'learn',
+        // Authors and tags are shared with the blog: one list of people and one tag vocabulary, no copies.
+        // The plugin wrapper (src/plugins/blog-plugin.js) hides the authors who have no posts in /learn.
+        authorsMapPath: '../blog/authors.yml',
+        tags: '../blog/tags.yml',
+        include: ['**/*.md', '**/*.mdx'],
+        exclude: [
+          '**/_*.{js,jsx,ts,tsx,md,mdx}',
+          '**/_*/**',
+          '**/*.test.{js,jsx,ts,tsx}',
+          '**/__tests__/**'
+        ],
+        postsPerPage: 12,
+        truncateMarker: /<!--\s*(truncate)\s*-->/,
+        showReadingTime: true,
+        onUntruncatedBlogPosts: 'ignore',
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin, externalLinksNofollowRehypePlugin],
+        // Adds width/height to local images so they reserve space (no layout shift)
+        beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
+      }
+    ],
+
+    [
+      './src/plugins/blog-plugin',
+      {
+        path: 'compare',
+        id: 'compare-blog',
+        // Real last-modified dates (from git) for the sitemap lastmod and the page metadata
+        showLastUpdateTime: true,
+        editLocalizedFiles: false,
+        blogTitle: 'Compare',
+        feedOptions: { title: 'OLake Compare' },
+        blogDescription:
+          'Comparisons of OLake with other data replication and pipeline tools: alternatives, head-to-head versus pages, pricing breakdowns and best-of lists.',
+        blogSidebarCount: 'ALL',
+        blogSidebarTitle: 'Compare',
+        routeBasePath: 'compare',
+        // Authors and tags are shared with the blog: one list of people and one tag vocabulary, no copies.
+        // The plugin wrapper (src/plugins/blog-plugin.js) hides the authors who have no posts in /compare.
+        authorsMapPath: '../blog/authors.yml',
+        tags: '../blog/tags.yml',
+        include: ['**/*.md', '**/*.mdx'],
+        exclude: [
+          '**/_*.{js,jsx,ts,tsx,md,mdx}',
+          '**/_*/**',
+          '**/*.test.{js,jsx,ts,tsx}',
+          '**/__tests__/**'
+        ],
+        postsPerPage: 12,
+        truncateMarker: /<!--\s*(truncate)\s*-->/,
+        showReadingTime: true,
+        onUntruncatedBlogPosts: 'ignore',
+        editUrl: 'https://github.com/datazip-inc/olake-docs/tree/master/',
+        remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
+        rehypePlugins: [imageFetchPriorityRehypePlugin, externalLinksNofollowRehypePlugin],
+        // Adds width/height to local images so they reserve space (no layout shift)
+        beforeDefaultRemarkPlugins: [imageDimensionsRemarkPlugin]
+      }
+    ],
     [
       // Local wrapper around @docusaurus/plugin-client-redirects: keeps the trailing slash in front
       // of #anchor / ?query targets, which Docusaurus strips (see src/plugins/client-redirects-slash)
@@ -493,6 +572,12 @@ const config = {
               '/iceberg/query-engine/starrocks/'
             ]
           },
+          // Posts that were published in /blog and moved to /compare and /learn: keep their old URLs working
+          { to: '/compare/what-is-fivetran', from: '/blog/what-is-fivetran' },
+          { to: '/compare/data-migration-tools', from: '/blog/data-migration-tools' },
+          { to: '/compare/database-to-iceberg-without-kafka', from: '/blog/database-to-iceberg-without-kafka' },
+          { to: '/compare/mysql-to-iceberg-tools', from: '/blog/mysql-to-iceberg-tools' },
+          { to: '/learn/etl-pipelines', from: '/blog/etl-pipelines' },
           // Duplicate blog tags merged into one each (apache-iceberg -> iceberg, data-lake -> lake)
           { to: '/blog/tags/iceberg', from: '/blog/tags/apache-iceberg' },
           { to: '/blog/tags/lake', from: '/blog/tags/data-lake' },

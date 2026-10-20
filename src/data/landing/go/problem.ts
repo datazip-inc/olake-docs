@@ -1,34 +1,20 @@
-/** "The Problem": four pain points and the answer headline. Emphasised words render larger and in the brand blue. */
-export interface ProblemSentence {
-  words: string[]
-  emphasis: string[]
-  /** Where the statement sits in the cloud: percent from the top and left, tilt in degrees, float delay in seconds, base font size in px. */
-  layout: { top: number; left: number; rot: number; delay: number; size: number }
+/** "Problem Statement": the four pain points OLake Go removes, each with its line illustration. */
+export type GoProblemArt = 'slow-syncs' | 'legacy-costs' | 'cdc-breaks' | 'schema-drift'
+
+export interface GoProblem {
+  label: string
+  title: string
+  art: GoProblemArt
 }
 
-export const GO_PROBLEM = {
-  eyebrow: 'The Problem',
-  headline: 'Replicate any source into your lakehouse, seamlessly',
-  sentences: [
-    {
-      words: ['Slow', 'syncs', 'BLOCK', 'your', 'analytics'],
-      emphasis: ['Slow', 'syncs', 'BLOCK'],
-      layout: { top: 22, left: 42, rot: -3, delay: 0, size: 28 }
-    },
-    {
-      words: ['Legacy', 'ETL', 'costs', 'PILE UP', 'fast'],
-      emphasis: ['costs', 'PILE UP'],
-      layout: { top: 43, left: 57, rot: 2, delay: 0.6, size: 24 }
-    },
-    {
-      words: ['CDC', 'pipelines', 'BREAK', 'silently', 'in', 'production'],
-      emphasis: ['CDC', 'BREAK'],
-      layout: { top: 64, left: 46, rot: -2, delay: 1.2, size: 25 }
-    },
-    {
-      words: ['Schema', 'drift', 'stalls', 'ingestion'],
-      emphasis: ['Schema', 'drift'],
-      layout: { top: 85, left: 55, rot: 3, delay: 0.3, size: 23 }
-    }
-  ] as ProblemSentence[]
+export const GO_PROBLEM_INTRO = {
+  eyebrow: 'Problem Statement',
+  title: 'Still doubling back on your ingestion jobs?'
 }
+
+export const GO_PROBLEMS: GoProblem[] = [
+  { label: 'Problem I', title: 'Slow syncs block your analytics', art: 'slow-syncs' },
+  { label: 'Problem II', title: 'Legacy ETL costs pile up fast', art: 'legacy-costs' },
+  { label: 'Problem III', title: 'CDC pipelines break silently in production', art: 'cdc-breaks' },
+  { label: 'Problem IV', title: 'Schema drift stalls ingestion', art: 'schema-drift' }
+]

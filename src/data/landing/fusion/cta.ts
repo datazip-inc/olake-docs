@@ -1,6 +1,7 @@
-/** Closing call to action on the OLake Fusion page. */
+/** The dark "Get in touch" card above the FAQ on the OLake Fusion page. */
 export const FUSION_CTA = {
-  title: 'Optimize your Iceberg tables today!',
-  cta: { label: "Try, it's Free", href: '/docs/fusion/getting-started/quickstart/' },
-  image: { src: '/img/landing/shared/iceberg-backdrop.webp', width: 1280, height: 720 }
+  eyebrow: 'Get in touch',
+  title: 'Optimize your Iceberg Table Maintenance',
+  primary: { label: 'Get Started', href: '/docs/fusion/getting-started/quickstart/' },
+  secondary: { label: 'Request Callback', href: '/contact/' }
 }

@@ -127,6 +127,7 @@ import SupportedIcebergCatalogs from '../../../docs/shared/SupportedIcebergCatal
 
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
 import Faq from '../../components/olake/Faq';
+import Quiz from '../../components/blog/Quiz/Quiz';
 
 
 const MDXComponents = {
@@ -259,7 +260,8 @@ const MDXComponents = {
 
 
   OLakePathInfo,
-  Faq
+  Faq,
+  Quiz
 };
 
 export default MDXComponents;

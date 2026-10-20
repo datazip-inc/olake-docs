@@ -5,6 +5,9 @@
  * - blog: one category tag per post, listed last in its front matter. These tags are hidden from the
  *   post footer and the tag index so they do not show up twice next to the topic tags.
  * - customer-stories: B2B and Consumer Internet. They were already visible tags, so they stay listed.
+ * - learn: no categories yet, so no filter row.
+ * - compare: Alternatives, Versus, Pricing and Best-of, as tags in blog/tags.yml (hidden from the post footer
+ *   like the blog's categories).
  */
 export const CATEGORY_SETS = {
   blog: {
@@ -24,6 +27,21 @@ export const CATEGORY_SETS = {
     categories: [
       { slug: 'b2b', label: 'B2B' },
       { slug: 'consumer-internet', label: 'Consumer Internet' }
+    ]
+  },
+  learn: {
+    base: '/learn/',
+    hideTags: false,
+    categories: []
+  },
+  compare: {
+    base: '/compare/',
+    hideTags: true,
+    categories: [
+      { slug: 'alternatives', label: 'Alternatives' },
+      { slug: 'versus', label: 'Versus' },
+      { slug: 'pricing', label: 'Pricing' },
+      { slug: 'best-of', label: 'Best-of' }
     ]
   }
 }

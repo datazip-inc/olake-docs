@@ -274,15 +274,98 @@ x-envs:
 
 These values are used by the compose stack when resolving image pull credentials and registry TLS settings.
 
+### S3 Log File Storage Configuration
+
+By default, OLake Go stores job configuration and log files on **local storage** (the `olake-data` directory on the host). Over time, logs and related files can consume significant disk space on that machine.
+
+S3 log file storage is **optional**. Enable it when you want job configs and logs written to an S3-compatible bucket instead of local disk, so the host volume does not keep growing.
+
+To enable S3 storage, uncomment and configure the following environment variables in the `x-envs.shared` section of your `docker-compose-v1.yml` file:
+
+```yaml
+x-envs:
+  shared: &sharedEnvs
+    
+    # S3 log file storage 
+    OLAKE_STORAGE_MODE: s3  # Default is local storage
+    OLAKE_S3_BUCKET: "my-olake-bucket"
+    OLAKE_S3_REGION: "us-east-1"
+    OLAKE_S3_PREFIX: ""                  # Optional key prefix
+    OLAKE_S3_ENDPOINT: ""                # Required for non-AWS S3
+    OLAKE_S3_ACCESS_KEY_ID: "your-access-key"
+    OLAKE_S3_SECRET_ACCESS_KEY: "your-secret-key"
+```
+
+**Configuration Notes:**
+- `OLAKE_STORAGE_MODE` must remain set to `s3` when S3 storage is enabled
+- For AWS S3, the `OLAKE_S3_ENDPOINT` can be left empty and for S3-compatible services configure `OLAKE_S3_ENDPOINT`
+- If using EC2 instance role, then `OLAKE_S3_ACCESS_KEY_ID` and `OLAKE_S3_SECRET_ACCESS_KEY` are not required and can be left empty. Set the EC2 instance metadata hop limit to 2 so containers can use the role:
+  ```bash
+  aws ec2 modify-instance-metadata-options \
+    --instance-id <instance-id> \
+    --http-tokens required \
+    --http-put-response-hop-limit 2
+  ```
+  
+  <details>
+    <summary>IAM Policy for S3 Log File Storage</summary>
+    ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "ListBucket",
+                "Effect": "Allow",
+                "Action": [
+                    "s3:ListBucket"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::{BUCKET_NAME}"
+                ]
+            },
+            {
+                "Sid": "AllowObject",
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::{BUCKET_NAME}/*"
+                ]
+            }
+        ]
+    }
+    ```
+
+  :::note
+  Adding `s3:DeleteObject` is **optional**. With it, OLake Go deletes log objects older than the retention period (default **30 days**, see [Log Retention](#log-retention)). Without it, or if a delete fails, cleanup is skipped and everything else keeps working.
+
+  Alternatively, you can delete objects with **S3 bucket lifecycle rules** (for example, auto-delete after a number of days).
+  :::
+
+  </details>
+
+:::info[Version Requirements]
+For using S3 storage, the following versions are required:
+- OLake Version **0.12.0 and above**.
+- OLake UI **0.7.0 and above**.
+- OLake worker **0.4.0 and above**.
+:::
+
 ### Data Persistence
 
 The Docker Compose setup creates the following data storage:
 
 #### OLake Go Config Directory
-- `olake-data`: Local directory created in the current working directory
+- `olake-data`: Local directory created in the current working directory (used when storage mode is local)
   - Contains streams configurations, connection settings, and sync state
   - Persists across container restarts and recreations
   - Used by OLake UI and Temporal Worker services
+
+  :::note
+  When S3 storage is enabled (`OLAKE_STORAGE_MODE: s3`), job configurations and logs are stored in the configured S3 bucket instead of this directory. Switching an existing install to S3 does not move existing files, so logs from earlier runs will not show in the UI.
+  :::
 
 #### Docker Volumes
 - `temporal-postgresql-data`: PostgreSQL database storage
@@ -302,7 +385,7 @@ OLake Go includes an automated log retention system that helps manage disk space
 Set the `LOG_RETENTION_PERIOD` environment variable in the docker-compose of [olake-ui](https://github.com/datazip-inc/olake-ui)  to control how long logs are kept:
 
 ```yml
-# In docker-compose.yml
+# In docker-compose-v1.yml
 services:
   temporal-worker:
     environment:

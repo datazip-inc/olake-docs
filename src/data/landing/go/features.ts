@@ -1,41 +1,34 @@
-/** "The Fundamental": the four capabilities in the feature selector. */
-export type GoFeatureArt = 'tiered' | 'decay' | 'chunk' | 'resume'
+import type { ProductFeature } from '@site/src/components/landing/product/ProductFeatures'
 
-export interface GoFeature {
-  id: string
-  title: string
-  body: string
-  art: GoFeatureArt
-}
-
+/** "Features": the four capabilities behind the tab strip on the OLake Go page. */
 export const GO_FEATURES_INTRO = {
-  eyebrow: 'The Fundamental',
+  eyebrow: 'Features',
   title: 'Experience the most seamless workflow'
 }
 
-export const GO_FEATURES: GoFeature[] = [
+export const GO_FEATURES: ProductFeature[] = [
   {
-    id: 'syncs',
-    title: 'Full, incremental & CDC syncs',
-    body: 'Run full loads, incremental pulls, or real-time change data capture, whatever each table needs, all from a single tool.',
-    art: 'tiered'
+    id: 'cdc',
+    tab: 'CDC',
+    title: 'Full, Incremental & CDC Syncs',
+    body: 'Run full loads, incremental pulls, or real-time change data capture, whatever each table needs, all from a single tool.'
   },
   {
-    id: 'evolution',
-    title: 'Schema & partition evolution',
-    body: 'Source schemas change and partitions grow. OLake Go evolves your Iceberg tables automatically so pipelines never break.',
-    art: 'decay'
+    id: 'schema-evolution',
+    tab: 'Schema Evolution',
+    title: 'Schema & Partition Evolution',
+    body: 'Source schemas change and partitions grow. OLake Go evolves your Iceberg tables automatically so pipelines never break.'
   },
   {
-    id: 'chunking',
-    title: 'Parallelised chunking',
-    body: 'Large collections are split into virtual chunks read in parallel, dramatically cutting the time for full snapshots of big datasets.',
-    art: 'chunk'
+    id: 'parallel-chunking',
+    tab: 'Parallel Chunking',
+    title: 'Parallelised Chunking',
+    body: 'Large collections are split into virtual chunks read in parallel, dramatically cutting the time for full snapshots of big datasets.'
   },
   {
-    id: 'resumable',
-    title: 'Stateful, resumable syncs',
-    body: 'Syncs checkpoint their progress and resume automatically after crashes or network failures; never from scratch.',
-    art: 'resume'
+    id: 'resumable-syncs',
+    tab: 'Resumable Syncs',
+    title: 'Stateful Resumable Syncs',
+    body: 'Syncs checkpoint their progress and resume automatically after crashes or network failures; never from scratch.'
   }
 ]
