@@ -103,7 +103,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   'understanding': 'Core Concepts',
   'features': 'Features',
   'benchmarks': 'Benchmarks',
-  'archive': 'Archive'
+  'archive': 'Archive',
+  'integrations': 'Integrations'
 }
 
 function segmentLabel(permalink: string, isFusion: boolean): string | undefined {

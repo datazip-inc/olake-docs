@@ -248,4 +248,21 @@ const fusionDocSidebar = {
   ],
 };
 
-export default { ...docSidebar, ...fusionDocSidebar };
+// ─── INTEGRATIONS SIDEBAR ──────────────────────────────────────────────────────
+// One category per query engine, built from src/data/integrations/pairs.ts so a new pair shows
+// up as soon as its status is `live`. Draft pages stay `unlisted` and out of the sidebar.
+const integrationsSidebar = {
+  integrationsSidebar: [
+    { type: 'doc', id: 'integrations/index', label: 'Overview' },
+    {
+      type: 'category',
+      label: 'Snowflake',
+      link: { type: 'generated-index', title: 'Replicate databases to Snowflake via Apache Iceberg', slug: '/integrations/snowflake' },
+      items: [
+        { type: 'doc', id: 'integrations/postgres-to-snowflake', label: 'Postgres to Snowflake' },
+      ],
+    },
+  ],
+};
+
+export default { ...docSidebar, ...fusionDocSidebar, ...integrationsSidebar };
