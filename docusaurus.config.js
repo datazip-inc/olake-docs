@@ -1247,11 +1247,11 @@ const config = {
           },
 
           {
-            to: '/docs/core/configs/streams',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/docs/configs/catalog'
           },
           {
-            to: '/docs/core/configs/streams',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/docs/core/configs/catalog'
           },
           {
@@ -1284,7 +1284,7 @@ const config = {
             from: '/docs/olake/mongodb/colake-connectors-for-olake'
           },
           {
-            to: '/docs/core/configs/streams',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/core/configs/catalog'
           },
           {
@@ -1445,7 +1445,7 @@ const config = {
             from: '/docs/connectors'
           },
           {
-            to: '/docs/core/configs/streams/',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/iceberg/docs/core/configs/catalog/'
           },
           {

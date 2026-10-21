@@ -110,7 +110,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
             <li>Specifies the path to <code>available_streams.json</code>. Discover writes this read-only file. Do not edit it.</li>
             <li>Must be passed together with <code>--selected-streams</code>.</li>
             <li>Used by <code>discover</code> (merge, keeps your edits), <code>sync</code> and <code>clear-destination</code>.</li>
-            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+            <li>For the file format, see <Link to="/docs/install/docker-cli/#streams-config">Streams configuration</Link>.</li>
           </ul>
         </>
       ),
@@ -128,7 +128,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
             <li>Specifies the path to <code>selected_streams.json</code>. This is the file you edit. It lists the streams to sync and their settings.</li>
             <li>Must be passed together with <code>--available-streams</code>.</li>
             <li>Used by <code>discover</code> (merge, keeps your edits), <code>sync</code> and <code>clear-destination</code>.</li>
-            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+            <li>For the file format, see <Link to="/docs/install/docker-cli/#streams-config">Streams configuration</Link>.</li>
           </ul>
         </>
       ),
@@ -443,11 +443,6 @@ Example:
       description: (
         <>
           <p><strong>Description:</strong></p>
-          <div className="admonition admonition-warning alert alert--warning">
-            <div className="admonition-content">
-              <p><strong>Deprecated.</strong> Still works and logs a warning. Use <code>--difference-selected-streams</code> and <code>--difference-available-streams</code> instead. See the <Link to="/docs/core/configs/streams-migration">streams migration guide</Link> and the <Link to="/docs/core/configs/streams-legacy">Streams v1 reference</Link>.</p>
-            </div>
-          </div>
           <ul>
             <li>Used with the discover command to compare differences between two streams, specifically an old stream and a new stream.</li>
             <li>Must be used together with <code>--streams /path/old_streams.json</code> to specify the path to the old streams file.</li>
@@ -475,13 +470,19 @@ Example:
         <>
           <p><strong>Description:</strong></p>
           <ul>
-            <li>Applies only to the discover command.</li>
-            <li>Specifies the path to the new <code>available_streams.json</code> to compare against the old files.</li>
-            <li>Must be passed together with <code>--difference-selected-streams</code>.</li>
-            <li>Does not connect to the source, so <code>--config</code> is not needed.</li>
-            <li>Writes <code>difference_available_streams.json</code> and <code>difference_selected_streams.json</code> next to the old files. They list selected streams that are new or changed in a way that needs a destination reset. Pass them to <code>clear-destination</code> as <code>--available-streams</code> and <code>--selected-streams</code> to reset only those streams.</li>
-            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+            <li>Used with the discover command to compare differences between two <code>available_streams.json</code> files, specifically an old file and a new file.</li>
+            <li>Must be used together with <code>--available-streams /path/old_available_streams.json</code> to specify the path to the old available streams file.</li>
+            <li>The <code>--difference-available-streams</code> flag specifies the path to the new <code>available_streams.json</code> that will be compared against the old one.</li>
+            <li>Running this command generates a <code>difference_available_streams.json</code> file containing the differences between the old and new available streams files.</li>
           </ul>
+          <div className="admonition admonition-note alert alert--secondary">
+            <div className="admonition-heading">
+              <h5>Internal testing command</h5>
+            </div>
+            <div className="admonition-content">
+              <p>This command is primarily used internally for testing purposes to compare differences between old and new <code>available_streams.json</code> files. It is not typically required for production use. However, if you want to check the differences between available streams, you can use this command.</p>
+            </div>
+          </div>
         </>
       ),
       usage: {
@@ -497,12 +498,19 @@ Example:
         <>
           <p><strong>Description:</strong></p>
           <ul>
-            <li>Applies only to the discover command.</li>
-            <li>Specifies the path to the new <code>selected_streams.json</code> to compare against the old files.</li>
-            <li>Must be passed together with <code>--difference-available-streams</code>.</li>
-            <li>The old side and the new side can each use either format. For example, use legacy <code>--streams</code> with the new difference pair.</li>
-            <li>For the file format, see <Link to="/docs/core/configs/streams">Streams configuration</Link>.</li>
+            <li>Used with the discover command to compare differences between two <code>selected_streams.json</code> files, specifically an old file and a new file.</li>
+            <li>Must be used together with <code>--selected-streams /path/old_selected_streams.json</code> to specify the path to the old selected streams file.</li>
+            <li>The <code>--difference-selected-streams</code> flag specifies the path to the new <code>selected_streams.json</code> that will be compared against the old one.</li>
+            <li>Running this command generates a <code>difference_selected_streams.json</code> file containing the differences between the old and new selected streams files.</li>
           </ul>
+          <div className="admonition admonition-note alert alert--secondary">
+            <div className="admonition-heading">
+              <h5>Internal testing command</h5>
+            </div>
+            <div className="admonition-content">
+              <p>This command is primarily used internally for testing purposes to compare differences between old and new <code>selected_streams.json</code> files. It is not typically required for production use. However, if you want to check the differences between selected streams, you can use this command.</p>
+            </div>
+          </div>
         </>
       ),
       usage: {
