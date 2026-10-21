@@ -133,5 +133,17 @@ export function onRouteDidUpdate({
     return
   }
 
+  // Hash-only change on the same page (an in-page link, or the OLake UI docs panel jumping to a source
+  // form section): the page is already laid out, so the browser's own scroll is right. It honours the
+  // heading's scroll-margin (clearing the sticky tab bar) and can animate; re-asserting it here would
+  // snap it instantly and hide the heading under the tab bar.
+  if (
+    previousLocation &&
+    location.pathname === previousLocation.pathname &&
+    location.search === previousLocation.search
+  ) {
+    return
+  }
+
   handleSpaNavigation()
 }
