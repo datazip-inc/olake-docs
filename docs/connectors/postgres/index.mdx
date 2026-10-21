@@ -84,6 +84,14 @@ For users who previously set up jobs using the wal2json plugin: [wal2json plugin
 | Replication Slot `required for CDC` | Logical replication slot (pgoutput) that retains WAL segments until read, ensuring consistent CDC.                                                                            | `olake-repl-slot`                                                                                        |
 | Publication `required for CDC`      | Name of the PostgreSQL publication that defines which tables and operations (INSERT, UPDATE, DELETE, TRUNCATE) to replicate. Must exist in the same database as the replication slot and include all tables for CDC capture. | `postgres_pub` |
 | Initial Wait Time                   | Idle timeout for pgoutput log reading                                                                                                                                         | `120`                                                                                                    |
+| Preserve TOAST Values               | Keeps large column values that Postgres leaves out of an update (unchanged [TOAST](#toast-columns-preserve) values) by using the previous value from memory when available; otherwise, it reads it from the Iceberg destination. Works only with Iceberg destinations whose update type is positional deletes (`pos`) or deletion vectors (`dv`). Off by default. | Off |
+
+:::note[Preserve TOAST Values]
+- **Set it when you create the source.** This option can only be changed while creating the source. Once a source or job exists, it can't be changed from the UI.
+- **It limits the update types.** With this option on, Equality deletes (`eq`) is not offered.
+
+See [Preserving TOAST Values](#toast-columns-preserve) for what is supported and why you should not switch it on or off for an existing source or job.
+:::
 
 #### Connection details
 
@@ -157,12 +165,17 @@ An example `source.json` file will look like this:
 | initial_wait_time `required for CDC` | Idle timeout for pgoutput log reading                                                                                                                               | `120`                                                                                                  | INTEGER                                                          |
 | replication_slot `required for CDC`  | Logical replication slot (pgoutput) that retains WAL segments until read, ensuring consistent CDC.                                                                  | `"olake-repl-slot"`                                                                                    | STRING                                                           |
 | publication `required for CDC`       | Name of the PostgreSQL publication that defines which tables and operations (INSERT, UPDATE, DELETE, TRUNCATE) to replicate. Must exist in the same database as the replication slot and include all tables for CDC capture.  | `"postgres_pub"`                        | STRING                                                           |
+| preserve_toast_values                | Keeps large column values Postgres leaves out of an update (unchanged TOAST values) by using the previous value from memory when available; otherwise, it reads it from the Iceberg destination. Iceberg destination with update type `pos` or `dv` only. Optional; default `false`. | `true` | BOOLEAN |
 | Schemas                             | Comma-separated list of schemas for discovery. Helps avoid reading all schemas by limiting discovery to only the specified ones. When omitted, all accessible non-system schemas are discovered.                                          | [`public`,`analytics`]                | STRING []                                                           |
 | max_threads                          | Maximum number of worker threads the connector can spin up for parallel tasks.                                                                                      | `10`                                                                                                   | INTEGER                                                          |
 | retry_count                          | Number of times the retry will take place incase of timeout before failing the sync.                                                                                | `3`                                                                                                    | INTEGER                                                          |
 | jdbc_url_params                      | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                         | `{"connect_timeout":"20"}`                                                                              | OBJECT                                                           |
 | ssl*                                  | Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic.                                                                               |  <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul>          | OBJECT                                                           |
 | ssh_config                           | Configure OLake Go to connect through an SSH tunnel.  | `{"host": "my-tunnel-host", "port": 22 , "username": "my-tunnel-user", "password": "tunnel-password"}` | OBJECT                                                           |
+
+:::warning[Choose this once]
+Set `preserve_toast_values` before the first `discover` and keep it. Changing it might cause errors.
+:::
 
 <span>*</span> See **SSL Mode Details** below for supported modes and example configurations.
 
@@ -247,6 +260,33 @@ check \
 </TabItem>
 
 </Tabs>
+
+---
+
+## Preserving TOAST Values {/* #toast-columns-preserve */}
+
+Postgres does not resend large column values (called TOAST values, usually big `text`, `jsonb`, `bytea` or array values) when an `UPDATE` leaves them unchanged. This happens unless the table uses `REPLICA IDENTITY FULL`. Without the option below, OLake Go writes the placeholder `__olake_unavailable_value__` for those columns.
+
+When **Preserve TOAST Values** (`preserve_toast_values`) is on, OLake Go uses the column's previous value from memory when available; otherwise, it reads it from the Iceberg destination. OLake Go writes that value instead of the placeholder.
+
+### When It Works
+
+| Setup | Large values kept? |
+| ----- | ------------------ |
+| Iceberg destination, update type `pos` or `dv`, CDC or Strict CDC | ✅ Yes |
+| Iceberg destination, update type `eq` | ❌ No, placeholder written |
+| Stream in append mode | ❌ No, placeholder written |
+| Parquet / S3 destination | ❌ No, placeholder written |
+| Full refresh / incremental / backfill | Not needed. These read whole rows |
+| Table with `REPLICA IDENTITY FULL` | Not needed. Postgres already sends the value |
+| `wal2json` plugin | ❌ Not supported (deprecated) |
+
+**Known limit:** with the option on, a sync may take longer when many updates leave large values unchanged, because values unavailable in memory must be read from the destination.
+
+### Do Not Switch It On or Off for an Existing Source or Job
+
+- **Turning it on later:** values synced earlier already hold `__olake_unavailable_value__` in the destination, so turning it on will not bring back the intended value.
+- **Turning it off later:** updates from then on write the placeholder again. Values that were already kept stay as they are.
 
 ---
 
@@ -350,11 +390,14 @@ By default, WAL only includes the primary key on deletes. In OLake Go, delete re
 ALTER TABLE <table_name> REPLICA IDENTITY FULL;
 ```
 
-### 5. TOAST Columns Return Null on updates to Non-TOAST Columns
+### 5. TOAST Columns Show `__olake_unavailable_value__` After an Update
 
-When a table has TOAST columns and an `UPDATE` modifies a non-TOAST column, PostgreSQL does not include the unchanged TOAST column value in the WAL entry. As a result, OLake Go receives no value for that column and writes `null` to the destination.
+When an `UPDATE` changes other columns but not a large (TOAST) column, Postgres doesn't send the TOAST column's value. OLake Go writes `__olake_unavailable_value__` for it.
 
-**Solution**: To ensure TOAST column values are always included in the WAL output, run the following on the affected table:
+**Solution**: Use either of these:
+
+- Turn on **Preserve TOAST Values** when creating the source (Iceberg destination with update type `pos` or `dv`). See [Preserving TOAST Values](#toast-columns-preserve).
+- Run the following on the affected table. Postgres then sends the full row, at the cost of more WAL:
 
 ```sql
 ALTER TABLE <table_name> REPLICA IDENTITY FULL;
