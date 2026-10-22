@@ -79,6 +79,42 @@ olakego/source-[SOURCE-TYPE]:latest \\
         docker: `--streams /mnt/config/streams.json`
       }
     },
+    'available-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Specifies the path to <code>available_streams.json</code>. Discover writes this read-only file. Do not edit it.</li>
+            <li>Must be passed together with <code>--selected-streams</code>.</li>
+            <li>Used by <code>discover</code> (merge, keeps your edits), <code>sync</code> and <code>clear-destination</code>.</li>
+            <li>For the file format, see <Link to="/docs/install/docker-cli/#streams-config">Streams configuration</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --selected-streams [PATH_TO_SELECTED_STREAMS_FILE] --available-streams [PATH_TO_AVAILABLE_STREAMS_FILE]`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json`
+      }
+    },
+    'selected-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Specifies the path to <code>selected_streams.json</code>. This is the file you edit. It lists the streams to sync and their settings.</li>
+            <li>Must be passed together with <code>--available-streams</code>.</li>
+            <li>Used by <code>discover</code> (merge, keeps your edits), <code>sync</code> and <code>clear-destination</code>.</li>
+            <li>For the file format, see <Link to="/docs/install/docker-cli/#streams-config">Streams configuration</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] [COMMAND] --selected-streams [PATH_TO_SELECTED_STREAMS_FILE] --available-streams [PATH_TO_AVAILABLE_STREAMS_FILE]`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json`
+      }
+    },
     destination: {
       description: (
         <>
@@ -281,7 +317,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
             </tbody>
           </table>
 
-          <p><strong>What's Next</strong>: The state file is automatically created and updated during sync operations. You can manually specify a state file using the <Link to="/docs/community/commands-and-flags#5-state"><code>--state</code></Link> flag to resume from a previous synchronization point.</p>
+          <p><strong>What's Next</strong>: The state file is automatically created and updated during sync operations. You can manually specify a state file using the <Link to="/docs/community/commands-and-flags#6-state"><code>--state</code></Link> flag to resume from a previous synchronization point.</p>
         </>
       ),
       usage: {
@@ -346,13 +382,31 @@ Example:
         docker: `--max-discover-threads 100`
       }
     },
+    'target-query-engines': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Applies only to the discover command.</li>
+            <li>Comma-separated list of query engines you plan to use to read synced Iceberg tables (for example <code>trino</code>, <code>databricks</code>, <code>spark</code>).</li>
+            <li>Discover limits each stream&apos;s <code>available_update_types</code> in <code>available_streams.json</code> to delete formats those engines can read. With multiple engines, only formats supported by <strong>all</strong> listed engines are included (the intersection).</li>
+            <li>Use this when editing <code>selected_streams.json</code> so <code>update_type</code> choices match your query engines. </li>
+            <li>To know more about the behavior of this flag, see <Link to="/docs/getting-started/job-level-properties/#target-query-engines">Target Query Engines</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] discover --config [PATH_TO_CONFIG_FILE] --target-query-engines trino,databricks,spark`,
+        docker: `--target-query-engines trino,databricks,spark`
+      }
+    },
     'discover-schema': {
       description: (
         <>
           <p><strong>Description:</strong></p>
           <ul>
             <li>Applies only to the sync command.</li>
-            <li>By default, sync skips source schema discovery to keep runs fast and trusts the catalog passed (<code>--streams /path/to/streams.json</code>) from a prior discover run.</li>
+            <li>By default, sync skips source schema discovery to keep runs fast and trusts the streams files passed (<code>--selected-streams</code> and <code>--available-streams</code>, or the deprecated <code>--streams</code>) from a prior discover run.</li>
             <li>When this flag is passed, sync re-discovers source schema and validates configured streams against the source.</li>
           </ul>
         </>
@@ -388,6 +442,62 @@ Example:
 --difference /path/new_streams.json`
       }
     },
+    'difference-available-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Used with the discover command to compare differences between two <code>available_streams.json</code> files, specifically an old file and a new file.</li>
+            <li>Must be used together with <code>--available-streams /path/old_available_streams.json</code> to specify the path to the old available streams file.</li>
+            <li>The <code>--difference-available-streams</code> flag specifies the path to the new <code>available_streams.json</code> that will be compared against the old one.</li>
+            <li>Running this command generates a <code>difference_available_streams.json</code> file containing the differences between the old and new available streams files.</li>
+          </ul>
+          <div className="admonition admonition-note alert alert--secondary">
+            <div className="admonition-heading">
+              <h5>Internal testing command</h5>
+            </div>
+            <div className="admonition-content">
+              <p>This command is primarily used internally for testing purposes to compare differences between old and new <code>available_streams.json</code> files. It is not typically required for production use. However, if you want to check the differences between available streams, you can use this command.</p>
+            </div>
+          </div>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] discover --selected-streams /path/selected_streams.json --available-streams /path/available_streams.json --difference-selected-streams /path/new_selected_streams.json --difference-available-streams /path/new_available_streams.json`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json \\
+--difference-selected-streams /mnt/config/new_selected_streams.json \\
+--difference-available-streams /mnt/config/new_available_streams.json`
+      }
+    },
+    'difference-selected-streams': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Used with the discover command to compare differences between two <code>selected_streams.json</code> files, specifically an old file and a new file.</li>
+            <li>Must be used together with <code>--selected-streams /path/old_selected_streams.json</code> to specify the path to the old selected streams file.</li>
+            <li>The <code>--difference-selected-streams</code> flag specifies the path to the new <code>selected_streams.json</code> that will be compared against the old one.</li>
+            <li>Running this command generates a <code>difference_selected_streams.json</code> file containing the differences between the old and new selected streams files.</li>
+          </ul>
+          <div className="admonition admonition-note alert alert--secondary">
+            <div className="admonition-heading">
+              <h5>Internal testing command</h5>
+            </div>
+            <div className="admonition-content">
+              <p>This command is primarily used internally for testing purposes to compare differences between old and new <code>selected_streams.json</code> files. It is not typically required for production use. However, if you want to check the differences between selected streams, you can use this command.</p>
+            </div>
+          </div>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] discover --selected-streams /path/selected_streams.json --available-streams /path/available_streams.json --difference-selected-streams /path/new_selected_streams.json --difference-available-streams /path/new_available_streams.json`,
+        docker: `--selected-streams /mnt/config/selected_streams.json \\
+--available-streams /mnt/config/available_streams.json \\
+--difference-selected-streams /mnt/config/new_selected_streams.json \\
+--difference-available-streams /mnt/config/new_available_streams.json`
+      }
+    },
     'destination-type': {
       description: (
         <>
@@ -404,6 +514,26 @@ Example:
 olakego/source-[SOURCE-TYPE]:latest \\
 spec \\
 --destination-type iceberg`
+      }
+    },
+    'available-query-engines': {
+      description: (
+        <>
+          <p><strong>Description:</strong></p>
+          <ul>
+            <li>Used with the <Link to="/docs/community/commands-and-flags#2-spec"><code>spec</code></Link> command.</li>
+            <li>Prints the query engine identifiers OLake Go supports (for example <code>trino</code>, <code>databricks</code>, <code>spark</code>).</li>
+            <li>Use these values in the comma-separated list for <code>--target-query-engines</code> on <code>discover</code> so delete format options match what your engines can read.</li>
+            <li>For which delete formats each engine supports, see <Link to="/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine">Delete format support by query engine</Link>.</li>
+          </ul>
+        </>
+      ),
+      usage: {
+        'build.sh': `./build.sh driver-[SOURCE-TYPE] spec --available-query-engines`,
+        docker: `docker run --pull=always \\
+olakego/source-[SOURCE-TYPE]:latest \\
+spec \\
+--available-query-engines`
       }
     },
     'encryption-key': {
@@ -437,7 +567,7 @@ check \\
           <p><strong>Description:</strong></p>
           <ul>
             <li>Prevents saving of any files generated by the command. This flag is valid for all available commands.</li>
-            <li>Example: If used with discover, the <code>streams.json</code> file and related logs are not saved.</li>
+            <li>Example: If used with discover, the generated streams files and related logs are not saved.</li>
           </ul>
         </>
       ),

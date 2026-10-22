@@ -1148,19 +1148,19 @@ const config = {
             from: '/blog/olake-vs-aws-dms-benchmark'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsConfiguration'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsOnly'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsOnlyDetails'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsFull'
           },
           {
@@ -1247,8 +1247,12 @@ const config = {
           },
 
           {
-            to: '/docs/core/configs/catalog',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/docs/configs/catalog'
+          },
+          {
+            to: '/docs/install/docker-cli/#streams-config',
+            from: '/docs/core/configs/catalog'
           },
           {
             to: '/blog/tags',
@@ -1280,7 +1284,7 @@ const config = {
             from: '/docs/olake/mongodb/colake-connectors-for-olake'
           },
           {
-            to: '/docs/core/configs/catalog',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/core/configs/catalog'
           },
           {
@@ -1441,7 +1445,7 @@ const config = {
             from: '/docs/connectors'
           },
           {
-            to: '/docs/core/configs/catalog/',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/iceberg/docs/core/configs/catalog/'
           },
           {
