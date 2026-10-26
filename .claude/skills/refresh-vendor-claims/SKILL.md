@@ -9,11 +9,18 @@ Comparison posts state prices, plan terms, limits and licences taken from other 
 
 ## The pattern it looks for
 
-A vendor claim is a sentence or table row that has a link to the vendor's page and ends with `(checked <Mon YYYY>)` right after the link, for example:
+A vendor claim is a sentence, bullet or table row that has a link to the vendor's page and carries `(checked <Mon YYYY>)` right after the link, for example:
 
 `Standard starts at $20 a month ([pricing page](https://example.com/pricing)) (checked Oct 2026).`
 
-See SOP section 5.7. Claims that are missing the suffix or the link are findings too: list them in the report, do not guess a source for them.
+Two more forms count as claims:
+
+- A line with several vendor links and one suffix at the end: each link on that line is checked against the claim text it supports.
+- A `Sources: ... (checked Oct 2026)` line under a table: every link on it is checked against the table rows above it.
+
+The month is written with three letters (`Oct 2026`). Lines that only explain the pattern, or have no vendor URL, are not claims (skip them).
+
+See SOP section 5.7.
 
 ## Scope
 
@@ -22,15 +29,16 @@ See SOP section 5.7. Claims that are missing the suffix or the link are findings
 
 ## Steps
 
-1. Find every claim by the pattern: `grep -rn "(checked " compare learn`. Build a list of: file, line, claim text, vendor URL, date checked.
+1. Find every claim by the pattern: `grep -rnE "\(checked [A-Z][a-z]{2} [0-9]{4}\)|Sources:.*checked" compare learn`. Drop lines with no vendor URL. Build a list of: file, line, claim text, vendor URL(s), date checked.
+   Also find claims that should carry the pattern but do not: price, plan, limit, licence or version sentences with a vendor link and no `(checked ...)` suffix, and competitor limits ("its docs say") with no link. List them in the "Missing the pattern" table; do not guess a fix.
 2. For each distinct vendor URL, fetch the page once (WebFetch, or the browser for pages that need it). Do not use search snippets as the source.
 3. Compare the claim with the page:
    - Same number, term or limit: change only the date suffix to the current month.
    - Different: change the number or wording to what the page says now, keep the same link, set the date to the current month. If the claim appears in a quiz (`src/data/quizzes/<slug>.json`), a table, the TL;DR or the FAQ, change it there too so the post stays consistent.
    - Page moved or removed, claim no longer on the page, or page behind a login or JavaScript you cannot read: do not edit the number. Flag it.
 4. Do not touch anything else: no rewrites, no new claims, no removed claims unless the page shows the claim is false (then flag it for the owner and wait).
-5. Keep the style rules in `CLAUDE.md` (no em-dashes, plain sentences, vendor-neutral tone, OLake facts only from our docs).
-6. Run `npm run build` once, check there are no broken links or image warnings.
+5. Keep the style rules from the SOP section 5.7 and the rest of the post: no em-dashes, plain sentences, vendor-neutral tone, OLake facts only from our docs.
+6. Run `npm run lint:content`, `npm run typecheck` and `npm run build` once, and check there are no broken links or image warnings.
 7. Open one PR from a fork or branch named `content/refresh-vendor-claims-YYYY-MM` with a short table in the body: claim, old value, new value, link. Add a second table for the claims it could not verify and for claims missing the pattern. Keep the title short, for example "Refresh vendor claims, October 2026".
 
 ## Report format
