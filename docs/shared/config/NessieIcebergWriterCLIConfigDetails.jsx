@@ -58,6 +58,15 @@ const FIELDS = [
     description: 'S3 bucket path where Iceberg table data and metadata files will be stored.',
   },
   {
+    id: 'rest-auth-type',
+    authTypes: AUTH_COMMON,
+    parameter: 'rest_auth_type',
+    required: true,
+    getDynamicSample: (authType) => authType || 'none',
+    description:
+      'Authentication method OLake Go uses for REST catalog requests. Set to match your catalog\'s authentication requirement.',
+  },
+  {
     id: 'aws-region',
     authTypes: AUTH_COMMON,
     parameter: 'aws_region',
@@ -198,7 +207,7 @@ export default function NessieIcebergWriterCLIConfigDetails({ authType }) {
             <tr key={field.id}>
               <td>{renderParameter(field.parameter, field.required)}</td>
               <td>
-                <code>{field.sample}</code>
+                <code>{field.getDynamicSample ? field.getDynamicSample(authType) : field.sample}</code>
               </td>
               <td>{renderDescription(field.description)}</td>
             </tr>
