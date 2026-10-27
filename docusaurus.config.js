@@ -509,6 +509,12 @@ const config = {
           // Author pages removed for authors without posts
           { to: '/blog/authors', from: '/blog/authors/pavan' },
           { to: '/blog/authors', from: '/blog/authors/arsham' },
+          // The per-engine MySQL to Iceberg posts were merged into one post with an engine tab each
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=clickhouse', from: '/blog/mysql-to-iceberg-clickhouse' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=presto', from: '/blog/mysql-to-apache-iceberg-presto' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=spark', from: '/blog/mysql-to-iceberg-spark' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=trino', from: '/blog/mysql-to-apache-iceberg-trino' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=duckdb', from: '/blog/mysql-to-apache-iceberg-query-duckdb' },
           // The separate Iceberg blog (/iceberg) was merged into the main blog: posts keep their slugs
           { to: '/blog/data-partitioning-in-s3/', from: '/iceberg/data-partitioning-in-s3/' },
           { to: '/blog/mor-vs-cow/', from: '/iceberg/mor-vs-cow/' },
