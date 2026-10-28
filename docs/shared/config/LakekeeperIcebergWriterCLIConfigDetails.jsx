@@ -38,6 +38,15 @@ const FIELDS = [
       'Name of the Lakekeeper warehouse to use, OLake Go uses this to look up the storage configuration (eg. S3 bucket) already defined in Lakekeeper.',
   },
   {
+    id: 'rest-auth-type',
+    authTypes: AUTH_COMMON,
+    parameter: 'rest_auth_type',
+    required: true,
+    getDynamicSample: (authType) => authType || 'none',
+    description:
+      'Authentication method OLake Go uses for REST catalog requests. Set to match your catalog\'s authentication requirement.',
+  },
+  {
     id: 'token',
     authTypes: [AUTH_TOKEN],
     parameter: 'token',
@@ -179,7 +188,7 @@ export default function LakekeeperIcebergWriterCLIConfigDetails({ authType }) {
             <tr key={field.id}>
               <td>{renderParameter(field.parameter, field.required)}</td>
               <td>
-                <code>{field.sample}</code>
+                <code>{field.getDynamicSample ? field.getDynamicSample(authType) : field.sample}</code>
               </td>
               <td>{renderDescription(field.description)}</td>
             </tr>
