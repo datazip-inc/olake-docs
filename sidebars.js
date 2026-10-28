@@ -106,7 +106,7 @@ const docSidebar = {
           label: 'Parquet Writer',
           items: [
             { type: 'doc', id: 'writers/parquet/config', label: 'Configuration' },
-            { type: 'doc', id: 'writers/parquet/permission', label: 'IAM Permissions' },
+            { type: 'doc', id: 'writers/parquet/permission', label: 'Permissions' },
             { type: 'doc', id: 'writers/parquet/partitioning', label: 'Partitioning' },
             { type: 'doc', id: 'writers/parquet/troubleshoot', label: 'Troubleshooting' },
           ],
