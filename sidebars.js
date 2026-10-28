@@ -165,6 +165,8 @@ const docSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'release/ingestion/v1.1.0',
+        'release/ingestion/v1.0.0',
         'release/ingestion/v0.12.0',
         'release/ingestion/v0.11.0',
         'release/ingestion/v0.10.0',
@@ -251,6 +253,7 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'fusion/release/maintenance/v0.2.0',
         'fusion/release/maintenance/v0.1.0',
       ],
     },
