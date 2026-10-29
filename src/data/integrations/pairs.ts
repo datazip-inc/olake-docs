@@ -139,6 +139,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'polaris',
     tested: ['polaris'],
     alsoRead: ['duckdb', 'trino']
+  },
+  {
+    source: 'mysql',
+    engine: 'duckdb',
+    slug: 'mysql-to-duckdb',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['clickhouse', 'trino']
   }
 ]
 
