@@ -1,0 +1,37 @@
+OLake Go reads MongoDB changes through change streams, which MongoDB builds on the replica set oplog. Three things must be in place before the first sync.
+
+| Setting | Value | Why it matters |
+| --- | --- | --- |
+| Replica set | any name, even a single node | Change streams and the oplog exist only in replica set mode. Atlas clusters are already replica sets. |
+| Oplog retention | long enough to cover your longest pause | OLake Go resumes from a change-stream token saved after each sync; if the oplog has rolled past it, the next sync needs a fresh snapshot. |
+| A user for OLake Go | `read` on the database plus `clusterMonitor` | The snapshot reads the collections; the change stream needs oplog access, which `clusterMonitor` (or `readAnyDatabase`) grants. |
+
+```javascript title="mongosh, on the primary"
+// 1. A single-node replica set, if you do not have one (self-hosted only)
+//    start mongod with --replSet rs0, then:
+rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "<host>:27017" }] })
+
+// 2. A user for OLake Go
+use admin
+db.createUser({
+  user: "olake", pwd: "<password>",
+  roles: [{ role: "read", db: "shop" }, { role: "clusterMonitor", db: "admin" }]
+})
+
+// 3. Check the oplog window; OLake Go warns below 7 days
+use local
+db.oplog.rs.stats().maxSize      // bytes; raise with replSetResizeOplog if it is small
+```
+
+Check the result before moving on:
+
+```javascript
+rs.status().members.map(m => m.stateStr)      // one PRIMARY
+db.getSiblingDB("admin").getUsers().users.map(u => u.user)
+```
+
+On MongoDB Atlas the replica set and oplog are already there; create the user under **Database Access** with the `read` role on your database and `clusterMonitor`, and allow OLake Go's IP in **Network Access**. The full guide, including Atlas screenshots, is [MongoDB and Atlas CDC setup](/docs/connectors/mongodb/cdc_setup).
+
+:::warning[The oplog is your replay window]
+Atlas and most self-hosted installs keep 24 hours or less of oplog by default. OLake Go's source test shows the current window and warns below 7 days. Size it for your longest planned pause, or run the job often enough that the token never falls out of the window.
+:::

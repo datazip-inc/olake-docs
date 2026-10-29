@@ -75,6 +75,7 @@ const docSidebar = {
           items: [
             { type: 'doc', id: 'integrations/postgres-to-snowflake', label: 'Postgres to Snowflake' },
             { type: 'doc', id: 'integrations/mysql-to-snowflake', label: 'MySQL to Snowflake' },
+            { type: 'doc', id: 'integrations/mongodb-to-snowflake', label: 'MongoDB to Snowflake' },
           ],
         },
       ],
