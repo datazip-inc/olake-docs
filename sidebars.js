@@ -109,6 +109,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/postgres-to-redshift', label: 'Postgres to Redshift' },
             { type: 'doc', id: 'integrations/oracle-to-redshift', label: 'Oracle to Redshift' },
             { type: 'doc', id: 'integrations/kafka-to-redshift', label: 'Kafka to Redshift' },
+            { type: 'doc', id: 'integrations/mysql-to-redshift', label: 'MySQL to Redshift' },
           ],
         },
       ],
