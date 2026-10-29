@@ -179,6 +179,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'glue',
     tested: ['glue'],
     alsoRead: ['athena', 'duckdb']
+  },
+  {
+    source: 'kafka',
+    engine: 'redshift',
+    slug: 'kafka-to-redshift',
+    status: 'draft',
+    catalogs: ['glue'],
+    defaultCatalog: 'glue',
+    tested: ['glue'],
+    alsoRead: ['athena', 'duckdb']
   }
 ]
 
