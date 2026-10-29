@@ -78,6 +78,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/mongodb-to-snowflake', label: 'MongoDB to Snowflake' },
             { type: 'doc', id: 'integrations/oracle-to-snowflake', label: 'Oracle to Snowflake' },
             { type: 'doc', id: 'integrations/mariadb-to-snowflake', label: 'MariaDB to Snowflake' },
+            { type: 'doc', id: 'integrations/kafka-to-snowflake', label: 'Kafka to Snowflake' },
           ],
         },
       ],

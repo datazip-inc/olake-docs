@@ -17,6 +17,8 @@ import OraclePrereqs from './sources/oracle/Prereqs.mdx'
 import OracleConnect from './sources/oracle/Connect.mdx'
 import MssqlPrereqs from './sources/mssql/Prereqs.mdx'
 import MssqlConnect from './sources/mssql/Connect.mdx'
+import KafkaPrereqs from './sources/kafka/Prereqs.mdx'
+import KafkaConnect from './sources/kafka/Connect.mdx'
 
 import HorizonSetup from './catalogs/horizon/Setup.mdx'
 import HorizonWriter from './catalogs/horizon/Writer.mdx'
@@ -43,6 +45,8 @@ export const PARTIALS = {
   'sources/oracle/connect': OracleConnect,
   'sources/mssql/prereqs': MssqlPrereqs,
   'sources/mssql/connect': MssqlConnect,
+  'sources/kafka/prereqs': KafkaPrereqs,
+  'sources/kafka/connect': KafkaConnect,
   'catalogs/horizon/setup': HorizonSetup,
   'catalogs/horizon/writer': HorizonWriter,
   'catalogs/glue/setup': GlueSetup,
