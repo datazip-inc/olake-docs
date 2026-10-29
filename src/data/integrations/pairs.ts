@@ -209,6 +209,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'glue',
     tested: ['glue'],
     alsoRead: ['athena', 'duckdb']
+  },
+  {
+    source: 'mariadb',
+    engine: 'redshift',
+    slug: 'mariadb-to-redshift',
+    status: 'draft',
+    catalogs: ['glue'],
+    defaultCatalog: 'glue',
+    tested: ['glue'],
+    alsoRead: ['athena', 'duckdb']
   }
 ]
 
