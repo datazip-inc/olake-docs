@@ -1,0 +1,41 @@
+OLake Go reads SQL Server changes from the change tables that SQL Server's own change data capture (CDC) feature fills from the transaction log. Four things must be in place before the first sync.
+
+| Setting | Value | Why it matters |
+| --- | --- | --- |
+| CDC on the database | `sys.sp_cdc_enable_db` | Creates the `cdc` schema and the capture jobs for the database. |
+| CDC on each table | `sys.sp_cdc_enable_table` per table | Creates the capture instance whose change table OLake Go reads. |
+| SQL Server Agent | running | The capture job that copies log records into the change tables is an Agent job; without it nothing lands in `cdc.*`. On Amazon RDS and Azure SQL Managed Instance the agent is on by default. |
+| A login for OLake Go | `SELECT` on the table schema and on the `cdc` schema | The snapshot reads the tables; the change stream reads the change tables. |
+
+```sql title="On the SQL Server database"
+-- 1. CDC on the database (Developer, Standard 2016 SP1+ or Enterprise edition)
+USE shop;
+EXEC sys.sp_cdc_enable_db;
+
+-- 2. CDC on every table you sync. @role_name = NULL skips the gating role.
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'customers', @role_name = NULL;
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'orders',    @role_name = NULL;
+
+-- 3. A login for OLake Go
+USE master;
+CREATE LOGIN olake WITH PASSWORD = '<password>';
+USE shop;
+CREATE USER olake FOR LOGIN olake;
+GRANT SELECT ON SCHEMA :: dbo TO olake;
+GRANT SELECT ON SCHEMA :: cdc TO olake;
+GRANT VIEW DATABASE STATE TO olake;
+```
+
+Check the result before moving on:
+
+```sql
+SELECT name, is_cdc_enabled FROM sys.databases WHERE name = 'shop';   -- 1
+SELECT capture_instance FROM cdc.change_tables;                        -- dbo_customers, dbo_orders
+EXEC msdb.dbo.sp_help_job @job_name = N'cdc.shop_capture';             -- the Agent job exists
+```
+
+Hosted SQL Server uses its own procedure to enable CDC on the database: `EXEC msdb.dbo.rds_cdc_enable_db 'shop'` on Amazon RDS, `EXEC msdb.dbo.gcloudsql_cdc_enable_db 'shop'` on Cloud SQL; the table step is the same. The full walk-through is the [SQL Server connector page](/docs/connectors/mssql/#cdc-prerequisites).
+
+:::warning[Change tables keep three days by default]
+The cleanup job removes change rows older than three days (`sys.sp_cdc_change_job @job_type = 'cleanup'` changes it). A job paused longer than that loses its position and needs a fresh snapshot. Lengthen retention before a planned pause.
+:::
