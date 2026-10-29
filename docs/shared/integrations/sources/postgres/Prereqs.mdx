@@ -1,17 +1,19 @@
+import CodeBlock from '@theme/CodeBlock';
+
 OLake Go reads changes through logical replication with the built-in `pgoutput` plugin (Postgres 10 and later). Four things must be in place on the database before the first sync.
 
 | Setting | Value | Why it matters |
 | --- | --- | --- |
 | `wal_level` | `logical` | Without it Postgres writes no row images to the WAL (write-ahead log), so there is nothing to replicate. Changing it needs a restart. |
-| Replication role | `LOGIN REPLICATION` plus `SELECT` on the tables | The initial snapshot reads the tables; the change stream opens a replication connection. |
+| Replication role | `LOGIN REPLICATION` plus `SELECT` on the tables | The first snapshot reads the tables; the change stream opens a replication connection. |
 | Publication | one per OLake Go job, covering the synced tables | Tells Postgres which tables' changes to publish. |
 | Replication slot | one per OLake Go job, plugin `pgoutput` | Keeps WAL segments until OLake Go has read them. |
 
-```sql title="On the source database"
--- 1. Logical replication (needs a restart, or a parameter-group change on managed Postgres)
+<CodeBlock language="sql" title="On the source database">{`-- 1. Logical replication. wal_level needs a restart (a parameter-group change on managed Postgres).
 ALTER SYSTEM SET wal_level = 'logical';
 ALTER SYSTEM SET max_replication_slots = 10;
 ALTER SYSTEM SET max_wal_senders = 10;
+ALTER SYSTEM SET wal_sender_timeout = 0;   -- so a long first snapshot is not cut off
 
 -- 2. A role for OLake Go
 CREATE ROLE olake WITH LOGIN REPLICATION PASSWORD '<password>';
@@ -20,9 +22,10 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO olake;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO olake;
 
 -- 3. A publication for the tables you sync, and a pgoutput slot
-CREATE PUBLICATION olake_pub FOR TABLE customers, orders;
-SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');
-```
+CREATE PUBLICATION olake_pub FOR TABLE ${props.tables ?? '<table_1>, <table_2>'};
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');`}</CodeBlock>
+
+Tables with a primary key need nothing more. A table without one needs `ALTER TABLE <table> REPLICA IDENTITY FULL;` so that its updates and deletes carry the old row.
 
 Check the result before moving on:
 

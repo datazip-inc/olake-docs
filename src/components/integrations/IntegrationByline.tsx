@@ -1,38 +1,6 @@
 import React from 'react'
 import Link from '@docusaurus/Link'
-import useBaseUrl from '@docusaurus/useBaseUrl'
 import { useIntegration } from './useIntegration'
-import type { Person } from '@site/src/data/integrations'
-
-function PersonChip({ person, role }: { person: Person | undefined; role: string }) {
-  const avatar = useBaseUrl(person?.avatar ?? '')
-  if (!person) return null
-  const body = (
-    <>
-      <img
-        src={avatar}
-        alt=''
-        width={28}
-        height={28}
-        loading='lazy'
-        decoding='async'
-        className='h-[28px] w-[28px] rounded-full object-cover'
-      />
-      <span className='flex flex-col leading-tight'>
-        <span className='text-[12px] text-olake-muted'>{role}</span>
-        <span className='text-[14px] font-medium text-olake-ink'>{person.name}</span>
-      </span>
-    </>
-  )
-  const className = 'flex items-center gap-[10px] no-underline'
-  return person.page ? (
-    <Link to={person.page} className={className}>
-      {body}
-    </Link>
-  ) : (
-    <span className={className}>{body}</span>
-  )
-}
 
 function formatDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`)
@@ -41,24 +9,28 @@ function formatDate(iso: string): string {
 }
 
 /**
- * Under the title: who wrote the page, who checked it, and when the pipeline was last run. Every
- * value comes from the `integration:` front matter, so the byline cannot drift from the page.
+ * One line under the title: the author and the date of the run behind the page. Both come from
+ * the `integration:` front matter, so the byline cannot drift from the page. The reviewer and the
+ * OLake Go version are in the "How we tested this" box at the end, not here.
  */
 export default function IntegrationByline() {
-  const { author, reviewer, frontMatter } = useIntegration()
+  const { author, frontMatter } = useIntegration()
   const tested = frontMatter.tested
+  if (!author && !tested) return null
+  const name = author ? (
+    author.page ? (
+      <Link to={author.page} className='font-medium text-olake-ink no-underline hover:underline'>
+        {author.name}
+      </Link>
+    ) : (
+      <span className='font-medium text-olake-ink'>{author.name}</span>
+    )
+  ) : null
   return (
-    <div className='olake-integration-byline my-[20px] flex flex-wrap items-center gap-x-[28px] gap-y-[12px] border-y border-solid border-olake-line py-[12px]'>
-      <PersonChip person={author} role='Written and tested by' />
-      <PersonChip person={reviewer} role='Technical review' />
-      {tested ? (
-        <span className='flex flex-col leading-tight'>
-          <span className='text-[12px] text-olake-muted'>Last tested</span>
-          <span className='text-[14px] font-medium text-olake-ink'>
-            {formatDate(tested.date)} on OLake Go {tested.olake}
-          </span>
-        </span>
-      ) : null}
-    </div>
+    <p className='olake-integration-byline mb-[20px] mt-[-4px] text-[14px] leading-[1.5] text-olake-muted'>
+      {name ? <>By {name}</> : null}
+      {name && tested ? <span aria-hidden='true'> &middot; </span> : null}
+      {tested ? <>Updated {formatDate(tested.date)}</> : null}
+    </p>
   )
 }
