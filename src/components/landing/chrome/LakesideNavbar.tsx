@@ -53,6 +53,16 @@ const StarMark = () => (
   </svg>
 )
 
+/** The OLake mark (static/img/landing/shared/olake-mark-mono.svg), inlined so it follows the wordmark's color in dark mode. */
+const OLakeMark = () => (
+  <svg width='20' height='20' viewBox='0 0 42 42' fill='none' aria-hidden='true' className='shrink-0'>
+    <path
+      fill='currentColor'
+      d='M41.785 0H0v22.548c17.383-1.832 41.72-2.29 29.8 4.123-8.074 4.343-2.538 5.945 2.308 7.348 3.154.913 6.016 1.741 4.645 3.186-2.791 2.942 2.742 4.112 5.032 4.459z'
+    />
+  </svg>
+)
+
 const Burger = ({ open }: { open: boolean }) => (
   <svg width='20' height='20' viewBox='0 0 20 20' fill='none' aria-hidden='true'>
     {open ? (
@@ -443,10 +453,12 @@ export default function LakesideNavbar({
           </button>
           <Link
             to='/'
-            className='text-[16px] font-medium text-olake-blue leading-none dark:text-olake-blue-on-dark'
+            className='flex shrink-0 items-center gap-[7px] text-[16px] font-medium text-olake-blue leading-none hover:no-underline dark:text-olake-blue-on-dark'
             style={{ margin: 0, padding: 0 }}
           >
-            OLake
+            <OLakeMark />
+            {/* Below 360px the bar cannot fit the wordmark beside search and the CTA, so only the mark shows */}
+            <span className={cn(isBar && 'max-[359px]:sr-only')}>OLake</span>
           </Link>
           <div className={cn('items-center gap-[24px]', wideFlex)}>
             {LAKESIDE_NAV.filter((entry) => !entry.mobileOnly).map((entry) => (
@@ -459,7 +471,7 @@ export default function LakesideNavbar({
           </div>
         </div>
 
-        <div className='flex items-center gap-[14px]'>
+        <div className='flex items-center gap-[8px] sm:gap-[14px]'>
           <Link
             to={LAKESIDE_SLACK.href}
             aria-label={LAKESIDE_SLACK.label}
@@ -479,7 +491,7 @@ export default function LakesideNavbar({
             <StarMark />
           </a>
           {isBar && trailing}
-          <Button href={cta.href} size='sm'>
+          <Button href={cta.href} size='sm' className='shrink-0 whitespace-nowrap'>
             {cta.label}
           </Button>
         </div>
