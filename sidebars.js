@@ -82,6 +82,14 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/s3-to-snowflake', label: 'S3 to Snowflake' },
           ],
         },
+        {
+          type: 'category',
+          label: 'ClickHouse',
+          link: { type: 'generated-index', title: 'Replicate databases to ClickHouse via Apache Iceberg', slug: '/integrations/clickhouse' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-clickhouse', label: 'Postgres to ClickHouse' },
+          ],
+        },
       ],
     },
     {

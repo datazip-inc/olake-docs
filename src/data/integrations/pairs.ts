@@ -109,6 +109,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'horizon',
     tested: ['horizon'],
     alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'postgres',
+    engine: 'clickhouse',
+    slug: 'postgres-to-clickhouse',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['duckdb', 'trino']
   }
 ]
 

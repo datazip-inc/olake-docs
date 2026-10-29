@@ -341,7 +341,7 @@ export const ENGINES: Record<EngineId, Engine> = {
     label: 'ClickHouse',
     version: '26.9 (LTS 26.8)',
     deletes: { eq: 'yes', pos: 'yes', dv: 'no' },
-    deletesNote: 'ClickHouse reads position deletes, and equality deletes from 25.8. Deletion vector reads merged for 26.10, which is not released yet.',
+    deletesNote: 'ClickHouse reads position deletes, and equality deletes from 25.8. Deletion vector reads were merged for 26.10 (PR 110781); the 26.8 LTS release does not read them.',
     recommendedDelete: 'pos',
     catalogs: {
       glue: { reads: 'yes', how: 'DataLakeCatalog with catalog_type glue (beta)' },

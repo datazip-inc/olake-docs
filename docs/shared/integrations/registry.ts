@@ -26,6 +26,8 @@ import HorizonSetup from './catalogs/horizon/Setup.mdx'
 import HorizonWriter from './catalogs/horizon/Writer.mdx'
 import GlueSetup from './catalogs/glue/Setup.mdx'
 import GlueWriter from './catalogs/glue/Writer.mdx'
+import PolarisSetup from './catalogs/polaris/Setup.mdx'
+import PolarisWriter from './catalogs/polaris/Writer.mdx'
 
 import CreateJob from './jobs/CreateJob.mdx'
 
@@ -33,6 +35,9 @@ import SnowflakeQueryHorizon from './engines/snowflake/Query-horizon.mdx'
 import SnowflakeQueryGlue from './engines/snowflake/Query-glue.mdx'
 import SparkConnectHorizon from './engines/spark/Connect-horizon.mdx'
 import DuckdbConnectHorizon from './engines/duckdb/Connect-horizon.mdx'
+import DuckdbConnectPolaris from './engines/duckdb/Connect-polaris.mdx'
+import TrinoConnectPolaris from './engines/trino/Connect-polaris.mdx'
+import ClickhouseQueryPolaris from './engines/clickhouse/Query-polaris.mdx'
 
 export const PARTIALS = {
   'sources/postgres/prereqs': PostgresPrereqs,
@@ -55,11 +60,16 @@ export const PARTIALS = {
   'catalogs/horizon/writer': HorizonWriter,
   'catalogs/glue/setup': GlueSetup,
   'catalogs/glue/writer': GlueWriter,
+  'catalogs/polaris/setup': PolarisSetup,
+  'catalogs/polaris/writer': PolarisWriter,
   'jobs/create': CreateJob,
   'engines/snowflake/query-horizon': SnowflakeQueryHorizon,
   'engines/snowflake/query-glue': SnowflakeQueryGlue,
   'engines/spark/connect-horizon': SparkConnectHorizon,
-  'engines/duckdb/connect-horizon': DuckdbConnectHorizon
+  'engines/duckdb/connect-horizon': DuckdbConnectHorizon,
+  'engines/duckdb/connect-polaris': DuckdbConnectPolaris,
+  'engines/trino/connect-polaris': TrinoConnectPolaris,
+  'engines/clickhouse/query-polaris': ClickhouseQueryPolaris
 } satisfies Record<string, ComponentType<Record<string, unknown>>>
 
 export type PartialId = keyof typeof PARTIALS
