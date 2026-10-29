@@ -88,6 +88,8 @@ const docSidebar = {
           link: { type: 'generated-index', title: 'Replicate databases to ClickHouse via Apache Iceberg', slug: '/integrations/clickhouse' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-clickhouse', label: 'Postgres to ClickHouse' },
+            { type: 'doc', id: 'integrations/mysql-to-clickhouse', label: 'MySQL to ClickHouse' },
+            { type: 'doc', id: 'integrations/mongodb-to-clickhouse', label: 'MongoDB to ClickHouse' },
           ],
         },
       ],
