@@ -219,6 +219,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'glue',
     tested: ['glue'],
     alsoRead: ['athena', 'duckdb']
+  },
+  {
+    source: 's3',
+    engine: 'redshift',
+    slug: 's3-to-redshift',
+    status: 'draft',
+    catalogs: ['glue'],
+    defaultCatalog: 'glue',
+    tested: ['glue'],
+    alsoRead: ['athena', 'duckdb']
   }
 ]
 
