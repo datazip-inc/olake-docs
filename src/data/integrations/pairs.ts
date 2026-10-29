@@ -169,6 +169,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'glue',
     tested: ['glue'],
     alsoRead: ['athena', 'duckdb']
+  },
+  {
+    source: 'oracle',
+    engine: 'redshift',
+    slug: 'oracle-to-redshift',
+    status: 'draft',
+    catalogs: ['glue'],
+    defaultCatalog: 'glue',
+    tested: ['glue'],
+    alsoRead: ['athena', 'duckdb']
   }
 ]
 

@@ -107,6 +107,7 @@ const docSidebar = {
           link: { type: 'generated-index', title: 'Replicate databases to Amazon Redshift via Apache Iceberg', slug: '/integrations/redshift' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-redshift', label: 'Postgres to Redshift' },
+            { type: 'doc', id: 'integrations/oracle-to-redshift', label: 'Oracle to Redshift' },
           ],
         },
       ],
