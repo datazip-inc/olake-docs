@@ -59,6 +59,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'horizon',
     tested: ['horizon'],
     alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'oracle',
+    engine: 'snowflake',
+    slug: 'oracle-to-snowflake',
+    status: 'draft',
+    catalogs: ['horizon', 'glue'],
+    defaultCatalog: 'horizon',
+    tested: ['horizon'],
+    alsoRead: ['duckdb', 'spark']
   }
 ]
 

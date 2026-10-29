@@ -54,7 +54,7 @@ function parseFrontMatter(raw) {
     const r = new RegExp(`^${key}:\\s*(.*)$`, 'm').exec(yaml)
     return r ? r[1].trim().replace(/^"|"$/g, '') : undefined
   }
-  const block = /^integration:\n([\s\S]*?)(?=^\S|\Z)/m.exec(yaml)?.[1] ?? ''
+  const block = /^integration:\n([\s\S]*?)(?=^\S|(?![\s\S]))/m.exec(yaml)?.[1] ?? ''
   const sub = (key) => {
     const r = new RegExp(`^  ${key}:\\s*(.*)$`, 'm').exec(block)
     return r ? r[1].trim() : undefined
