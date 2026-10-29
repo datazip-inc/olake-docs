@@ -34,9 +34,9 @@ integration:
     - q: "Does OLake Go keep one row per key, or one row per message?"
       a: "One row per key when the stream runs in Upsert mode with a deduplication key, which is what this page uses: a later message with the same key replaces the earlier row. In Append mode every message becomes a row, with the Kafka partition, offset and timestamp kept in columns, which suits event logs that are never updated."
     - q: "Where does the first sync start reading a Kafka topic?"
-      a: "From the earliest offset the broker still retains, in every partition of every selected topic. The run on this page read all 48 messages on its first sync. Each later sync resumes from the offsets OLake Go committed in its consumer group, so retention is the replay window: anything the broker has already expired cannot be read."
+      a: "A new consumer group has no committed offset, so the first sync reads every message the broker still retains in every partition of every selected topic. The run on this page read all 48 messages on its first sync. Each later sync resumes from the offsets OLake Go committed in its consumer group, so retention is the replay window: anything the broker has already expired cannot be read."
     - q: "Can OLake Go delete a Snowflake row from a Kafka tombstone?"
-      a: "Yes, when the deduplication key is the message key (`_kafka_key`) alone. A message with that key and a null value deletes the matching row. When the key comes from the payload, as on this page, a tombstone has no payload to match and is skipped, so deletes do not propagate."
+      a: "Yes, when the deduplication key is the message key (`_kafka_key`) alone. A message with that key and a null value deletes the matching row. When the deduplication key comes from the payload, as on this page, a tombstone carries no payload to match, and the connector reference says a message with every dedup field missing fails the sync. Filter tombstones upstream, or key messages by the entity id and use `_kafka_key` as the single dedup key."
     - q: "Which message formats does OLake Go read from Kafka?"
       a: "JSON values, and Avro values when a schema registry is configured on the source. Field types are inferred from a sample of messages at discover time: integers become NUMBER in Snowflake, decimals FLOAT, ISO 8601 timestamp strings TIMESTAMP_LTZ and other strings VARCHAR. Protobuf and plain-text messages are not supported."
     - q: "Does Kafka to Snowflake with OLake Go work on Amazon MSK, Confluent Cloud or Redpanda?"
@@ -92,7 +92,7 @@ flowchart TB
   S -- "data and delete files" --> Q
 ```
 
-There is no separate snapshot phase, because the topic is the history. The first sync starts at the earliest offset the broker still holds in each partition and reads to the end. On this page that was all 48 messages. OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run, and the upsert makes that harmless.
+There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48. OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run. In Upsert mode the re-read is harmless; in Append mode it duplicates those rows.
 
 Every later sync resumes from the committed offsets and reads only what arrived since. In **Upsert** mode a message whose deduplication key already exists in the table retires the old row with a positional delete and writes the new one. A key seen for the first time becomes a new row. In **Append** mode every message is a row, which suits event logs that are never corrected.
 
@@ -276,7 +276,7 @@ A Kafka message has no schema of its own, so OLake Go infers one from a sample o
 | Other strings | `string` | `VARCHAR` | |
 | `_kafka_key` | `string` | `VARCHAR` | The message key, base64-encoded (`3` arrives as `Mw==`). |
 | `_kafka_partition`, `_kafka_offset` | `long` | `NUMBER` | Where the row's latest message sat on the topic. |
-| `_kafka_timestamp` | `timestamptz` | `TIMESTAMP_LTZ(6)` | When the broker received the message. |
+| `_kafka_timestamp` | `timestamptz` | `TIMESTAMP_LTZ(6)` | The message timestamp: produce time or broker append time, depending on the topic's `message.timestamp.type`. |
 
 Types on the left come from the [Kafka connector reference](/docs/connectors/kafka/#kafka-general-information); the Snowflake side from Snowflake's [Iceberg data types](https://docs.snowflake.com/en/user-guide/tables-iceberg-data-types) page (checked 2026-10-14). With **Normalization** on, which is the default, top-level fields become columns.
 
@@ -328,9 +328,9 @@ OLake Go's destination test exchanges the token at `/v1/oauth/tokens` before any
 
 | Method | Freshness | Updates and deletes | Where the data lands | What you run |
 | --- | --- | --- | --- | --- |
-| [Snowflake connector for Kafka](https://docs.snowflake.com/en/user-guide/kafka-connector) with Snowpipe Streaming | Seconds | No; every message is appended as a row, deduplication is yours downstream | Native Snowflake tables; Snowflake is the only reader | A Kafka Connect cluster with the connector, plus Snowpipe credits |
-| [Snowflake Openflow connector for Kafka](https://docs.snowflake.com/en/user-guide/data-integration/openflow/connectors/kafka/about) | Seconds | No; appends messages | Native Snowflake tables | An Openflow deployment, billed in Snowflake credits |
-| [Apache Iceberg Kafka Connect sink](https://iceberg.apache.org/docs/latest/kafka-connect/) | Minutes, by commit interval | Appends by default | Iceberg tables in a catalog you run | A Kafka Connect cluster with the sink, plus a catalog |
+| [Snowflake connector for Kafka](https://docs.snowflake.com/en/user-guide/kafka-connector-overview) with Snowpipe Streaming | Seconds | Loads only; Snowflake's overview says updates and deletes to messages might not be reflected | Native Snowflake tables, as `RECORD_CONTENT` and `RECORD_METADATA` VARIANT columns unless schematized; Snowflake is the only reader | A Kafka Connect cluster with the connector, plus Snowpipe credits |
+| [Snowflake Openflow connector for Kafka](https://docs.snowflake.com/en/user-guide/data-integration/openflow/connectors/kafka/about) | Seconds | Not stated in the connector docs | Native Snowflake tables | An Openflow deployment, billed in Snowflake credits |
+| [Apache Iceberg Kafka Connect sink](https://iceberg.apache.org/docs/latest/kafka-connect/) | Minutes, by commit interval | Append, or row-level changes when id columns and the Debezium or DMS transform are configured | Iceberg tables in a catalog you run | A Kafka Connect cluster with the sink, plus a catalog |
 | Managed ELT (Fivetran, Estuary, Airbyte Cloud) | Minutes, by plan | Varies by tool | Snowflake tables, a second copy you pay to move and store | Nothing; priced per row, per GB or per connector |
 | **OLake Go to Iceberg on Horizon (this guide)** | On a schedule down to one minute | Yes, upsert on a key with Iceberg row-level deletes | Apache Iceberg tables that Snowflake, DuckDB, Spark and Trino all read | One Docker Compose stack, open source; Snowflake storage plus your own compute |
 
@@ -342,7 +342,7 @@ The Snowflake connector is the simpler choice when you need seconds of latency a
 
 - **You need seconds of latency.** OLake Go drains the topic on a schedule, one minute at the shortest. Use the Snowflake connector with Snowpipe Streaming for a continuous feed.
 - **Messages are not JSON or Avro.** Protobuf, plain text and binary payloads cannot be mapped to columns.
-- **Deletes must propagate and the key is in the payload.** Tombstones delete a row only when `_kafka_key` is the single deduplication key. Key the messages by the entity id and use the key as the deduplication key, or run the topic in Append mode and filter deletes downstream.
+- **Deletes must propagate and the key is in the payload.** Tombstones delete a row only when `_kafka_key` is the single deduplication key; on a topic whose dedup key is a payload field, a tombstone fails the sync. Key the messages by the entity id and use the key as the deduplication key, or run the topic in Append mode and filter deletes downstream.
 - **The partition count will change while the job runs in Upsert mode.** The same key would then hash to a different partition, and concurrent partition readers could leave a stale row behind. Finish the repartition, then create the job.
 
 ## FAQs
