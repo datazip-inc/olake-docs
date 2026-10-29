@@ -9,6 +9,8 @@ import type { ComponentType } from 'react'
 
 import PostgresPrereqs from './sources/postgres/Prereqs.mdx'
 import PostgresConnect from './sources/postgres/Connect.mdx'
+import MysqlPrereqs from './sources/mysql/Prereqs.mdx'
+import MysqlConnect from './sources/mysql/Connect.mdx'
 
 import HorizonSetup from './catalogs/horizon/Setup.mdx'
 import HorizonWriter from './catalogs/horizon/Writer.mdx'
@@ -25,6 +27,8 @@ import DuckdbConnectHorizon from './engines/duckdb/Connect-horizon.mdx'
 export const PARTIALS = {
   'sources/postgres/prereqs': PostgresPrereqs,
   'sources/postgres/connect': PostgresConnect,
+  'sources/mysql/prereqs': MysqlPrereqs,
+  'sources/mysql/connect': MysqlConnect,
   'catalogs/horizon/setup': HorizonSetup,
   'catalogs/horizon/writer': HorizonWriter,
   'catalogs/glue/setup': GlueSetup,

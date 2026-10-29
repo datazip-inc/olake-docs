@@ -39,6 +39,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'horizon',
     tested: ['horizon'],
     alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'mysql',
+    engine: 'snowflake',
+    slug: 'mysql-to-snowflake',
+    status: 'draft',
+    catalogs: ['horizon', 'glue'],
+    defaultCatalog: 'horizon',
+    tested: ['horizon'],
+    alsoRead: ['duckdb', 'spark']
   }
 ]
 

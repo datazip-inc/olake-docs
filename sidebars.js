@@ -74,6 +74,7 @@ const docSidebar = {
           link: { type: 'generated-index', title: 'Replicate databases to Snowflake via Apache Iceberg', slug: '/integrations/snowflake' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-snowflake', label: 'Postgres to Snowflake' },
+            { type: 'doc', id: 'integrations/mysql-to-snowflake', label: 'MySQL to Snowflake' },
           ],
         },
       ],

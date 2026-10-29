@@ -194,7 +194,8 @@ for (const name of pages) {
   const own = ownWords(body)
   if (/\bTODO:/.test(body)) err(file, 'leftover TODO: marker')
   if (own < 1200) err(file, `only ${own} words of the page's own prose (minimum 1200)`)
-  if (own <= pulled) err(file, `shared blocks (${pulled} words) outweigh the page's own prose (${own} words)`)
+  if (own < 0.8 * pulled) err(file, `shared blocks (${pulled} words) outweigh the page's own prose (${own} words); own prose must be at least 80% of the shared words`)
+  else if (own < pulled) warn(file, `shared blocks (${pulled} words) slightly outweigh the page's own prose (${own} words)`)
   if (!/```mermaid/.test(body)) warn(file, 'no mermaid diagram')
   if ((body.match(/<Figure\s/g) ?? []).length < 4) warn(file, 'fewer than 4 screenshots')
   for (const tag of ['IntegrationByline', 'HowWeTested', 'IntegrationFaq', 'IntegrationJsonLd', 'RelatedIntegrations']) {

@@ -50,7 +50,7 @@ const page = `---
 title: "${source.label} to ${engine.label}: CDC via Apache Iceberg"
 seo_title: "${source.label} to ${engine.label}: CDC via Apache Iceberg"
 description: "TODO: 120 to 160 characters, unique on the site, containing \\"${source.label.toLowerCase()} to ${engine.label.toLowerCase()}\\"."
-sidebar_label: ${engine.label}
+sidebar_label: ${source.label} to ${engine.label}
 keywords:
   - ${source.label.toLowerCase()} to ${engine.label.toLowerCase()}
 unlisted: true
@@ -75,37 +75,40 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-TODO: two or three sentences that answer the query. Name the catalog and say why ${engine.label} can read the result.
+TODO: two or three sentences that answer the query. Name the default catalog and, if the page offers a second catalog, say where the files sit with each.
 
 <I.IntegrationByline />
 
 <TLDR title='Key takeaways'>
 
-- TODO: four to six bullets that each stand alone.
+- TODO: three highlight bullets, no caveats. What lands where, what you query it with, which other engines read the same tables.
 
 </TLDR>
 
-**The short answer.** TODO: 40 to 60 words an assistant can quote whole for "how do I sync ${source.label.toLowerCase()} to ${engine.label.toLowerCase()}".
+**The short answer.** TODO: 40 to 60 words an assistant can quote whole for "how do I sync ${source.label.toLowerCase()} to ${engine.label.toLowerCase()}". Say the historical snapshot runs first and the change stream follows on its own.
 
-## Ways to move ${source.label} data to ${engine.label}
+## How ${source.label} ${source.cdc ? 'CDC' : 'data'} reaches ${engine.label} here
 
-TODO: a 4 to 6 row table: the vendor's native path, Debezium and Kafka, managed ELT, manual export, and OLake Go to Iceberg. Columns: freshness, deletes, open format, what you run, cost model, where it falls short.
-
-## How ${source.label} CDC reaches ${engine.label} here
-
-TODO: a mermaid diagram of the mechanism, then the two or three source-side traps that matter for ${source.label}.
+TODO: a mermaid diagram of the real flow (source log or cursor, OLake Go writer, catalog: credentials then upload then commit, readers). Then one paragraph on the snapshot-then-changes order and one on the single source-side thing to watch.
 
 ## What you need
 
-TODO
+- **TODO** bold the main points.
 
-## Step 1: Prepare ${source.label} for CDC
+## Step 1: Prepare ${source.label} for ${source.cdc ? 'CDC' : 'incremental sync'}
 
-<I.Partial id="sources/${sourceId}/prereqs" />
+<details>
+<summary>The two sample tables used on this page</summary>
 
-## Step 2: Choose the catalog
+TODO: the sample schema in ${source.label}'s dialect, with "then insert whatever you like".
 
-TODO: one paragraph on why the catalog matters for ${engine.label}.
+</details>
+
+<I.Partial id="sources/${sourceId}/prereqs" tables="customers, orders" />
+
+## Step 2: Set up the catalog in ${engine.label}
+
+TODO: two short paragraphs: what each offered catalog means for ${engine.label} (where files sit, whether a refresh is needed) and which one this page uses.
 
 <I.CatalogStrip />
 
@@ -115,7 +118,11 @@ ${catalogTabs('setup')}
 
 ## Step 3: Connect ${source.label} to OLake Go
 
-<I.Partial id="sources/${sourceId}/connect" />
+<I.Partial id="sources/${sourceId}/connect">
+
+TODO: one sentence on the source form from the run, then the source form figure and the test dialog figure (they render in the OLake UI tab only).
+
+</I.Partial>
 
 ## Step 4: Configure the Iceberg destination
 
@@ -125,9 +132,13 @@ ${catalogTabs('writer')}
 
 ## Step 5: Create the job and run the first sync
 
-<I.Partial id="jobs/create" engines="${engine.label}" upsert="${CATALOGS[pair.defaultCatalog] ? '' : ''}TODO" updateType="${engine.recommendedDelete}" />
+<I.Partial id="jobs/create" engines="${engine.label}" upsert="TODO: the upsert type OLake Go resolved" updateType="${engine.recommendedDelete}">
 
-TODO: screenshots and the numbers from the real first run.
+TODO: one sentence on the target query engines, then the job form, streams and job history figures.
+
+</I.Partial>
+
+TODO: the first run's numbers (rows, seconds) and how the destination schema was named.
 
 ## Step 6: Query the tables in ${engine.label}
 
@@ -135,15 +146,19 @@ TODO: screenshots and the numbers from the real first run.
 ${pair.catalogs.map((c) => `<TabItem value="${c}">\n\n<I.Partial id="engines/${engineId}/query-${c}" />\n\n</TabItem>`).join('\n')}
 </I.CatalogTabs>
 
-## Updates and deletes: what ${engine.label} can read
+<I.Cta />
 
-<I.DeleteFormatTable engines={[${pair.alsoRead.map((e) => `'${e}'`).join(', ')}]} />
+## Step 7: Change rows in ${source.label} and sync again
 
-TODO: the change run, with the commit numbers from the log.
+TODO: the 12 changes, the second run's numbers and the commit report line from the log, the engine screenshot after the change sync, one short "Schema changes" paragraph.
+
+## Query the same tables from other engines
+
+TODO: one tab per engine in alsoRead (groupId="engine"), each with its connect partial and a figure, then the roll-up that matched.
 
 ## Data types: ${source.label} to Iceberg to ${engine.label}
 
-TODO: only if something is lossy for this pair.
+TODO: only if something is lossy for this pair; say OLake Go made the mapping.
 
 ## Cost and maintenance
 
@@ -153,13 +168,16 @@ TODO
 
 TODO: three or four failures with the exact error text and the fix.
 
-## Read the same tables from other engines
+<details>
+<summary>How this compares with other ways to move ${source.label} data to ${engine.label}</summary>
 
-TODO: one tab per engine in alsoRead.
+TODO: a 5 row table (native path, Debezium and Kafka, managed ELT, manual export, OLake Go). Columns: freshness, updates and deletes, where the data lands, what you run. Competitor facts only from their docs, no prices.
+
+</details>
 
 ## When not to use this
 
-TODO
+TODO: hard limits only.
 
 ## FAQs
 
@@ -173,7 +191,7 @@ TODO
 
 <I.IntegrationJsonLd />
 
-<BlogCTA />
+<I.Cta />
 `
 
 fs.mkdirSync(path.dirname(file), { recursive: true })

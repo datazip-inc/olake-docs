@@ -1,0 +1,48 @@
+import CodeBlock from '@theme/CodeBlock';
+
+OLake Go reads MySQL changes from the binary log (binlog), the same stream MySQL replicas use. Four things must be in place on the server before the first sync.
+
+| Setting | Value | Why it matters |
+| --- | --- | --- |
+| `log_bin` | `ON` with a `server_id` | Without a binlog MySQL records no row changes, so there is nothing to replicate. Changing it needs a restart. |
+| `binlog_format` | `ROW` | Statement-based logging does not carry the row images OLake Go needs. |
+| `binlog_row_metadata` | `FULL` | Adds column names and types to every event, so OLake Go can map changes to columns after a schema change. |
+| Replication user | `SELECT`, `REPLICATION SLAVE`, `REPLICATION CLIENT` | The snapshot reads the tables; the change stream reads the binlog. |
+
+<CodeBlock language="sql" title="On the MySQL server">{`-- 1. Binary logging: put these in my.cnf (or the parameter group on managed MySQL) and restart
+--    server-id = 1
+--    log_bin = mysql-bin
+--    binlog_format = ROW
+--    binlog_row_metadata = FULL
+--    binlog_expire_logs_seconds = 604800   -- keep 7 days, so a paused job can catch up
+--    gtid_mode = ON, enforce_gtid_consistency = ON   -- optional; gives microsecond _cdc_timestamp
+
+-- 2. A user for OLake Go
+CREATE USER IF NOT EXISTS 'olake'@'%' IDENTIFIED BY '<password>';
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'olake'@'%';
+FLUSH PRIVILEGES;
+
+-- 3. Table statistics: the chunked snapshot plans its chunks from them
+ANALYZE TABLE ${props.tables ?? '<table_1>, <table_2>'};`}</CodeBlock>
+
+Check the result before moving on:
+
+```sql
+SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'binlog_row_metadata', 'server_id');
+SHOW GRANTS FOR 'olake'@'%';
+```
+
+Managed MySQL sets these through a parameter group or server setting rather than `my.cnf`. Each flavour has its own guide:
+
+| Where MySQL runs | Guide |
+| --- | --- |
+| Amazon RDS | [RDS MySQL CDC setup](/docs/connectors/mysql/setup/rds/) |
+| Amazon Aurora | [Aurora MySQL CDC setup](/docs/connectors/mysql/setup/aurora/) |
+| Azure Database for MySQL | [Azure MySQL CDC setup](/docs/connectors/mysql/setup/azure/) |
+| Google Cloud SQL | [Cloud SQL MySQL CDC setup](/docs/connectors/mysql/setup/gcp/) |
+| Your own server or VM | [Generic MySQL CDC setup](/docs/connectors/mysql/setup/generic/) |
+| Docker, for a local test | [Local MySQL with Docker Compose](/docs/connectors/mysql/setup/local/) |
+
+:::warning[Binlog retention is your replay window]
+MySQL deletes binlog files after `binlog_expire_logs_seconds`. If a job is paused longer than that, the next sync cannot find its saved position and needs a fresh full snapshot. Keep retention longer than your longest planned pause.
+:::
