@@ -27,7 +27,7 @@ integration:
       - "Snowflake (Horizon catalog, Snowflake-managed storage, AWS ap-south-1)"
       - "DuckDB 1.5.5"
       - "Apache Spark 3.5.6 with Iceberg 1.10.0"
-    summary: "Two topics on a single-node Redpanda v26.2.6 cluster (8 customer and 40 order messages, JSON, keyed by id) synced in CDC Only mode with Upsert on the id field and positional deletes as the Iceberg update/delete format, then 12 new messages (7 new keys, 5 repeated keys) picked up by a second sync. All three engines returned identical rows."
+    summary: "Two topics on a single-node Apache Kafka 4.3.1 cluster in KRaft mode (8 customer and 40 order messages, JSON, keyed by id) synced in CDC Only mode with Upsert on the id field and positional deletes as the Iceberg update/delete format, then 12 new messages (7 new keys, 5 repeated keys) picked up by a second sync. All three engines returned identical rows."
   faq:
     - q: "How do I get Kafka topics into Snowflake without the Snowflake Kafka connector?"
       a: "Run OLake Go (open source, Apache 2.0) with the Kafka cluster as the source and Snowflake's Horizon catalog as the Iceberg destination. Each sync reads the topics from the last committed offset, upserts the messages on a deduplication key, and commits Snowflake-managed Iceberg tables. No Kafka Connect cluster, no Snowpipe and no staging tables sit in the path."
@@ -40,7 +40,7 @@ integration:
     - q: "Which message formats does OLake Go read from Kafka?"
       a: "JSON values, and Avro values when a schema registry is configured on the source. Field types are inferred from a sample of messages at discover time: integers become NUMBER in Snowflake, decimals FLOAT, ISO 8601 timestamp strings TIMESTAMP_LTZ and other strings VARCHAR. Protobuf and plain-text messages are not supported."
     - q: "Does Kafka to Snowflake with OLake Go work on Amazon MSK, Confluent Cloud or Redpanda?"
-      a: "Yes. OLake Go speaks the Kafka protocol with PLAINTEXT, SASL_PLAINTEXT or SASL_SSL and the PLAIN or SCRAM-SHA-512 mechanisms, which covers MSK, Confluent Cloud and self-hosted clusters. The run on this page used Redpanda, which exposes the same API. The connector was tested most on Amazon MSK."
+      a: "Yes. OLake Go speaks the Kafka protocol with PLAINTEXT, SASL_PLAINTEXT or SASL_SSL and the PLAIN or SCRAM-SHA-512 mechanisms, which covers MSK, Confluent Cloud and self-hosted clusters. The run on this page used Apache Kafka 4.3.1 in KRaft mode. The connector was tested most on Amazon MSK."
     - q: "Can I use AWS Glue instead of the Horizon catalog?"
       a: "Yes. With Glue as the catalog the files stay in your S3 bucket, Athena, Redshift and EMR read them natively, and Snowflake reads them through a catalog integration as read-only tables you refresh after each sync. Horizon is the better default when Snowflake is the main reader, because the tables are Snowflake-managed and need no refresh."
 ---
@@ -100,7 +100,7 @@ One thing to keep an eye on: retention is the replay window. Kafka deletes messa
 
 ## What you need
 
-- **A Kafka cluster on version 2.4 or later** that OLake Go can reach, with JSON messages (or Avro plus a schema registry) on the topics you want. Amazon Managed Streaming for Apache Kafka (MSK), Confluent Cloud, Redpanda and self-hosted Kafka all work; the run on this page used a single-node Redpanda v26.2.6 in Docker.
+- **A Kafka cluster on version 2.4 or later** that OLake Go can reach, with JSON messages (or Avro plus a schema registry) on the topics you want. Amazon Managed Streaming for Apache Kafka (MSK), Confluent Cloud, Redpanda and self-hosted Kafka all work; the run on this page used a single-node Apache Kafka 4.3.1 in KRaft mode in Docker.
 - **A field that identifies each entity** in every message, such as `id`, when you want one row per key. Without it, run the topic in Append mode.
 - **A Snowflake account** where you can run the one-time setup as `ACCOUNTADMIN`. Snowflake-managed storage means no cloud bucket or IAM role on your side.
 - **OLake UI** from the [Docker Compose install](/docs/install/olake-ui/), on OLake UI v0.7.1 or later with the OLake Go Kafka source on v0.12.1 or later, which is when Upsert mode for Kafka arrived. The run on this page used OLake Go v1.1.0.
@@ -113,17 +113,18 @@ Most readers point OLake Go at topics they already have. If you want to follow a
 <details>
 <summary>The two sample topics used on this page</summary>
 
-Both topics have one partition and carry JSON values keyed by the entity `id`. `rpk` is Redpanda's command-line tool; `kafka-console-producer.sh --property parse.key=true` does the same on Apache Kafka.
+Both topics have one partition and carry JSON values keyed by the entity `id`. The scripts ship with Apache Kafka under `bin/`; with Redpanda, `rpk topic create` and `rpk topic produce -f '%k\t%v\n'` do the same.
 
 ```bash title="Sample topics and messages"
-rpk topic create customers orders -p 1
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic customers --partitions 1
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic orders --partitions 1
 
 # key<TAB>value, one message per line
 printf '1\t{"id":1,"name":"Aarav Mehta","email":"aarav@example.com","city":"Mumbai","tier":"gold","created_at":"2026-10-29T15:22:04+00:00","updated_at":"2026-10-29T15:22:04+00:00"}\n' \
-  | rpk topic produce customers -f '%k\t%v\n'
+  | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic customers --property parse.key=true --property key.separator=$'\t'
 
 printf '1\t{"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"shipped","created_at":"2026-10-29T15:22:04+00:00","updated_at":"2026-10-29T15:22:04+00:00"}\n' \
-  | rpk topic produce orders -f '%k\t%v\n'
+  | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic orders --property parse.key=true --property key.separator=$'\t'
 
 # Then produce whatever you like. This page started with 8 customers and 40 orders.
 ```
@@ -157,7 +158,7 @@ Horizon is the default on this page. Glue is the right pick when Athena, Redshif
 
 <I.Partial id="sources/kafka/connect">
 
-Here is the source form from the run on this page. Redpanda ran in another container, so the bootstrap server is `host.docker.internal:19092`; the topic pattern `^(customers|orders)$` keeps discovery to the two sample topics.
+Here is the source form from the run on this page. Kafka ran in another container, so the bootstrap server is `host.docker.internal:19092`; the topic pattern `^(customers|orders)$` keeps discovery to the two sample topics.
 
 <Figure src='/img/docs/integrations/kafka-to-snowflake/olake-source-kafka.webp' alt='OLake UI Edit source form for Kafka on OLake Go v1.1.0 with the Enable CDC toggle marked not supported, bootstrap server host.docker.internal:19092, consumer group olake_kafka_to_snowflake, topic pattern ^(customers|orders)$, security protocol PLAINTEXT, schema registry off, max threads 2' caption='The Kafka source in OLake UI: bootstrap server, a consumer group for this job only, and a topic pattern that matches the two sample topics.' width='760px' />
 
@@ -188,11 +189,11 @@ Three target query engines were set on this job. Kafka streams offer one sync mo
 
 <Figure src='/img/docs/integrations/kafka-to-snowflake/olake-streams-cdc-only-upsert.webp' alt='OLake UI Streams Selection page with the topics namespace, customers and orders selected, sync mode CDC Only, ingestion mode Upsert, dedup key id and upsert type Positional Deletes on Iceberg format version V2' caption='Each topic: CDC Only, Upsert on the id field, and the upsert type OLake Go resolved (Positional Deletes in this run). The Iceberg DB name at the top is editable.' />
 
-<Figure src='/img/docs/integrations/kafka-to-snowflake/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for kafka_to_snowflake showing two completed syncs, the first in 30 seconds and the second in 19 seconds' caption='Job history: the 30 s first read of both topics, then the 19 s sync of the new messages.' />
+<Figure src='/img/docs/integrations/kafka-to-snowflake/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for kafka_to_snowflake showing two completed syncs, the first in 44 seconds and the second in 24 seconds' caption='Job history: the 44 s first read of both topics, then the 24 s sync of the new messages.' />
 
 </I.Partial>
 
-On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **30 seconds**, container start included. OLake Go names the destination schema after the job and the source namespace. The namespace for every Kafka topic is `topics`, so `kafka_to_snowflake` produced `kafka_to_snowflake_topics`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
+On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **44 seconds**, container start included. OLake Go names the destination schema after the job and the source namespace. The namespace for every Kafka topic is `topics`, so `kafka_to_snowflake` produced `kafka_to_snowflake_topics`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
 
 ## Step 6: Query the tables in Snowflake
 
@@ -231,7 +232,7 @@ To see the change path work, the run on this page produced 12 more messages afte
 1   {"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"delivered", ...}
 ```
 
-The second sync read **12 records (2.26 KB)** from the two topics and finished in **19 seconds** end to end. For `customers` that meant one new data file with 4 rows: the 2 new keys plus the new versions of the 2 repeated keys. One small delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
+The second sync read **12 records (2.26 KB)** from the two topics and finished in **24 seconds** end to end. For `customers` that meant one new data file with 4 rows: the 2 new keys plus the new versions of the 2 repeated keys. One small delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/kafka-to-snowflake/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for customers, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords 4, totalRecords 12 and addedPositionalDeletes 2' caption='The second sync in the OLake UI log: one data file and one positional delete file for customers, zero equality deletes.' />
 
@@ -296,7 +297,7 @@ Types on the left come from the [Kafka connector reference](/docs/connectors/kaf
 failed to ping kafka brokers: unable to dial: dial tcp 192.168.65.254:19999: connect: connection refused
 ```
 
-The address in **Bootstrap Servers** is not reachable from inside the OLake Go container. For a broker on the same machine use `host.docker.internal`, not `localhost`. Make sure the broker also advertises a listener the container can resolve; Redpanda's `--advertise-kafka-addr` and Kafka's `advertised.listeners` decide that. Credentials are not checked until the ping succeeds.
+The address in **Bootstrap Servers** is not reachable from inside the OLake Go container. For a broker on the same machine use `host.docker.internal`, not `localhost`. Make sure the broker also advertises a listener the container can resolve; Kafka's `advertised.listeners` (and Redpanda's `--advertise-kafka-addr`) decide that. Credentials are not checked until the ping succeeds.
 
 ### 2. The Streams page is empty
 
