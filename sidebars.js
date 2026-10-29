@@ -98,6 +98,7 @@ const docSidebar = {
           link: { type: 'generated-index', title: 'Replicate databases to DuckDB via Apache Iceberg', slug: '/integrations/duckdb' },
           items: [
             { type: 'doc', id: 'integrations/mysql-to-duckdb', label: 'MySQL to DuckDB' },
+            { type: 'doc', id: 'integrations/postgres-to-duckdb', label: 'Postgres to DuckDB' },
           ],
         },
       ],
