@@ -1019,6 +1019,33 @@ src/
    - Consistency
 
 
+### 5.7 Third-party content in `/compare` and `/learn` posts
+
+Comparison posts talk about other vendors. These rules keep them accurate, fair and cheap to maintain.
+
+**Review-site quotes (Hacker News, PeerSpot, G2, forums)**
+
+1. Quote opinions and first-hand cost or pricing experience only. Never quote an unverified factual defect ("it loses data", "it does not support X") from an anonymous commenter. If a defect matters, cite the vendor's own docs or issue tracker.
+2. Balance: for each tool use one positive and one negative quote, or none. A page that quotes only negatives about every competitor reads as a hit piece.
+3. Leave out insults and emphatic lines ("absurdly expensive", "an operational nightmare").
+4. Keep the date and the link on every quote, and keep the "one person's view" line.
+
+**No screenshots of other vendors' pages**
+
+- Do not add captures of vendor landing, pricing, plan, licence, docs or limits pages, console views or forum threads. They copy the vendor's page and go stale while staying live on our domain.
+- Our own diagrams and screenshots of OLake's UI or docs are fine.
+- Write the price, plan, limit or licence term as text, with a link to the vendor page and the check date.
+
+**Vendor claims use one pattern**
+
+- Every price, plan, limit or licence claim that comes from a vendor page carries a link to that page and ends with `(checked Oct 2026)` (the month and year it was checked), right after the link. Example: `Standard starts at $20 a month ([pricing page](https://example.com/pricing)) (checked Oct 2026).`
+- Every claim about what a competitor does not support or limits ("its docs say ...") links the page that shows it, on the same line. If the page cannot be linked, cut the claim.
+- A factual limit about a competitor always gets its link, even when that takes a post above the usual link budget. Links to outside sites in `/compare` and `/learn` are `nofollow` automatically.
+- Where table cells are not linked one by one, put a `Sources: <names with links> (checked Oct 2026)` line directly under the table. Write the month with three letters (`Oct 2026`).
+- Link the OLake repository (`https://github.com/datazip-inc/olake`) at every mention of Apache 2.0.
+- FAQ answers in `<Faq>` are JSX, so write links as `<a href={"..."}>label</a>` and code as `<code>`: a markdown link inside a plain string shows as raw text.
+- The monthly refresh skill (`/refresh-vendor-claims`) finds claims by this pattern, so use it from the first draft.
+
 ## 6. Deployment Procedures
 
 

@@ -49,7 +49,16 @@ const docSidebar = {
         { type: 'doc', id: 'install/olake-ui/offline-environments-generic', label: 'Offline Environments (Generic)' },
       ],
     },
-    { type: 'doc', id: 'install/docker-cli', label: 'Docker CLI' },
+    {
+      type: 'category',
+      label: 'Docker CLI',
+      link: { type: 'doc', id: 'install/docker-cli' },
+      collapsed: true,
+      items: [
+        { type: 'doc', id: 'core/configs/streams-migration', label: 'Migrate to Streams v2' },
+        { type: 'doc', id: 'core/configs/streams-legacy', label: 'Streams v1 (Legacy)' },
+      ],
+    },
     { type: 'doc', id: 'install/kubernetes', label: 'Kubernetes/Helm' },
 
     // MOVE AND MANAGE DATA
@@ -156,6 +165,8 @@ const docSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'release/ingestion/v1.1.0',
+        'release/ingestion/v1.0.0',
         'release/ingestion/v0.12.0',
         'release/ingestion/v0.11.0',
         'release/ingestion/v0.10.0',
@@ -242,6 +253,7 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'fusion/release/maintenance/v0.2.0',
         'fusion/release/maintenance/v0.1.0',
       ],
     },

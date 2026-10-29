@@ -1,4 +1,6 @@
-/** Hero copy, calls to action and the "how it fits" diagram on the OLake Fusion page. */
+import { FUSION_GITHUB_REPO_URL } from '@site/src/components/landing/chrome/navItems'
+
+/** Hero copy and calls to action of the OLake Fusion page. */
 
 /** PostHog multivariate flag that A/B tests the hero headline. */
 export const HERO_HEADLINE_FLAG = 'fusion-hero-headline'
@@ -9,20 +11,10 @@ export const HERO_HEADLINES = {
   simplicity: 'Simplify your Iceberg table maintenance'
 }
 
+/** The headline comes from the A/B test above. */
 export const HERO = {
   eyebrow: 'OLake Fusion',
-  primary: { label: 'Get Started', href: '/docs/fusion/getting-started/quickstart/' },
+  body: 'OLake Fusion helps keep your Iceberg tables performant, by automating compaction and reducing manual overhead.',
+  primary: { label: 'Github', href: FUSION_GITHUB_REPO_URL },
   secondary: { label: 'Visit Docs', href: '/docs/fusion/getting-started/overview/' }
-}
-
-/** Iceberg tables in, OLake Fusion in the middle, optimized Iceberg tables out. */
-export const FLOW = {
-  inputLabel: 'Iceberg Tables',
-  engineName: { brand: 'OLake', product: 'Fusion' },
-  outputLabel: 'Optimized Iceberg Tables',
-  capabilities: [
-    { label: 'Compaction' },
-    { label: 'Cleanup', badge: 'Soon' },
-    { label: 'Logs & Metrics' }
-  ] as { label: string; badge?: string }[]
 }

@@ -221,7 +221,8 @@ sudo ctr run --rm \
     /home/olake \
     sync \
     --config /mnt/config/source.json \
-    --catalog /mnt/config/streams.json \
+    --available-streams /mnt/config/available_streams.json \
+    --selected-streams /mnt/config/selected_streams.json \
     --destination /mnt/config/destination.json \
     --state /mnt/config/state.json
 OLAKE_EXIT_CODE=$?

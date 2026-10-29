@@ -37,6 +37,15 @@ const FIELDS = [
       'Name of the Polaris catalog to use, OLake Go passes this to the Polaris REST catalog as the warehouse identifier, so catalog operations are routed to that catalog and its pre-configured S3 storage and IAM settings.',
   },
   {
+    id: 'rest-auth-type',
+    authTypes: AUTH_COMMON,
+    parameter: 'rest_auth_type',
+    required: true,
+    getDynamicSample: (authType) => authType || 'token',
+    description:
+      'Authentication method OLake Go uses for Polaris REST catalog requests. Set to match your catalog\'s authentication configuration.',
+  },
+  {
     id: 'token',
     authTypes: [AUTH_TOKEN],
     parameter: 'token',
@@ -178,7 +187,7 @@ export default function PolarisIcebergWriterCLIConfigDetails({ authType }) {
             <tr key={field.id}>
               <td>{renderParameter(field.parameter, field.required)}</td>
               <td>
-                <code>{field.sample}</code>
+                <code>{field.getDynamicSample ? field.getDynamicSample(authType) : field.sample}</code>
               </td>
               <td>{renderDescription(field.description)}</td>
             </tr>
