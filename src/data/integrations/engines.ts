@@ -316,7 +316,7 @@ export const ENGINES: Record<EngineId, Engine> = {
     label: 'DuckDB',
     version: '1.5.5 with duckdb-iceberg 1.5.3 or later',
     deletes: { eq: 'partial', pos: 'yes', dv: 'yes' },
-    deletesNote: 'DuckDB reads positional deletes and, since duckdb-iceberg 1.5.3, deletion vectors. Equality delete reads are undocumented and have open correctness bugs, so avoid them.',
+    deletesNote: 'DuckDB reads positional deletes and, since duckdb-iceberg 1.5.3, deletion vectors. Equality delete reads are undocumented; they returned correct rows on the runs on this site (duckdb-iceberg 1.5.x, checked 2026-10-29), but prefer positional deletes when DuckDB is the main reader.',
     recommendedDelete: 'pos',
     catalogs: {
       glue: { reads: 'yes', how: 'ATTACH with ENDPOINT_TYPE glue (needs Lake Formation grants)' },

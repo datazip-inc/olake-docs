@@ -36,6 +36,7 @@ import SnowflakeQueryGlue from './engines/snowflake/Query-glue.mdx'
 import SparkConnectHorizon from './engines/spark/Connect-horizon.mdx'
 import DuckdbConnectHorizon from './engines/duckdb/Connect-horizon.mdx'
 import DuckdbConnectPolaris from './engines/duckdb/Connect-polaris.mdx'
+import DuckdbQueryPolaris from './engines/duckdb/Query-polaris.mdx'
 import TrinoConnectPolaris from './engines/trino/Connect-polaris.mdx'
 import ClickhouseQueryPolaris from './engines/clickhouse/Query-polaris.mdx'
 
@@ -68,6 +69,7 @@ export const PARTIALS = {
   'engines/spark/connect-horizon': SparkConnectHorizon,
   'engines/duckdb/connect-horizon': DuckdbConnectHorizon,
   'engines/duckdb/connect-polaris': DuckdbConnectPolaris,
+  'engines/duckdb/query-polaris': DuckdbQueryPolaris,
   'engines/trino/connect-polaris': TrinoConnectPolaris,
   'engines/clickhouse/query-polaris': ClickhouseQueryPolaris
 } satisfies Record<string, ComponentType<Record<string, unknown>>>
