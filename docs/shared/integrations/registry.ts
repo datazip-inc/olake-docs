@@ -39,6 +39,9 @@ import DuckdbConnectPolaris from './engines/duckdb/Connect-polaris.mdx'
 import DuckdbQueryPolaris from './engines/duckdb/Query-polaris.mdx'
 import TrinoConnectPolaris from './engines/trino/Connect-polaris.mdx'
 import ClickhouseQueryPolaris from './engines/clickhouse/Query-polaris.mdx'
+import RedshiftQueryGlue from './engines/redshift/Query-glue.mdx'
+import AthenaConnectGlue from './engines/athena/Connect-glue.mdx'
+import DuckdbConnectGlue from './engines/duckdb/Connect-glue.mdx'
 
 export const PARTIALS = {
   'sources/postgres/prereqs': PostgresPrereqs,
@@ -71,7 +74,10 @@ export const PARTIALS = {
   'engines/duckdb/connect-polaris': DuckdbConnectPolaris,
   'engines/duckdb/query-polaris': DuckdbQueryPolaris,
   'engines/trino/connect-polaris': TrinoConnectPolaris,
-  'engines/clickhouse/query-polaris': ClickhouseQueryPolaris
+  'engines/clickhouse/query-polaris': ClickhouseQueryPolaris,
+  'engines/redshift/query-glue': RedshiftQueryGlue,
+  'engines/athena/connect-glue': AthenaConnectGlue,
+  'engines/duckdb/connect-glue': DuckdbConnectGlue
 } satisfies Record<string, ComponentType<Record<string, unknown>>>
 
 export type PartialId = keyof typeof PARTIALS

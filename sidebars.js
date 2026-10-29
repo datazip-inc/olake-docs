@@ -101,6 +101,14 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/postgres-to-duckdb', label: 'Postgres to DuckDB' },
           ],
         },
+        {
+          type: 'category',
+          label: 'Amazon Redshift',
+          link: { type: 'generated-index', title: 'Replicate databases to Amazon Redshift via Apache Iceberg', slug: '/integrations/redshift' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-redshift', label: 'Postgres to Redshift' },
+          ],
+        },
       ],
     },
     {

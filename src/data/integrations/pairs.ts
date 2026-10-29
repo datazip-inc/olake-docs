@@ -159,6 +159,16 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'polaris',
     tested: ['polaris'],
     alsoRead: ['clickhouse', 'trino']
+  },
+  {
+    source: 'postgres',
+    engine: 'redshift',
+    slug: 'postgres-to-redshift',
+    status: 'draft',
+    catalogs: ['glue'],
+    defaultCatalog: 'glue',
+    tested: ['glue'],
+    alsoRead: ['athena', 'duckdb']
   }
 ]
 
