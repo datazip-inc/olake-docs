@@ -15,6 +15,8 @@ import MongodbPrereqs from './sources/mongodb/Prereqs.mdx'
 import MongodbConnect from './sources/mongodb/Connect.mdx'
 import OraclePrereqs from './sources/oracle/Prereqs.mdx'
 import OracleConnect from './sources/oracle/Connect.mdx'
+import MssqlPrereqs from './sources/mssql/Prereqs.mdx'
+import MssqlConnect from './sources/mssql/Connect.mdx'
 
 import HorizonSetup from './catalogs/horizon/Setup.mdx'
 import HorizonWriter from './catalogs/horizon/Writer.mdx'
@@ -33,10 +35,14 @@ export const PARTIALS = {
   'sources/postgres/connect': PostgresConnect,
   'sources/mysql/prereqs': MysqlPrereqs,
   'sources/mysql/connect': MysqlConnect,
+  'sources/mariadb/prereqs': MysqlPrereqs,
+  'sources/mariadb/connect': MysqlConnect,
   'sources/mongodb/prereqs': MongodbPrereqs,
   'sources/mongodb/connect': MongodbConnect,
   'sources/oracle/prereqs': OraclePrereqs,
   'sources/oracle/connect': OracleConnect,
+  'sources/mssql/prereqs': MssqlPrereqs,
+  'sources/mssql/connect': MssqlConnect,
   'catalogs/horizon/setup': HorizonSetup,
   'catalogs/horizon/writer': HorizonWriter,
   'catalogs/glue/setup': GlueSetup,
