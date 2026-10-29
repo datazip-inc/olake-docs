@@ -110,6 +110,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/oracle-to-redshift', label: 'Oracle to Redshift' },
             { type: 'doc', id: 'integrations/kafka-to-redshift', label: 'Kafka to Redshift' },
             { type: 'doc', id: 'integrations/mysql-to-redshift', label: 'MySQL to Redshift' },
+            { type: 'doc', id: 'integrations/mongodb-to-redshift', label: 'MongoDB to Redshift' },
           ],
         },
       ],
