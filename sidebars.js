@@ -65,6 +65,56 @@ const docSidebar = {
     sectionHeader("MOVE AND MANAGE DATA"),
     {
       type: 'category',
+      label: 'Sources',
+      items: [
+        { type: 'doc', id: 'connectors/postgres/index', label: 'PostgreSQL' },
+        { type: 'doc', id: 'connectors/mongodb/index', label: 'MongoDB' },
+        { type: 'doc', id: 'connectors/mysql/index', label: 'MySQL' },
+        { type: 'doc', id: 'connectors/oracle/index', label: 'Oracle' },
+        { type: 'doc', id: 'connectors/kafka/index', label: 'Kafka' },
+        { type: 'doc', id: 'connectors/db2/index', label: 'DB2 LUW' },
+        { type: 'doc', id: 'connectors/s3/index', label: 'S3' },
+        { type: 'doc', id: 'connectors/mssql/index', label: 'MSSQL' },
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Destinations',
+      items: [
+        {
+          type: 'category',
+          label: 'Apache Iceberg',
+          items: [
+            {
+              type: 'category',
+              label: 'Catalogs',
+              items: [
+                { type: 'doc', id: 'writers/iceberg/catalog/glue', label: 'AWS Glue' },
+                { type: 'doc', id: 'writers/iceberg/catalog/rest', label: 'REST Catalog' },
+                { type: 'doc', id: 'writers/iceberg/catalog/jdbc', label: 'JDBC Catalog' },
+                { type: 'doc', id: 'writers/iceberg/catalog/hive', label: 'Hive Metastore' },
+              ],
+            },
+            { type: 'doc', id: 'writers/iceberg/partitioning', label: 'Data Partitioning' },
+            { type: 'doc', id: 'writers/iceberg/azure', label: 'Iceberg On Azure' },
+            { type: 'doc', id: 'writers/iceberg/gcp', label: 'Iceberg on Google Cloud' },
+            { type: 'doc', id: 'writers/iceberg/troubleshooting-local', label: 'Troubleshooting & Local Testing' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Parquet Writer',
+          items: [
+            { type: 'doc', id: 'writers/parquet/config', label: 'Configuration' },
+            { type: 'doc', id: 'writers/parquet/permission', label: 'IAM Permissions' },
+            { type: 'doc', id: 'writers/parquet/partitioning', label: 'Partitioning' },
+            { type: 'doc', id: 'writers/parquet/troubleshoot', label: 'Troubleshooting' },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'category',
       label: 'Integrations',
       link: { type: 'doc', id: 'integrations/index' },
       items: [
@@ -195,56 +245,6 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/catalogs/unity', label: 'Unity Catalog' },
             { type: 'doc', id: 'integrations/catalogs/biglake', label: 'BigLake' },
             { type: 'doc', id: 'integrations/catalogs/s3tables', label: 'Amazon S3 Tables' },
-          ],
-        },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Sources',
-      items: [
-        { type: 'doc', id: 'connectors/postgres/index', label: 'PostgreSQL' },
-        { type: 'doc', id: 'connectors/mongodb/index', label: 'MongoDB' },
-        { type: 'doc', id: 'connectors/mysql/index', label: 'MySQL' },
-        { type: 'doc', id: 'connectors/oracle/index', label: 'Oracle' },
-        { type: 'doc', id: 'connectors/kafka/index', label: 'Kafka' },
-        { type: 'doc', id: 'connectors/db2/index', label: 'DB2 LUW' },
-        { type: 'doc', id: 'connectors/s3/index', label: 'S3' },
-        { type: 'doc', id: 'connectors/mssql/index', label: 'MSSQL' },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Destinations',
-      items: [
-        {
-          type: 'category',
-          label: 'Apache Iceberg',
-          items: [
-            {
-              type: 'category',
-              label: 'Catalogs',
-              items: [
-                { type: 'doc', id: 'writers/iceberg/catalog/glue', label: 'AWS Glue' },
-                { type: 'doc', id: 'writers/iceberg/catalog/rest', label: 'REST Catalog' },
-                { type: 'doc', id: 'writers/iceberg/catalog/jdbc', label: 'JDBC Catalog' },
-                { type: 'doc', id: 'writers/iceberg/catalog/hive', label: 'Hive Metastore' },
-              ],
-            },
-            { type: 'doc', id: 'writers/iceberg/partitioning', label: 'Data Partitioning' },
-            { type: 'doc', id: 'writers/iceberg/azure', label: 'Iceberg On Azure' },
-            { type: 'doc', id: 'writers/iceberg/gcp', label: 'Iceberg on Google Cloud' },
-            { type: 'doc', id: 'writers/iceberg/troubleshooting-local', label: 'Troubleshooting & Local Testing' },
-          ],
-        },
-        {
-          type: 'category',
-          label: 'Parquet Writer',
-          items: [
-            { type: 'doc', id: 'writers/parquet/config', label: 'Configuration' },
-            { type: 'doc', id: 'writers/parquet/permission', label: 'IAM Permissions' },
-            { type: 'doc', id: 'writers/parquet/partitioning', label: 'Partitioning' },
-            { type: 'doc', id: 'writers/parquet/troubleshoot', label: 'Troubleshooting' },
           ],
         },
       ],
