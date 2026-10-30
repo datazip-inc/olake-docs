@@ -161,6 +161,16 @@ export const PAIRS: Pair[] = [
     alsoRead: ['clickhouse', 'trino']
   },
   {
+    source: 'mssql',
+    engine: 'snowflake',
+    slug: 'sql-server-to-snowflake',
+    status: 'draft',
+    catalogs: ['horizon', 'glue'],
+    defaultCatalog: 'horizon',
+    tested: ['horizon'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
     source: 'postgres',
     engine: 'bigquery',
     slug: 'postgres-to-bigquery',

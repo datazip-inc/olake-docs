@@ -80,6 +80,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/mariadb-to-snowflake', label: 'MariaDB to Snowflake' },
             { type: 'doc', id: 'integrations/kafka-to-snowflake', label: 'Kafka to Snowflake' },
             { type: 'doc', id: 'integrations/s3-to-snowflake', label: 'S3 to Snowflake' },
+            { type: 'doc', id: 'integrations/sql-server-to-snowflake', label: 'SQL Server to Snowflake' },
           ],
         },
         {
