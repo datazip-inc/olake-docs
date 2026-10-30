@@ -123,6 +123,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/postgres-to-bigquery', label: 'Postgres to BigQuery' },
             { type: 'doc', id: 'integrations/oracle-to-bigquery', label: 'Oracle to BigQuery' },
             { type: 'doc', id: 'integrations/mongodb-to-bigquery', label: 'MongoDB to BigQuery' },
+            { type: 'doc', id: 'integrations/mysql-to-bigquery', label: 'MySQL to BigQuery' },
           ],
         },
       ],
