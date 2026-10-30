@@ -369,6 +369,86 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'glue',
     tested: ['glue'],
     alsoRead: ['athena', 'duckdb']
+  },
+  {
+    source: 'postgres',
+    engine: 'databricks',
+    slug: 'postgres-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'mysql',
+    engine: 'databricks',
+    slug: 'mysql-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'mariadb',
+    engine: 'databricks',
+    slug: 'mariadb-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'mongodb',
+    engine: 'databricks',
+    slug: 'mongodb-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'oracle',
+    engine: 'databricks',
+    slug: 'oracle-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'mssql',
+    engine: 'databricks',
+    slug: 'sql-server-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'kafka',
+    engine: 'databricks',
+    slug: 'kafka-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 's3',
+    engine: 'databricks',
+    slug: 's3-to-databricks',
+    status: 'draft',
+    catalogs: ['unity'],
+    defaultCatalog: 'unity',
+    tested: ['unity'],
+    alsoRead: ['duckdb', 'spark']
   }
 ]
 

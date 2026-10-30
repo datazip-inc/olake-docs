@@ -137,6 +137,21 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/sql-server-to-bigquery', label: 'SQL Server to BigQuery' },
           ],
         },
+        {
+          type: 'category',
+          label: 'Databricks',
+          link: { type: 'generated-index', title: 'Replicate databases to Databricks via Apache Iceberg', slug: '/integrations/databricks' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-databricks', label: 'Postgres to Databricks' },
+            { type: 'doc', id: 'integrations/mysql-to-databricks', label: 'MySQL to Databricks' },
+            { type: 'doc', id: 'integrations/mariadb-to-databricks', label: 'MariaDB to Databricks' },
+            { type: 'doc', id: 'integrations/mongodb-to-databricks', label: 'MongoDB to Databricks' },
+            { type: 'doc', id: 'integrations/oracle-to-databricks', label: 'Oracle to Databricks' },
+            { type: 'doc', id: 'integrations/sql-server-to-databricks', label: 'SQL Server to Databricks' },
+            { type: 'doc', id: 'integrations/kafka-to-databricks', label: 'Kafka to Databricks' },
+            { type: 'doc', id: 'integrations/s3-to-databricks', label: 'S3 to Databricks' },
+          ],
+        },
       ],
     },
     {

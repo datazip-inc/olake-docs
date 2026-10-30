@@ -49,6 +49,11 @@ import BiglakeWriter from './catalogs/biglake/Writer.mdx'
 import BigqueryQueryBiglake from './engines/bigquery/Query-biglake.mdx'
 import DuckdbConnectBiglake from './engines/duckdb/Connect-biglake.mdx'
 import SparkConnectBiglake from './engines/spark/Connect-biglake.mdx'
+import UnitySetup from './catalogs/unity/Setup.mdx'
+import UnityWriter from './catalogs/unity/Writer.mdx'
+import DatabricksQueryUnity from './engines/databricks/Query-unity.mdx'
+import DuckdbConnectUnity from './engines/duckdb/Connect-unity.mdx'
+import SparkConnectUnity from './engines/spark/Connect-unity.mdx'
 
 export const PARTIALS = {
   'sources/postgres/prereqs': PostgresPrereqs,
@@ -91,7 +96,12 @@ export const PARTIALS = {
   'catalogs/biglake/writer': BiglakeWriter,
   'engines/bigquery/query-biglake': BigqueryQueryBiglake,
   'engines/duckdb/connect-biglake': DuckdbConnectBiglake,
-  'engines/spark/connect-biglake': SparkConnectBiglake
+  'engines/spark/connect-biglake': SparkConnectBiglake,
+  'catalogs/unity/setup': UnitySetup,
+  'catalogs/unity/writer': UnityWriter,
+  'engines/databricks/query-unity': DatabricksQueryUnity,
+  'engines/duckdb/connect-unity': DuckdbConnectUnity,
+  'engines/spark/connect-unity': SparkConnectUnity
 } satisfies Record<string, ComponentType<Record<string, unknown>>>
 
 export type PartialId = keyof typeof PARTIALS
