@@ -117,6 +117,8 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/mongodb-to-redshift', label: 'MongoDB to Redshift' },
             { type: 'doc', id: 'integrations/mariadb-to-redshift', label: 'MariaDB to Redshift' },
             { type: 'doc', id: 'integrations/s3-to-redshift', label: 'S3 to Redshift' },
+            { type: 'doc', id: 'integrations/sql-server-to-redshift', label: 'SQL Server to Redshift' },
+            { type: 'doc', id: 'integrations/db2-to-redshift', label: 'DB2 to Redshift' },
           ],
         },
         {
