@@ -1,0 +1,335 @@
+---
+slug: postgres-cdc-rest-catalog-presto
+title: "Postgres CDC to Presto Without a Hive Metastore: Using a REST/Nessie Iceberg Catalog"
+seo_title: "Postgres CDC to Apache Iceberg REST Catalog, Queried by Presto"
+description: "Replicate PostgreSQL CDC into an Apache Iceberg REST/Nessie catalog with OLake Go, then query it from Presto's Iceberg connector — no Hive metastore required."
+tags: [iceberg, olake, postgres, cdc, rest-catalog, nessie, polaris, presto, how-to]
+authors: [gauri]
+image: /img/blog/cover/mysql-to-iceberg-query-with-presto.webp
+draft: true
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Postgres CDC to REST catalog cover](/img/blog/cover/mysql-to-iceberg-query-with-presto.webp)
+
+[Presto's Iceberg connector](https://prestodb.io/docs/current/connector/iceberg.html) supports four catalog types: `HIVE`, `NESSIE`, `REST`, and `HADOOP`. Almost every public Presto-on-Iceberg tutorial — including Presto's own — uses the first one. That's not because Hive metastore is required; it's because it's the default path everyone already knows. It's also one more stateful service to stand up, back up, and keep available.
+
+This post builds the same thing a different way: PostgreSQL CDC into an Iceberg table registered in a REST-compatible catalog, queried by Presto with `iceberg.catalog.type=nessie` (or `rest`) instead of `hive`. No metastore in the architecture at all. Every command below was run against real containers, not copied in blind — including the two places where the official docs turned out to be slightly off, called out inline.
+
+## The pieces
+
+- **Source**: PostgreSQL, replicated via logical decoding (`pgoutput`) — no Debezium, no Kafka in between.
+- **Ingestion**: [OLake Go](https://github.com/datazip-inc/olake), writing directly to an Iceberg REST catalog. The source for every driver, Postgres included, lives in that repository if you want to see exactly what the Docker image below runs.
+- **Catalog**: [Project Nessie](https://projectnessie.org/) for the walkthrough below — it's the only REST-compatible catalog OLake's own docs provide a complete local (MinIO-backed) setup for, so it's the one actually run here end to end. [Apache Polaris](https://polaris.apache.org/) uses the same `destination.json` shape on the OLake Go side and the same `rest` catalog type on the Presto side; it's covered as a reference, not run, since Polaris's documented setup expects a real AWS S3 bucket and IAM role rather than a local object store.
+- **Query engine**: Presto, via its Iceberg connector's `nessie` or `rest` catalog type — both tested below against the same data.
+
+## 1. Enable logical replication on Postgres
+
+OLake Go reads Postgres changes through native logical replication, not a bolted-on CDC agent. For a local Postgres, that means `wal_level = logical` plus a publication and a replication slot. This compose file starts Postgres with that config and a second container that creates a test table plus the publication/slot it needs:
+
+```yaml title="docker-compose.yml"
+services:
+  primary_postgres:
+    container_name: primary_postgres
+    image: postgres:15
+    ports:
+      - "5431:5432"
+    environment:
+      POSTGRES_USER: main
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: main
+    command: >
+      bash -c "exec docker-entrypoint.sh postgres -c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "main", "-d", "main"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  data-loader:
+    image: postgres:15
+    environment:
+      PGUSER: main
+      PGPASSWORD: password
+      PGDATABASE: main
+    depends_on:
+      primary_postgres:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "
+        until pg_isready -h primary_postgres -p 5432 -U main -d main; do sleep 2; done;
+        psql -h primary_postgres -U main -d main -c \"CREATE TABLE IF NOT EXISTS sample_data (id SERIAL PRIMARY KEY, str_col TEXT, num_col INT);\";
+        psql -h primary_postgres -U main -d main -c \"INSERT INTO sample_data (str_col, num_col) VALUES ('Hello world', 123);\";
+        psql -h primary_postgres -U main -d main -c \"CREATE PUBLICATION olake_publication FOR ALL TABLES;\";
+        psql -h primary_postgres -U main -d main -c \"SELECT * FROM pg_create_logical_replication_slot('postgres_slot', 'pgoutput');\";
+      "
+    restart: "no"
+```
+
+```bash
+docker compose up -d
+```
+
+(Adapted from [OLake's local Postgres setup guide](https://olake.io/docs/connectors/postgres/setup/local) — that guide also covers RDS, Aurora, and Cloud SQL if your source isn't local.)
+
+## 2. Point OLake Go at Postgres
+
+```json title="source.json"
+{
+    "host": "host.docker.internal",
+    "port": 5431,
+    "database": "main",
+    "username": "main",
+    "password": "password",
+    "ssl": { "mode": "disable" },
+    "update_method": {
+        "replication_slot": "postgres_slot",
+        "publication": "olake_publication",
+        "initial_wait_time": 120
+    },
+    "reader_batch_size": 100000,
+    "max_threads": 5
+}
+```
+
+One correction to the docs' own example here: `initial_wait_time` has a minimum of 120 seconds. Set it lower (the published Docker CLI example uses `10`) and OLake Go logs a warning and silently substitutes its own default of 10800 seconds (3 hours) instead — not what you'd expect from the value you typed. 120 is also what the OLake UI's own field hint uses, so it's the value in this walkthrough.
+
+## 3. Start a Nessie catalog backed by MinIO
+
+[OLake's REST catalog docs](https://olake.io/docs/writers/iceberg/catalog/rest?rest-catalog=nessie) provide a complete local stack for Nessie: the Nessie server itself, Postgres for Nessie's own metadata, and MinIO as the S3-compatible object store.
+
+```yaml title="docker-compose.yml"
+services:
+  nessie:
+    image: ghcr.io/projectnessie/nessie:0.105.0
+    container_name: nessie
+    ports:
+      - "19120:19120"
+    environment:
+      - nessie.version.store.type=JDBC
+      - quarkus.datasource.db-kind=postgresql
+      - quarkus.datasource.jdbc.url=jdbc:postgresql://postgres:5432/nessie_db
+      - quarkus.datasource.username=nessie
+      - quarkus.datasource.password=nessie
+      - nessie.catalog.default-warehouse=warehouse
+      - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
+      - nessie.catalog.service.s3.default-options.region=us-east-1
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
+      - nessie.catalog.service.s3.default-options.external-endpoint=http://host.docker.internal:9000/
+      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+      - nessie.catalog.secrets.access-key.name=minio
+      - nessie.catalog.secrets.access-key.secret=minio123
+    depends_on:
+      postgres: { condition: service_healthy }
+      mc: { condition: service_completed_successfully }
+
+  minio:
+    image: olakego/minio:RELEASE.2025-04-03T14-56-28Z
+    container_name: minio
+    ports: ["9000:9000", "9090:9090"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ADDRESS: ":9000"
+      MINIO_CONSOLE_ADDRESS: ":9090"
+    command: server /data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+
+  mc:
+    image: olakego/minio:RELEASE.2025-04-03T14-56-28Z
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: /bin/bash
+    restart: "no"
+    command: >
+      -c "mc alias set myminio http://minio:9000/ minio minio123 &&
+          mc mb myminio/warehouse --ignore-existing"
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: nessie
+      POSTGRES_PASSWORD: nessie
+      POSTGRES_DB: nessie_db
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nessie"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+```
+
+`<YOUR_MACHINE_IP>` in the original doc becomes `host.docker.internal` on macOS, or your machine's private IP on Linux — that's the docs' own instruction, not a workaround.
+
+```bash
+docker compose up -d
+```
+
+Now point OLake Go at it:
+
+```json title="destination.json"
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "nessie",
+    "rest_catalog_url": "http://host.docker.internal:19120/iceberg/",
+    "catalog_name": "olake_iceberg",
+    "iceberg_s3_path": "s3://warehouse",
+    "rest_auth_type": "none",
+    "s3_endpoint": "http://host.docker.internal:9000/",
+    "aws_access_key": "minio",
+    "aws_secret_key": "minio123",
+    "aws_region": "us-east-1",
+    "arrow_writes": false
+  }
+}
+```
+
+(Full field reference: [OLake's Nessie catalog config](https://olake.io/docs/writers/iceberg/catalog/rest?rest-catalog=nessie&tab=nessie-cli).)
+
+## 4. Discover and sync
+
+[Discover](https://olake.io/docs/install/docker-cli#discover-command) reads the source and lists its streams:
+
+```bash
+docker run --pull=always \
+  -v "$(pwd)/config:/mnt/config" \
+  olakego/source-postgres:latest \
+  discover \
+  --config /mnt/config/source.json
+```
+
+This writes `available_streams.json` and `selected_streams.json` into the config folder — `sample_data` comes back already set to `sync_mode: cdc`, so there's nothing to edit for this walkthrough.
+
+Then [sync](https://olake.io/docs/install/docker-cli#sync-command):
+
+```bash
+docker run --pull=always \
+  -v "$(pwd)/config:/mnt/config" \
+  olakego/source-postgres:latest \
+  sync \
+  --config /mnt/config/source.json \
+  --selected-streams /mnt/config/selected_streams.json \
+  --available-streams /mnt/config/available_streams.json \
+  --destination /mnt/config/destination.json
+```
+
+That backfills the one existing row and commits the first Iceberg snapshot. Insert a second row to see CDC pick it up:
+
+```bash
+docker exec primary_postgres psql -U main -d main -c \
+  "INSERT INTO sample_data (str_col, num_col) VALUES ('CDC test row', 456);"
+```
+
+Sync writes a `state.json` after the first run, so re-running with `--state` only reads what changed since:
+
+```bash
+docker run --pull=always \
+  -v "$(pwd)/config:/mnt/config" \
+  olakego/source-postgres:latest \
+  sync \
+  --config /mnt/config/source.json \
+  --selected-streams /mnt/config/selected_streams.json \
+  --available-streams /mnt/config/available_streams.json \
+  --destination /mnt/config/destination.json \
+  --state /mnt/config/state.json
+```
+
+The logs confirm it: `pgoutput starting from lsn=0/1999CA8 target=0/1999DA0`, `Total records read: 1` — exactly the one new row, not a re-read of the whole table.
+
+## 5. Query it from Presto
+
+One detail worth getting right before writing the query: OLake Go doesn't write the table into a namespace called `public`, it writes to `<source-name>_<database>_<schema>`, so the table in this example lands as `postgres_main_public.sample_data`.
+
+For a Nessie catalog:
+
+```properties title="etc/catalog/iceberg.properties"
+connector.name=iceberg
+iceberg.catalog.type=nessie
+iceberg.catalog.warehouse=s3://warehouse
+iceberg.nessie.uri=http://host.docker.internal:19120/api/v1
+hive.s3.use-instance-credentials=false
+hive.s3.aws-access-key=minio
+hive.s3.aws-secret-key=minio123
+hive.s3.endpoint=http://host.docker.internal:9000
+hive.s3.path-style-access=true
+hive.s3.ssl.enabled=false
+```
+
+Nessie's REST endpoint also happens to speak the plain Iceberg REST protocol, so the same table is reachable with Presto's generic `rest` catalog type too — no Nessie-specific code path required:
+
+```properties title="etc/catalog/iceberg.properties"
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest.uri=http://host.docker.internal:19120/iceberg/
+hive.s3.use-instance-credentials=false
+hive.s3.aws-access-key=minio
+hive.s3.aws-secret-key=minio123
+hive.s3.endpoint=http://host.docker.internal:9000
+hive.s3.path-style-access=true
+hive.s3.ssl.enabled=false
+```
+
+(Full property reference, including OAuth2/Basic auth for the REST type: [Presto's Iceberg connector docs](https://prestodb.io/docs/current/connector/iceberg.html).)
+
+Either config, same result:
+
+```sql
+SELECT id, str_col, num_col, _op_type
+FROM iceberg.postgres_main_public.sample_data
+ORDER BY id;
+```
+
+```
+ id |    str_col    | num_col | _op_type
+----+----------------+---------+----------
+  1 | Hello world    |     123 | r
+  2 | CDC test row   |     456 | c
+```
+
+`_op_type` is OLake Go's own bookkeeping column: `r` for the initial backfill read, `c` for a change captured via CDC. Both rows, same table, same query — Presto doesn't need to know or care which one arrived through a full read and which one streamed in off the WAL.
+
+## What about Polaris?
+
+OLake Go's `destination.json` for Apache Polaris is the same shape, just a different catalog and auth:
+
+```json title="destination.json — Polaris, not run in this walkthrough"
+{
+  "type": "ICEBERG",
+  "writer": {
+    "catalog_type": "polaris",
+    "rest_catalog_url": "http://<REST_ENDPOINT>:8181/api/catalog",
+    "catalog_name": "olake_iceberg",
+    "iceberg_s3_path": "<POLARIS_CATALOG_NAME>",
+    "rest_auth_type": "oauth2",
+    "oauth2_uri": "http://<REST_ENDPOINT>:8181/api/catalog/v1/oauth/tokens",
+    "credential": "<client_id>:<client_secret>",
+    "scope": "<SCOPE>",
+    "aws_region": "<S3_REGION>",
+    "arrow_writes": false
+  }
+}
+```
+
+And on the Presto side, there's no separate `polaris` catalog type — Polaris speaks the standard Iceberg REST protocol, so it's configured exactly like the generic `rest` block above, pointed at Polaris's endpoint instead.
+
+This section is given as reference rather than a tested walkthrough: [OLake's Polaris setup docs](https://olake.io/docs/writers/iceberg/catalog/rest?rest-catalog=polaris) have Polaris itself running locally in a container, but creating the catalog, principal, and role still goes through Polaris's own management API against a real AWS S3 bucket and IAM role — not something to improvise for a local walkthrough.
+
+## Why bother with a non-Hive catalog
+
+Two reasons this is worth doing even though Hive metastore works fine:
+
+1. **One fewer stateful service.** A REST/Nessie catalog server is simpler to run and back up than a Hive metastore backed by its own relational database.
+2. **Nessie specifically adds git-like semantics on top of Iceberg** — branches and tags over your tables (`iceberg.nessie.ref` in Presto's config), which a Hive metastore has no equivalent for. That's a genuinely different capability, not just a swapped backend.
+
+## Takeaway
+
+The ingestion side (OLake Go reading Postgres CDC) and the query side (Presto's Iceberg connector) don't change based on which catalog sits between them. Whether that's Hive metastore, Nessie, or a Polaris-style REST catalog is a separate decision from how the data gets there or how it gets queried — and increasingly, it doesn't have to be Hive.
+
+<BlogCTA />
