@@ -113,6 +113,10 @@ const docSidebar = {
         },
       ],
     },
+    { type: 'doc', id: 'understanding/terminologies/olake', label: 'Stream Properties' },
+    { type: 'doc', id: 'getting-started/job-level-properties', label: 'Job-level Properties' },
+    { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
+
     {
       type: 'category',
       label: 'Integrations',
@@ -249,10 +253,6 @@ const docSidebar = {
         },
       ],
     },
-    { type: 'doc', id: 'understanding/terminologies/olake', label: 'Stream Properties' },
-    { type: 'doc', id: 'getting-started/job-level-properties', label: 'Job-level Properties' },
-    { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
-
     // MONITORING AND OBSERVABILITY
     sectionHeader("MONITORING AND OBSERVABILITY"),
     { type: 'doc', id: 'monitoring-and-observability/metrics', label: 'Prometheus Integration' },
