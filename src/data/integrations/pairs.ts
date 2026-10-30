@@ -81,6 +81,16 @@ export const PAIRS: Pair[] = [
     alsoRead: ['duckdb', 'spark']
   },
   {
+    source: 'db2',
+    engine: 'snowflake',
+    slug: 'db2-to-snowflake',
+    status: 'draft',
+    catalogs: ['horizon', 'glue'],
+    defaultCatalog: 'horizon',
+    tested: ['horizon'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
     source: 'mariadb',
     engine: 'snowflake',
     slug: 'mariadb-to-snowflake',

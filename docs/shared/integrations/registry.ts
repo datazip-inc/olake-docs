@@ -21,6 +21,8 @@ import KafkaPrereqs from './sources/kafka/Prereqs.mdx'
 import KafkaConnect from './sources/kafka/Connect.mdx'
 import S3Prereqs from './sources/s3/Prereqs.mdx'
 import S3Connect from './sources/s3/Connect.mdx'
+import Db2Prereqs from './sources/db2/Prereqs.mdx'
+import Db2Connect from './sources/db2/Connect.mdx'
 
 import HorizonSetup from './catalogs/horizon/Setup.mdx'
 import HorizonWriter from './catalogs/horizon/Writer.mdx'
@@ -65,6 +67,8 @@ export const PARTIALS = {
   'sources/kafka/connect': KafkaConnect,
   'sources/s3/prereqs': S3Prereqs,
   'sources/s3/connect': S3Connect,
+  'sources/db2/prereqs': Db2Prereqs,
+  'sources/db2/connect': Db2Connect,
   'catalogs/horizon/setup': HorizonSetup,
   'catalogs/horizon/writer': HorizonWriter,
   'catalogs/glue/setup': GlueSetup,
