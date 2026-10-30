@@ -121,6 +121,7 @@ const docSidebar = {
           link: { type: 'generated-index', title: 'Replicate databases to Google BigQuery via Apache Iceberg', slug: '/integrations/bigquery' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-bigquery', label: 'Postgres to BigQuery' },
+            { type: 'doc', id: 'integrations/oracle-to-bigquery', label: 'Oracle to BigQuery' },
           ],
         },
       ],

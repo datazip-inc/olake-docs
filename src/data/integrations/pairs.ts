@@ -171,6 +171,16 @@ export const PAIRS: Pair[] = [
     alsoRead: ['duckdb', 'spark']
   },
   {
+    source: 'oracle',
+    engine: 'bigquery',
+    slug: 'oracle-to-bigquery',
+    status: 'draft',
+    catalogs: ['biglake'],
+    defaultCatalog: 'biglake',
+    tested: ['biglake'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
     source: 'postgres',
     engine: 'redshift',
     slug: 'postgres-to-redshift',
