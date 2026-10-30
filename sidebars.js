@@ -126,6 +126,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/mysql-to-bigquery', label: 'MySQL to BigQuery' },
             { type: 'doc', id: 'integrations/kafka-to-bigquery', label: 'Kafka to BigQuery' },
             { type: 'doc', id: 'integrations/mariadb-to-bigquery', label: 'MariaDB to BigQuery' },
+            { type: 'doc', id: 'integrations/s3-to-bigquery', label: 'S3 to BigQuery' },
           ],
         },
       ],
