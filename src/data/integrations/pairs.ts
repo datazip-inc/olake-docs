@@ -74,7 +74,7 @@ export const PAIRS: Pair[] = [
     source: 'mssql',
     engine: 'snowflake',
     slug: 'sql-server-to-snowflake',
-    status: 'planned',
+    status: 'draft',
     catalogs: ['horizon', 'glue'],
     defaultCatalog: 'horizon',
     tested: ['horizon'],
@@ -159,16 +159,6 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'polaris',
     tested: ['polaris'],
     alsoRead: ['clickhouse', 'trino']
-  },
-  {
-    source: 'mssql',
-    engine: 'snowflake',
-    slug: 'sql-server-to-snowflake',
-    status: 'draft',
-    catalogs: ['horizon', 'glue'],
-    defaultCatalog: 'horizon',
-    tested: ['horizon'],
-    alsoRead: ['duckdb', 'spark']
   },
   {
     source: 'postgres',
