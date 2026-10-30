@@ -71,7 +71,7 @@ const docSidebar = {
         {
           type: 'category',
           label: 'Snowflake',
-          link: { type: 'generated-index', title: 'Replicate databases to Snowflake via Apache Iceberg', slug: '/integrations/snowflake' },
+          link: { type: 'doc', id: 'integrations/engines/snowflake' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-snowflake', label: 'Postgres to Snowflake' },
             { type: 'doc', id: 'integrations/mysql-to-snowflake', label: 'MySQL to Snowflake' },
@@ -87,19 +87,20 @@ const docSidebar = {
         {
           type: 'category',
           label: 'ClickHouse',
-          link: { type: 'generated-index', title: 'Replicate databases to ClickHouse via Apache Iceberg', slug: '/integrations/clickhouse' },
+          link: { type: 'doc', id: 'integrations/engines/clickhouse' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-clickhouse', label: 'Postgres to ClickHouse' },
             { type: 'doc', id: 'integrations/mysql-to-clickhouse', label: 'MySQL to ClickHouse' },
             { type: 'doc', id: 'integrations/mongodb-to-clickhouse', label: 'MongoDB to ClickHouse' },
             { type: 'doc', id: 'integrations/sql-server-to-clickhouse', label: 'SQL Server to ClickHouse' },
             { type: 'doc', id: 'integrations/db2-to-clickhouse', label: 'DB2 to ClickHouse' },
+            { type: 'doc', id: 'integrations/kafka-to-clickhouse', label: 'Kafka to ClickHouse' },
           ],
         },
         {
           type: 'category',
           label: 'DuckDB',
-          link: { type: 'generated-index', title: 'Replicate databases to DuckDB via Apache Iceberg', slug: '/integrations/duckdb' },
+          link: { type: 'doc', id: 'integrations/engines/duckdb' },
           items: [
             { type: 'doc', id: 'integrations/mysql-to-duckdb', label: 'MySQL to DuckDB' },
             { type: 'doc', id: 'integrations/postgres-to-duckdb', label: 'Postgres to DuckDB' },
@@ -108,7 +109,7 @@ const docSidebar = {
         {
           type: 'category',
           label: 'Amazon Redshift',
-          link: { type: 'generated-index', title: 'Replicate databases to Amazon Redshift via Apache Iceberg', slug: '/integrations/redshift' },
+          link: { type: 'doc', id: 'integrations/engines/redshift' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-redshift', label: 'Postgres to Redshift' },
             { type: 'doc', id: 'integrations/oracle-to-redshift', label: 'Oracle to Redshift' },
@@ -124,7 +125,7 @@ const docSidebar = {
         {
           type: 'category',
           label: 'Google BigQuery',
-          link: { type: 'generated-index', title: 'Replicate databases to Google BigQuery via Apache Iceberg', slug: '/integrations/bigquery' },
+          link: { type: 'doc', id: 'integrations/engines/bigquery' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-bigquery', label: 'Postgres to BigQuery' },
             { type: 'doc', id: 'integrations/oracle-to-bigquery', label: 'Oracle to BigQuery' },
@@ -140,7 +141,7 @@ const docSidebar = {
         {
           type: 'category',
           label: 'Databricks',
-          link: { type: 'generated-index', title: 'Replicate databases to Databricks via Apache Iceberg', slug: '/integrations/databricks' },
+          link: { type: 'doc', id: 'integrations/engines/databricks' },
           items: [
             { type: 'doc', id: 'integrations/postgres-to-databricks', label: 'Postgres to Databricks' },
             { type: 'doc', id: 'integrations/mysql-to-databricks', label: 'MySQL to Databricks' },
@@ -150,6 +151,50 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/sql-server-to-databricks', label: 'SQL Server to Databricks' },
             { type: 'doc', id: 'integrations/kafka-to-databricks', label: 'Kafka to Databricks' },
             { type: 'doc', id: 'integrations/s3-to-databricks', label: 'S3 to Databricks' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Apache Iceberg',
+          link: { type: 'doc', id: 'integrations/engines/iceberg' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-iceberg', label: 'Postgres to Iceberg' },
+            { type: 'doc', id: 'integrations/mysql-to-iceberg', label: 'MySQL to Iceberg' },
+            { type: 'doc', id: 'integrations/mongodb-to-iceberg', label: 'MongoDB to Iceberg' },
+            { type: 'doc', id: 'integrations/oracle-to-iceberg', label: 'Oracle to Iceberg' },
+            { type: 'doc', id: 'integrations/sql-server-to-iceberg', label: 'SQL Server to Iceberg' },
+            { type: 'doc', id: 'integrations/kafka-to-iceberg', label: 'Kafka to Iceberg' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'More query engines',
+          collapsed: true,
+          items: [
+            { type: 'doc', id: 'integrations/engines/athena', label: 'Amazon Athena' },
+            { type: 'doc', id: 'integrations/engines/trino', label: 'Trino' },
+            { type: 'doc', id: 'integrations/engines/spark', label: 'Apache Spark' },
+            { type: 'doc', id: 'integrations/engines/emr', label: 'Spark on Amazon EMR' },
+            { type: 'doc', id: 'integrations/engines/dataproc', label: 'Google Cloud Dataproc' },
+            { type: 'doc', id: 'integrations/engines/starburst', label: 'Starburst' },
+            { type: 'doc', id: 'integrations/engines/presto', label: 'Presto' },
+            { type: 'doc', id: 'integrations/engines/doris', label: 'Apache Doris' },
+            { type: 'doc', id: 'integrations/engines/starrocks', label: 'StarRocks' },
+            { type: 'doc', id: 'integrations/engines/fabric', label: 'Microsoft Fabric' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Catalogs',
+          collapsed: true,
+          items: [
+            { type: 'doc', id: 'integrations/catalogs/glue', label: 'AWS Glue' },
+            { type: 'doc', id: 'integrations/catalogs/polaris', label: 'Apache Polaris' },
+            { type: 'doc', id: 'integrations/catalogs/lakekeeper', label: 'Lakekeeper' },
+            { type: 'doc', id: 'integrations/catalogs/horizon', label: 'Snowflake Horizon' },
+            { type: 'doc', id: 'integrations/catalogs/unity', label: 'Unity Catalog' },
+            { type: 'doc', id: 'integrations/catalogs/biglake', label: 'BigLake' },
+            { type: 'doc', id: 'integrations/catalogs/s3tables', label: 'Amazon S3 Tables' },
           ],
         },
       ],

@@ -1,0 +1,348 @@
+---
+title: "Kafka to Apache Iceberg: Topics as Tables"
+seo_title: "Kafka to Apache Iceberg: Upsert Topics into Polaris, No Kafka Connect"
+description: "Stream Kafka to Apache Iceberg without Kafka Connect: OLake Go upserts JSON messages into a Polaris catalog, and Spark, DuckDB and Trino query the tables."
+sidebar_label: Kafka to Iceberg
+image: /img/docs/integrations/kafka-to-iceberg/cover.webp
+keywords:
+  - kafka to iceberg
+  - kafka to apache iceberg
+  - kafka iceberg sink
+  - kafka topics to iceberg tables
+  - apache polaris
+  - iceberg rest catalog
+unlisted: true
+integration:
+  source: kafka
+  engine: iceberg
+  catalogs: [polaris]
+  default: polaris
+  author: shubham
+  reviewer: nayan
+  tested:
+    date: "2026-10-30"
+    olake: v1.1.0
+    catalogs: [polaris]
+    engines:
+      - "Apache Spark 3.5.6 with Iceberg 1.10.0"
+      - "DuckDB 1.5.5"
+      - "Trino 484"
+    summary: "Two topics on a single-node Apache Kafka 4.3.1 cluster in KRaft mode (8 customer and 40 order messages, JSON, keyed by id) synced in CDC Only mode with Upsert on the id field and positional deletes as the Iceberg update/delete format into Apache Polaris 1.8.0 on MinIO, then 12 new messages (7 new keys, 5 repeated keys) picked up by a second sync. Spark, DuckDB and Trino returned identical rows."
+  faq:
+    - q: "How do I write Kafka topics to Apache Iceberg without Kafka Connect?"
+      a: "Run OLake Go (open source, Apache 2.0) with the Kafka cluster as the source and an Iceberg REST catalog such as Apache Polaris as the destination. Each sync reads the topics from the last committed offset, upserts the messages on a deduplication key, and commits Iceberg tables in your own bucket. No Kafka Connect cluster, no Flink job and no Spark streaming job sit in the path."
+    - q: "Does OLake Go keep one row per key, or one row per message?"
+      a: "One row per key when the stream runs in Upsert mode with a deduplication key, which is what this page uses: a later message with the same key replaces the earlier row. In Append mode every message becomes a row, with the Kafka partition, offset and timestamp kept in columns, which suits event logs that are never updated."
+    - q: "Which Iceberg delete format does OLake Go use for Kafka upserts?"
+      a: "Positional deletes on Iceberg v2. In OLake Go v1.1.0 Upsert on a Kafka stream always writes positional deletes, which Apache Spark, DuckDB and Trino all read. A query engine that reads only deletion vectors, such as Databricks on Unity Catalog, therefore gets Kafka topics in Append mode instead."
+    - q: "Where does the first sync start reading a Kafka topic?"
+      a: "A new consumer group has no committed offset, so the first sync reads every message the broker still retains in every partition of every selected topic. The run on this page read all 48 messages on its first sync. Each later sync resumes from the offsets OLake Go committed in its consumer group, so retention is the replay window."
+    - q: "Which message formats does OLake Go read from Kafka?"
+      a: "JSON values, and Avro values when a schema registry is configured on the source. Field types are inferred from a sample of messages at discover time: integers become long, decimals double, ISO 8601 timestamp strings timestamptz and other strings string. Protobuf and plain-text messages are not supported."
+    - q: "Does this work with Amazon MSK or Confluent Cloud?"
+      a: "Yes. OLake Go speaks the Kafka protocol with PLAINTEXT, SASL_PLAINTEXT or SASL_SSL and the PLAIN or SCRAM-SHA-512 mechanisms, which covers Amazon Managed Streaming for Apache Kafka (MSK), Confluent Cloud and self-hosted clusters. The run on this page used Apache Kafka 4.3.1 in KRaft mode."
+---
+
+import * as I from '@site/src/components/integrations';
+
+Kafka to Apache Iceberg usually means a Kafka Connect cluster running the Iceberg sink, or a Flink or Spark streaming job that runs all day. OLake Go takes a lighter route: it reads the topics itself on a schedule, as a change data capture (CDC) stream, and keeps one row per key. The result lands once, as Iceberg tables in an Apache Polaris catalog, with the files in your own bucket.
+
+Polaris is an open source Iceberg REST (Representational State Transfer) catalog you run yourself. Apache Spark, DuckDB and Trino all read the tables through that one endpoint.
+
+<I.IntegrationByline />
+
+<TLDR title='Key takeaways'>
+
+- OLake Go turns Kafka topics into Iceberg tables in Polaris: each sync reads from the last committed offset and upserts messages on a deduplication key, so a repeated key updates its row instead of adding one.
+- No Kafka Connect cluster and no streaming job run between syncs; one container reads the topics, commits the snapshot, then commits the offsets.
+- Spark, DuckDB and Trino read the same tables through the same catalog, with no export and no second copy. In the run on this page all three returned identical rows.
+
+</TLDR>
+
+**The short answer.** To write Kafka topics to Apache Iceberg, run OLake Go with the Kafka cluster as the source and an Iceberg REST catalog such as Apache Polaris as the destination. Put each topic in **CDC Only** mode with **Upsert** on a deduplication key. The first sync reads every retained message; every later sync reads only what arrived after the committed offsets.
+
+## How Kafka messages reach Apache Iceberg here
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 40}}}%%
+flowchart TB
+  subgraph kf["Kafka"]
+    T[topics customers and orders, JSON values keyed by id]
+    CG[consumer group: committed offset per partition]
+    T ~~~ CG
+  end
+  subgraph olake["OLake Go"]
+    R[one reader per partition]
+    W[Iceberg writer: upsert on the dedup key]
+    R --> W
+  end
+  subgraph pol["Apache Polaris"]
+    H[REST catalog: table pointers, access control]
+  end
+  S[(S3 or MinIO bucket)]
+  Q[Query engines: Apache Spark, DuckDB, Trino]
+  T -- "first sync: every retained message, from the earliest offset" --> R
+  CG -- "later syncs: only messages after the committed offsets" --> R
+  W -- "1. Parquet data files and positional delete files" --> S
+  W -- "2. commit snapshot, then commit offsets to Kafka" --> H
+  H -- "table metadata and vended credentials" --> Q
+  S -- "data and delete files" --> Q
+```
+
+There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48. OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run, which Upsert mode absorbs.
+
+Every later sync resumes from the committed offsets and reads only what arrived since. A message whose deduplication key already exists retires the old row with a positional delete and writes the new one. Keys seen for the first time become new rows.
+
+Two Kafka details shape the tables. On this page the deduplication key is the `id` field in the JSON value; the message key, stored as `_kafka_key`, is the other choice. Tombstones (messages with a null value) delete a row only when `_kafka_key` is the single deduplication key, and on a topic deduplicated on a payload field a tombstone fails the sync.
+
+One thing to keep an eye on: retention is the replay window. Kafka deletes messages past `retention.ms`, and OLake Go cannot read what is gone. A job paused longer than the retention of its topics silently misses the expired messages.
+
+## What you need
+
+- **A Kafka cluster on version 2.4 or later** that OLake Go can reach, with JSON messages (or Avro plus a schema registry) on the topics you want. Amazon Managed Streaming for Apache Kafka (MSK), Confluent Cloud, Redpanda and self-hosted Kafka all work; the run on this page used a single-node Apache Kafka 4.3.1 in KRaft mode in Docker.
+- **A field that identifies each entity** in every message, such as `id`, when you want one row per key. Without it, run the topic in Append mode.
+- **An Apache Polaris server and a bucket**, both reachable from OLake Go and from the engines. The run on this page used Polaris 1.8.0 and MinIO in Docker.
+- **At least one Iceberg reader.** The run on this page used Apache Spark 3.5.6 with Iceberg 1.10.0, DuckDB 1.5.5 and Trino 484.
+- **OLake UI** from the [Docker Compose install](/docs/install/olake-ui/), on OLake UI v0.7.1 or later with the OLake Go Kafka source on v0.12.1 or later, which is when Upsert mode for Kafka arrived. The run on this page used OLake Go v1.1.0.
+- **Docker**, and about 40 minutes.
+
+## Step 1: Prepare the Kafka topics
+
+Most readers point OLake Go at topics they already have. If you want to follow along with the exact data from this page, produce messages shaped like these first:
+
+<details>
+<summary>The two sample topics used on this page</summary>
+
+Both topics have one partition and carry JSON values keyed by the entity `id`. The scripts ship with Apache Kafka under `bin/`.
+
+```bash title="Sample topics and messages"
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic customers --partitions 1
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic orders --partitions 1
+
+# key<TAB>value, one message per line
+printf '1\t{"id":1,"name":"Aarav Mehta","email":"aarav@example.com","city":"Mumbai","tier":"gold","created_at":"2026-10-29T15:22:04+00:00","updated_at":"2026-10-29T15:22:04+00:00"}\n' \
+  | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic customers --property parse.key=true --property key.separator=$'\t'
+
+printf '1\t{"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"shipped","created_at":"2026-10-29T15:22:04+00:00","updated_at":"2026-10-29T15:22:04+00:00"}\n' \
+  | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic orders --property parse.key=true --property key.separator=$'\t'
+
+# Then produce whatever you like. This page started with 8 customers and 40 orders.
+```
+
+</details>
+
+<I.Partial id="sources/kafka/prereqs" topics="customers orders" />
+
+## Step 2: Set up the Polaris catalog
+
+An Iceberg table is a set of files plus a pointer to its current metadata, and the catalog holds that pointer. **Apache Polaris** is the catalog this page uses: OLake Go commits into it, and every reader asks it where the current snapshot is. The files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
+
+The [Polaris catalog page](/docs/integrations/catalogs/polaris/) lists which engines read it and how. Any Iceberg REST client with OAuth2 works, which covers Spark, DuckDB, Trino, ClickHouse, Flink and PyIceberg.
+
+<I.CatalogStrip />
+
+<I.CatalogTabs>
+<TabItem value="polaris">
+
+<I.Partial id="catalogs/polaris/setup" />
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 3: Connect Kafka to OLake Go
+
+<I.Partial id="sources/kafka/connect">
+
+Here is the source form from the run on this page. Kafka ran in another container, so the bootstrap server is `host.docker.internal:19092`; the topic pattern `^(customers|orders)$` keeps discovery to the two sample topics.
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/olake-source-kafka.webp' alt='OLake UI Edit source form for Kafka on OLake Go v1.1.0 with bootstrap server host.docker.internal:19092, a consumer group, topic pattern ^(customers|orders)$ and security protocol PLAINTEXT' caption='The Kafka source in OLake UI: bootstrap server, a consumer group for the job, and a topic pattern that matches the two sample topics.' width='760px' />
+
+**Set up source** pings the brokers before anything is saved. The consumer group is created on the first sync; it does not need to exist yet.
+
+</I.Partial>
+
+## Step 4: Configure the Iceberg destination
+
+<I.CatalogTabs>
+<TabItem value="polaris">
+
+<I.Partial id="catalogs/polaris/writer">
+
+Here is the destination form from the run on this page. Polaris and MinIO ran in other containers, so both addresses use `host.docker.internal`; the credential is the `olake` principal from step 2.
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/olake-destination-polaris.webp' alt='OLake UI Edit destination form for Apache Iceberg with catalog type Polaris, OAuth2, REST catalog URI on port 8181, catalog name olake and the MinIO endpoint' caption='The Polaris destination in OLake UI: OAuth2 with the principal from step 2, and the MinIO endpoint for the files.' width='760px' />
+
+</I.Partial>
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 5: Create the job and run the first sync
+
+The target query engines on this job are Apache Spark, DuckDB and Trino. Kafka streams offer one sync mode, **CDC Only**, and Upsert on a Kafka stream writes **Positional Deletes**, which all three engines read. What you decide on the Streams page is the ingestion mode and the deduplication key.
+
+<I.Partial id="jobs/create" engines="Apache Spark, DuckDB and Trino" unit="topics" syncMode="CDC Only" dedupKeys="id" upsert="Positional Deletes" updateType="pos" image="olakego/source-kafka:latest" cliSyncMode="strict_cdc" namespace="topics">
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/olake-streams-positional-deletes.webp' alt='OLake UI Streams Selection page with the topics namespace, customers and orders selected, CDC Only, Upsert, dedup key id and Positional Deletes on Iceberg V2' caption='Each topic: CDC Only, Upsert on the id field, and Positional Deletes on Iceberg v2. The Iceberg DB name at the top is editable.' />
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for kafka_to_iceberg showing two completed syncs, 24 seconds and then 18 seconds' caption='Job history: the 24 s first read of both topics, then the 18 s sync of the new messages.' />
+
+</I.Partial>
+
+On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **24 seconds**, container start included. OLake Go names the Iceberg namespace after the job and the source namespace. The namespace for every Kafka topic is `topics`, so `kafka_to_iceberg` produced `kafka_to_iceberg_topics`.
+
+## Step 6: Query the Iceberg tables
+
+DuckDB is the quickest reader to try: one process, no server. It attaches the whole Polaris catalog and reads the tables in place. Because the topics ran with Upsert on `id`, a plain `SELECT` returns one row per key.
+
+<I.CatalogTabs>
+<TabItem value="polaris">
+
+<I.Partial id="engines/duckdb/query-polaris" schema="kafka_to_iceberg_topics" />
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/duckdb-polaris-customers.webp' alt='DuckDB 1.5.5 querying polaris.kafka_to_iceberg_topics.customers through the attached Polaris catalog and returning 10 rows, one per key' caption='DuckDB 1.5.5 reading the customers table through Polaris after the second sync: 10 rows, one per key.' />
+
+</TabItem>
+</I.CatalogTabs>
+
+<I.Cta />
+
+## Step 7: Produce new messages and sync again
+
+To see the change path work, the run on this page produced 12 more messages after the first sync. Seven carry new keys; five repeat an existing key with a changed value.
+
+```bash title="Messages produced between the two syncs (key, then value)"
+# customers: two new keys, two repeated keys
+9   {"id":9,"name":"Maya Patel","email":"maya@example.com","city":"Pune","tier":"silver", ...}
+10  {"id":10,"name":"Lucas Silva","email":"lucas@example.com","city":"São Paulo","tier":"bronze", ...}
+3   {"id":3,"name":"Liam Carter","email":"liam@example.com","city":"Austin","tier":"gold", ...}
+8   {"id":8,"name":"Zara Ali","email":"zara@example.com","city":"Abu Dhabi","tier":"silver", ...}
+
+# orders: five new keys (41 to 45), three repeated keys (1, 4, 7) with status "delivered"
+41  {"id":41,"customer_id":9,"product":"Laptop","amount":1299.0,"status":"placed", ...}
+1   {"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"delivered", ...}
+```
+
+The second sync read **12 records (2.26 KB)** from the two topics and finished in **18 seconds** end to end. For `orders` that meant one new data file with 8 rows: the 5 new keys plus the new versions of the 3 repeated keys. One small positional delete file retires the 3 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=8`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=3`.
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for orders, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords 8 and addedPositionalDeletes 3' caption='The second sync in the OLake UI log: one data file and one positional delete file for orders.' />
+
+`customers` has the same shape with 4 rows and 2 deletes. Every reader shows the result on its next query, still with one row per key. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The `_op_type` column shows how each row arrived (`c` for a first-seen key, `u` for a repeated key) and `_kafka_offset` shows which message it came from.
+
+**Schema changes.** When a new field appears in the messages, OLake Go adds it as a column on the next sync and commits the new schema to Polaris. A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+
+## Query the same tables from Trino and Spark
+
+This is the point of writing Iceberg. Nothing is exported, copied or refreshed: each engine reads the files OLake Go wrote, through the same Polaris endpoint.
+
+<Tabs groupId="engine" queryString="engine">
+<TabItem value="trino" label="Trino" default>
+
+<I.Partial id="engines/trino/connect-polaris" schema="kafka_to_iceberg_topics" />
+
+<Figure src='/img/docs/integrations/kafka-to-iceberg/trino-polaris-customers.webp' alt='Trino 484 CLI querying customers in the kafka_to_iceberg_topics schema of the polaris catalog and returning 10 rows' caption='Trino 484 reading the same table through Polaris: the same 10 rows.' />
+
+</TabItem>
+<TabItem value="spark" label="Apache Spark">
+
+<I.Partial id="engines/spark/connect-polaris" schema="kafka_to_iceberg_topics" />
+
+Spark 3.5.6 with Iceberg 1.10.0 returned the same 10 customers and 45 orders in the run on this page.
+
+</TabItem>
+</Tabs>
+
+An `orders` roll-up matched the latest message per key in all three engines: 45 orders for 25579.19 in total. By status it gave 16 delivered orders for 8659.68, 18 placed for 10522.26, 11 shipped for 6397.25.
+
+## Data types: Kafka JSON to Apache Iceberg
+
+A Kafka message has no schema of its own, so OLake Go infers one from a sample of messages at discover time and maps it to Iceberg types. Four Kafka columns are added to every row. This is what the run on this page produced:
+
+| In the JSON value | Iceberg (written by OLake Go) | Notes |
+| --- | --- | --- |
+| Integer (`"id": 3`) | `long` | |
+| Decimal (`"amount": 99.19`) | `double` | The `orders.amount` sums on this page matched the messages to the cent in every engine; round at query time when you need exact decimal arithmetic. |
+| ISO 8601 timestamp string (`"2026-10-29T15:22:04+00:00"`) | `timestamptz` (UTC) | Strings that parse as timestamps are stored as timestamps. |
+| Other strings | `string` | |
+| `_kafka_key` | `string` | The message key, base64-encoded (`3` arrives as `Mw==`). |
+| `_kafka_partition`, `_kafka_offset` | `int`, `long` | Where the row's latest message sat on the topic. |
+| `_kafka_timestamp` | `timestamptz` | The message timestamp: produce time or broker append time, depending on the topic's `message.timestamp.type`. |
+
+Types on the left come from the [Kafka connector reference](/docs/connectors/kafka/#kafka-general-information). With **Normalization** on, which is the default, top-level fields become columns.
+
+## Cost and maintenance
+
+- **Storage** is your bucket: you pay S3 or MinIO rates for the Parquet and delete files, and nothing to Polaris for holding pointers.
+- **Compute.** OLake Go runs wherever you run Docker, for the length of a sync; the second sync on this page took 18 seconds. Nothing runs between syncs, unlike a Connect worker or a streaming job.
+- **Maintenance.** A topic synced every minute adds a small file and a delete file per run, so plan compaction. [OLake Fusion](/docs/fusion/getting-started/overview/) does this for the catalogs OLake Go writes to, and Spark's `rewrite_data_files` works through the same Polaris endpoint.
+- **Retention disk.** Seven days of a busy topic is real disk on the brokers. Size for it, or shorten retention once the job runs reliably every hour.
+
+## Troubleshooting
+
+### 1. The source test cannot reach the brokers
+
+```text
+failed to ping kafka brokers: unable to dial: dial tcp 192.168.65.254:19999: connect: connection refused
+```
+
+The address in **Bootstrap Servers** is not reachable from inside the OLake Go container. For a broker on the same machine use `host.docker.internal`, not `localhost`. Make sure the broker also advertises a listener the container can resolve; Kafka's `advertised.listeners` decides that.
+
+### 2. The Streams page is empty
+
+```text
+Skipping topic customers (does not match topic_pattern: ^nothing_here$)
+```
+
+The topic pattern is a full regular expression anchored by you. `^orders$` matches one topic, `^orders` matches every topic that starts with it, and a pattern with a typo matches nothing. Fix the pattern on the source and run discovery again.
+
+### 3. The destination test fails at the token exchange
+
+OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure: a wrong client id or secret, a principal with no role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or a wrong `Polaris Catalog Name`. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
+
+### 4. A sync ends early after a consumer-group rebalance
+
+A rebalance in OLake Go's consumer group, usually because another process joined it, makes the sync stop cleanly with what it has read. Nothing is lost: the messages read so far are committed, and the next sync resumes from the committed offsets. Give each job its own consumer group and never point another consumer at it.
+
+<details>
+<summary>How this compares with other ways to move Kafka data to Apache Iceberg</summary>
+
+| Method | Freshness | Updates and deletes | Where the data lands | What you run |
+| --- | --- | --- | --- | --- |
+| [Iceberg Kafka Connect sink](https://iceberg.apache.org/docs/latest/kafka-connect/) | Seconds to minutes, by commit interval | Upsert with its own settings | Iceberg tables in your catalog | A Kafka Connect cluster and the sink connector |
+| [Flink with the Iceberg connector](https://iceberg.apache.org/docs/latest/flink/) | Seconds | Upsert on a primary key | Iceberg tables in your catalog | A Flink cluster and a job per pipeline |
+| Spark Structured Streaming | Seconds to minutes | Only with your own `MERGE` logic | Iceberg tables in your catalog | A Spark cluster running all day and the merge code |
+| Managed ELT (Fivetran, Estuary, Airbyte Cloud) | Minutes, by plan | Varies by tool | Their managed destination, often a warehouse table | Nothing; priced per row, per GB or per connector |
+| **OLake Go to Iceberg on Polaris (this guide)** | On a schedule down to one minute | Yes, upsert on a key with Iceberg row-level deletes | Apache Iceberg tables in your bucket and your catalog | One Docker Compose stack, open source; your bucket plus your own compute |
+
+The Connect sink or Flink is the right choice when you need seconds of latency and already run that platform. OLake Go needs no always-on worker, which matters when a few-minute lag is fine and the cluster would exist only for this pipeline.
+
+</details>
+
+## When not to use this
+
+- **You need seconds of latency.** OLake Go drains the topic on a schedule, one minute at the shortest.
+- **Messages are not JSON or Avro.** Protobuf, plain text and binary payloads cannot be mapped to columns.
+- **The only reader takes deletion vectors alone.** Kafka upserts are written as positional deletes, so a reader such as Databricks on Unity Catalog gets the topics in Append mode; [Kafka to Databricks](/docs/integrations/kafka-to-databricks/) shows that setup.
+- **The partition count will change while the job runs in Upsert mode.** The same key would then hash to a different partition, and concurrent partition readers could leave a stale row behind. Finish the repartition, then create the job.
+
+## FAQs
+
+<I.IntegrationFaq />
+
+<I.HowWeTested />
+
+## Related guides
+
+<I.RelatedIntegrations />
+
+Deeper reading on this site:
+
+- [Kafka connector reference](/docs/connectors/kafka/)
+- [Apache Iceberg readers and delete formats](/docs/integrations/iceberg/)
+- [Kafka to ClickHouse on the same catalog](/docs/integrations/kafka-to-clickhouse/)
+- [Equality vs positional deletes vs deletion vectors](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors/)
+- [OLake Go ingestion benchmarks](/docs/benchmarks/ingestion/)
+
+<I.IntegrationJsonLd />
+
+<I.Cta title='Start with your own topics' body='The quickstart runs OLake UI with Docker Compose. Create the Kafka source, the Polaris destination and the job as above, and the first sync lands your topics as Iceberg in your own bucket.' />

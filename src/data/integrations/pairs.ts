@@ -449,13 +449,75 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'unity',
     tested: ['unity'],
     alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'postgres',
+    engine: 'iceberg',
+    slug: 'postgres-to-iceberg',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['spark', 'duckdb', 'trino']
+  },
+  {
+    source: 'mysql',
+    engine: 'iceberg',
+    slug: 'mysql-to-iceberg',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['spark', 'duckdb', 'trino']
+  },
+  {
+    source: 'mongodb',
+    engine: 'iceberg',
+    slug: 'mongodb-to-iceberg',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['spark', 'duckdb', 'trino']
+  },
+  {
+    source: 'oracle',
+    engine: 'iceberg',
+    slug: 'oracle-to-iceberg',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['spark', 'duckdb', 'trino']
+  },
+  {
+    source: 'mssql',
+    engine: 'iceberg',
+    slug: 'sql-server-to-iceberg',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['spark', 'duckdb', 'trino']
+  },
+  {
+    source: 'kafka',
+    engine: 'iceberg',
+    slug: 'kafka-to-iceberg',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['spark', 'duckdb', 'trino']
+  },
+  {
+    source: 'kafka',
+    engine: 'clickhouse',
+    slug: 'kafka-to-clickhouse',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['duckdb', 'trino']
   }
 ]
-
-export function findPair(source: string, engine: string): Pair | undefined {
-  return PAIRS.find((p) => p.source === source && p.engine === engine)
-}
-
-export function pairBySlug(slug: string): Pair | undefined {
-  return PAIRS.find((p) => p.slug === slug)
-}

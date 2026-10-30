@@ -40,6 +40,7 @@ import DuckdbConnectHorizon from './engines/duckdb/Connect-horizon.mdx'
 import DuckdbConnectPolaris from './engines/duckdb/Connect-polaris.mdx'
 import DuckdbQueryPolaris from './engines/duckdb/Query-polaris.mdx'
 import TrinoConnectPolaris from './engines/trino/Connect-polaris.mdx'
+import SparkConnectPolaris from './engines/spark/Connect-polaris.mdx'
 import ClickhouseQueryPolaris from './engines/clickhouse/Query-polaris.mdx'
 import RedshiftQueryGlue from './engines/redshift/Query-glue.mdx'
 import AthenaConnectGlue from './engines/athena/Connect-glue.mdx'
@@ -88,6 +89,7 @@ export const PARTIALS = {
   'engines/duckdb/connect-polaris': DuckdbConnectPolaris,
   'engines/duckdb/query-polaris': DuckdbQueryPolaris,
   'engines/trino/connect-polaris': TrinoConnectPolaris,
+  'engines/spark/connect-polaris': SparkConnectPolaris,
   'engines/clickhouse/query-polaris': ClickhouseQueryPolaris,
   'engines/redshift/query-glue': RedshiftQueryGlue,
   'engines/athena/connect-glue': AthenaConnectGlue,
