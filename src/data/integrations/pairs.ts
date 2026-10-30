@@ -141,6 +141,16 @@ export const PAIRS: Pair[] = [
     alsoRead: ['duckdb', 'trino']
   },
   {
+    source: 'mssql',
+    engine: 'clickhouse',
+    slug: 'sql-server-to-clickhouse',
+    status: 'draft',
+    catalogs: ['polaris'],
+    defaultCatalog: 'polaris',
+    tested: ['polaris'],
+    alsoRead: ['duckdb', 'trino']
+  },
+  {
     source: 'mysql',
     engine: 'duckdb',
     slug: 'mysql-to-duckdb',

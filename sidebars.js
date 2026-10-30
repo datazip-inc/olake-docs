@@ -91,6 +91,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/postgres-to-clickhouse', label: 'Postgres to ClickHouse' },
             { type: 'doc', id: 'integrations/mysql-to-clickhouse', label: 'MySQL to ClickHouse' },
             { type: 'doc', id: 'integrations/mongodb-to-clickhouse', label: 'MongoDB to ClickHouse' },
+            { type: 'doc', id: 'integrations/sql-server-to-clickhouse', label: 'SQL Server to ClickHouse' },
           ],
         },
         {
