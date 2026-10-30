@@ -28,6 +28,7 @@ export type EngineId =
   | 'doris'
   | 'starrocks'
   | 'fabric'
+  | 'iceberg'
 
 export type DeleteFormat = 'eq' | 'pos' | 'dv'
 
@@ -399,6 +400,31 @@ export const ENGINES: Record<EngineId, Engine> = {
     docsUrl: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/',
     sources: [
       { title: 'StarRocks: Iceberg catalog', url: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/', checked: '2026-10-12' }
+    ]
+  },
+  iceberg: {
+    id: 'iceberg',
+    label: 'Apache Iceberg',
+    version: 'table format v2 and v3, read through an Iceberg REST catalog',
+    deletes: { eq: 'yes', pos: 'yes', dv: 'yes' },
+    deletesNote:
+      'The Iceberg spec defines all three delete formats; what a reader can open depends on the engine. OLake Go picks the format every target query engine on the job reads, so list the engines that will read the tables.',
+    recommendedDelete: 'pos',
+    catalogs: {
+      glue: { reads: 'yes', how: 'any engine with the Iceberg AWS bundle' },
+      polaris: { reads: 'yes', how: 'any Iceberg REST client with OAuth2' },
+      lakekeeper: { reads: 'yes', how: 'any Iceberg REST client with OAuth2' },
+      s3tables: { reads: 'yes', how: 'Iceberg REST with SigV4' },
+      nessie: { reads: 'yes', how: 'Nessie or REST client' },
+      hive: { reads: 'yes', how: 'Hive Metastore client' },
+      jdbc: { reads: 'yes', how: 'Iceberg JDBC catalog' },
+      rest: { reads: 'yes', how: 'any Iceberg REST client' }
+    },
+    defaultCatalog: 'polaris',
+    docsUrl: 'https://iceberg.apache.org/spec/',
+    sources: [
+      { title: 'Apache Iceberg: table spec', url: 'https://iceberg.apache.org/spec/', checked: '2026-10-30' },
+      { title: 'Apache Iceberg: REST catalog spec', url: 'https://iceberg.apache.org/rest-catalog-spec/', checked: '2026-10-30' }
     ]
   },
   fabric: {

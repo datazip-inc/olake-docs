@@ -4,13 +4,10 @@ import { useIntegration } from './useIntegration'
 import { plainText, renderInline } from './inline'
 
 /**
- * The page FAQ: native <details> items (answers stay in the DOM) plus a FAQPage JSON-LD block
- * built from the same strings, so the structured data can never say something the page does not.
- * Questions and answers live in the front matter `integration.faq` list.
+ * FAQ items as native <details> (answers stay in the DOM) plus a FAQPage JSON-LD block built from
+ * the same strings, so the structured data can never say something the page does not.
  */
-export default function IntegrationFaq() {
-  const { frontMatter } = useIntegration()
-  const items = frontMatter.faq ?? []
+export function FaqList({ items }: { items: { q: string; a: string }[] }) {
   if (!items.length) return null
   const schema = {
     '@context': 'https://schema.org',
@@ -38,4 +35,10 @@ export default function IntegrationFaq() {
       </div>
     </>
   )
+}
+
+/** The pair page FAQ, from the front matter `integration.faq` list. */
+export default function IntegrationFaq() {
+  const { frontMatter } = useIntegration()
+  return <FaqList items={frontMatter.faq ?? []} />
 }
