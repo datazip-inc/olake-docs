@@ -162,6 +162,16 @@ export const PAIRS: Pair[] = [
   },
   {
     source: 'postgres',
+    engine: 'bigquery',
+    slug: 'postgres-to-bigquery',
+    status: 'draft',
+    catalogs: ['biglake'],
+    defaultCatalog: 'biglake',
+    tested: ['biglake'],
+    alsoRead: ['duckdb', 'spark']
+  },
+  {
+    source: 'postgres',
     engine: 'redshift',
     slug: 'postgres-to-redshift',
     status: 'draft',

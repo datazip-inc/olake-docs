@@ -115,6 +115,14 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/s3-to-redshift', label: 'S3 to Redshift' },
           ],
         },
+        {
+          type: 'category',
+          label: 'Google BigQuery',
+          link: { type: 'generated-index', title: 'Replicate databases to Google BigQuery via Apache Iceberg', slug: '/integrations/bigquery' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-bigquery', label: 'Postgres to BigQuery' },
+          ],
+        },
       ],
     },
     {

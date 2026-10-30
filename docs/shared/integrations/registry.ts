@@ -42,6 +42,11 @@ import ClickhouseQueryPolaris from './engines/clickhouse/Query-polaris.mdx'
 import RedshiftQueryGlue from './engines/redshift/Query-glue.mdx'
 import AthenaConnectGlue from './engines/athena/Connect-glue.mdx'
 import DuckdbConnectGlue from './engines/duckdb/Connect-glue.mdx'
+import BiglakeSetup from './catalogs/biglake/Setup.mdx'
+import BiglakeWriter from './catalogs/biglake/Writer.mdx'
+import BigqueryQueryBiglake from './engines/bigquery/Query-biglake.mdx'
+import DuckdbConnectBiglake from './engines/duckdb/Connect-biglake.mdx'
+import SparkConnectBiglake from './engines/spark/Connect-biglake.mdx'
 
 export const PARTIALS = {
   'sources/postgres/prereqs': PostgresPrereqs,
@@ -77,7 +82,12 @@ export const PARTIALS = {
   'engines/clickhouse/query-polaris': ClickhouseQueryPolaris,
   'engines/redshift/query-glue': RedshiftQueryGlue,
   'engines/athena/connect-glue': AthenaConnectGlue,
-  'engines/duckdb/connect-glue': DuckdbConnectGlue
+  'engines/duckdb/connect-glue': DuckdbConnectGlue,
+  'catalogs/biglake/setup': BiglakeSetup,
+  'catalogs/biglake/writer': BiglakeWriter,
+  'engines/bigquery/query-biglake': BigqueryQueryBiglake,
+  'engines/duckdb/connect-biglake': DuckdbConnectBiglake,
+  'engines/spark/connect-biglake': SparkConnectBiglake
 } satisfies Record<string, ComponentType<Record<string, unknown>>>
 
 export type PartialId = keyof typeof PARTIALS
