@@ -48,7 +48,6 @@ const catalogTabs = (partialKind) =>
 
 const page = `---
 title: "${source.label} to ${engine.label}: CDC via Apache Iceberg"
-seo_title: "${source.label} to ${engine.label}: CDC via Apache Iceberg"
 description: "TODO: 120 to 160 characters, unique on the site, containing \\"${source.label.toLowerCase()} to ${engine.label.toLowerCase()}\\"."
 sidebar_label: ${source.label} to ${engine.label}
 keywords:
