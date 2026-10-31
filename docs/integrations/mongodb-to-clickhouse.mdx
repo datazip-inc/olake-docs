@@ -1,7 +1,7 @@
 ---
 title: "MongoDB to ClickHouse: CDC via Apache Iceberg"
 seo_title: "MongoDB to ClickHouse: Change Stream CDC via Apache Iceberg"
-description: "Replicate MongoDB to ClickHouse with change stream CDC: OLake Go writes Iceberg tables into an Apache Polaris catalog; ClickHouse, DuckDB and Trino query them."
+description: "Replicate MongoDB to ClickHouse with change stream CDC: OLake Go writes Iceberg tables to a Polaris catalog that ClickHouse, DuckDB and Trino query."
 sidebar_label: MongoDB to ClickHouse
 image: /img/docs/integrations/mongodb-to-clickhouse/cover.webp
 keywords:
@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-MongoDB to ClickHouse usually means ClickPipes on ClickHouse Cloud, the MongoDB table engine, or Debezium through Kafka, and tables that only ClickHouse can read. This guide takes a different route. OLake Go reads a MongoDB change stream and commits the changes as Apache Iceberg tables into an Apache Polaris catalog. ClickHouse attaches that catalog as a database.
+MongoDB to ClickHouse usually means ClickPipes on ClickHouse Cloud, the MongoDB table engine, or Debezium through Kafka, and tables that only ClickHouse can read. This guide takes a different route.
+
+OLake Go reads a MongoDB change stream and commits the changes as Apache Iceberg tables into an Apache Polaris catalog. ClickHouse attaches that catalog as a database.
 
 Polaris is an open source Iceberg REST (Representational State Transfer) catalog you run yourself, with the files in your own bucket. Nothing else is in the path: no Kafka, no Debezium, no ClickHouse Cloud. DuckDB and Trino read the same tables through the same endpoint.
 
@@ -60,7 +62,9 @@ Polaris is an open source Iceberg REST (Representational State Transfer) catalog
 
 </TLDR>
 
-**The short answer.** To replicate MongoDB to ClickHouse with change data capture (CDC), run OLake Go with a MongoDB replica set as the source. Point it at an Apache Polaris catalog as the Iceberg destination. The first sync copies each collection in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change stream. ClickHouse, DuckDB and Trino then query the same Iceberg tables, with no second copy.
+**The short answer.** To replicate MongoDB to ClickHouse with change data capture (CDC), run OLake Go with a MongoDB replica set as the source. Point it at an Apache Polaris catalog as the Iceberg destination.
+
+The first sync copies each collection in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change stream. ClickHouse, DuckDB and Trino then query the same Iceberg tables, with no second copy.
 
 ## How MongoDB CDC reaches ClickHouse here
 
@@ -89,11 +93,15 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync opens a change stream and saves its resume token. Then it reads each collection in parallel chunks and writes Parquet data files: that is the historical load. Every later sync resumes the stream from the saved token and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync opens a change stream and saves its resume token. Then it reads each collection in parallel chunks and writes Parquet data files: that is the historical load.
+
+Every later sync resumes the stream from the saved token and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
 
 Each sync ends with one commit to Polaris. OLake Go asks Polaris for short-lived storage credentials, uploads the data and delete files, then posts the new snapshot to the catalog. ClickHouse, DuckDB and Trino see it on their next query; none of them keeps a copy.
 
-One thing to keep an eye on: the oplog is MongoDB's replay window. A change stream can only resume from a token that is still in the oplog. A job paused for longer than the oplog window cannot resume and needs a fresh snapshot. Size the oplog for your longest planned pause; the source test on this page reports the current window.
+One thing to keep an eye on: the oplog is MongoDB's replay window. A change stream can only resume from a token that is still in the oplog.
+
+A job paused for longer than the oplog window cannot resume and needs a fresh snapshot. Size the oplog for your longest planned pause; the source test on this page reports the current window.
 
 ## What you need
 
@@ -129,7 +137,9 @@ db.orders.insertMany([
 
 ## Step 2: Set up the Polaris catalog
 
-ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket. OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
+ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket.
+
+OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
 
 <I.CatalogStrip />
 
@@ -173,7 +183,9 @@ Here is the destination form from the run on this page. Polaris and MinIO ran in
 
 <I.Partial id="jobs/create" engines="ClickHouse, plus DuckDB and Trino if they will read the tables too" unit="collections" upsert="Equality Deletes" updateType="eq" image="olakego/source-mongodb:latest" namespace="shop">
 
-Three target query engines were set on this job. That is the only format decision you make. OLake Go works out which Iceberg delete format all three can read and sets it on every stream. With ClickHouse in the list it chose equality deletes, which need no index between runs.
+Three target query engines were set on this job. That is the only format decision you make.
+
+OLake Go works out which Iceberg delete format all three can read and sets it on every stream. With ClickHouse in the list it chose equality deletes, which need no index between runs.
 
 <Figure src='/img/docs/integrations/mongodb-to-clickhouse/olake-streams-equality-deletes.webp' alt='OLake UI Streams Selection page with the shop database, customers and orders selected, sync mode Full Refresh + CDC, ingestion mode Upsert and upsert type Equality Deletes on Iceberg format version V2' caption='Each collection: Full Refresh + CDC, Upsert, and the upsert type OLake Go resolved (Equality Deletes in this run). The Iceberg DB name at the top is editable.' />
 
@@ -227,13 +239,19 @@ db.customers.updateOne({ name: 'Zara Ali' },    { $set: { city: 'Abu Dhabi', upd
 db.orders.updateMany({ _id: { $in: [1, 4, 7] } }, { $set: { status: 'delivered', updated_at: now } });
 ```
 
-The second sync read **12 change events (1.60 KB)** from the stream and finished in **8 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated documents. One small equality delete file retires the 2 old versions by key. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedEqualityDeleteFiles=1`, `addedEqualityDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+The second sync read **12 change events (1.60 KB)** from the stream and finished in **8 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated documents. One small equality delete file retires the 2 old versions by key.
+
+OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedEqualityDeleteFiles=1`, `addedEqualityDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/mongodb-to-clickhouse/olake-sync-log-equality-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for orders, showing addedDataFiles 1, addedEqualityDeleteFiles 1, addedRecords 8, totalRecords 48 and addedEqualityDeletes 3' caption='The change-only sync in the OLake UI log: one data file and one equality delete file per collection.' />
 
-ClickHouse shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The two retired versions are gone, because ClickHouse applies the equality deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates.
+ClickHouse shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there.
 
-**Schema changes.** When a new field appears in the documents, OLake Go adds it as a column on the next sync. ClickHouse shows it the next time the table is opened, with nulls for older rows. A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+The two retired versions are gone, because ClickHouse applies the equality deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates.
+
+**Schema changes.** When a new field appears in the documents, OLake Go adds it as a column on the next sync. ClickHouse shows it the next time the table is opened, with nulls for older rows.
+
+A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Trino
 
@@ -319,7 +337,9 @@ The field is a `Decimal128` in MongoDB, which arrives as `String`. Wrap it: `sum
 
 ### 5. The destination test fails at the token exchange
 
-OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure. A wrong client id or secret, a principal without a role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or a wrong `Polaris Catalog Name`. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
+OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure.
+
+A wrong client id or secret, a principal without a role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or a wrong `Polaris Catalog Name`. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
 
 <details>
 <summary>How this compares with other ways to move MongoDB data to ClickHouse</summary>

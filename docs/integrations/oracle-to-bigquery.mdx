@@ -1,7 +1,7 @@
 ---
 title: "Oracle to BigQuery: Replicate via Apache Iceberg"
 seo_title: "Oracle to BigQuery: Incremental Sync via Apache Iceberg and BigLake"
-description: "Replicate Oracle to BigQuery without GoldenGate: OLake Go lands Oracle tables as Iceberg in a BigLake catalog on Cloud Storage and keeps them fresh on a cursor."
+description: "Replicate Oracle to BigQuery without GoldenGate: OLake Go lands Oracle tables as Iceberg in a BigLake catalog and keeps them fresh on a cursor column."
 sidebar_label: Oracle to BigQuery
 image: /img/docs/integrations/oracle-to-bigquery/cover.webp
 keywords:
@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-Oracle to BigQuery usually means GoldenGate, a Datastream stream, or a nightly export and `bq load`. This guide takes a fourth route. OLake Go reads the Oracle tables over a plain Java Database Connectivity (JDBC) connection, writes them once as Apache Iceberg tables into a BigLake catalog, Google Cloud's Iceberg representational state transfer (REST) catalog, and keeps them fresh on a cursor column. The files stay in your own Cloud Storage bucket.
+Oracle to BigQuery usually means GoldenGate, a Datastream stream, or a nightly export and `bq load`. This guide takes a fourth route.
+
+OLake Go reads the Oracle tables over a plain Java Database Connectivity (JDBC) connection, writes them once as Apache Iceberg tables into a BigLake catalog, Google Cloud's Iceberg representational state transfer (REST) catalog, and keeps them fresh on a cursor column. The files stay in your own Cloud Storage bucket.
 
 BigQuery queries the tables through the catalog with a four-part name, with no dataset to create and no external table to declare. Nothing else is in the path: no GoldenGate, no Datastream, no load job. DuckDB and Spark read the same tables through the same catalog.
 
@@ -88,7 +90,9 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync reads each table in parallel chunks and writes Parquet data files, then records the highest cursor value it saw: that is the historical load. Every later sync selects rows above that value and writes them as new data files. A delete file retires the old version of each updated row. There is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync reads each table in parallel chunks and writes Parquet data files, then records the highest cursor value it saw: that is the historical load. Every later sync selects rows above that value and writes them as new data files.
+
+A delete file retires the old version of each updated row. There is no separate backfill job.
 
 Each sync ends with one commit to BigLake. OLake Go uploads the data and delete files to the bucket with the service account's own credentials, then updates the table's metadata pointer in the catalog. BigQuery, DuckDB and Spark see the new snapshot on their next query; none of them keeps a copy.
 
@@ -132,7 +136,9 @@ CREATE TABLE shop.orders (
 
 ## Step 2: Set up the BigLake catalog
 
-BigQuery reads Iceberg tables through a catalog. **BigLake** is the one this page uses: it is Google Cloud's Iceberg REST catalog, OLake Go creates a namespace per job in it, and the files sit in your Cloud Storage bucket. BigQuery, DuckDB and Spark all read from the same catalog. BigQuery treats it as a data source in the project, so a table OLake Go commits is queryable on the next statement.
+BigQuery reads Iceberg tables through a catalog. **BigLake** is the one this page uses: it is Google Cloud's Iceberg REST catalog, OLake Go creates a namespace per job in it, and the files sit in your Cloud Storage bucket.
+
+BigQuery, DuckDB and Spark all read from the same catalog. BigQuery treats it as a data source in the project, so a table OLake Go commits is queryable on the next statement.
 
 <I.CatalogStrip />
 
@@ -220,13 +226,17 @@ UPDATE orders    SET status = 'delivered', updated_at = SYSTIMESTAMP WHERE id IN
 COMMIT;
 ```
 
-The second sync fetched **12 rows (598 bytes)** above the saved cursor and finished in **45 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+The second sync fetched **12 rows (598 bytes)** above the saved cursor and finished in **45 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small positional delete file retires the 2 old versions.
+
+OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/oracle-to-bigquery/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords and addedPositionalDeletes for the incremental sync' caption='The incremental sync in the OLake UI log: one data file and one positional delete file per table.' />
 
 BigQuery shows the result on the next query, with no refresh and no `ALTER TABLE`. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. In incremental mode OLake Go cannot tell an insert from an update, so every row the second sync brought carries `_op_type = u`; the snapshot rows keep `r`.
 
-**Schema changes.** When a column is added in Oracle, OLake Go adds it to the Iceberg table on the next sync and commits the new schema to BigLake in the same commit. BigQuery shows the column on the next query. Widening changes are applied; narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+**Schema changes.** When a column is added in Oracle, OLake Go adds it to the Iceberg table on the next sync and commits the new schema to BigLake in the same commit. BigQuery shows the column on the next query.
+
+Widening changes are applied; narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Spark
 

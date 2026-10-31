@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-SQL Server to ClickHouse usually means Debezium through Kafka into the ClickHouse Kafka engine, a nightly `bcp` export, or a managed extract, load and transform (ELT) tool, and tables that only ClickHouse can read. This guide takes a different route. SQL Server's own change data capture (CDC) feature fills change tables from the transaction log. OLake Go reads them and commits the rows as Apache Iceberg tables into an Apache Polaris catalog, and ClickHouse attaches that catalog as a database.
+SQL Server to ClickHouse usually means Debezium through Kafka into the ClickHouse Kafka engine, a nightly `bcp` export, or a managed extract, load and transform (ELT) tool, and tables that only ClickHouse can read. This guide takes a different route.
+
+SQL Server's own change data capture (CDC) feature fills change tables from the transaction log. OLake Go reads them and commits the rows as Apache Iceberg tables into an Apache Polaris catalog, and ClickHouse attaches that catalog as a database.
 
 Polaris is an open source Iceberg REST (Representational State Transfer) catalog you run yourself, with the files in your own bucket. Nothing else is in the path: no Kafka, no Debezium, no ClickHouse Cloud. DuckDB and Trino read the same tables through the same endpoint.
 
@@ -60,7 +62,9 @@ Polaris is an open source Iceberg REST (Representational State Transfer) catalog
 
 </TLDR>
 
-**The short answer.** To replicate SQL Server to ClickHouse with change data capture (CDC), enable CDC on the database and tables. Run OLake Go with a read-only login as the source and an Apache Polaris catalog as the Iceberg destination. The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change tables. ClickHouse, DuckDB and Trino then query the same Iceberg tables, with no second copy.
+**The short answer.** To replicate SQL Server to ClickHouse with change data capture (CDC), enable CDC on the database and tables. Run OLake Go with a read-only login as the source and an Apache Polaris catalog as the Iceberg destination.
+
+The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change tables. ClickHouse, DuckDB and Trino then query the same Iceberg tables, with no second copy.
 
 ## How SQL Server CDC reaches ClickHouse here
 
@@ -89,7 +93,9 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync records the current log sequence number (LSN). Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load. Every later sync reads the change tables from the saved LSN and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync records the current log sequence number (LSN). Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load.
+
+Every later sync reads the change tables from the saved LSN and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
 
 Each sync ends with one commit to Polaris. OLake Go asks Polaris for short-lived storage credentials, uploads the data and delete files, then posts the new snapshot to the catalog. ClickHouse, DuckDB and Trino see it on their next query; none of them keeps a copy.
 
@@ -133,7 +139,9 @@ CREATE TABLE dbo.orders (
 
 ## Step 2: Set up the Polaris catalog
 
-ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket. OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
+ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket.
+
+OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
 
 <I.CatalogStrip />
 
@@ -177,7 +185,9 @@ Here is the destination form from the run on this page. Polaris and MinIO ran in
 
 <I.Partial id="jobs/create" engines="ClickHouse, plus DuckDB and Trino if they will read the tables too" upsert="Equality Deletes" updateType="eq" image="olakego/source-mssql:latest" namespace="dbo">
 
-Three target query engines were set on this job. That is the only format decision you make. OLake Go works out which Iceberg delete format all three can read and sets it on every stream. With ClickHouse in the list it chose equality deletes, which need no index between runs. Leave `systranschemas` unticked; troubleshooting entry 2 explains why.
+Three target query engines were set on this job. That is the only format decision you make. OLake Go works out which Iceberg delete format all three can read and sets it on every stream.
+
+With ClickHouse in the list it chose equality deletes, which need no index between runs. Leave `systranschemas` unticked; troubleshooting entry 2 explains why.
 
 <Figure src='/img/docs/integrations/sql-server-to-clickhouse/olake-streams-equality-deletes.webp' alt='OLake UI Streams Selection page with the dbo schema, customers and orders selected and systranschemas unticked, sync mode Full Refresh + CDC, ingestion mode Upsert and upsert type Equality Deletes on Iceberg format version V2' caption='Each stream: Full Refresh + CDC, Upsert, and the upsert type OLake Go resolved (Equality Deletes in this run). The Iceberg DB name at the top is editable.' />
 
@@ -217,13 +227,19 @@ UPDATE dbo.customers SET city = N'Abu Dhabi', updated_at = SYSUTCDATETIME() WHER
 UPDATE dbo.orders    SET status = 'delivered', updated_at = SYSUTCDATETIME() WHERE id IN (1, 4, 7);
 ```
 
-The second sync read **12 records (855 bytes)** from the change tables and finished in **9 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small equality delete file carries a delete for each of the 4 keys it wrote, inserts included, because an equality delete costs nothing when no older row matches. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedEqualityDeleteFiles=1`, `addedEqualityDeletes=4`. The `orders` table has the same shape with 8 rows and 8 deletes.
+The second sync read **12 records (855 bytes)** from the change tables and finished in **9 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small equality delete file carries a delete for each of the 4 keys it wrote, inserts included, because an equality delete costs nothing when no older row matches.
+
+OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedEqualityDeleteFiles=1`, `addedEqualityDeletes=4`. The `orders` table has the same shape with 8 rows and 8 deletes.
 
 <Figure src='/img/docs/integrations/sql-server-to-clickhouse/olake-sync-log-equality-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit reports for customers and orders, showing addedDataFiles 1, addedEqualityDeleteFiles 1, addedRecords 4 and 8, and addedEqualityDeletes 4 and 8' caption='The change-only sync in the OLake UI log: one data file and one equality delete file per table.' />
 
-ClickHouse shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The two retired versions are gone, because ClickHouse applies the equality deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates. The Agent capture job runs every few seconds, so a change made right before a sync starts can land in the next one instead.
+ClickHouse shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The two retired versions are gone, because ClickHouse applies the equality deletes while reading.
 
-**Schema changes.** A column added in SQL Server is not part of the existing capture instance. Create a new capture instance for the table, or let OLake Go do it with **Manage Capture Instance** on the source. OLake Go then adds the column to the Iceberg table on the next sync, and ClickHouse shows it the next time the table is opened. Narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates. The Agent capture job runs every few seconds, so a change made right before a sync starts can land in the next one instead.
+
+**Schema changes.** A column added in SQL Server is not part of the existing capture instance. Create a new capture instance for the table, or let OLake Go do it with **Manage Capture Instance** on the source. OLake Go then adds the column to the Iceberg table on the next sync, and ClickHouse shows it the next time the table is opened.
+
+Narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Trino
 
@@ -293,7 +309,9 @@ Enabling CDC or replication on a database adds `dbo.systranschemas` to it, and d
 
 ### 3. The source test passes but no changes arrive
 
-Two causes. The common one is timing: the capture job copies log records into the change tables every few seconds, so a sync started right after a write can read nothing and the next sync picks the rows up. The other cause is that the SQL Server Agent is not running, so the change tables never fill. In Docker the agent is off unless the container starts with `MSSQL_AGENT_ENABLED=true`. `EXEC master.dbo.xp_servicecontrol 'QueryState', 'SQLServerAgent'` reports `Running.` when it is up.
+Two causes. The common one is timing: the capture job copies log records into the change tables every few seconds, so a sync started right after a write can read nothing and the next sync picks the rows up. The other cause is that the SQL Server Agent is not running, so the change tables never fill.
+
+In Docker the agent is off unless the container starts with `MSSQL_AGENT_ENABLED=true`. `EXEC master.dbo.xp_servicecontrol 'QueryState', 'SQLServerAgent'` reports `Running.` when it is up.
 
 ### 4. ClickHouse lists the tables but every query returns a 404
 
@@ -305,7 +323,9 @@ The object key is doubled. ClickHouse 26.8 and 26.10 join the table location ont
 
 ### 5. The destination test fails at the token exchange
 
-OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure. The client id or secret is wrong, the principal has no role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or the `Polaris Catalog Name` is wrong. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
+OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure.
+
+The client id or secret is wrong, the principal has no role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or the `Polaris Catalog Name` is wrong. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
 
 <details>
 <summary>How this compares with other ways to move SQL Server data to ClickHouse</summary>

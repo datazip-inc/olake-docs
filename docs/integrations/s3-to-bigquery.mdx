@@ -1,7 +1,7 @@
 ---
 title: "S3 to BigQuery: CSV Files as Apache Iceberg"
 seo_title: "S3 to BigQuery: Load CSV, JSON and Parquet Files as Iceberg on BigLake"
-description: "Load S3 files into BigQuery as Iceberg tables: OLake Go reads CSV, JSON or Parquet drops, syncs only new files into a BigLake catalog, and BigQuery reads them."
+description: "Load S3 files into BigQuery as Iceberg tables: OLake Go reads CSV, JSON or Parquet drops, syncs new files into a BigLake catalog, and BigQuery reads them."
 sidebar_label: S3 to BigQuery
 image: /img/docs/integrations/s3-to-bigquery/cover.webp
 keywords:
@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-Files land in S3 every hour or every day: exports from an application, drops from a partner, logs from a job. S3 to BigQuery usually means a BigQuery Data Transfer Service job, a `bq load` script on a schedule, or an external table per folder. This guide takes a different route. OLake Go reads the files itself and turns each folder into an Apache Iceberg table in a BigLake catalog, Google Cloud's Iceberg representational state transfer (REST) catalog. Every later run syncs only the files that are new.
+Files land in S3 every hour or every day: exports from an application, drops from a partner, logs from a job. S3 to BigQuery usually means a BigQuery Data Transfer Service job, a `bq load` script on a schedule, or an external table per folder.
+
+This guide takes a different route. OLake Go reads the files itself and turns each folder into an Apache Iceberg table in a BigLake catalog, Google Cloud's Iceberg representational state transfer (REST) catalog. Every later run syncs only the files that are new.
 
 BigQuery queries the tables through the catalog with a four-part name, with no dataset to create and no external table to declare. Nothing else is in the path: no transfer job, no load job, no table definition per folder. DuckDB and Spark read the same tables through the same catalog.
 
@@ -60,7 +62,9 @@ BigQuery queries the tables through the catalog with a four-part name, with no d
 
 </TLDR>
 
-**The short answer.** To load S3 files into BigQuery as Iceberg, run OLake Go with the bucket and prefix as the source and a BigLake catalog with a Cloud Storage bucket as the destination. Put each stream in **Full Refresh + Incremental** mode with `_last_modified_time` as the cursor. The first sync reads every file; every later sync reads only the files added since. BigQuery, DuckDB and Spark then query the same Iceberg tables, with no second copy.
+**The short answer.** To load S3 files into BigQuery as Iceberg, run OLake Go with the bucket and prefix as the source and a BigLake catalog with a Cloud Storage bucket as the destination.
+
+Put each stream in **Full Refresh + Incremental** mode with `_last_modified_time` as the cursor. The first sync reads every file; every later sync reads only the files added since. BigQuery, DuckDB and Spark then query the same Iceberg tables, with no second copy.
 
 ## How S3 files reach BigQuery here
 
@@ -90,11 +94,17 @@ flowchart TB
   S -- "data files" --> Q
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync lists everything under the prefix and makes one stream per first-level folder. Then it reads every file in parallel: that is the historical load. At the end it saves the newest `LastModified` time it saw per stream.
+Two things happen in order, and OLake Go does both on its own. The first sync lists everything under the prefix and makes one stream per first-level folder.
 
-Every later sync lists the prefix again and reads only the files whose `LastModified` time is newer than the saved cursor. On this page the second sync reported `Filtered 1 files to process out of 2 total` for each stream. Rows are appended; a file never changes a row that an earlier file wrote. Each sync ends with one commit to BigLake, and BigQuery, DuckDB and Spark see the new snapshot on their next query.
+Then it reads every file in parallel: that is the historical load. At the end it saves the newest `LastModified` time it saw per stream.
 
-One thing to keep an eye on: the cursor is the object's modification time, not anything inside the file. Uploading a corrected copy of yesterday's file gives it today's `LastModified` time. The whole file is then read again, and every row in it is appended a second time. Add files, never rewrite them, and keep an `id` column in the data so a query can pick the latest version of a row.
+Every later sync lists the prefix again and reads only the files whose `LastModified` time is newer than the saved cursor. On this page the second sync reported `Filtered 1 files to process out of 2 total` for each stream.
+
+Rows are appended; a file never changes a row that an earlier file wrote. Each sync ends with one commit to BigLake, and BigQuery, DuckDB and Spark see the new snapshot on their next query.
+
+One thing to keep an eye on: the cursor is the object's modification time, not anything inside the file. Uploading a corrected copy of yesterday's file gives it today's `LastModified` time.
+
+The whole file is then read again, and every row in it is appended a second time. Add files, never rewrite them, and keep an `id` column in the data so a query can pick the latest version of a row.
 
 ## What you need
 
@@ -137,7 +147,9 @@ aws s3 sync ./stage s3://shop/data/
 
 ## Step 2: Set up the BigLake catalog
 
-BigQuery reads Iceberg tables through a catalog. **BigLake** is the one this page uses: it is Google Cloud's Iceberg REST catalog, OLake Go creates a namespace per job in it, and the Iceberg files sit in your Cloud Storage bucket, separate from the source files. BigQuery, DuckDB and Spark all read from the same catalog. BigQuery treats it as a data source in the project, so a table OLake Go commits is queryable on the next statement.
+BigQuery reads Iceberg tables through a catalog. **BigLake** is the one this page uses: it is Google Cloud's Iceberg REST catalog, OLake Go creates a namespace per job in it, and the Iceberg files sit in your Cloud Storage bucket, separate from the source files.
+
+BigQuery, DuckDB and Spark all read from the same catalog. BigQuery treats it as a data source in the project, so a table OLake Go commits is queryable on the next statement.
 
 <I.CatalogStrip />
 
@@ -181,7 +193,9 @@ Here is the destination form from the run on this page. It holds the BigLake end
 
 ## Step 5: Create the job and run the first sync
 
-S3 streams differ from database streams in one way on the Streams page. The ingestion mode is **Append** and cannot be changed, because a file carries no key to match an earlier row by. Set the sync mode to **Full Refresh + Incremental** and leave the cursor on `_last_modified_time`, which OLake Go adds to every stream. This job lists **BigQuery**, **Spark** and **DuckDB** as target query engines.
+S3 streams differ from database streams in one way on the Streams page. The ingestion mode is **Append** and cannot be changed, because a file carries no key to match an earlier row by.
+
+Set the sync mode to **Full Refresh + Incremental** and leave the cursor on `_last_modified_time`, which OLake Go adds to every stream. This job lists **BigQuery**, **Spark** and **DuckDB** as target query engines.
 
 <I.Partial id="jobs/create" engines="Google BigQuery, Apache Spark and DuckDB" unit="folders" syncMode="Full Refresh + Incremental" cursor="_last_modified_time" image="olakego/source-s3:latest" cliSyncMode="incremental" namespace="s3" ingestion="Append">
 
@@ -193,7 +207,9 @@ With Append mode there are no delete files to agree on, so the target engines on
 
 </I.Partial>
 
-On this page the first run read the 8 customer and 40 order rows (48 records, 2.61 KB). It finished in **28 seconds**, container start included. OLake Go names the BigLake namespace after the job, the bucket and the namespace. The namespace for every S3 stream is `s3`, so `s3_to_bigquery` on bucket `shop` produced `s3_to_bigquery_shop_s3`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
+On this page the first run read the 8 customer and 40 order rows (48 records, 2.61 KB). It finished in **28 seconds**, container start included. OLake Go names the BigLake namespace after the job, the bucket and the namespace.
+
+The namespace for every S3 stream is `s3`, so `s3_to_bigquery` on bucket `shop` produced `s3_to_bigquery_shop_s3`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
 
 ## Step 6: Query the tables in BigQuery
 
@@ -231,7 +247,9 @@ The second sync listed both folders, skipped the two files it had already read, 
 
 <Figure src='/img/docs/integrations/s3-to-bigquery/olake-sync-log-filtered-files.webp' alt='OLake UI sync log filtered to the lines Filtered 1 files to process out of 2 total, one line per stream' caption='The second sync in the OLake UI log: one new file per folder, the first file skipped by its modification time.' />
 
-BigQuery shows the result with no refresh. The corrected rows exist twice. `_op_type` tells them apart: `r` for the first full read, `u` for rows that arrived through an incremental sync. `_last_modified_time` carries the file time, which is what the `QUALIFY` clause above sorts on:
+BigQuery shows the result with no refresh. The corrected rows exist twice.
+
+`_op_type` tells them apart: `r` for the first full read, `u` for rows that arrived through an incremental sync. `_last_modified_time` carries the file time, which is what the `QUALIFY` clause above sorts on:
 
 ```text title="SELECT CAST(id AS INT64), name, city, tier, _op_type, _last_modified_time FROM ... WHERE id IN (3, 8, 9, 10) ORDER BY 1, 6"
 id  name         city       tier    _op_type  _last_modified_time
@@ -243,7 +261,9 @@ id  name         city       tier    _op_type  _last_modified_time
 10  Lucas Silva  São Paulo  bronze  u         2026-10-30T06:20:46Z
 ```
 
-**Schema changes.** When a new column appears in a later file, OLake Go adds it to the Iceberg table on the next sync and commits the new schema to BigLake in the same commit. BigQuery shows the column on the next query, with nulls for older rows. A column whose inferred type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+**Schema changes.** When a new column appears in a later file, OLake Go adds it to the Iceberg table on the next sync and commits the new schema to BigLake in the same commit.
+
+BigQuery shows the column on the next query, with nulls for older rows. A column whose inferred type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Spark
 
@@ -272,7 +292,9 @@ An `orders` roll-up over the latest row per id matched the files in all three en
 
 ## Data types: CSV to Iceberg to BigQuery
 
-A CSV file has no types, so OLake Go infers them from a sample of rows at discover time and maps them to Iceberg types. BigQuery then maps Iceberg types to its own when it reads the catalog. Parquet files skip the inference and keep their own types. This is what the CSV run on this page produced:
+A CSV file has no types, so OLake Go infers them from a sample of rows at discover time and maps them to Iceberg types.
+
+BigQuery then maps Iceberg types to its own when it reads the catalog. Parquet files skip the inference and keep their own types. This is what the CSV run on this page produced:
 
 | In the CSV | Iceberg (written by OLake Go) | BigQuery shows | Notes |
 | --- | --- | --- | --- |
@@ -301,7 +323,9 @@ Types on the left come from the [S3 connector reference](/docs/connectors/s3/#da
 failed to access bucket shop: operation error S3: HeadBucket, https response error StatusCode: 403, api error Forbidden: Forbidden
 ```
 
-The key pair cannot read the source bucket. On AWS, check that the policy from step 1 is attached to the user or role, and that the bucket policy does not deny it. On MinIO, the access key or secret is wrong. A `StatusCode: 404` with `NotFound` instead means the bucket name is wrong or the endpoint points at another store.
+The key pair cannot read the source bucket. On AWS, check that the policy from step 1 is attached to the user or role, and that the bucket policy does not deny it.
+
+On MinIO, the access key or secret is wrong. A `StatusCode: 404` with `NotFound` instead means the bucket name is wrong or the endpoint points at another store.
 
 ### 2. Discovery finds nothing
 

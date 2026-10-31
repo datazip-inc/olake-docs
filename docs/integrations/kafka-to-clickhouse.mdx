@@ -58,7 +58,9 @@ ClickHouse attaches that catalog as a database and queries the tables in place. 
 
 </TLDR>
 
-**The short answer.** To stream Kafka to ClickHouse as Iceberg, run OLake Go with the Kafka cluster as the source and an Apache Polaris catalog as the destination. Put each topic in **CDC Only** mode with **Upsert** on a deduplication key. The first sync reads every retained message; every later sync reads only newer messages. ClickHouse, DuckDB and Trino query the same tables.
+**The short answer.** To stream Kafka to ClickHouse as Iceberg, run OLake Go with the Kafka cluster as the source and an Apache Polaris catalog as the destination.
+
+Put each topic in **CDC Only** mode with **Upsert** on a deduplication key. The first sync reads every retained message; every later sync reads only newer messages. ClickHouse, DuckDB and Trino query the same tables.
 
 ## How Kafka messages reach ClickHouse here
 
@@ -88,7 +90,9 @@ flowchart TB
   S -- "data and delete files" --> Q
 ```
 
-There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48. OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run, which Upsert mode absorbs.
+There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48.
+
+OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run, which Upsert mode absorbs.
 
 Every later sync resumes from the committed offsets and reads only what arrived since. A message whose deduplication key already exists retires the old row with a positional delete and writes the new one. Keys seen for the first time become new rows, and ClickHouse applies the deletes while reading.
 
@@ -132,7 +136,9 @@ printf '1\t{"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status
 
 ## Step 2: Set up the Polaris catalog
 
-ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket. OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The [Polaris catalog page](/docs/integrations/catalogs/polaris/) lists every engine that reads it.
+ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket.
+
+OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The [Polaris catalog page](/docs/integrations/catalogs/polaris/) lists every engine that reads it.
 
 <I.CatalogStrip />
 
@@ -216,13 +222,19 @@ To see the change path work, the run on this page produced 12 more messages afte
 1   {"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"delivered", ...}
 ```
 
-The second sync read **12 records (2.26 KB)** from the two topics and finished in **23 seconds** end to end. For `orders` that meant one new data file with 8 rows: the 5 new keys plus the new versions of the 3 repeated keys. One small positional delete file retires the 3 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=8`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=3`.
+The second sync read **12 records (2.26 KB)** from the two topics and finished in **23 seconds** end to end. For `orders` that meant one new data file with 8 rows: the 5 new keys plus the new versions of the 3 repeated keys.
+
+One small positional delete file retires the 3 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=8`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=3`.
 
 <Figure src='/img/docs/integrations/kafka-to-clickhouse/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for orders, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords 8 and addedPositionalDeletes 3' caption='The second sync in the OLake UI log: one data file and one positional delete file for orders.' />
 
-`customers` has the same shape with 4 rows and 2 deletes. ClickHouse shows the result on the next query, with no refresh and still one row per key. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The `_op_type` column shows how each row arrived (`c` for a first-seen key, `u` for a repeated key) and `_kafka_offset` shows which message it came from.
+`customers` has the same shape with 4 rows and 2 deletes. ClickHouse shows the result on the next query, with no refresh and still one row per key.
 
-**Schema changes.** When a new field appears in the messages, OLake Go adds it as a column on the next sync and commits the new schema to Polaris. ClickHouse shows it the next time the table is opened. A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The `_op_type` column shows how each row arrived (`c` for a first-seen key, `u` for a repeated key) and `_kafka_offset` shows which message it came from.
+
+**Schema changes.** When a new field appears in the messages, OLake Go adds it as a column on the next sync and commits the new schema to Polaris. ClickHouse shows it the next time the table is opened.
+
+A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Trino
 

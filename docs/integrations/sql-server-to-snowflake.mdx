@@ -48,7 +48,9 @@ import * as I from '@site/src/components/integrations';
 
 SQL Server to Snowflake comes down to one choice. Copy the rows into tables Snowflake owns, or write them once as Apache Iceberg tables that Snowflake and every other engine can read. This guide does the second.
 
-SQL Server's own change data capture (CDC) feature fills change tables from the transaction log. OLake Go reads those change tables and commits the rows as Iceberg tables into a catalog Snowflake reads. With Snowflake's own Horizon catalog, the default on this page, the files sit on Snowflake-managed storage. Nothing else is in the path: no Openflow, no Kafka, no Debezium. With AWS Glue, the files sit in your S3 bucket and Snowflake reads them through a catalog integration.
+SQL Server's own change data capture (CDC) feature fills change tables from the transaction log. OLake Go reads those change tables and commits the rows as Iceberg tables into a catalog Snowflake reads. With Snowflake's own Horizon catalog, the default on this page, the files sit on Snowflake-managed storage.
+
+Nothing else is in the path: no Openflow, no Kafka, no Debezium. With AWS Glue, the files sit in your S3 bucket and Snowflake reads them through a catalog integration.
 
 <I.IntegrationByline />
 
@@ -60,7 +62,9 @@ SQL Server's own change data capture (CDC) feature fills change tables from the 
 
 </TLDR>
 
-**The short answer.** To replicate SQL Server to Snowflake with change data capture (CDC), enable CDC on the database and tables. Run OLake Go with a read-only login as the source and the Snowflake Horizon catalog as the Iceberg destination. The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change tables. Snowflake, DuckDB and Spark then query the same Iceberg tables, with no second copy.
+**The short answer.** To replicate SQL Server to Snowflake with change data capture (CDC), enable CDC on the database and tables. Run OLake Go with a read-only login as the source and the Snowflake Horizon catalog as the Iceberg destination.
+
+The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change tables. Snowflake, DuckDB and Spark then query the same Iceberg tables, with no second copy.
 
 ## How SQL Server CDC reaches Snowflake here
 
@@ -89,7 +93,9 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync records the current log sequence number (LSN). Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load. Every later sync reads the change tables from the saved LSN and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync records the current log sequence number (LSN). Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load.
+
+Every later sync reads the change tables from the saved LSN and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
 
 Each sync ends with one commit to Horizon. OLake Go asks Horizon for short-lived storage credentials, uploads the data and delete files, then posts the new snapshot to the catalog. Snowflake sees it the moment the commit lands; DuckDB and Spark see it on their next catalog load.
 
@@ -132,7 +138,9 @@ CREATE TABLE dbo.orders (
 
 ## Step 2: Set up the catalog in Snowflake
 
-Snowflake reads Iceberg tables from two kinds of catalog. **Horizon** is Snowflake's own: OLake Go writes straight into it, the tables are Snowflake-managed, and they appear in Snowsight the moment a sync commits. **AWS Glue** is a catalog outside Snowflake, so the files stay in your S3 bucket. Snowflake reaches them through a *catalog integration*: a read-only link to that external catalog, refreshed after each sync.
+Snowflake reads Iceberg tables from two kinds of catalog. **Horizon** is Snowflake's own: OLake Go writes straight into it, the tables are Snowflake-managed, and they appear in Snowsight the moment a sync commits.
+
+**AWS Glue** is a catalog outside Snowflake, so the files stay in your S3 bucket. Snowflake reaches them through a *catalog integration*: a read-only link to that external catalog, refreshed after each sync.
 
 Horizon is the default on this page. Glue is the right pick when Athena, Redshift or Spark on Amazon Elastic MapReduce (EMR) will read the same tables and you want the files in your own bucket.
 
@@ -227,13 +235,19 @@ UPDATE dbo.customers SET city = N'Abu Dhabi', updated_at = SYSUTCDATETIME() WHER
 UPDATE dbo.orders    SET status = 'delivered', updated_at = SYSUTCDATETIME() WHERE id IN (1, 4, 7);
 ```
 
-The second sync read **12 records (855 bytes)** from the change tables and finished in **18 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
+The second sync read **12 records (855 bytes)** from the change tables and finished in **18 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows.
+
+One small delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/sql-server-to-snowflake/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords and addedPositionalDeletes for the change-only sync' caption='The change-only sync in the OLake UI log: one data file and one positional delete file per table.' />
 
-Snowflake shows the result with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates. The Agent capture job runs every few seconds, so a change made right before a sync starts can land in the next one instead.
+Snowflake shows the result with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there.
 
-**Schema changes.** A column added in SQL Server is not part of the existing capture instance. Create a new capture instance for the table, or let OLake Go do it with **Manage Capture Instance** on the source. OLake Go then adds the column to the Iceberg table on the next sync, and Snowflake shows it. Widening changes are applied; narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates. The Agent capture job runs every few seconds, so a change made right before a sync starts can land in the next one instead.
+
+**Schema changes.** A column added in SQL Server is not part of the existing capture instance. Create a new capture instance for the table, or let OLake Go do it with **Manage Capture Instance** on the source. OLake Go then adds the column to the Iceberg table on the next sync, and Snowflake shows it.
+
+Widening changes are applied; narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Spark
 
@@ -299,11 +313,17 @@ The login does not exist on the server, or the password is wrong. `CREATE LOGIN`
 failed to run change stream: failed in pre cdc run for driver[mssql]: CDC is not enabled for stream dbo.systranschemas
 ```
 
-Enabling CDC or replication on a database adds `dbo.systranschemas` to it, and discovery lists it next to your tables. It has no capture instance, so a job that selects every stream fails before the snapshot. Untick it on the Streams page (or any other table without a capture instance), and keep the job to the tables from step 1. The run on this page hit this on its first attempt.
+Enabling CDC or replication on a database adds `dbo.systranschemas` to it, and discovery lists it next to your tables. It has no capture instance, so a job that selects every stream fails before the snapshot.
+
+Untick it on the Streams page (or any other table without a capture instance), and keep the job to the tables from step 1. The run on this page hit this on its first attempt.
 
 ### 3. The source test passes but no changes arrive
 
-Two causes. The common one is timing: the capture job copies log records into the change tables every few seconds, so a sync started right after a write can read nothing and the next sync picks the rows up. The run on this page saw exactly that on one attempt. The other cause is that the SQL Server Agent is not running, so the capture job never copies log records into the change tables. In Docker the agent is off unless the container starts with `MSSQL_AGENT_ENABLED=true`. On a VM, start the `SQLSERVERAGENT` service. `EXEC master.dbo.xp_servicecontrol 'QueryState', 'SQLServerAgent'` reports `Running.` when it is up. After that, `SELECT count(*) FROM cdc.dbo_customers_CT` starts growing a few seconds after the next insert.
+Two causes. The common one is timing: the capture job copies log records into the change tables every few seconds, so a sync started right after a write can read nothing and the next sync picks the rows up. The run on this page saw exactly that on one attempt.
+
+The other cause is that the SQL Server Agent is not running, so the capture job never copies log records into the change tables. In Docker the agent is off unless the container starts with `MSSQL_AGENT_ENABLED=true`. On a VM, start the `SQLSERVERAGENT` service.
+
+`EXEC master.dbo.xp_servicecontrol 'QueryState', 'SQLServerAgent'` reports `Running.` when it is up. After that, `SELECT count(*) FROM cdc.dbo_customers_CT` starts growing a few seconds after the next insert.
 
 ### 4. The next sync cannot resume
 
@@ -320,7 +340,9 @@ Snowflake upper-cased an unquoted identifier. OLake Go creates the schema and ta
 
 ### 6. The destination test fails at the catalog handshake
 
-OLake Go's destination test exchanges the token at `/v1/oauth/tokens` before anything else. Three causes cover nearly every failure. The service user has no network or authentication policy, the `scope` does not match the token's `ROLE_RESTRICTION`, or the token expired. Run the `curl` exchange from the catalog setup; it returns the same error Snowflake gives OLake Go.
+OLake Go's destination test exchanges the token at `/v1/oauth/tokens` before anything else. Three causes cover nearly every failure.
+
+The service user has no network or authentication policy, the `scope` does not match the token's `ROLE_RESTRICTION`, or the token expired. Run the `curl` exchange from the catalog setup; it returns the same error Snowflake gives OLake Go.
 
 <details>
 <summary>How this compares with other ways to move SQL Server data to Snowflake</summary>

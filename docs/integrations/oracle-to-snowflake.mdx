@@ -87,11 +87,15 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync reads each table in parallel chunks and writes Parquet data files, then records the highest cursor value it saw: that is the historical load. Every later sync selects rows above that value and writes them as new data files. A delete file retires the old version of each updated row. There is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync reads each table in parallel chunks and writes Parquet data files, then records the highest cursor value it saw: that is the historical load. Every later sync selects rows above that value and writes them as new data files.
+
+A delete file retires the old version of each updated row. There is no separate backfill job.
 
 Each sync ends with one commit to Horizon. OLake Go asks Horizon for short-lived storage credentials, uploads the data and delete files, then posts the new snapshot to the catalog. Snowflake sees it the moment the commit lands; DuckDB and Spark see it on their next catalog load.
 
-One thing to keep an eye on: the cursor is the whole contract. A row that changes without its `updated_at` moving is never picked up. A deleted row leaves no cursor value behind, so it stays in the Iceberg table. Set the column from a trigger or in every write path, and soft-delete if deletes matter.
+One thing to keep an eye on: the cursor is the whole contract. A row that changes without its `updated_at` moving is never picked up.
+
+A deleted row leaves no cursor value behind, so it stays in the Iceberg table. Set the column from a trigger or in every write path, and soft-delete if deletes matter.
 
 ## What you need
 
@@ -130,7 +134,9 @@ CREATE TABLE shop.orders (
 
 ## Step 2: Set up the catalog in Snowflake
 
-Snowflake reads Iceberg tables from two kinds of catalog. **Horizon** is Snowflake's own: OLake Go writes straight into it, the tables are Snowflake-managed, and they appear in Snowsight the moment a sync commits. **AWS Glue** is a catalog outside Snowflake, so the files stay in your S3 bucket. Snowflake reaches them through a *catalog integration*: a read-only link to that external catalog, refreshed after each sync.
+Snowflake reads Iceberg tables from two kinds of catalog. **Horizon** is Snowflake's own: OLake Go writes straight into it, the tables are Snowflake-managed, and they appear in Snowsight the moment a sync commits.
+
+**AWS Glue** is a catalog outside Snowflake, so the files stay in your S3 bucket. Snowflake reaches them through a *catalog integration*: a read-only link to that external catalog, refreshed after each sync.
 
 Horizon is the default on this page. Glue is the right pick when Athena, Redshift or Spark on Amazon Elastic MapReduce (EMR) will read the same tables. It keeps the files in your own bucket.
 
@@ -227,7 +233,9 @@ UPDATE orders    SET status = 'delivered', updated_at = SYSTIMESTAMP WHERE id IN
 COMMIT;
 ```
 
-The second sync fetched **12 rows (598 bytes)** above the saved cursor and finished in **17 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
+The second sync fetched **12 rows (598 bytes)** above the saved cursor and finished in **17 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows.
+
+One small delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/oracle-to-snowflake/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit reports for customers and orders after the incremental sync, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords 4 and 8, totalEqualityDeletes 0' caption='The incremental sync in the OLake UI log: one data file and one positional delete file per table, zero equality deletes.' />
 

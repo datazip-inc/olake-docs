@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-Postgres to DuckDB usually means `pg_dump`, a CSV or Parquet export, and a DuckDB file somebody rebuilds, or DuckDB's `postgres` extension hitting the live database. This guide takes a different route. OLake Go reads the Postgres write-ahead log (WAL) and commits the changes as Apache Iceberg tables into an Apache Polaris catalog. DuckDB attaches that catalog and queries the tables in place.
+Postgres to DuckDB usually means `pg_dump`, a CSV or Parquet export, and a DuckDB file somebody rebuilds, or DuckDB's `postgres` extension hitting the live database. This guide takes a different route.
+
+OLake Go reads the Postgres write-ahead log (WAL) and commits the changes as Apache Iceberg tables into an Apache Polaris catalog. DuckDB attaches that catalog and queries the tables in place.
 
 Polaris is an open source Iceberg REST (Representational State Transfer) catalog you run yourself, with the files in your own bucket. Nothing else is in the path: no Kafka, no Debezium, no DuckDB file to copy around. ClickHouse and Trino read the same tables through the same endpoint.
 
@@ -89,7 +91,9 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync records the current WAL position through the replication slot. Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load. Every later sync opens the slot at the saved position and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync records the current WAL position through the replication slot. Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load.
+
+Every later sync opens the slot at the saved position and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
 
 Each sync ends with one commit to Polaris. OLake Go asks Polaris for short-lived storage credentials, uploads the data and delete files, then posts the new snapshot to the catalog. DuckDB, ClickHouse and Trino see it on their next query; none of them keeps a copy.
 
@@ -132,7 +136,9 @@ CREATE TABLE orders (
 
 ## Step 2: Set up the Polaris catalog
 
-DuckDB reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket. OLake Go writes into it, and DuckDB, ClickHouse and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
+DuckDB reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket.
+
+OLake Go writes into it, and DuckDB, ClickHouse and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
 
 <I.CatalogStrip />
 
@@ -216,13 +222,19 @@ UPDATE customers SET city = 'Abu Dhabi', updated_at = NOW() WHERE name = 'Zara A
 UPDATE orders    SET status = 'delivered', updated_at = NOW() WHERE id IN (1, 4, 7);
 ```
 
-The second sync read **12 records (594 bytes)** from the slot and finished in **12 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+The second sync read **12 records (594 bytes)** from the slot and finished in **12 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows.
+
+One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/postgres-to-duckdb/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for orders, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords 8, totalRecords 48 and addedPositionalDeletes 3' caption='The change-only sync in the OLake UI log: one data file and one positional delete file per table.' />
 
-DuckDB shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The two retired versions are gone, because DuckDB applies the positional deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates.
+DuckDB shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there.
 
-**Schema changes.** When a column is added in Postgres, OLake Go adds it to the Iceberg table on the next sync. DuckDB shows it on the next `ATTACH`. Widening changes (`int` to `bigint`, `real` to `double precision`) are applied. Narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+The two retired versions are gone, because DuckDB applies the positional deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates.
+
+**Schema changes.** When a column is added in Postgres, OLake Go adds it to the Iceberg table on the next sync. DuckDB shows it on the next `ATTACH`.
+
+Widening changes (`int` to `bigint`, `real` to `double precision`) are applied. Narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from ClickHouse and Trino
 
@@ -304,7 +316,9 @@ If a sync hangs after the snapshot, another process holds the replication slot, 
 
 ### 5. The destination test fails at the token exchange
 
-OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure. A wrong client id or secret, a principal without a role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or a wrong `Polaris Catalog Name`. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
+OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure.
+
+A wrong client id or secret, a principal without a role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or a wrong `Polaris Catalog Name`. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
 
 <details>
 <summary>How this compares with other ways to get Postgres data into DuckDB</summary>

@@ -1,7 +1,7 @@
 ---
 title: "Kafka to BigQuery: Topics as Apache Iceberg"
 seo_title: "Kafka to BigQuery: Stream Topics into Iceberg Tables on BigLake"
-description: "Stream Kafka topics to BigQuery as Iceberg tables: OLake Go upserts JSON messages into a BigLake catalog on Cloud Storage; BigQuery, DuckDB and Spark read them."
+description: "Stream Kafka topics to BigQuery as Iceberg tables: OLake Go upserts JSON messages into a BigLake catalog, and BigQuery, DuckDB and Spark read them."
 sidebar_label: Kafka to BigQuery
 image: /img/docs/integrations/kafka-to-bigquery/cover.webp
 keywords:
@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-Kafka to BigQuery usually means a Kafka Connect cluster with the BigQuery sink, a Dataflow pipeline, or a consumer that writes files for `bq load`, and tables that only BigQuery can read. This guide takes a different route. OLake Go reads the topics itself as a change data capture (CDC) stream and keeps one row per key. It writes the result once, as Apache Iceberg tables in a BigLake catalog, Google Cloud's Iceberg representational state transfer (REST) catalog, with the files in your own Cloud Storage bucket.
+Kafka to BigQuery usually means a Kafka Connect cluster with the BigQuery sink, a Dataflow pipeline, or a consumer that writes files for `bq load`, and tables that only BigQuery can read. This guide takes a different route.
+
+OLake Go reads the topics itself as a change data capture (CDC) stream and keeps one row per key. It writes the result once, as Apache Iceberg tables in a BigLake catalog, Google Cloud's Iceberg representational state transfer (REST) catalog, with the files in your own Cloud Storage bucket.
 
 BigQuery queries the tables through the catalog with a four-part name, with no dataset to create and no external table to declare. Nothing else is in the path: no Kafka Connect, no Dataflow, no load job. DuckDB and Spark read the same tables through the same catalog.
 
@@ -60,7 +62,9 @@ BigQuery queries the tables through the catalog with a four-part name, with no d
 
 </TLDR>
 
-**The short answer.** To stream Kafka to BigQuery as Iceberg, run OLake Go with the Kafka cluster as the source and a BigLake catalog with a Cloud Storage bucket as the destination, with BigQuery as the target query engine. Put each topic in **CDC Only** mode with **Upsert** on a deduplication key. The first sync reads every retained message; every later sync reads only the messages after the committed offsets. BigQuery, DuckDB and Spark then query the same Iceberg tables, with no second copy.
+**The short answer.** To stream Kafka to BigQuery as Iceberg, run OLake Go with the Kafka cluster as the source and a BigLake catalog with a Cloud Storage bucket as the destination, with BigQuery as the target query engine.
+
+Put each topic in **CDC Only** mode with **Upsert** on a deduplication key. The first sync reads every retained message; every later sync reads only the messages after the committed offsets. BigQuery, DuckDB and Spark then query the same Iceberg tables, with no second copy.
 
 ## How Kafka messages reach BigQuery here
 
@@ -90,11 +94,17 @@ flowchart TB
   S -- "data and delete files" --> Q
 ```
 
-There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48. OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run. In Upsert mode the re-read is harmless; in Append mode it duplicates those rows.
+There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48.
 
-Every later sync resumes from the committed offsets and reads only what arrived since. In **Upsert** mode a message whose deduplication key already exists in the table retires the old row with a positional delete and writes the new one. A key seen for the first time becomes a new row. In **Append** mode every message is a row, which suits event logs that are never corrected.
+OLake Go commits the Iceberg snapshot first and the consumer-group offsets second. A sync that fails mid-way therefore re-reads its messages on the next run. In Upsert mode the re-read is harmless; in Append mode it duplicates those rows.
 
-One thing to keep an eye on: retention is the replay window. Kafka deletes messages past `retention.ms`, and OLake Go cannot read what is gone. A job paused longer than the retention of its topics silently misses the expired messages. Set retention from your longest tolerable pause, not from disk size.
+Every later sync resumes from the committed offsets and reads only what arrived since. In **Upsert** mode a message whose deduplication key already exists in the table retires the old row with a positional delete and writes the new one.
+
+A key seen for the first time becomes a new row. In **Append** mode every message is a row, which suits event logs that are never corrected.
+
+One thing to keep an eye on: retention is the replay window. Kafka deletes messages past `retention.ms`, and OLake Go cannot read what is gone.
+
+A job paused longer than the retention of its topics silently misses the expired messages. Set retention from your longest tolerable pause, not from disk size.
 
 ## What you need
 
@@ -131,7 +141,9 @@ printf '1\t{"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status
 
 ## Step 2: Set up the BigLake catalog
 
-BigQuery reads Iceberg tables through a catalog. **BigLake** is the one this page uses: it is Google Cloud's Iceberg REST catalog, OLake Go creates a namespace per job in it, and the files sit in your Cloud Storage bucket. BigQuery, DuckDB and Spark all read from the same catalog. BigQuery treats it as a data source in the project, so a table OLake Go commits is queryable on the next statement.
+BigQuery reads Iceberg tables through a catalog. **BigLake** is the one this page uses: it is Google Cloud's Iceberg REST catalog, OLake Go creates a namespace per job in it, and the files sit in your Cloud Storage bucket.
+
+BigQuery, DuckDB and Spark all read from the same catalog. BigQuery treats it as a data source in the project, so a table OLake Go commits is queryable on the next statement.
 
 <I.CatalogStrip />
 
@@ -185,7 +197,9 @@ This job lists **BigQuery**, **Spark** and **DuckDB** as target query engines. K
 
 </I.Partial>
 
-On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **44 seconds**, container start included. OLake Go names the BigLake namespace after the job and the source namespace. The namespace for every Kafka topic is `topics`, so `kafka_to_bigquery` produced `kafka_to_bigquery_topics`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
+On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **44 seconds**, container start included. OLake Go names the BigLake namespace after the job and the source namespace.
+
+The namespace for every Kafka topic is `topics`, so `kafka_to_bigquery` produced `kafka_to_bigquery_topics`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
 
 ## Step 6: Query the tables in BigQuery
 
@@ -216,13 +230,17 @@ To see the change path work, the run on this page produced 12 more messages afte
 1   {"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"delivered", ...}
 ```
 
-The second sync read **12 records (2.26 KB)** from the two topics and finished in **53 seconds** end to end. For `customers` that meant one new data file with 4 rows: the 2 new keys plus the new versions of the 2 repeated keys. One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+The second sync read **12 records (2.26 KB)** from the two topics and finished in **53 seconds** end to end. For `customers` that meant one new data file with 4 rows: the 2 new keys plus the new versions of the 2 repeated keys.
+
+One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/kafka-to-bigquery/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords and addedPositionalDeletes for the second sync' caption='The second sync in the OLake UI log: one data file and one positional delete file per topic.' />
 
 BigQuery shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there, with still one row per key. The `_op_type` column shows how each row arrived (`c` for a first-seen key, `u` for a repeated key) and `_kafka_offset` shows which message it came from.
 
-**Schema changes.** When a new field appears in the messages, OLake Go adds it as a column on the next sync and commits the new schema to BigLake in the same commit. BigQuery shows the column on the next query. A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+**Schema changes.** When a new field appears in the messages, OLake Go adds it as a column on the next sync and commits the new schema to BigLake in the same commit. BigQuery shows the column on the next query.
+
+A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Spark
 
@@ -251,7 +269,9 @@ An `orders` roll-up matched the latest message per key in all three engines. It 
 
 ## Data types: Kafka JSON to Iceberg to BigQuery
 
-A Kafka message has no schema of its own, so OLake Go infers one from a sample of messages at discover time and maps it to Iceberg types. BigQuery then maps Iceberg types to its own when it reads the catalog. Four Kafka columns are added to every row. This is what the run on this page produced:
+A Kafka message has no schema of its own, so OLake Go infers one from a sample of messages at discover time and maps it to Iceberg types.
+
+BigQuery then maps Iceberg types to its own when it reads the catalog. Four Kafka columns are added to every row. This is what the run on this page produced:
 
 | In the JSON value | Iceberg (written by OLake Go) | BigQuery shows | Notes |
 | --- | --- | --- | --- |
@@ -281,7 +301,9 @@ Types on the left come from the [Kafka connector reference](/docs/connectors/kaf
 failed to ping kafka brokers: unable to dial: dial tcp 192.168.65.254:19999: connect: connection refused
 ```
 
-The address in **Bootstrap Servers** is not reachable from inside the OLake Go container. For a broker on the same machine use `host.docker.internal`, not `localhost`. Make sure the broker also advertises a listener the container can resolve; Kafka's `advertised.listeners` decides that. On a managed cluster, run OLake Go on a network that can reach the brokers' advertised addresses.
+The address in **Bootstrap Servers** is not reachable from inside the OLake Go container. For a broker on the same machine use `host.docker.internal`, not `localhost`.
+
+Make sure the broker also advertises a listener the container can resolve; Kafka's `advertised.listeners` decides that. On a managed cluster, run OLake Go on a network that can reach the brokers' advertised addresses.
 
 ### 2. The Streams page is empty
 
@@ -309,7 +331,9 @@ The query ran in a location other than the bucket's region. Set the query locati
 
 ### 5. A sync ends early after a consumer-group rebalance
 
-A rebalance in OLake Go's consumer group, usually because another process joined it, makes the sync stop cleanly with what it has read. Nothing is lost: the messages read so far are committed, and the next sync resumes from the committed offsets. Give each job its own consumer group and never point another consumer at it. If a group's offsets are damaged, create the job again with a new group id. The group name cannot be edited on an existing source in the UI.
+A rebalance in OLake Go's consumer group, usually because another process joined it, makes the sync stop cleanly with what it has read. Nothing is lost: the messages read so far are committed, and the next sync resumes from the committed offsets.
+
+Give each job its own consumer group and never point another consumer at it. If a group's offsets are damaged, create the job again with a new group id. The group name cannot be edited on an existing source in the UI.
 
 <details>
 <summary>How this compares with other ways to move Kafka data to BigQuery</summary>

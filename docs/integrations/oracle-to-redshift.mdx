@@ -1,7 +1,7 @@
 ---
 title: "Oracle to Redshift: Replicate via Apache Iceberg"
 seo_title: "Oracle to Redshift: Incremental Sync via Apache Iceberg and Glue"
-description: "Replicate Oracle to Amazon Redshift without GoldenGate: OLake Go lands Oracle tables as Iceberg in the AWS Glue Data Catalog and keeps them fresh on a cursor."
+description: "Replicate Oracle to Amazon Redshift without GoldenGate: OLake Go lands Oracle tables as Iceberg in AWS Glue and keeps them fresh on a cursor column."
 sidebar_label: Oracle to Redshift
 image: /img/docs/integrations/oracle-to-redshift/cover.webp
 keywords:
@@ -46,7 +46,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-Oracle to Redshift usually means GoldenGate, a Database Migration Service (DMS) task, or a nightly export and `COPY`. This guide takes a fourth route. OLake Go reads the Oracle tables over a plain Java Database Connectivity (JDBC) connection, writes them once as Apache Iceberg tables into the AWS Glue Data Catalog, and keeps them fresh on a cursor column. The files stay in your own S3 bucket.
+Oracle to Redshift usually means GoldenGate, a Database Migration Service (DMS) task, or a nightly export and `COPY`. This guide takes a fourth route.
+
+OLake Go reads the Oracle tables over a plain Java Database Connectivity (JDBC) connection, writes them once as Apache Iceberg tables into the AWS Glue Data Catalog, and keeps them fresh on a cursor column. The files stay in your own S3 bucket.
 
 Redshift maps the Glue database onto an external schema and queries the tables in place. Nothing else is in the path: no GoldenGate, no DMS, no load job. Athena and DuckDB read the same tables through the same catalog.
 
@@ -60,7 +62,9 @@ Redshift maps the Glue database onto an external schema and queries the tables i
 
 </TLDR>
 
-**The short answer.** To replicate Oracle to Redshift without redo-log access, run OLake Go with a read-only Oracle user as the source and the AWS Glue Data Catalog as the Iceberg destination. Set the upsert type to Positional Deletes, the format Redshift reads. The first sync copies each table in full (the historical snapshot); every later sync fetches the rows whose cursor column moved and upserts them. Redshift, Athena and DuckDB then query the same Iceberg tables, with no second copy.
+**The short answer.** To replicate Oracle to Redshift without redo-log access, run OLake Go with a read-only Oracle user as the source and the AWS Glue Data Catalog as the Iceberg destination. Set the upsert type to Positional Deletes, the format Redshift reads.
+
+The first sync copies each table in full (the historical snapshot); every later sync fetches the rows whose cursor column moved and upserts them. Redshift, Athena and DuckDB then query the same Iceberg tables, with no second copy.
 
 ## How Oracle changes reach Redshift here
 
@@ -88,7 +92,9 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync reads each table in parallel chunks and writes Parquet data files, then records the highest cursor value it saw: that is the historical load. Every later sync selects rows above that value and writes them as new data files. A delete file retires the old version of each updated row. There is no separate backfill job.
+Two things happen in order, and OLake Go does both on its own. The first sync reads each table in parallel chunks and writes Parquet data files, then records the highest cursor value it saw: that is the historical load. Every later sync selects rows above that value and writes them as new data files.
+
+A delete file retires the old version of each updated row. There is no separate backfill job.
 
 Each sync ends with one commit to Glue. OLake Go uploads the data and delete files to the bucket, then updates the table's metadata pointer in the Glue database. Redshift, Athena and DuckDB see the new snapshot on their next query; none of them keeps a copy.
 
@@ -132,7 +138,9 @@ CREATE TABLE shop.orders (
 
 ## Step 2: Set up the Glue catalog
 
-Redshift reads Iceberg tables through a catalog. **AWS Glue Data Catalog** is the one this page uses: OLake Go creates a Glue database per job and registers each table there. The files sit in your S3 bucket. Redshift, Athena, Amazon Elastic MapReduce (EMR) and DuckDB all read from the same catalog. Redshift reaches it through an external schema, with the IAM role attached to the workgroup or cluster.
+Redshift reads Iceberg tables through a catalog. **AWS Glue Data Catalog** is the one this page uses: OLake Go creates a Glue database per job and registers each table there. The files sit in your S3 bucket.
+
+Redshift, Athena, Amazon Elastic MapReduce (EMR) and DuckDB all read from the same catalog. Redshift reaches it through an external schema, with the IAM role attached to the workgroup or cluster.
 
 <I.CatalogStrip />
 
@@ -185,7 +193,9 @@ Here is the destination form from the run on this page. It holds the bucket path
 
 ## Step 5: Create the job and run the first sync
 
-Redshift is not in OLake Go's target engine picker yet. This job therefore lists **Athena** and **DuckDB** as target engines and sets the upsert type to **Positional Deletes** by hand. That is the format Redshift reads, and both listed engines read it too. Because the Oracle connector has no change data capture (CDC) mode, each stream runs as **Full Refresh + Incremental** with `UPDATED_AT` as the cursor.
+Redshift is not in OLake Go's target engine picker yet. This job therefore lists **Athena** and **DuckDB** as target engines and sets the upsert type to **Positional Deletes** by hand.
+
+That is the format Redshift reads, and both listed engines read it too. Because the Oracle connector has no change data capture (CDC) mode, each stream runs as **Full Refresh + Incremental** with `UPDATED_AT` as the cursor.
 
 <I.Partial id="jobs/create" engines="AWS Athena and DuckDB (Redshift is not in the list yet; it reads what Athena reads)" upsert="Positional Deletes" updateType="pos" image="olakego/source-oracle:latest" cliSyncMode="incremental" syncMode="Full Refresh + Incremental" cursor="UPDATED_AT" namespace="SHOP" stream="CUSTOMERS">
 
@@ -231,13 +241,17 @@ UPDATE orders    SET status = 'delivered', updated_at = SYSTIMESTAMP WHERE id IN
 COMMIT;
 ```
 
-The second sync fetched **12 rows (598 bytes)** above the saved cursor and finished in **11 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+The second sync fetched **12 rows (598 bytes)** above the saved cursor and finished in **11 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small positional delete file retires the 2 old versions.
+
+OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/oracle-to-redshift/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords and addedPositionalDeletes for the incremental sync' caption='The incremental sync in the OLake UI log: one data file and one positional delete file per table.' />
 
 Redshift shows the result on the next query, with no refresh and no `ALTER TABLE`. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. In incremental mode OLake Go cannot tell an insert from an update, so every row the second sync brought carries `_op_type = u`; the snapshot rows keep `r`.
 
-**Schema changes.** When a column is added in Oracle, OLake Go adds it to the Iceberg table on the next sync. The Glue table definition is updated in the same commit, and Redshift shows it on the next query of the external schema. Widening changes are applied; narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
+**Schema changes.** When a column is added in Oracle, OLake Go adds it to the Iceberg table on the next sync. The Glue table definition is updated in the same commit, and Redshift shows it on the next query of the external schema.
+
+Widening changes are applied; narrowing or incompatible type changes fail the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from Athena and DuckDB
 
@@ -313,7 +327,9 @@ The update did not move the cursor column. OLake Go only fetches rows whose curs
 User: arn:aws:iam::<account>:user/<olake user> is not authorized to perform: s3:GetObject on resource: "arn:aws:s3:::<another bucket>/.../test_olake.db/test_olake/metadata/00000-....metadata.json"
 ```
 
-OLake Go's destination test opens a probe table called `test_olake.test_olake` in the Glue database `test_olake`. An earlier run in the same account and region may have left that table behind, pointing at a bucket your user cannot read. The test then fails before it writes anything. Delete the stale table from Glue, or run OLake Go against a region whose Glue catalog does not have it.
+OLake Go's destination test opens a probe table called `test_olake.test_olake` in the Glue database `test_olake`. An earlier run in the same account and region may have left that table behind, pointing at a bucket your user cannot read.
+
+The test then fails before it writes anything. Delete the stale table from Glue, or run OLake Go against a region whose Glue catalog does not have it.
 
 ### 5. Redshift cannot see the external schema's tables
 

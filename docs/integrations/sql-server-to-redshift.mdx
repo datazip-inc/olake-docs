@@ -44,7 +44,9 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-SQL Server to Redshift usually means an AWS Database Migration Service (DMS) task, a Kafka pipeline, or a nightly `bcp` export and `COPY`. This guide takes a different route. SQL Server's own change data capture (CDC) feature fills change tables from the transaction log. OLake Go reads them and commits the rows as Apache Iceberg tables into the AWS Glue Data Catalog, with the files in your own S3 bucket.
+SQL Server to Redshift usually means an AWS Database Migration Service (DMS) task, a Kafka pipeline, or a nightly `bcp` export and `COPY`. This guide takes a different route.
+
+SQL Server's own change data capture (CDC) feature fills change tables from the transaction log. OLake Go reads them and commits the rows as Apache Iceberg tables into the AWS Glue Data Catalog, with the files in your own S3 bucket.
 
 Redshift maps the Glue database onto an external schema and queries the tables in place. Nothing else is in the path: no DMS, no Kafka, no load job. Athena and DuckDB read the same tables through the same catalog.
 
@@ -58,7 +60,9 @@ Redshift maps the Glue database onto an external schema and queries the tables i
 
 </TLDR>
 
-**The short answer.** To replicate SQL Server to Redshift with change data capture (CDC), enable CDC on the database and tables. Run OLake Go with a read-only login as the source and the AWS Glue Data Catalog as the Iceberg destination, with Positional Deletes as the upsert type, the format Redshift reads. The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change tables. Redshift, Athena and DuckDB then query the same Iceberg tables, with no second copy.
+**The short answer.** To replicate SQL Server to Redshift with change data capture (CDC), enable CDC on the database and tables. Run OLake Go with a read-only login as the source and the AWS Glue Data Catalog as the Iceberg destination, with Positional Deletes as the upsert type, the format Redshift reads.
+
+The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the change tables. Redshift, Athena and DuckDB then query the same Iceberg tables, with no second copy.
 
 ## How SQL Server CDC reaches Redshift here
 
@@ -86,7 +90,9 @@ flowchart TB
   S -- "data and delete files" --> R
 ```
 
-Two things happen in order, and OLake Go does both on its own. The first sync records the current log sequence number (LSN). Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load. Every later sync reads the change tables from the saved LSN and replays the inserts, updates and deletes since.
+Two things happen in order, and OLake Go does both on its own. The first sync records the current log sequence number (LSN).
+
+Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load. Every later sync reads the change tables from the saved LSN and replays the inserts, updates and deletes since.
 
 Each sync ends with one commit to Glue. OLake Go uploads the data and delete files to the bucket, then updates the table's metadata pointer in the Glue database. Redshift, Athena and DuckDB see the new snapshot on their next query; none of them keeps a copy.
 
@@ -130,7 +136,9 @@ CREATE TABLE dbo.orders (
 
 ## Step 2: Set up the Glue catalog
 
-Redshift reads Iceberg tables through a catalog. **AWS Glue Data Catalog** is the one this page uses: OLake Go creates a Glue database per job and registers each table there. The files sit in your S3 bucket. Redshift, Athena, Amazon Elastic MapReduce (EMR) and DuckDB all read from the same catalog. Redshift reaches it through an external schema, with the IAM role attached to the workgroup or cluster.
+Redshift reads Iceberg tables through a catalog. **AWS Glue Data Catalog** is the one this page uses: OLake Go creates a Glue database per job and registers each table there. The files sit in your S3 bucket.
+
+Redshift, Athena, Amazon Elastic MapReduce (EMR) and DuckDB all read from the same catalog. Redshift reaches it through an external schema, with the IAM role attached to the workgroup or cluster.
 
 <I.CatalogStrip />
 
@@ -229,13 +237,19 @@ UPDATE dbo.customers SET city = N'Abu Dhabi', updated_at = SYSUTCDATETIME() WHER
 UPDATE dbo.orders    SET status = 'delivered', updated_at = SYSUTCDATETIME() WHERE id IN (1, 4, 7);
 ```
 
-The second sync read **12 records (855 bytes)** from the change tables and finished in **13 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One small positional delete file retires the 2 old versions. The commit report in the sync log shows `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
+The second sync read **12 records (855 bytes)** from the change tables and finished in **13 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows.
+
+One small positional delete file retires the 2 old versions. The commit report in the sync log shows `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`, and `orders` the same shape with 8 rows and 3 deletes.
 
 <Figure src='/img/docs/integrations/sql-server-to-redshift/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit reports for customers and orders, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords 4 and 8, and addedPositionalDeletes 2 and 3' caption='The change-only sync in the OLake UI log: one data file and one positional delete file per table.' />
 
-Redshift shows the result on the next query, with no refresh and no `ALTER TABLE`. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The `_op_type` column shows how each row arrived: `r` for the 6 untouched snapshot rows, `c` for the 2 inserts and `u` for the 2 updates. The Agent capture job runs every few seconds, so a change made right before a sync starts can land in the next one instead.
+Redshift shows the result on the next query, with no refresh and no `ALTER TABLE`. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there.
 
-**Schema changes.** A column added in SQL Server is not part of the existing capture instance. Create a new capture instance for the table, or let OLake Go do it with **Manage Capture Instance** on the source. OLake Go then adds the column to the Iceberg table and its Glue definition on the next sync, and Redshift shows it on the next query. Full rules are on the [schema evolution page](/docs/features/schema/).
+The `_op_type` column shows how each row arrived: `r` for the 6 untouched snapshot rows, `c` for the 2 inserts and `u` for the 2 updates. The Agent capture job runs every few seconds, so a change made right before a sync starts can land in the next one instead.
+
+**Schema changes.** A column added in SQL Server is not part of the existing capture instance. Create a new capture instance for the table, or let OLake Go do it with **Manage Capture Instance** on the source.
+
+OLake Go then adds the column to the Iceberg table and its Glue definition on the next sync, and Redshift shows it on the next query. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from Athena and DuckDB
 
@@ -305,7 +319,9 @@ Enabling CDC or replication on a database adds `dbo.systranschemas` to it, and d
 
 ### 3. The source test passes but no changes arrive
 
-Two causes. The common one is timing: the capture job copies log records into the change tables every few seconds, so a sync started right after a write can read nothing and the next sync picks the rows up. The other cause is that the SQL Server Agent is not running, so the change tables never fill. `EXEC master.dbo.xp_servicecontrol 'QueryState', 'SQLServerAgent'` reports `Running.` when it is up.
+Two causes. The common one is timing: the capture job copies log records into the change tables every few seconds, so a sync started right after a write can read nothing and the next sync picks the rows up.
+
+The other cause is that the SQL Server Agent is not running, so the change tables never fill. `EXEC master.dbo.xp_servicecontrol 'QueryState', 'SQLServerAgent'` reports `Running.` when it is up.
 
 ### 4. The destination test fails on a table OLake Go did not create
 
