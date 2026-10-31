@@ -1,0 +1,51 @@
+import CodeBlock from '@theme/CodeBlock';
+
+OLake Go reads changes through logical replication with the built-in `pgoutput` plugin (Postgres 10 and later). Four things must be in place on the database before the first sync.
+
+| Setting | Value | Why it matters |
+| --- | --- | --- |
+| `wal_level` | `logical` | Without it Postgres writes no row images to the WAL (write-ahead log), so there is nothing to replicate. Changing it needs a restart. |
+| Replication role | `LOGIN REPLICATION` plus `SELECT` on the tables | The first snapshot reads the tables; the change stream opens a replication connection. |
+| Publication | one per OLake Go job, covering the synced tables | Tells Postgres which tables' changes to publish. |
+| Replication slot | one per OLake Go job, plugin `pgoutput` | Keeps WAL segments until OLake Go has read them. |
+
+<CodeBlock language="sql" title="On the source database">{`-- 1. Logical replication. wal_level needs a restart (a parameter-group change on managed Postgres).
+ALTER SYSTEM SET wal_level = 'logical';
+ALTER SYSTEM SET max_replication_slots = 10;
+ALTER SYSTEM SET max_wal_senders = 10;
+ALTER SYSTEM SET wal_sender_timeout = 0;   -- so a long first snapshot is not cut off
+
+-- 2. A role for OLake Go
+CREATE ROLE olake WITH LOGIN REPLICATION PASSWORD '<password>';
+GRANT USAGE ON SCHEMA public TO olake;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO olake;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO olake;
+
+-- 3. A publication for the tables you sync, and a pgoutput slot
+CREATE PUBLICATION olake_pub FOR TABLE ${props.tables ?? '<table_1>, <table_2>'};
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');`}</CodeBlock>
+
+Tables with a primary key need nothing more. A table without one needs `ALTER TABLE <table> REPLICA IDENTITY FULL;` so that its updates and deletes carry the old row.
+
+Check the result before moving on:
+
+```sql
+SHOW wal_level;                                        -- logical
+SELECT slot_name, plugin, active FROM pg_replication_slots;
+SELECT pubname, puballtables FROM pg_publication;
+```
+
+Managed Postgres sets `wal_level` through a parameter group or server setting rather than `ALTER SYSTEM`. Each flavour has its own guide:
+
+| Where Postgres runs | Guide |
+| --- | --- |
+| Amazon RDS | [RDS Postgres CDC setup](/docs/connectors/postgres/setup/rds/) |
+| Amazon Aurora | [Aurora Postgres CDC setup](/docs/connectors/postgres/setup/aurora/) |
+| Azure Database for PostgreSQL | [Azure Postgres CDC setup](/docs/connectors/postgres/setup/azure/) |
+| Google Cloud SQL | [Cloud SQL Postgres CDC setup](/docs/connectors/postgres/setup/gcp/) |
+| Your own server or VM | [Generic Postgres CDC setup](/docs/connectors/postgres/setup/generic/) |
+| Docker, for a local test | [Local Postgres with Docker Compose](/docs/connectors/postgres/setup/local/) |
+
+:::warning[One slot and one publication per job]
+Two OLake Go jobs sharing a replication slot read each other's changes and both lose data. Create a separate slot and publication for every job.
+:::

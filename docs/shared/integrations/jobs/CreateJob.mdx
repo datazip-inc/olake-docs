@@ -1,0 +1,60 @@
+import CodeBlock from '@theme/CodeBlock';
+
+<Tabs groupId="interface" queryString="interface">
+<TabItem value="ui" label="OLake UI" default>
+
+1. Open **Jobs** and click **Create Job**. Give it a name and a schedule. **Every Day** at a fixed hour, or a cron expression, both work; the schedule is how often the change stream is drained, not how often a full copy runs.
+2. Select the source and the destination you created.
+3. Under **Advanced Settings**, set **Target Query Engines** to {props.engines ?? 'the engines that will read the tables'}. OLake Go then resolves an Iceberg delete format every one of those engines can read, so you never pick one by hand.
+4. Click **Next**. OLake Go discovers the {props.unit ?? 'tables'} and opens the **Streams** page.
+5. Tick the {props.unit ?? 'tables'} to replicate. For each one, set the sync mode to **{props.syncMode ?? 'Full Refresh + CDC'}**{props.cursor ? <> with <code>{props.cursor}</code> as the cursor column</> : null} and the ingestion mode to **{props.ingestion ?? 'Upsert'}**.{props.dedupKeys ? <> Under <strong>Dedup Keys</strong>, pick <code>{props.dedupKeys}</code>: that is the field OLake Go uses to match a later message to the row it replaces.</> : null}{(props.ingestion ?? 'Upsert') === 'Upsert' ? <> Leave the <strong>Upsert Type</strong> as OLake Go resolved it{props.upsert ? ` (${props.upsert} in the run on this page)` : ''}.</> : null}
+6. Click **Create Job**, then open the job's menu and choose **Sync Now** for the first run.
+
+{props.children}
+
+</TabItem>
+<TabItem value="cli" label="OLake CLI">
+
+Discover the {props.unit ?? 'tables'}, choose the streams, then sync:
+
+<CodeBlock language="bash" title="discover">{`docker run --pull=always \\
+  -v "$PWD/config:/mnt/config" \\${props.platform ? `
+  --platform ${props.platform} \\` : ''}
+  ${props.image ?? 'olakego/source-postgres:latest'} \\
+  discover --config /mnt/config/source.json`}</CodeBlock>
+
+`discover` writes two files: `available_streams.json` (every {(props.unit ?? 'tables').replace(/s$/, '')} it found, do not edit) and `selected_streams.json` (the {props.unit ?? 'tables'} you want and their settings). In `selected_streams.json`, set `sync_mode` to `{props.cliSyncMode ?? 'cdc'}` for each {(props.unit ?? 'tables').replace(/s$/, '')}{props.ingestion === 'Append' ? '' : ' and pick the delete format your readers can open'}:
+
+<CodeBlock language="json" title="selected_streams.json (one selected stream)">{`{
+  "selected_streams": {
+    "${props.namespace ?? 'public'}": [
+      {
+        "stream_name": "${props.stream ?? 'customers'}",
+        "sync_mode": "${props.cliSyncMode ?? 'cdc'}",${props.cursor ? `
+        "cursor_field": "${props.cursor}",` : ''}
+        "normalization": true,
+        "append_mode": ${props.ingestion === 'Append' ? 'true' : 'false'}${props.dedupKeys ? `,
+        "dedup_keys": [${props.dedupKeys.split(',').map((k) => `"${k.trim()}"`).join(', ')}]` : ''}${props.ingestion === 'Append' ? '' : `,
+        "update_type": "${props.updateType ?? 'pos'}"`}
+      }
+    ]
+  }
+}`}</CodeBlock>
+
+{props.ingestion === 'Append' ? <p>Append mode writes data files only, so no delete format or index directory is involved. The first sync runs without a state file; OLake Go writes one at the end of the run:</p> : <p><code>update_type</code> accepts <code>eq</code> (equality deletes, the default), <code>pos</code> (positional deletes) and <code>dv</code> (deletion vectors). Positional deletes and deletion vectors keep a small index between runs, so give the container a persistent directory for it through <code>OLAKE_INDEX_DB_DIR</code>. The first sync runs without a state file; OLake Go writes one at the end of the run:</p>}
+
+<CodeBlock language="bash" title="first sync">{`docker run --pull=always \\
+  -v "$PWD/config:/mnt/config" \\${props.ingestion === 'Append' ? '' : `
+  -e OLAKE_INDEX_DB_DIR=/mnt/config/index-db \\`}${props.platform ? `
+  --platform ${props.platform} \\` : ''}
+  ${props.image ?? 'olakego/source-postgres:latest'} \\
+  sync \\
+  --config /mnt/config/source.json \\
+  --selected-streams /mnt/config/selected_streams.json \\
+  --available-streams /mnt/config/available_streams.json \\
+  --destination /mnt/config/destination.json`}</CodeBlock>
+
+Every later run adds `--state /mnt/config/state.json` to the same command, which is how OLake Go knows to replay only the changes since the last run. The full `selected_streams.json` reference is on the [Docker CLI page](/docs/install/docker-cli/#streams-config); the index directory is described under [index DB setup](/docs/install/olake-ui/#index-db-setup-for-positional-delete-deletion-vector-writes).
+
+</TabItem>
+</Tabs>

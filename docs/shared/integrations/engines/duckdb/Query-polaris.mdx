@@ -1,0 +1,34 @@
+import CodeBlock from '@theme/CodeBlock';
+
+There is no registration step. DuckDB attaches the whole Polaris catalog with `ATTACH`, lists every table OLake Go committed, and reads the files straight from the bucket. DuckDB fetches the OAuth2 token itself from the principal's client id and secret. On a laptop, where the store address Polaris hands out may not resolve, add an S3 secret for the store and turn credential vending off:
+
+<CodeBlock language="sql" title="DuckDB 1.5.5">{`INSTALL iceberg; LOAD iceberg;
+INSTALL httpfs;  LOAD httpfs;
+
+CREATE SECRET polaris_secret (
+  TYPE iceberg,
+  CLIENT_ID '<client_id>', CLIENT_SECRET '<client_secret>',
+  OAUTH2_SERVER_URI 'http://<polaris-host>:8181/api/catalog/v1/oauth/tokens',
+  OAUTH2_SCOPE 'PRINCIPAL_ROLE:ALL'
+);
+-- MinIO, or any store whose address differs from the one Polaris vends
+CREATE SECRET store_secret (
+  TYPE s3, KEY_ID '<access key>', SECRET '<secret key>',
+  ENDPOINT '<minio-host>:9000', URL_STYLE 'path', USE_SSL false, REGION 'us-east-1'
+);
+
+ATTACH 'olake' AS polaris (
+  TYPE iceberg,
+  ENDPOINT 'http://<polaris-host>:8181/api/catalog',
+  SECRET polaris_secret,
+  ACCESS_DELEGATION_MODE 'none'
+);
+
+SHOW ALL TABLES;
+
+-- What OLake Go created (schema = <job name>_<source database>)
+SELECT ${props.idCol ?? 'id'}, name, city, tier FROM polaris.${props.schema ?? 'mysql_to_duckdb_shop'}.customers ORDER BY ${props.idCol ?? 'id'};`}</CodeBlock>
+
+With Polaris on AWS S3, drop the S3 secret and the `ACCESS_DELEGATION_MODE` line: DuckDB then reads with the credentials Polaris vends. The attached catalog is read-only from DuckDB; OLake Go is the writer.
+
+OLake Go adds four columns to every table: `_olake_id` (a hash of the primary key), `_op_type`, `_olake_timestamp` and `_cdc_timestamp`. `_op_type` is `r` for a row from the first snapshot, `c` for an insert, `u` for an update and `d` for a delete. Filter them out of dashboards, or use them to see when a row last changed.
