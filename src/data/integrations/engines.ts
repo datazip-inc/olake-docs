@@ -397,9 +397,9 @@ export const ENGINES: Record<EngineId, Engine> = {
       jdbc: { reads: 'yes', how: 'JDBC catalog (same catalog name as OLake Go)' }
     },
     defaultCatalog: 'glue',
-    docsUrl: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/',
+    docsUrl: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/',
     sources: [
-      { title: 'StarRocks: Iceberg catalog', url: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/iceberg_catalog/', checked: '2026-10-12' }
+      { title: 'StarRocks: Iceberg catalog', url: 'https://docs.starrocks.io/docs/data_source/catalog/iceberg/', checked: '2026-10-31' }
     ]
   },
   iceberg: {
