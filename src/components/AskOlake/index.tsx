@@ -307,8 +307,8 @@ function processCiteChildren(
         return part
       })
     }
-    if (React.isValidElement(child) && child.props?.children) {
-      return React.cloneElement(child as React.ReactElement<any>, {
+    if (React.isValidElement<{children?: React.ReactNode}>(child) && child.props?.children) {
+      return React.cloneElement(child as React.ReactElement<{children?: React.ReactNode}>, {
         children: processCiteChildren(child.props.children, citeMap)
       })
     }
