@@ -1,0 +1,37 @@
+name: Refresh docs index
+
+# Nightly: re-scrape olake.io docs, re-clone the OLake repos, refresh GitHub issues,
+# rebuild chunks + embeddings, and commit the snapshot. Render auto-deploys on push.
+on:
+  schedule:
+    - cron: "30 20 * * *"   # 02:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Rebuild index
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python -m ingest.build
+      - name: Retrieval eval (fails the job if search quality regresses)
+        run: |
+          uv run python -m eval.run retrieval | tee eval.txt
+          grep -qE 'hit@10: (3[3-9]|[4-9][0-9])/' eval.txt
+      - name: Commit snapshot if changed
+        run: |
+          git config user.name "ask-olake-bot"
+          git config user.email "ask-olake-bot@users.noreply.github.com"
+          git add data/chunks.jsonl data/sections.jsonl data/embeddings.npy data/issues.jsonl data/meta.json
+          if git diff --cached --quiet -- data/chunks.jsonl data/issues.jsonl; then
+            echo "Docs unchanged"; exit 0
+          fi
+          git commit -m "chore: nightly docs index refresh"
+          git push
