@@ -67,9 +67,9 @@ const AboutTeam = () => {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     url: primaryUrl,
-    name: 'Fastest Open Source Data Replication Tool',
+    name: 'OLake: Open Source Data Replication to Apache Iceberg',
     description:
-      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     publisher: {
       '@type': 'Organization',
       name: 'OLake'
@@ -87,7 +87,7 @@ const AboutTeam = () => {
     url: 'https://olake.io/about-us/',
     name: 'About Us',
     description:
-      'OLake is the fastest open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make database → Apache Iceberg simple, fast, and observable — with benchmarks showing up to 500× faster ingest than common alternatives.',
+      'OLake is an open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make database → Apache Iceberg simple, fast, and observable, with a published benchmark of 580,113 rows per second on a 4-billion-row Postgres full load.',
     publisher: {
       '@type': 'Organization',
       name: 'OLake',
@@ -98,7 +98,7 @@ const AboutTeam = () => {
       name: 'OLake',
       url: primaryUrl,
       description:
-        'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.'
+        'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.'
     }
   }
 
@@ -158,12 +158,12 @@ const AboutTeam = () => {
   return (
     <LakesidePage
       title="About Us"
-      description="Meet the OLake team behind the fastest open-source data replication tool. Learn about our mission to simplify database to Apache Iceberg workflows."
+      description="Meet the OLake team behind the open-source data replication tool for Apache Iceberg. Learn about our mission to simplify database to Apache Iceberg workflows."
       activePath='/about-us'
       heroBackground={
-        <PageHero title='About OLake - Fastest Open Source Data Replication Tool'>
+        <PageHero title='About OLake - Open Source Data Replication to Apache Iceberg'>
           <p>
-            OLake is the fastest open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable—with recent benchmarks showing up to 500× faster ingest than common alternatives—so your team can stop handling connectors and start focusing on models, products, and impact.
+            OLake is an open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable (our published benchmark loads 4 billion Postgres rows at 580,113 rows per second), so your team can stop handling connectors and start focusing on models, products, and impact.
           </p>
           <p>
             Born from real-world issues with slow, fragile ingestion, OLake gives you a clean UI/CLI, resilient CDC, and a path that keeps getting faster with every release—and we're actively pushing those benchmarks even further. No vendor lock-in, no plumbing issues—just a reliable way to move data into Iceberg for your modern analytics.

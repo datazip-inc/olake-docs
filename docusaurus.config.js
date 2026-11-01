@@ -51,7 +51,7 @@ const latestOlakeRelease = getLatestOlakeRelease()
 const config = {
   title: 'OLake',
   tagline:
-    'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
   favicon: 'img/logo/olake-blue.svg',
 
   // Exposed to components via useDocusaurusContext().siteConfig.customFields

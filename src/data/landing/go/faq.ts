@@ -27,7 +27,7 @@ export const GO_FAQS: ProductFaqItem[] = [
   },
   {
     q: 'How can I contribute?',
-    a: 'Join our Slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building the fastest open-source Iceberg-native ingestion tool.',
+    a: 'Join our Slack community, review the Contribution Guide, and explore "Good First Issues" on GitHub. Contributors can get their pull requests merged and be part of building an open-source, Iceberg-native ingestion tool.',
     links: [{ text: 'Slack community', href: SLACK_URL }]
   },
   {
