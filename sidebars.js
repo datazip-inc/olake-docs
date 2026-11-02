@@ -63,6 +63,7 @@ const docSidebar = {
     {
       type: 'category',
       label: 'GitOps',
+      link: { type: 'doc', id: 'install/gitops/index' },
       items: [
         { type: 'doc', id: 'install/gitops/docker', label: 'Docker Compose' },
         { type: 'doc', id: 'install/gitops/kubernetes', label: 'Kubernetes' },
