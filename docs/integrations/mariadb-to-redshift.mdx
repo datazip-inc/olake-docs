@@ -1,0 +1,391 @@
+---
+title: "MariaDB to Redshift: CDC via Apache Iceberg"
+description: "Replicate MariaDB to Amazon Redshift with binlog CDC: OLake Go writes Iceberg tables to the AWS Glue Data Catalog for Redshift, Athena and DuckDB to query."
+sidebar_label: MariaDB to Redshift
+image: /img/docs/integrations/mariadb-to-redshift/cover.webp
+keywords:
+  - mariadb to redshift
+  - mariadb to redshift cdc
+  - mariadb to redshift replication
+  - mariadb binlog redshift
+  - redshift iceberg
+  - aws glue data catalog iceberg
+integration:
+  source: mariadb
+  engine: redshift
+  catalogs: [glue]
+  default: glue
+  author: shubham
+  reviewer: nayan
+  tested:
+    date: "2026-10-30"
+    olake: v1.1.0
+    catalogs: [glue]
+    engines:
+      - "Amazon Redshift Serverless (8 RPU workgroup, ap-southeast-1)"
+      - "Amazon Athena engine v3"
+      - "DuckDB 1.5.5"
+    summary: "A 2-table MariaDB 11.8 database (8 customers, 40 orders) synced with Full Refresh + CDC and positional deletes as the Iceberg update/delete format into the AWS Glue Data Catalog on S3, then 7 inserts and 5 updates replayed from the binlog by a second sync. Redshift Serverless, Athena and DuckDB returned identical rows."
+  faq:
+    - q: "How do I replicate MariaDB to Redshift without DMS?"
+      a: "Run OLake Go (open source, Apache 2.0) against a MariaDB server with row-based binary logging on, and point it at the AWS Glue Data Catalog with an S3 bucket. The first sync copies the tables in full, every later sync replays only the changes from the binlog, and Redshift reads the result through an external schema over the Glue database. DMS, Kafka, Debezium and a Redshift load job are not needed. OLake Go reads MariaDB through its MySQL connector, so the setup is the same as for MySQL."
+    - q: "Does Redshift read Iceberg tables with row-level deletes?"
+      a: "Yes. Redshift reads Iceberg v2 tables with positional deletes through Redshift Spectrum, on Serverless and RA3. The run on this page used positional deletes and Redshift returned one row per key after the updates. Equality deletes and Iceberg v3 tables with deletion vectors are not the right pick while Redshift is a reader."
+    - q: "Does OLake Go copy the existing MariaDB data before it starts reading the binlog?"
+      a: "Yes, automatically. A job in Full Refresh + CDC mode records the binlog position, copies every selected table in parallel chunks, then switches to the binlog from that position. Nothing written during the copy is lost, and there is no separate backfill job."
+    - q: "Is Redshift one of OLake Go's target query engines?"
+      a: "Not in the picker yet. On this page the job lists Athena and DuckDB as target engines and sets the upsert type to Positional Deletes by hand, which is the format Redshift reads. Redshift then reads the tables through the external schema like any other Iceberg v2 table."
+    - q: "Does MariaDB CDC with OLake Go work on Amazon RDS, Azure or SkySQL?"
+      a: "Yes, as long as the binlog is on with row format. Managed MariaDB sets binlog_format, binlog_row_metadata and retention through a parameter group or server parameter instead of my.cnf; the MySQL setup guides on this site apply, because OLake Go reads MariaDB through the MySQL connector. On RDS for MariaDB the binlog is on once automated backups are enabled; set binlog_format to ROW in the parameter group."
+    - q: "Which MariaDB data types change on the way to Redshift?"
+      a: "decimal columns become Iceberg double and show up in Redshift as DOUBLE PRECISION, so round at query time when you need exact decimal arithmetic. datetime and timestamp become TIMESTAMP in UTC. int stays INTEGER, bigint BIGINT, and varchar, text, json, enum and time arrive as VARCHAR."
+    - q: "How much binlog does MariaDB need to keep for OLake Go?"
+      a: "Enough to cover your longest pause. OLake Go saves the binlog position after every sync and resumes from it; if MariaDB has already expired that file, the next sync cannot resume and needs a fresh snapshot. Seven days (binlog_expire_logs_seconds = 604800) is a safe default for a job that runs at least daily."
+---
+
+import * as I from '@site/src/components/integrations';
+
+MariaDB to Redshift usually means a Database Migration Service (DMS) task, Debezium through Kafka, or a nightly export and `COPY`. This guide takes a fourth route. OLake Go reads the MariaDB binary log and commits the changes as Apache Iceberg tables into the AWS Glue Data Catalog, with the files in your own S3 bucket.
+
+Redshift maps the Glue database onto an external schema and queries the tables in place. Nothing else is in the path: no DMS, no Kafka, no load job. Athena and DuckDB read the same tables through the same catalog.
+
+<I.IntegrationByline />
+
+<TLDR title='Key takeaways'>
+
+- OLake Go replicates MariaDB into Iceberg tables in the Glue Data Catalog: a full historical snapshot first, then change data capture (CDC) from the binlog, with no DMS or Debezium in between. OLake Go reads MariaDB through its MySQL connector, so every step applies as written.
+- Redshift reads the Glue database through one `CREATE EXTERNAL SCHEMA` statement, with no refresh. Every change a sync commits is visible on the next query, on Serverless and RA3 alike.
+- The same tables, written once by OLake Go, are also queryable from Athena and DuckDB. In the run on this page all three engines returned identical rows.
+
+</TLDR>
+
+**The short answer.** To replicate MariaDB to Redshift with change data capture (CDC), run OLake Go with MariaDB's binary log as the source and the AWS Glue Data Catalog as the Iceberg destination. Set the upsert type to Positional Deletes, the format Redshift reads.
+
+The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the binlog. Redshift, Athena and DuckDB then query the same Iceberg tables, with no second copy.
+
+## How MariaDB CDC reaches Redshift here
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 40}}}%%
+flowchart TB
+  subgraph mdb["MariaDB"]
+    T[(customers, orders)]
+    BL[binary log, ROW format, read from the saved position]
+    T ~~~ BL
+  end
+  subgraph olake["OLake Go"]
+    W[Iceberg writer]
+  end
+  subgraph aws["AWS"]
+    G[Glue Data Catalog: one database per job, table pointers]
+    S[(S3 bucket: Parquet data and delete files)]
+  end
+  R[Query engines: Redshift via external schema, Athena, DuckDB]
+  T -- "first sync (historical snapshot): parallel reads over table chunks" --> W
+  BL -- "later syncs: inserts, updates, deletes" --> W
+  W -- "1. Parquet data files and positional delete files" --> S
+  W -- "2. commit: new metadata pointer" --> G
+  G -- "table metadata" --> R
+  S -- "data and delete files" --> R
+```
+
+Two things happen in order, and OLake Go does both on its own. The first sync records the current binlog position. Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load.
+
+Every later sync opens the binlog at the saved position and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
+
+Each sync ends with one commit to Glue. OLake Go uploads the data and delete files to the bucket, then updates the table's metadata pointer in the Glue database. Redshift, Athena and DuckDB see the new snapshot on their next query; none of them keeps a copy.
+
+One thing to keep an eye on: the binlog is MariaDB's replay window. MariaDB deletes binlog files after `binlog_expire_logs_seconds`.
+
+A job paused for longer than that cannot resume and needs a fresh snapshot. Keep retention longer than your longest planned pause, and alert on `SHOW BINARY LOGS` size if disk is tight.
+
+## What you need
+
+- **MariaDB 10.5 or later** with the binlog on in `ROW` format and a user that can read it. The tables on this page ran on MariaDB 11.8 in Docker. Hosted MariaDB on Amazon Relational Database Service (RDS), Azure Database for MariaDB or SkySQL works the same way; step 1 links the setup guides. OLake Go reads MariaDB through its MySQL connector, so every MariaDB step on this page applies as written.
+- **An AWS account** with an S3 bucket for the files and an IAM user or role for OLake Go with Glue and S3 permissions. The run on this page used a bucket and a scoped IAM user in `ap-southeast-1`.
+- **Amazon Redshift**, Serverless or an RA3 cluster, with an IAM role attached that can read Glue and the bucket. The run on this page used a Serverless workgroup at 8 RPU.
+- **OLake UI** from the [Docker Compose install](/docs/install/olake-ui/). The run on this page used OLake Go v1.1.0.
+- **Docker**, and about 40 minutes.
+
+## Step 1: Prepare MariaDB for CDC
+
+Most readers point OLake Go at tables they already have. If you want to follow along with the exact data from this page, create these two tables first:
+
+<details>
+<summary>The two sample tables used on this page</summary>
+
+```sql title="Sample schema"
+CREATE TABLE customers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100), email VARCHAR(200), city VARCHAR(100), tier VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);
+
+CREATE TABLE orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id));
+
+-- Then insert whatever you like. This page started with 8 customers and 40 orders.
+```
+
+</details>
+
+<I.Partial id="sources/mariadb/prereqs" tables="customers, orders" />
+
+## Step 2: Set up the Glue catalog
+
+Redshift reads Iceberg tables through a catalog. **AWS Glue Data Catalog** is the one this page uses: OLake Go creates a Glue database per job and registers each table there. The files sit in your S3 bucket.
+
+Redshift, Athena, Amazon Elastic MapReduce (EMR) and DuckDB all read from the same catalog. Redshift reaches it through an external schema, with the IAM role attached to the workgroup or cluster.
+
+<I.CatalogStrip />
+
+<I.CatalogTabs>
+<TabItem value="glue">
+
+<I.Partial id="catalogs/glue/setup" />
+
+The run on this page gave OLake Go a scoped IAM user with this inline policy. Redshift got a role with `AmazonS3ReadOnlyAccess` and read access to Glue:
+
+```json title="IAM policy for the OLake Go user (replace the bucket, region and account)"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": ["s3:ListBucket", "s3:GetBucketLocation"], "Resource": "arn:aws:s3:::<bucket>" },
+    { "Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"], "Resource": "arn:aws:s3:::<bucket>/*" },
+    { "Effect": "Allow",
+      "Action": ["glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:GetTable", "glue:GetTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable"],
+      "Resource": ["arn:aws:glue:<region>:<account>:catalog", "arn:aws:glue:<region>:<account>:database/*", "arn:aws:glue:<region>:<account>:table/*/*"] }
+  ]
+}
+```
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 3: Connect MariaDB to OLake Go
+
+<I.Partial id="sources/mariadb/connect">
+
+Here is the source form from the run on this page. MariaDB ran in another container, so the host is `host.docker.internal` on port `3307`; the connector is **MySQL**, which is how OLake Go reads MariaDB, and the user is the replication user from step 1.
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/olake-source-mariadb-cdc.webp' alt='OLake UI Edit source form for MariaDB through the MySQL connector on OLake Go v1.1.0 with Enable CDC on, initial wait time 10, host host.docker.internal, port 3307, database shop, user olake and SSL disabled' caption='The MariaDB source in OLake UI, through the MySQL connector: Enable CDC on, with the replication user from step 1.' width='760px' />
+
+**Set up source** runs the connection test and the binlog checks (`binlog_access`, `log_bin`, `binlog_format`, `binlog_row_metadata`) before anything is saved. When one fails, the dialog names the setting and its recommended value.
+
+</I.Partial>
+
+## Step 4: Configure the Iceberg destination
+
+<I.CatalogTabs>
+<TabItem value="glue">
+
+<I.Partial id="catalogs/glue/writer" />
+
+Here is the destination form from the run on this page. It holds the bucket path OLake Go writes under, the region of the bucket and the Glue catalog, and the access key pair of the IAM user from step 2.
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/olake-destination-glue.webp' alt='OLake UI Edit destination form for Apache Iceberg with catalog type AWS Glue, an S3 path under the lab bucket, region ap-southeast-1 and an access key pair' caption='The Glue destination in OLake UI: the S3 path, the region and the keys of the scoped IAM user.' width='760px' />
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 5: Create the job and run the first sync
+
+Redshift is not in OLake Go's target engine picker yet. This job therefore lists **Athena** and **DuckDB** as target engines and sets the upsert type to **Positional Deletes** by hand.
+
+That is the format Redshift reads, and both listed engines read it too. Each stream runs as **Full Refresh + CDC**, so the binlog carries every change after the snapshot.
+
+<I.Partial id="jobs/create" engines="AWS Athena and DuckDB (Redshift is not in the list yet; it reads what Athena reads)" upsert="Positional Deletes" updateType="pos" image="olakego/source-mysql:latest" namespace="shop">
+
+OLake Go offers every delete format Athena and DuckDB both read. The run on this page picked **Positional Deletes** from that list because Redshift reads Iceberg v2 tables with positional deletes and nothing else.
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/olake-streams-positional-deletes.webp' alt='OLake UI Streams Selection page with the shop database, customers and orders selected, sync mode Full Refresh + CDC, ingestion mode Upsert and upsert type Positional Deletes on Iceberg format version V2' caption='Each stream: Full Refresh + CDC, Upsert, and Positional Deletes as the upsert type. The Iceberg DB name at the top is editable.' />
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for mariadb_to_redshift showing two completed syncs, the first in 16 seconds and the second in 14 seconds' caption='Job history: the 16 s historical snapshot, then the 14 s change-only sync.' />
+
+</I.Partial>
+
+On this page the first run copied 8 customers and 40 orders (48 records, 2.10 KB) and finished in **16 seconds**, container start included. OLake Go names the Glue database after the job and the source database, so `mariadb_to_redshift` on database `shop` produced `mariadb_to_redshift_shop`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
+
+## Step 6: Query the tables in Redshift
+
+<I.CatalogTabs>
+<TabItem value="glue">
+
+<I.Partial id="engines/redshift/query-glue" schema="mariadb_to_redshift_shop" />
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/redshift-glue-customers.webp' alt='Redshift query editor v2 in the AWS console running the customers query on the Serverless workgroup and returning 10 rows with id, name, city and tier' caption='Redshift Serverless reading the customers table through the external schema after the change sync in query editor v2: 10 rows, one per key.' />
+
+</TabItem>
+</I.CatalogTabs>
+
+<I.Cta />
+
+## Step 7: Change rows in MariaDB and sync again
+
+To see the change path work, the run on this page made 12 changes in MariaDB after the first sync:
+
+```sql title="Changes made in MariaDB between the two syncs"
+INSERT INTO customers (name, email, city, tier) VALUES
+  ('Maya Patel', 'maya@example.com', 'Pune', 'silver'),
+  ('Lucas Silva', 'lucas@example.com', 'São Paulo', 'bronze');
+INSERT INTO orders (customer_id, product, amount, status) VALUES
+  (9, 'Laptop', 1299.00, 'placed'), (9, 'Mouse', 25.50, 'placed'),
+  (10, 'Monitor', 349.99, 'placed'), (3, 'Keyboard', 89.00, 'placed'), (7, 'Webcam', 79.90, 'placed');
+UPDATE customers SET tier = 'gold'      WHERE name = 'Liam Carter';
+UPDATE customers SET city = 'Abu Dhabi' WHERE name = 'Zara Ali';
+UPDATE orders    SET status = 'delivered' WHERE id IN (1, 4, 7);
+```
+
+The second sync read **12 records (563 bytes)** from the binlog and finished in **14 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows.
+
+One small positional delete file retires the 2 old versions. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedPositionalDeleteFiles=1`, `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/olake-sync-log-positional-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report, showing addedDataFiles 1, addedPositionalDeleteFiles 1, addedRecords and addedPositionalDeletes for the change-only sync' caption='The change-only sync in the OLake UI log: one data file and one positional delete file per table.' />
+
+Redshift shows the result on the next query, with no refresh and no `ALTER TABLE`. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there.
+
+The two retired versions are gone, because Redshift applies the positional deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates.
+
+**Schema changes.** When a column is added in MariaDB, OLake Go adds it to the Iceberg table on the next sync. The Glue table definition is updated in the same commit, and Redshift shows it on the next query of the external schema. Widening changes (`int` to `bigint`, `float` to `double`) are applied.
+
+Narrowing or incompatible type changes fail the sync rather than corrupt the table. `binlog_row_metadata = FULL` is what lets OLake Go see the new column names in the binlog. Full rules are on the [schema evolution page](/docs/features/schema/).
+
+## Query the same tables from Athena and DuckDB
+
+This is the point of writing Iceberg instead of loading Redshift tables. Nothing is exported, copied or refreshed: both engines read the files OLake Go wrote, through the same Glue database.
+
+<Tabs groupId="engine" queryString="engine">
+<TabItem value="athena" label="Amazon Athena" default>
+
+<I.Partial id="engines/athena/connect-glue" schema="mariadb_to_redshift_shop" />
+
+<Figure src='/img/docs/integrations/mariadb-to-redshift/athena-glue-customers.webp' alt='Athena query editor in the AWS console running the customers query on the mariadb_to_redshift_shop database and returning 10 rows' caption='Athena reading the same table through Glue: the same 10 rows.' />
+
+</TabItem>
+<TabItem value="duckdb" label="DuckDB">
+
+<I.Partial id="engines/duckdb/connect-glue" schema="mariadb_to_redshift_shop" />
+
+DuckDB 1.5.5 returned the same 10 customers and the same `orders` roll-up as Redshift and Athena in the run on this page. It read the current metadata file of each table.
+
+</TabItem>
+</Tabs>
+
+An `orders` roll-up matched MariaDB to the cent in all three engines. It gave 16 delivered orders for 8659.68, 18 placed for 10522.26, 11 shipped for 6397.25.
+
+## Data types: MariaDB to Iceberg to Redshift
+
+OLake Go maps MariaDB types to Iceberg types, and Redshift maps Iceberg types to its own through the external schema. Most columns pass through unchanged; three groups are worth knowing about.
+
+| MariaDB | Iceberg (written by OLake Go) | Redshift shows | Notes |
+| --- | --- | --- | --- |
+| `int`, `mediumint`, `smallint`, `tinyint` (signed or unsigned) | `int` | `INTEGER` | The `id` and `customer_id` columns on this page arrived as `INTEGER`. |
+| `bigint`, `bigint unsigned` | `long` | `BIGINT` | |
+| `decimal(p,s)`, `float`, `double`, `real` | `double` | `DOUBLE PRECISION` | OLake Go stores decimals as doubles. The `orders.amount` sums on this page matched MariaDB to the cent in every engine; round at query time when you need exact decimal arithmetic. |
+| `datetime`, `timestamp` | `timestamptz` (UTC) | `TIMESTAMP` | `datetime` has no zone in MariaDB; it is read as UTC and shown without a zone. |
+| `char`, `varchar`, `text` family, `enum`, `json`, `time`, `bit(1)` | `string` | `VARCHAR` | Parse `json` with Redshift's `JSON_PARSE` or `json_extract_path_text`. `time` arrives as text. |
+| `binary(n)`, `varbinary`, `blob` family | `fixed[n]` or `binary` | `VARBYTE` | Keep large binaries out of the sync. |
+
+MariaDB types in the table come from the [MySQL connector reference](/docs/connectors/mysql/#data-type-mapping), which OLake Go uses for MariaDB. The Redshift side comes from the [Redshift Iceberg page](https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html) (checked 2026-10-30) and from `svv_external_columns` on the tables of this run.
+
+## Cost and maintenance
+
+- **Storage** is your bucket: you pay S3 rates for the Parquet and delete files, and nothing to Glue beyond its per-object pricing for the table entries.
+- **Compute.** OLake Go runs wherever you run Docker. Redshift Serverless bills RPU-hours only while queries run; a query over the external schema scans the Parquet files in S3 through Redshift Spectrum, so filter on the columns you need. Athena bills per terabyte scanned.
+- **Maintenance.** Glue has no built-in compaction for tables written by external engines. A CDC table that gets a new small file and delete file per sync wants compaction; [OLake Fusion](/docs/fusion/getting-started/overview/) does this for the catalogs OLake Go writes to, and Spark on EMR's `rewrite_data_files` works through the same Glue catalog.
+- **Binlog disk.** Seven days of binlog on a busy server can be tens of gigabytes. Size the volume for it, or shorten retention once the job runs reliably every hour.
+- **Key rotation.** The IAM user's access key is what OLake Go writes with. Rotate it on your schedule, or run OLake Go on an instance with a role and leave the key fields empty.
+
+## Troubleshooting
+
+### 1. The first sync stops with a statistics error
+
+```text
+failed to get or split chunks: stats not populated for table[shop.orders]. Please run ANALYZE TABLE to update table statistics
+```
+
+OLake Go plans the parallel snapshot from `information_schema` row estimates. A freshly created or freshly loaded table has none. Run `ANALYZE TABLE <table>;` for each table in the job, then sync again.
+
+### 2. The source test fails on the binlog
+
+```text
+binlog_format: current STATEMENT, recommended ROW
+```
+
+The test dialog names the setting. `binlog_format` and `binlog_row_metadata` can be changed at runtime with `SET GLOBAL`.
+
+Put them in `my.cnf` (or the parameter group) too, or they revert on restart. `log_bin` itself needs a restart.
+
+### 3. The next sync cannot find its binlog position
+
+```text
+idle timeout reached, exiting binlog syncer
+```
+
+Two causes. If `binlog_expire_logs_seconds` already removed the saved binlog file, run a fresh full snapshot and lengthen retention.
+
+If the file exists but the server is slow to seek to the position, raise **Initial Wait Time** on the source. 10 seconds was enough for the two-table database on this page.
+
+### 4. The destination test fails on a table OLake Go did not create
+
+```text
+User: arn:aws:iam::<account>:user/<olake user> is not authorized to perform: s3:GetObject on resource: "arn:aws:s3:::<another bucket>/.../test_olake.db/test_olake/metadata/00000-....metadata.json"
+```
+
+OLake Go's destination test opens a probe table called `test_olake.test_olake` in the Glue database `test_olake`. An earlier run in the same account and region may have left that table behind, pointing at a bucket your user cannot read.
+
+The test then fails before it writes anything. Delete the stale table from Glue, or run OLake Go against a region whose Glue catalog does not have it.
+
+### 5. Redshift cannot see the external schema's tables
+
+```text
+ERROR: Database 'mariadb_to_redshift_shop' does not exist in the Glue Data Catalog
+```
+
+The external schema was created before the first sync, or in a different region from the Glue database. OLake Go creates the Glue database on the first sync; create the external schema after it, in the workgroup's region.
+
+<details>
+<summary>How this compares with other ways to move MariaDB data to Redshift</summary>
+
+| Method | Freshness | Updates and deletes | Where the data lands | What you run |
+| --- | --- | --- | --- | --- |
+| [AWS DMS to Redshift](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Redshift.html) with the [MariaDB source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.MySQL.html) | CDC through the binlog | Yes | Native Redshift tables | A DMS replication instance and task, plus an S3 staging bucket |
+| Debezium, Kafka and a Redshift sink | Seconds | Yes, with your own merge logic | Kafka topics, then Redshift tables | Kafka, Kafka Connect, Debezium and a sink connector per table |
+| Export (`mariadb-dump` or `SELECT INTO OUTFILE`), then `COPY` into Redshift | Hours to daily | No; full reloads only | Native Redshift tables | A script, a scheduler and a staging bucket |
+| Managed ELT (Fivetran, Estuary, Airbyte Cloud) | Minutes, by plan | Varies by tool | Redshift tables, a second copy you pay to move and store | Nothing; priced per row, per GB or per connector |
+| **OLake Go to Iceberg on Glue (this guide)** | CDC on a schedule down to one minute | Yes, as Iceberg row-level deletes | Apache Iceberg tables that Redshift, Athena, EMR, Spark and DuckDB all read | One Docker Compose stack, open source; your bucket plus your own compute |
+
+DMS is the simpler choice when Redshift is the only reader and you are already on AWS. Writing Iceberg once avoids paying to move and store a second copy. That matters as soon as Athena, EMR or a notebook needs the same rows, or you want to own the files.
+
+</details>
+
+## When not to use this
+
+- **Every query must hit native Redshift speed.** Spectrum reads Parquet from S3 on every query. Keep the Iceberg tables as the source and load the hot slice into a native table on a schedule.
+- **You need equality deletes or deletion vectors.** Redshift reads positional deletes only. Keep the upsert type on Positional Deletes while Redshift is a reader.
+- **Tables have no primary key.** Inserts replicate; updates and deletes cannot be matched to a row and are not applied. Add a primary key or a unique index first.
+
+## FAQs
+
+<I.IntegrationFaq />
+
+<I.HowWeTested />
+
+## Related guides
+
+<I.RelatedIntegrations />
+
+Deeper reading on this site:
+
+- [MySQL to Apache Iceberg with OLake Go](/blog/mysql-to-iceberg-query-engines/)
+- [Equality vs positional deletes vs deletion vectors](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors/)
+- [Which engines read which delete formats](/blog/iceberg-delete-formats-interoperability-olake-go/)
+- [OLake Go ingestion benchmarks](/docs/benchmarks/ingestion/)
+
+<I.IntegrationJsonLd />
+
+<I.Cta title='Start with your own MariaDB' body='The quickstart runs OLake UI with Docker Compose. Create the source, the Glue destination and the job as above, and the first sync lands your tables where Redshift can read them.' />

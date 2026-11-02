@@ -1,0 +1,375 @@
+---
+title: "MySQL to ClickHouse: CDC via Apache Iceberg"
+description: "Replicate MySQL to ClickHouse with binlog CDC: OLake Go writes Iceberg tables into an Apache Polaris catalog, and ClickHouse, DuckDB and Trino query them."
+sidebar_label: MySQL to ClickHouse
+image: /img/docs/integrations/mysql-to-clickhouse/cover.webp
+keywords:
+  - mysql to clickhouse
+  - mysql to clickhouse cdc
+  - mysql to clickhouse replication
+  - mysql binlog clickhouse
+  - clickhouse iceberg
+  - apache polaris
+integration:
+  source: mysql
+  engine: clickhouse
+  catalogs: [polaris]
+  default: polaris
+  author: shubham
+  reviewer: nayan
+  tested:
+    date: "2026-10-29"
+    olake: v1.1.0
+    catalogs: [polaris]
+    engines:
+      - "ClickHouse 26.8.36 (LTS), DataLakeCatalog engine"
+      - "DuckDB 1.5.5"
+      - "Trino 484"
+    summary: "A 2-table MySQL 8.4 database (8 customers, 40 orders) synced with Full Refresh + CDC and equality deletes as the Iceberg update/delete format into Apache Polaris 1.8.0 on MinIO, then 7 inserts and 5 updates replayed through a second sync. ClickHouse, DuckDB and Trino returned identical rows."
+  faq:
+    - q: "How do I replicate MySQL to ClickHouse without ClickPipes or the MySQL table engine?"
+      a: "Run OLake Go (open source, Apache 2.0) against a MySQL server with row-based binary logging on, and point it at an Apache Polaris catalog. The first sync copies the tables in full, every later sync replays only the changes from the binlog, and ClickHouse reads the result as Iceberg tables through its DataLakeCatalog engine. No Kafka, no Debezium and no ClickHouse Cloud account sit in the path."
+    - q: "Does ClickHouse read Iceberg tables with row-level deletes?"
+      a: "Yes. ClickHouse reads positional deletes, and equality deletes from 25.8. The run on this page used equality deletes, which OLake Go chose because ClickHouse, DuckDB and Trino all read them, and ClickHouse 26.8 returned one row per key after the updates. Deletion vectors (Iceberg v3) are not read by the 26.8 LTS release."
+    - q: "Does OLake Go copy the existing MySQL data before it starts reading the binlog?"
+      a: "Yes, automatically. A job in Full Refresh + CDC mode records the binlog position, copies every selected table in parallel chunks, then switches to the binlog from that position. Nothing written during the copy is lost, and there is no separate backfill job."
+    - q: "Why Apache Polaris rather than a ClickHouse table?"
+      a: "A Polaris catalog is one open endpoint that ClickHouse, DuckDB, Trino and Spark all read, with its own access control and vended storage credentials. Loading into a ClickHouse MergeTree table is faster to query but makes ClickHouse the only reader, and a second engine means a second copy. Keep the Iceberg tables as the shared source and load hot slices into MergeTree when a dashboard needs it."
+    - q: "Does MySQL CDC with OLake Go work on Amazon RDS, Aurora or Cloud SQL?"
+      a: "Yes, as long as the binlog is on with row format. Managed MySQL sets binlog_format, binlog_row_metadata and retention through a parameter group or flag instead of my.cnf; step 1 links the setup guide for each. On RDS the binlog is on once automated backups are enabled; set binlog_format to ROW in the parameter group."
+    - q: "Which MySQL data types change on the way to ClickHouse?"
+      a: "decimal columns become Iceberg double and show up in ClickHouse as Float64, so round at query time when you need exact decimal arithmetic. datetime and timestamp become DateTime64(6, 'UTC'). int stays Int32, bigint Int64, varchar and text become String, and json, enum and time arrive as String. Every column arrives Nullable except _olake_id."
+    - q: "How much binlog does MySQL need to keep for OLake Go?"
+      a: "Enough to cover your longest pause. OLake Go saves the binlog position after every sync and resumes from it; if MySQL has already expired that file, the next sync cannot resume and needs a fresh snapshot. Seven days (binlog_expire_logs_seconds = 604800) is a safe default for a job that runs at least daily."
+---
+
+import * as I from '@site/src/components/integrations';
+
+MySQL to ClickHouse usually means ClickPipes on ClickHouse Cloud, the MySQL table engine, or Debezium through Kafka, and tables that only ClickHouse can read. This guide takes a different route.
+
+OLake Go reads the MySQL binary log and commits the changes as Apache Iceberg tables into an Apache Polaris catalog. ClickHouse attaches that catalog as a database.
+
+Polaris is an open source Iceberg REST (Representational State Transfer) catalog you run yourself, with the files in your own bucket. Nothing else is in the path: no Kafka, no Debezium, no ClickHouse Cloud. DuckDB and Trino read the same tables through the same endpoint.
+
+<I.IntegrationByline />
+
+<TLDR title='Key takeaways'>
+
+- OLake Go replicates MySQL into Iceberg tables in Polaris: a full historical snapshot first, then change data capture (CDC) from the binlog, with no Kafka or Debezium in between.
+- ClickHouse attaches the whole Polaris catalog as one database with `DataLakeCatalog`, reads the files with the credentials Polaris vends, and sees every change the moment a sync commits.
+- The same tables, written once by OLake Go, are also queryable from DuckDB and Trino through the same catalog. In the run on this page all three engines returned identical rows.
+
+</TLDR>
+
+**The short answer.** To replicate MySQL to ClickHouse with change data capture (CDC), run OLake Go with MySQL's binary log as the source. Point it at an Apache Polaris catalog as the Iceberg destination.
+
+The first sync copies each table in full (the historical snapshot); every later sync replays inserts, updates and deletes from the binlog. ClickHouse, DuckDB and Trino then query the same Iceberg tables, with no second copy.
+
+## How MySQL CDC reaches ClickHouse here
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 40}}}%%
+flowchart TB
+  subgraph my["MySQL"]
+    T[(customers, orders)]
+    BL[binary log, ROW format, read from the saved position]
+    T ~~~ BL
+  end
+  subgraph olake["OLake Go"]
+    W[Iceberg writer]
+  end
+  subgraph pol["Apache Polaris"]
+    H[REST catalog: table pointers, access control]
+  end
+  S[(S3 or MinIO bucket)]
+  R[Query engines: ClickHouse, DuckDB, Trino]
+  T -- "first sync (historical snapshot): parallel reads over table chunks" --> W
+  BL -- "later syncs: inserts, updates, deletes" --> W
+  H -. "1. vended storage credentials" .-> W
+  W -- "2. Parquet data files and equality delete files" --> S
+  W -- "3. commit snapshot" --> H
+  H -- "table metadata and vended credentials" --> R
+  S -- "data and delete files" --> R
+```
+
+Two things happen in order, and OLake Go does both on its own. The first sync records the current binlog position. Then it reads each table in parallel chunks and writes Parquet data files: that is the historical load.
+
+Every later sync opens the binlog at the saved position and replays the inserts, updates and deletes since. Nothing written during the snapshot is lost, and there is no separate backfill job.
+
+Each sync ends with one commit to Polaris. OLake Go asks Polaris for short-lived storage credentials, uploads the data and delete files, then posts the new snapshot to the catalog. ClickHouse, DuckDB and Trino see it on their next query; none of them keeps a copy.
+
+One thing to keep an eye on: the binlog is MySQL's replay window. MySQL deletes binlog files after `binlog_expire_logs_seconds`.
+
+A job paused for longer than that cannot resume and needs a fresh snapshot. Keep retention longer than your longest planned pause, and alert on `SHOW BINARY LOGS` size if disk is tight.
+
+## What you need
+
+- **MySQL 8.0 or later** with the binlog on in `ROW` format and a user that can read it. The tables on this page ran on MySQL 8.4. Hosted MySQL on Amazon Relational Database Service (RDS), Aurora, Google Cloud SQL or Azure works the same way; step 1 links the setup guides.
+- **An Apache Polaris server and a bucket**, both reachable from OLake Go and from ClickHouse. The run on this page used Polaris 1.8.0 and MinIO in Docker; on AWS, use an S3 bucket and an IAM role instead.
+- **ClickHouse 26.1 or later**, where the `DataLakeCatalog` engine reads REST catalogs. The run on this page used the 26.8 LTS release in Docker.
+- **OLake UI** from the [Docker Compose install](/docs/install/olake-ui/). The run on this page used OLake Go v1.1.0.
+- **Docker**, and about 40 minutes.
+
+## Step 1: Prepare MySQL for CDC
+
+Most readers point OLake Go at tables they already have. If you want to follow along with the exact data from this page, create these two tables first:
+
+<details>
+<summary>The two sample tables used on this page</summary>
+
+```sql title="Sample schema"
+CREATE TABLE customers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100), email VARCHAR(200), city VARCHAR(100), tier VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);
+
+CREATE TABLE orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id));
+
+-- Then insert whatever you like. This page started with 8 customers and 40 orders.
+```
+
+</details>
+
+<I.Partial id="sources/mysql/prereqs" tables="customers, orders" />
+
+## Step 2: Set up the Polaris catalog
+
+ClickHouse reads Iceberg tables through a catalog. **Apache Polaris** is the one this page uses: an open source REST catalog that you run next to your bucket.
+
+OLake Go writes into it, and ClickHouse, DuckDB and Trino read from it with the credentials Polaris hands out. The Iceberg files sit in your own S3 or MinIO bucket; Polaris holds only the pointers and the permissions.
+
+<I.CatalogStrip />
+
+<I.CatalogTabs>
+<TabItem value="polaris">
+
+<I.Partial id="catalogs/polaris/setup" />
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 3: Connect MySQL to OLake Go
+
+<I.Partial id="sources/mysql/connect">
+
+Here is the source form from the run on this page. MySQL ran in another container, so the host is `host.docker.internal`; the user is the replication user from step 1.
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/olake-source-mysql-cdc.webp' alt='OLake UI Edit source form for MySQL on OLake Go v1.1.0 with Enable CDC on, initial wait time 10, host host.docker.internal, database shop, user olake and SSL disabled' caption='The MySQL source in OLake UI: Enable CDC on, with the replication user from step 1.' width='760px' />
+
+**Set up source** runs the connection test and the binlog checks (`binlog_access`, `log_bin`, `binlog_format`, `binlog_row_metadata`) before anything is saved. When one fails, the dialog names the setting and its recommended value.
+
+</I.Partial>
+
+## Step 4: Configure the Iceberg destination
+
+<I.CatalogTabs>
+<TabItem value="polaris">
+
+<I.Partial id="catalogs/polaris/writer">
+
+Here is the destination form from the run on this page. Polaris and MinIO ran in other containers, so both addresses use `host.docker.internal`; the credential is the `olake` principal from step 2.
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/olake-destination-polaris.webp' alt='OLake UI Edit destination form for Apache Iceberg with catalog type Polaris, authentication type OAuth2, REST catalog URI http://host.docker.internal:8181/api/catalog, Polaris catalog name olake, S3 endpoint http://host.docker.internal:9000, REST scope PRINCIPAL_ROLE:ALL and region us-east-1' caption='The Polaris destination in OLake UI: OAuth2 with the principal from step 2, and the MinIO endpoint for the files.' width='760px' />
+
+</I.Partial>
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 5: Create the job and run the first sync
+
+<I.Partial id="jobs/create" engines="ClickHouse, plus DuckDB and Trino if they will read the tables too" upsert="Equality Deletes" updateType="eq" image="olakego/source-mysql:latest" namespace="shop">
+
+Three target query engines were set on this job. That is the only format decision you make.
+
+OLake Go works out which Iceberg delete format all three can read and sets it on every stream. With ClickHouse in the list it chose equality deletes, which need no index between runs.
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/olake-streams-equality-deletes.webp' alt='OLake UI Streams Selection page with the shop database, customers and orders selected, sync mode Full Refresh + CDC, ingestion mode Upsert and upsert type Equality Deletes on Iceberg format version V2' caption='Each stream: Full Refresh + CDC, Upsert, and the upsert type OLake Go resolved (Equality Deletes in this run). The Iceberg DB name at the top is editable.' />
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for mysql_to_clickhouse showing two completed syncs, the first in 10 seconds and the second in 8 seconds' caption='Job history: the 10 s historical snapshot, then the 8 s change-only sync.' />
+
+</I.Partial>
+
+On this page the first run copied 8 customers and 40 orders (48 records, 2.10 KB) and finished in **10 seconds**, container start included. OLake Go names the destination namespace after the job and the source database, so `mysql_to_clickhouse` on database `shop` produced `mysql_to_clickhouse_shop`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
+
+## Step 6: Query the tables in ClickHouse
+
+<I.CatalogTabs>
+<TabItem value="polaris">
+
+<I.Partial id="engines/clickhouse/query-polaris" schema="mysql_to_clickhouse_shop" />
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/clickhouse-polaris-customers.webp' alt='clickhouse-client querying polaris.mysql_to_clickhouse_shop.customers through the DataLakeCatalog engine and returning 10 rows with id, name, city and tier' caption='ClickHouse 26.8 reading the customers table through Polaris after the change sync: 10 rows, one per key.' />
+
+</TabItem>
+</I.CatalogTabs>
+
+<I.Cta />
+
+## Step 7: Change rows in MySQL and sync again
+
+To see the change path work, the run on this page made 12 changes in MySQL after the first sync:
+
+```sql title="Changes made in MySQL between the two syncs"
+INSERT INTO customers (name, email, city, tier) VALUES
+  ('Maya Patel', 'maya@example.com', 'Pune', 'silver'),
+  ('Lucas Silva', 'lucas@example.com', 'São Paulo', 'bronze');
+INSERT INTO orders (customer_id, product, amount, status) VALUES
+  (9, 'Laptop', 1299.00, 'placed'), (9, 'Mouse', 25.50, 'placed'),
+  (10, 'Monitor', 349.99, 'placed'), (3, 'Keyboard', 89.00, 'placed'), (7, 'Webcam', 79.90, 'placed');
+UPDATE customers SET tier = 'gold'      WHERE name = 'Liam Carter';
+UPDATE customers SET city = 'Abu Dhabi' WHERE name = 'Zara Ali';
+UPDATE orders    SET status = 'delivered' WHERE id IN (1, 4, 7);
+```
+
+The second sync read **12 records (563 bytes)** from the binlog and finished in **8 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows.
+
+One small equality delete file retires the 2 old versions by key. OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedEqualityDeleteFiles=1`, `addedEqualityDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deletes.
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/olake-sync-log-equality-delete-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for customers, showing addedDataFiles 1, addedEqualityDeleteFiles 1, addedRecords 4, totalRecords 12 and addedEqualityDeletes 2' caption='The change-only sync in the OLake UI log: one data file and one equality delete file per table.' />
+
+ClickHouse shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there.
+
+The two retired versions are gone, because ClickHouse applies the equality deletes while reading. The `_op_type` column shows how each row arrived: `r` for the snapshot, `c` for the inserts and `u` for the updates.
+
+**Schema changes.** When a column is added in MySQL, OLake Go adds it to the Iceberg table on the next sync. ClickHouse shows it the next time the table is opened. Widening changes (`int` to `bigint`, `float` to `double`) are applied.
+
+Narrowing or incompatible type changes fail the sync rather than corrupt the table. `binlog_row_metadata = FULL` is what lets OLake Go see the new column names in the binlog. Full rules are on the [schema evolution page](/docs/features/schema/).
+
+## Query the same tables from DuckDB and Trino
+
+This is the point of writing Iceberg instead of loading ClickHouse tables. Nothing is exported, copied or refreshed: both engines read the files OLake Go wrote, through the same Polaris endpoint.
+
+<Tabs groupId="engine" queryString="engine">
+<TabItem value="duckdb" label="DuckDB" default>
+
+<I.Partial id="engines/duckdb/connect-polaris" schema="mysql_to_clickhouse_shop" />
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/duckdb-polaris-customers.webp' alt='DuckDB 1.5.5 shell querying polaris.mysql_to_clickhouse_shop.customers and returning the same 10 rows as ClickHouse' caption='DuckDB 1.5.5 reading the same table through Polaris: the same 10 rows.' />
+
+</TabItem>
+<TabItem value="trino" label="Trino">
+
+<I.Partial id="engines/trino/connect-polaris" schema="mysql_to_clickhouse_shop" />
+
+<Figure src='/img/docs/integrations/mysql-to-clickhouse/trino-polaris-customers.webp' alt='Trino 484 CLI querying customers in the polaris catalog and returning the same 10 rows as ClickHouse' caption='Trino 484 reading the same table through Polaris with vended credentials: the same 10 rows.' />
+
+</TabItem>
+</Tabs>
+
+An `orders` roll-up matched MySQL to the cent in all three engines. It gave 16 delivered orders for 8659.68, 18 placed for 10522.26, 11 shipped for 6397.25.
+
+## Data types: MySQL to Iceberg to ClickHouse
+
+OLake Go maps MySQL types to Iceberg types, and ClickHouse maps Iceberg types to its own. Most columns pass through unchanged; three groups are worth knowing about.
+
+| MySQL | Iceberg (written by OLake Go) | ClickHouse shows | Notes |
+| --- | --- | --- | --- |
+| `int`, `mediumint`, `smallint`, `tinyint` (signed or unsigned) | `int` | `Nullable(Int32)` | |
+| `bigint`, `bigint unsigned` | `long` | `Nullable(Int64)` | |
+| `decimal(p,s)`, `float`, `double` | `double` | `Nullable(Float64)` | OLake Go stores decimals as doubles. The `orders.amount` sums on this page matched MySQL to the cent in every engine; round at query time when you need exact decimal arithmetic. |
+| `datetime`, `timestamp` | `timestamptz` (UTC) | `Nullable(DateTime64(6, 'UTC'))` | `datetime` has no zone in MySQL; it is read as UTC. |
+| `char`, `varchar`, `text` family, `enum`, `json`, `time`, `bit(1)` | `string` | `Nullable(String)` | Parse `json` with `JSONExtract` in ClickHouse. `time` arrives as text. |
+| `binary(n)`, `varbinary`, `blob` family | `fixed[n]` or `binary` | `Nullable(String)` | |
+
+MySQL types in the table come from the [MySQL connector reference](/docs/connectors/mysql/#data-type-mapping). The ClickHouse side comes from the [ClickHouse Iceberg table engine page](https://clickhouse.com/docs/engines/table-engines/integrations/iceberg) (checked 2026-10-29) and from `DESCRIBE` on the tables of this run.
+
+## Cost and maintenance
+
+- **Storage** is your bucket: you pay S3 or MinIO rates for the Parquet and delete files, and nothing to Polaris or ClickHouse for holding them.
+- **Compute.** OLake Go runs wherever you run Docker. ClickHouse spends CPU only when you query; a `DataLakeCatalog` query reads Parquet over the network with no MergeTree index, so load a hot slice into a MergeTree table when a dashboard needs sub-second answers.
+- **Maintenance.** Nothing compacts the tables for you. A CDC table that gets a new small file and delete file per sync wants compaction; [OLake Fusion](/docs/fusion/getting-started/overview/) does this for the catalogs OLake Go writes to, and Spark's `rewrite_data_files` works through the same Polaris endpoint.
+- **Binlog disk.** Seven days of binlog on a busy server can be tens of gigabytes. Size the volume for it, or shorten retention once the job runs reliably every hour.
+- **Credential rotation.** Polaris principals do not expire by default. Rotate the `olake` principal's secret on your own schedule with the management API; a rotated secret fails the next sync at the token exchange, before any data moves.
+
+## Troubleshooting
+
+### 1. The first sync stops with a statistics error
+
+```text
+failed to get or split chunks: stats not populated for table[shop.orders]. Please run ANALYZE TABLE to update table statistics
+```
+
+OLake Go plans the parallel snapshot from `information_schema` row estimates. A freshly created or freshly loaded table has none. Run `ANALYZE TABLE <table>;` for each table in the job, then sync again.
+
+### 2. The source test fails on the binlog
+
+```text
+binlog_format: current STATEMENT, recommended ROW
+```
+
+The test dialog names the setting. `binlog_format` and `binlog_row_metadata` can be changed at runtime with `SET GLOBAL`.
+
+Put them in `my.cnf` (or the parameter group) too, or they revert on restart. `log_bin` itself needs a restart.
+
+### 3. ClickHouse lists the tables but every query returns a 404
+
+```text
+Code: 499. DB::Exception: Failed to get object info for key olake/mysql_to_clickhouse_shop/customers/lakehouse/olake/mysql_to_clickhouse_shop/customers/metadata/00003-....metadata.json in bucket lakehouse: No response body.. HTTP response code: 404
+```
+
+The object key is doubled. ClickHouse 26.8 and 26.10 join the table location onto the storage endpoint, then fail to strip it again when the endpoint has no trailing slash. Set the Polaris catalog's `endpoint` (and `storage_endpoint` in ClickHouse, if you use static keys) to a value ending in `/`, for example `http://minio:9000/`.
+
+### 4. The next sync cannot find its binlog position
+
+```text
+idle timeout reached, exiting binlog syncer
+```
+
+Two causes. If `binlog_expire_logs_seconds` already removed the saved binlog file, run a fresh full snapshot and lengthen retention.
+
+If the file exists but the server is slow to seek to the position, raise **Initial Wait Time** on the source. 10 seconds was enough for the two-table database on this page.
+
+### 5. The destination test fails at the token exchange
+
+OLake Go's destination test exchanges the principal's credentials at `/api/catalog/v1/oauth/tokens` before anything else. Three causes cover nearly every failure.
+
+A wrong client id or secret, a principal without a role that carries `CATALOG_MANAGE_CONTENT` on the catalog, or a wrong `Polaris Catalog Name`. Run the token check from the catalog setup; it returns the same error Polaris gives OLake Go.
+
+<details>
+<summary>How this compares with other ways to move MySQL data to ClickHouse</summary>
+
+| Method | Freshness | Updates and deletes | Where the data lands | What you run |
+| --- | --- | --- | --- | --- |
+| [ClickPipes for MySQL](https://clickhouse.com/docs/integrations/clickpipes/mysql) (ClickHouse Cloud) | CDC through the binlog | Yes, into `ReplacingMergeTree` tables | Native ClickHouse Cloud tables; ClickHouse is the only reader | Nothing to run; ClickHouse Cloud only, billed per ClickPipe |
+| [ClickHouse MySQL table engine](https://clickhouse.com/docs/engines/table-engines/integrations/mysql) | Live, per query | Reads the current row | Nothing is copied; every query hits MySQL | A MySQL user ClickHouse can log in with |
+| Debezium, Kafka and the ClickHouse Kafka engine | Seconds | Yes, with your own merge logic | Kafka topics, then ClickHouse tables | Kafka, Kafka Connect, Debezium and a materialized view per table |
+| Managed ELT (Fivetran, Estuary, Airbyte Cloud) | Minutes, by plan | Varies by tool | ClickHouse tables, a second copy you pay to move and store | Nothing; priced per row, per GB or per connector |
+| **OLake Go to Iceberg on Polaris (this guide)** | CDC on a schedule down to one minute | Yes, as Iceberg row-level deletes | Apache Iceberg tables that ClickHouse, DuckDB, Trino and Spark all read | One Docker Compose stack, open source; your bucket plus your own compute |
+
+ClickPipes is the simpler choice when you are on ClickHouse Cloud, ClickHouse is the only reader and you want MergeTree query speed. Writing Iceberg once avoids paying to move and store a second copy. That matters as soon as another engine needs the same rows, or you want to own the files and the catalog.
+
+</details>
+
+## When not to use this
+
+- **Every query must hit MergeTree speed.** A `DataLakeCatalog` query reads Parquet with no primary index. Keep the Iceberg tables as the source and load the hot slice into a MergeTree table on a schedule.
+- **You need deletion vectors on ClickHouse 26.8.** The LTS release reads positional and equality deletes only; keep the upsert type OLake Go resolves, or move to a release that reads Iceberg v3.
+- **Tables have no primary key.** Inserts replicate; updates and deletes cannot be matched to a row and are not applied. Add a primary key or a unique index first.
+
+## FAQs
+
+<I.IntegrationFaq />
+
+<I.HowWeTested />
+
+## Related guides
+
+<I.RelatedIntegrations />
+
+Deeper reading on this site:
+
+- [MySQL to Apache Iceberg with OLake Go](/blog/mysql-to-iceberg-query-engines/)
+- [Equality vs positional deletes vs deletion vectors](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors/)
+- [Which engines read which delete formats](/blog/iceberg-delete-formats-interoperability-olake-go/)
+- [OLake Go ingestion benchmarks](/docs/benchmarks/ingestion/)
+
+<I.IntegrationJsonLd />
+
+<I.Cta title='Start with your own MySQL' body='The quickstart runs OLake UI with Docker Compose. Create the source, the Polaris destination and the job as above, and the first sync lands your tables where ClickHouse can read them.' />

@@ -1,0 +1,77 @@
+Apache Polaris is an open source Iceberg REST catalog. It keeps the table metadata pointers, hands out short-lived storage credentials to engines, and applies its own role-based access control. OLake Go writes to it through the standard Iceberg REST API, and ClickHouse, Trino, DuckDB and Spark read from the same endpoint. The files live in an S3 bucket or an S3-compatible store that you own.
+
+Three things need to exist before OLake Go can write: a Polaris server, a *catalog* inside it that points at your bucket, and a *principal* (a client id and secret) with the right to manage that catalog. The run on this page used Polaris 1.8.0 and MinIO in Docker; on AWS, swap the MinIO endpoint for a plain S3 bucket and an IAM role.
+
+```yaml title="docker-compose.yml (Polaris and MinIO, for a local test)"
+services:
+  minio:
+    image: minio/minio
+    hostname: lake-minio
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: minioadmin, MINIO_ROOT_PASSWORD: minioadmin }
+    ports: ["9000:9000", "9001:9001"]
+  polaris:
+    image: apache/polaris:latest
+    depends_on: [minio]
+    ports: ["8181:8181", "8182:8182"]
+    environment:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,<root-secret>
+      polaris.realm-context.realms: POLARIS
+```
+
+Polaris stores its own state in memory with this setup, so it starts empty every time; a production deployment points it at Postgres. Once it is up, create the bucket, the catalog and the principal through the management API. `root` is the bootstrap principal; the `olake` principal is the one OLake Go and the engines use.
+
+```bash title="Polaris, once"
+P=http://localhost:8181
+
+# 1. A bucket for the tables (MinIO; on AWS create it in the console or with aws s3 mb)
+aws --endpoint-url http://localhost:9000 s3 mb s3://lakehouse
+
+# 2. A root token
+TOKEN=$(curl -s $P/api/catalog/v1/oauth/tokens -H 'Polaris-Realm: POLARIS' \
+  -d grant_type=client_credentials -d client_id=root -d client_secret=<root-secret> \
+  -d scope=PRINCIPAL_ROLE:ALL | jq -r .access_token)
+H=(-H "Authorization: Bearer $TOKEN" -H 'Polaris-Realm: POLARIS' -H 'Content-Type: application/json')
+
+# 3. The catalog: where the files go, and how Polaris and the engines reach the store
+curl -s "${H[@]}" $P/api/management/v1/catalogs -d '{"catalog": {
+  "name": "olake", "type": "INTERNAL", "readOnly": false,
+  "properties": {"default-base-location": "s3://lakehouse/olake"},
+  "storageConfigInfo": {"storageType": "S3", "allowedLocations": ["s3://lakehouse/olake"],
+    "endpoint": "http://<minio-host>:9000/", "endpointInternal": "http://lake-minio:9000",
+    "pathStyleAccess": true, "region": "us-east-1"}}}'
+
+# 4. A principal for OLake Go and the engines. The response holds clientId and clientSecret: keep them.
+curl -s "${H[@]}" $P/api/management/v1/principals -d '{"principal": {"name": "olake"}}'
+
+# 5. Roles and the grant that lets the principal create namespaces and tables in the catalog
+curl -s "${H[@]}" $P/api/management/v1/principal-roles -d '{"principalRole": {"name": "olake_role"}}'
+curl -s "${H[@]}" $P/api/management/v1/catalogs/olake/catalog-roles -d '{"catalogRole": {"name": "olake_catalog_role"}}'
+curl -s -X PUT "${H[@]}" $P/api/management/v1/principals/olake/principal-roles -d '{"principalRole": {"name": "olake_role"}}'
+curl -s -X PUT "${H[@]}" $P/api/management/v1/principal-roles/olake_role/catalog-roles/olake -d '{"catalogRole": {"name": "olake_catalog_role"}}'
+curl -s -X PUT "${H[@]}" $P/api/management/v1/catalogs/olake/catalog-roles/olake_catalog_role/grants -d '{"type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT"}'
+```
+
+What each block is for:
+
+- `endpoint` is the store address Polaris hands to engines along with vended credentials; `endpointInternal` is the address Polaris itself uses. On AWS S3 leave both out. On MinIO both are required, or Polaris tries to reach AWS and fails. Keep the trailing slash on `endpoint`: ClickHouse 26.8 and 26.10 build the object path from it, and without the slash every read fails with a 404 (the fix is explained under troubleshooting on this page).
+- Polaris vends credentials through the store's STS endpoint. MinIO exposes one, so nothing else is needed. For a store without STS, add `"stsUnavailable": true` and give Polaris static keys to hand out.
+- `CATALOG_MANAGE_CONTENT` lets the principal create namespaces and tables and read and write their data. Scope it to a namespace instead when several teams share the catalog.
+- The principal's secret is shown once, in the response to step 4. It is what goes into OLake Go as `<client_id>:<client_secret>`.
+
+:::warning[Hostnames with underscores break Polaris]
+Polaris is a Java service, and Java's URI parser rejects hostnames that contain an underscore. A MinIO container named `lab_minio` makes every table creation fail with `host must not be null` or `Expected scheme-specific part at index 5: http:`. Use a hyphen in the hostname (`lake-minio`), as above.
+:::
+
+You can check the principal outside OLake Go by exchanging its credentials for a token, the same call OLake Go makes on every sync:
+
+```bash title="Token check"
+curl -s http://localhost:8181/api/catalog/v1/oauth/tokens -H 'Polaris-Realm: POLARIS' \
+  -d grant_type=client_credentials -d client_id=<client_id> -d client_secret=<client_secret> \
+  -d scope=PRINCIPAL_ROLE:ALL
+```
+
+A good principal returns a JSON object with an `access_token`. Running Polaris on Kubernetes, with Postgres behind it, or with an external identity provider is covered on the [Polaris catalog page](/docs/writers/iceberg/catalog/rest/?rest-catalog=polaris).

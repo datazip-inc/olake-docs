@@ -7,7 +7,7 @@ import { GITHUB_REPO_URL, FUSION_GITHUB_REPO_URL } from '../landing/chrome/navIt
 const PRODUCTS = {
   go: {
     label: 'About OLake',
-    description: 'Fastest open-source tool for replicating Databases to Apache Iceberg or Data Lakehouse.',
+    description: 'Open-source tool for replicating databases to Apache Iceberg or a data lakehouse.',
     detail: 'Efficient, quick and scalable data ingestion for real-time analytics.',
     quickstart: '/docs/getting-started/quickstart/',
     github: GITHUB_REPO_URL

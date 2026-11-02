@@ -1,0 +1,34 @@
+OLake Go reads Oracle tables over a plain Java Database Connectivity (JDBC) connection: a parallel full snapshot first, then incremental syncs that fetch only rows whose cursor column moved past the last value seen. There is no log-based change data capture (CDC) for Oracle in OLake Go, so three things must be in place before the first sync.
+
+| Setting | Value | Why it matters |
+| --- | --- | --- |
+| A read-only user | `CREATE SESSION` plus `SELECT` on each table | The snapshot and every incremental sync read the tables directly. |
+| A cursor column | a column that grows with every change, such as `updated_at` | Incremental syncs select `WHERE cursor > last value`. Rows updated without touching the cursor are not picked up. |
+| A primary key | on every table | OLake Go uses it to upsert changed rows into the Iceberg table. Without one, changed rows are appended. |
+
+```sql title="On the Oracle database, as a DBA"
+-- 1. A user for OLake Go
+CREATE USER olake IDENTIFIED BY "<password>";
+GRANT CREATE SESSION TO olake;
+
+-- 2. Read access to the tables you sync
+GRANT SELECT ON shop.customers TO olake;
+GRANT SELECT ON shop.orders TO olake;
+GRANT SELECT ANY DICTIONARY TO olake;   -- lets discovery read the catalog views
+
+-- 3. A cursor column that your application always sets, for example
+--    updated_at TIMESTAMP DEFAULT SYSTIMESTAMP, updated by a trigger or by the application on every change
+```
+
+Check the result before moving on:
+
+```sql
+SELECT username FROM all_users WHERE username = 'OLAKE';
+SELECT table_name FROM all_tables WHERE owner = 'SHOP';
+```
+
+The full list of privileges, with the reason for each, is on the [generic Oracle setup guide](/docs/connectors/oracle/setup/generic/).
+
+:::warning[Deletes do not replicate in incremental mode]
+A deleted row has no cursor value to read, so it stays in the Iceberg table. If deletes matter, soft-delete in Oracle (a `deleted_at` column that also bumps `updated_at`) or schedule an occasional full refresh.
+:::

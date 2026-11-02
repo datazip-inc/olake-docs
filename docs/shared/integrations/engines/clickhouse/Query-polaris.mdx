@@ -1,0 +1,27 @@
+import CodeBlock from '@theme/CodeBlock';
+
+There is no registration step. ClickHouse attaches the whole Polaris catalog as one database with the `DataLakeCatalog` engine, lists every table OLake Go committed, and reads the files with the credentials Polaris vends. One thing to know before the first query: ClickHouse has one level of namespace, so the Iceberg namespace and table name go together inside backticks.
+
+<CodeBlock language="sql" title="clickhouse-client">{`SET allow_database_iceberg = 1;
+
+CREATE DATABASE polaris
+ENGINE = DataLakeCatalog('http://<polaris-host>:8181/api/catalog')
+SETTINGS
+  catalog_type = 'rest',
+  warehouse = 'olake',
+  catalog_credential = '<client_id>:<client_secret>',
+  oauth_server_uri = 'http://<polaris-host>:8181/api/catalog/v1/oauth/tokens',
+  auth_scope = 'PRINCIPAL_ROLE:ALL',
+  vended_credentials = true,
+  region = 'us-east-1';
+
+SHOW TABLES FROM polaris;
+
+-- What OLake Go created (namespace = <job name>_<source database>_<source schema>)
+SELECT ${props.idCol ?? 'id'}, name, city, tier
+FROM polaris.\`${props.schema ?? 'postgres_to_clickhouse_shop_public'}.customers\`
+ORDER BY ${props.idCol ?? 'id'};`}</CodeBlock>
+
+`vended_credentials = true` makes ClickHouse read the files with the short-lived keys Polaris hands out per table, so no store keys sit in ClickHouse. To use static keys instead, replace it with `storage_endpoint`, `aws_access_key_id` and `aws_secret_access_key`. The database is read-only: `INSERT`, `ALTER` and `RENAME DATABASE` return `NOT_IMPLEMENTED`.
+
+OLake Go adds four columns to every table: `_olake_id` (a hash of the primary key), `_op_type`, `_olake_timestamp` and `_cdc_timestamp`. `_op_type` is `r` for a row from the first snapshot, `c` for an insert, `u` for an update and `d` for a delete. Filter them out of dashboards, or use them to see when a row last changed.
