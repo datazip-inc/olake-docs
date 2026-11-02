@@ -1,6 +1,6 @@
 ---
 title: "Kafka to Databricks: Topics as Apache Iceberg"
-description: "Stream Kafka topics to Databricks as Apache Iceberg: OLake Go appends JSON messages into Unity Catalog, and Databricks, DuckDB and Spark query the tables."
+description: "Stream Kafka topics to Databricks as Iceberg: OLake Go upserts JSON messages into Unity Catalog with deletion vectors for Databricks, DuckDB and Spark."
 sidebar_label: Kafka to Databricks
 image: /img/docs/integrations/kafka-to-databricks/cover.webp
 keywords:
@@ -18,21 +18,21 @@ integration:
   author: shubham
   reviewer: nayan
   tested:
-    date: "2026-10-30"
-    olake: v1.1.0
+    date: "2026-11-02"
+    olake: v1.1.1
     catalogs: [unity]
     engines:
       - "Databricks (Unity Catalog managed Iceberg tables, 2X-Small serverless SQL warehouse, GCP)"
       - "DuckDB 1.5.5"
       - "Apache Spark 4.0.1 with Iceberg 1.10.0"
-    summary: "Two topics on a single-node Apache Kafka 4.3.1 cluster in KRaft mode (8 customer and 40 order messages, JSON, keyed by id) synced in CDC Only mode with Append into Unity Catalog, then 12 new messages (7 new keys, 5 repeated keys) picked up by a second sync. Databricks, DuckDB and Spark returned identical rows, and the same latest row per key."
+    summary: "Two topics on a single-node Apache Kafka 4.3.1 cluster in KRaft mode (8 customer and 40 order messages, JSON, keyed by id) synced in CDC Only mode with Upsert on id and deletion vectors as the Iceberg update/delete format into Unity Catalog, then 12 new messages (7 new keys, 5 repeated keys) picked up by a second sync. Databricks, DuckDB and Spark returned identical rows, one per key."
   faq:
     - q: "How do I get Kafka topics into Databricks as Iceberg tables without a streaming job?"
-      a: "Run OLake Go (open source, Apache 2.0) with the Kafka cluster as the source and Unity Catalog's Iceberg REST endpoint as the destination. Each sync reads the topics from the last committed offset and appends the messages to Unity Catalog managed Iceberg tables. No Kafka Connect cluster and no Databricks streaming job sit in the path."
-    - q: "Why is Upsert greyed out for Kafka when Databricks is a target engine?"
-      a: "In OLake Go v1.1.0 the Kafka writer applies Upsert with positional delete files, and Unity Catalog managed Iceberg tables take deletion vectors instead. The Streams page therefore offers Append only and shows the message Upsert is not supported for this query engine. Every message becomes a row, and a QUALIFY ROW_NUMBER() query returns the latest row per key."
-    - q: "How do I get one row per key in Databricks?"
-      a: "Order the rows of each key by _olake_timestamp and keep the first, with QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY _olake_timestamp DESC) = 1. In the run on this page that query returned 10 customers and 45 orders from 12 and 48 rows. Wrap it in a view so dashboards read one row per key."
+      a: "Run OLake Go (open source, Apache 2.0) with the Kafka cluster as the source and Unity Catalog's Iceberg REST endpoint as the destination. Each sync reads the topics from the last committed offset and upserts the messages on a deduplication key into Unity Catalog managed Iceberg tables. No Kafka Connect cluster and no Databricks streaming job sit in the path."
+    - q: "Does OLake Go keep one row per key in Databricks, or one row per message?"
+      a: "One row per key when the stream runs in Upsert mode with a deduplication key, which is what this page uses. A later message with the same key retires the old row with a deletion vector and writes the new one, so Databricks reads one row per key with no QUALIFY or view. Append mode, which keeps every message as a row, is still there for event logs that are never updated."
+    - q: "Which OLake versions do I need for Kafka upserts into Databricks?"
+      a: "The OLake Go Kafka source v1.1.1 or later and OLake UI v0.8.2 or later. Unity Catalog managed Iceberg tables take deletion vectors only, and from v1.1.1 the Kafka writer keeps deletion vectors as the upsert format instead of switching to positional deletes. On older versions the Streams page greys out Upsert with the message Upsert is not supported for this query engine."
     - q: "Where does the first sync start reading a Kafka topic?"
       a: "A new consumer group has no committed offset, so the first sync reads every message the broker still retains in every partition of every selected topic. The run on this page read all 48 messages on its first sync. Each later sync resumes from the offsets OLake Go committed in its consumer group, so retention is the replay window."
     - q: "Which message formats does OLake Go read from Kafka?"
@@ -43,7 +43,7 @@ integration:
 
 import * as I from '@site/src/components/integrations';
 
-Kafka to Databricks usually means a Structured Streaming job that runs on a cluster all day, or a Kafka Connect sink. This guide takes a different route. OLake Go reads the topics itself on a schedule, as a change data capture (CDC) stream, and appends every message to an Apache Iceberg table in Unity Catalog.
+Kafka to Databricks usually means a Structured Streaming job that runs on a cluster all day, or a Kafka Connect sink. This guide takes a different route. OLake Go reads the topics itself on a schedule, as a change data capture (CDC) stream, and keeps one row per key in an Apache Iceberg table in Unity Catalog.
 
 The tables land as Unity Catalog managed Iceberg tables, with the files in your own cloud storage. Nothing else is in the path: no Kafka Connect, no Databricks job, no staging table. DuckDB and Spark read the same tables through the same catalog.
 
@@ -51,15 +51,15 @@ The tables land as Unity Catalog managed Iceberg tables, with the files in your 
 
 <TLDR title='Key takeaways'>
 
-- OLake Go turns Kafka topics into Databricks Iceberg tables: each sync reads from the last committed offset and appends the new messages, with the partition, offset and key kept in columns.
+- OLake Go turns Kafka topics into Databricks Iceberg tables with one row per key: each sync reads from the last committed offset and upserts the new messages, retiring old rows with deletion vectors.
 - The tables are Unity Catalog managed Iceberg tables. You query them from the Databricks SQL editor or a notebook right away, with no external table and no refresh.
 - The same tables, written once by OLake Go, are also queryable from DuckDB and Spark through Unity Catalog. In the run on this page all three engines returned identical rows.
 
 </TLDR>
 
-**The short answer.** To stream Kafka to Databricks as Iceberg, run OLake Go with the Kafka cluster as the source and Unity Catalog as the destination, with Databricks as a target query engine. Each topic runs in **CDC Only** mode with **Append**, because Upsert on Kafka is not available for Databricks in OLake Go v1.1.0.
+**The short answer.** To stream Kafka to Databricks as Iceberg, run OLake Go with the Kafka cluster as the source and Unity Catalog as the destination, with Databricks as a target query engine. Put each topic in **CDC Only** mode with **Upsert** on a deduplication key.
 
-The first sync reads every retained message; every later sync reads only the messages after the committed offsets. A `QUALIFY` query returns the latest row per key in Databricks, DuckDB and Spark.
+OLake Go writes the upserts as deletion vectors, the one delete format Unity Catalog takes. This needs the Kafka source v1.1.1 and OLake UI v0.8.2 or later. Databricks, DuckDB and Spark then read one row per key from the same tables.
 
 ## How Kafka messages reach Databricks here
 
@@ -73,7 +73,7 @@ flowchart TB
   end
   subgraph olake["OLake Go"]
     R[one reader per partition]
-    W[Iceberg writer: append]
+    W[Iceberg writer: upsert on id, deletion vectors]
     R --> W
   end
   subgraph db["Databricks"]
@@ -84,7 +84,7 @@ flowchart TB
   T -- "first sync: every retained message, from the earliest offset" --> R
   CG -- "later syncs: only messages after the committed offsets" --> R
   H -. "1. vended storage credentials" .-> W
-  W -- "2. Parquet data files" --> S
+  W -- "2. Parquet data files and deletion vectors" --> S
   W -- "3. commit snapshot, then commit offsets to Kafka" --> H
   H -- "table metadata and read credentials" --> Q
   S -- "data files" --> Q
@@ -92,16 +92,18 @@ flowchart TB
 
 There is no separate snapshot phase, because the topic is the history. The first sync runs with a new consumer group, which has no committed offset, so it reads every message the broker still holds: on this page all 48. OLake Go commits the Iceberg snapshot first and the consumer-group offsets second.
 
-Every later sync resumes from the committed offsets and reads only what arrived since. In **Append** mode every message is a row, so a repeated key adds a row next to the old one. A sync that fails mid-way re-reads its messages on the next run, which can add those rows twice; the latest-row query in step 6 hides both cases.
+Every later sync resumes from the committed offsets and reads only what arrived since. In **Upsert** mode a message whose deduplication key already exists retires the old row with a deletion vector, an Iceberg v3 bitmap of deleted row positions, and writes the new one. A key seen for the first time becomes a new row.
+
+A sync that fails mid-way re-reads its messages on the next run. In Upsert mode that is harmless, because the same key lands on the same row. Tombstones (messages with a null value) delete a row only when `_kafka_key` is the single deduplication key.
 
 One thing to keep an eye on: retention is the replay window. Kafka deletes messages past `retention.ms`, and OLake Go cannot read what is gone. A job paused longer than the retention of its topics silently misses the expired messages.
 
 ## What you need
 
 - **A Kafka cluster on version 2.4 or later** that OLake Go can reach, with JSON messages (or Avro plus a schema registry) on the topics you want. Amazon Managed Streaming for Apache Kafka (MSK), Confluent Cloud, Redpanda and self-hosted Kafka all work; the run on this page used a single-node Apache Kafka 4.3.1 in KRaft mode in Docker.
-- **A field that identifies each entity** in every message, such as `id`, so a query can pick the latest row per key.
+- **A field that identifies each entity** in every message, such as `id`, to use as the deduplication key for one row per key.
 - **A Databricks workspace with Unity Catalog**, a catalog with managed storage, and an admin who can turn on external data access and grant `EXTERNAL USE SCHEMA`. The run on this page used a workspace on Google Cloud.
-- **OLake UI** from the [Docker Compose install](/docs/install/olake-ui/) with the OLake Go Kafka source. The run on this page used v1.1.0.
+- **OLake UI v0.8.2 or later** from the [Docker Compose install](/docs/install/olake-ui/), with the OLake Go Kafka source **v1.1.1 or later**. Older versions offer only Append for Kafka with Databricks. The run on this page used UI v0.8.2 and source v1.1.1.
 - **Docker**, and about 30 minutes.
 
 ## Step 1: Prepare the Kafka topics
@@ -153,7 +155,7 @@ The files sit in the catalog's managed storage, which is backed by an external l
 
 Here is the source form from the run on this page. Kafka ran in another container, so the bootstrap server is `host.docker.internal:19092`; the topic pattern `^(customers|orders)$` keeps discovery to the two sample topics.
 
-<Figure src='/img/docs/integrations/kafka-to-databricks/olake-source-kafka.webp' alt='OLake UI Edit source form for Kafka on OLake Go v1.1.0 with the Enable CDC toggle marked not supported, bootstrap server host.docker.internal:19092, consumer group olake_kafka_to_snowflake, topic pattern ^(customers|orders)$, security protocol PLAINTEXT, schema registry off, max threads 2' caption='The Kafka source in OLake UI: bootstrap server, a consumer group for this job only, and a topic pattern that matches the two sample topics.' width='760px' />
+<Figure src='/img/docs/integrations/kafka-to-databricks/olake-source-kafka.webp' alt='OLake UI Edit source form for Kafka with the Enable CDC toggle marked not supported, bootstrap server host.docker.internal:19092, consumer group olake_kafka_to_snowflake, topic pattern ^(customers|orders)$, security protocol PLAINTEXT, schema registry off, max threads 2' caption='The Kafka source in OLake UI: bootstrap server, a consumer group for this job only, and a topic pattern that matches the two sample topics.' width='760px' />
 
 **Set up source** pings the brokers before anything is saved. The consumer group is created on the first sync; it does not need to exist yet.
 
@@ -175,17 +177,17 @@ The run on this page wrote into a catalog called `datazip`, with a personal acce
 
 ## Step 5: Create the job and run the first sync
 
-<I.Partial id="jobs/create" engines="Databricks, plus DuckDB and Apache Spark if they will read the tables too" unit="topics" syncMode="CDC Only" image="olakego/source-kafka:latest" cliSyncMode="strict_cdc" namespace="topics" ingestion="Append">
+<I.Partial id="jobs/create" engines="Databricks, plus DuckDB and Apache Spark if they will read the tables too" unit="topics" syncMode="CDC Only" image="olakego/source-kafka:latest" cliSyncMode="strict_cdc" namespace="topics" dedupKeys="id" upsert="Deletion Vector" updateType="dv">
 
-Three target query engines were set on this job. Kafka streams offer one sync mode, **CDC Only**, and with Databricks as a target the ingestion mode is **Append**. The Streams page greys out Upsert with the note "Upsert is not supported for this query engine."
+Three target query engines were set on this job. Kafka streams offer one sync mode, **CDC Only**. With **Upsert** on `id`, OLake Go resolved **Deletion Vector** as the upsert type, on Iceberg format version V3, because Databricks reads no other delete format.
 
-<Figure src='/img/docs/integrations/kafka-to-databricks/olake-streams.webp' alt='OLake UI Streams Selection page with the topics namespace, customers and orders selected, sync mode CDC Only, ingestion mode Append with Upsert greyed out and the note Upsert is not supported for this query engine, normalization on' caption='Each topic: CDC Only and Append. Upsert is greyed out for Databricks; the Iceberg DB name at the top is editable.' />
+<Figure src='/img/docs/integrations/kafka-to-databricks/olake-streams.webp' alt='OLake UI Streams Selection page with customers and orders selected, sync mode CDC Only, ingestion mode Upsert, dedup key id and upsert type Deletion Vector on Iceberg format version V3' caption='Each topic: CDC Only, Upsert on id, and Deletion Vector on Iceberg v3, the format Databricks reads.' />
 
-<Figure src='/img/docs/integrations/kafka-to-databricks/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for kafka_to_databricks showing two completed syncs, the first in 33 seconds and the second in 27 seconds' caption='Job history: the 33 s first read of both topics, then the 27 s sync of the new messages.' />
+<Figure src='/img/docs/integrations/kafka-to-databricks/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for kafka_to_databricks showing two completed syncs, the first in 55 seconds and the second in 46 seconds' caption='Job history: the 55 s first read of both topics, then the 46 s sync of the new messages.' />
 
 </I.Partial>
 
-On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **33 seconds**, container start included. OLake Go names the Unity Catalog schema after the job and the source namespace. The namespace for every Kafka topic is `topics`, so `kafka_to_databricks` produced `kafka_to_databricks_topics`.
+On this page the first run read 8 customer and 40 order messages (48 records, 9.00 KB) and finished in **55 seconds**, container start included. OLake Go names the Unity Catalog schema after the job and the source namespace. The namespace for every Kafka topic is `topics`, so `kafka_to_databricks` produced `kafka_to_databricks_topics`.
 
 ## Step 6: Query the tables in Databricks
 
@@ -194,25 +196,9 @@ On this page the first run read 8 customer and 40 order messages (48 records, 9.
 
 <I.Partial id="engines/databricks/query-unity" schema="kafka_to_databricks_topics" idCol="id" />
 
-<Figure src='/img/docs/integrations/kafka-to-databricks/databricks-sql-editor-customers.webp' alt='Databricks SQL editor running a latest-row-per-id query on datazip.kafka_to_databricks_topics.customers on the 2X-Small SQL warehouse, returning 10 rows' caption='The same table in the Databricks SQL editor: the Kafka rows are append-only, so the query keeps the latest row per id and returns the 10 current customers.' />
+{/* TODO-DATABRICKS-SHOT: plain SELECT id, name, city, tier FROM datazip.kafka_to_databricks_topics.customers ORDER BY id, 10 rows */}
 
-The tables are append-only, so the queries above return every message: 12 customer rows and 48 order rows after the second sync. The query that most readers want is the latest row per key. `QUALIFY` does that in one statement, ordering by the time OLake Go wrote each row:
-
-```sql title="Latest row per id"
-SELECT id, name, city, tier
-FROM lakehouse.kafka_to_databricks_topics.customers
-QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY _olake_timestamp DESC) = 1
-ORDER BY id;
-
-SELECT status, count(*) AS n, round(sum(amount), 2) AS total
-FROM (
-  SELECT * FROM lakehouse.kafka_to_databricks_topics.orders
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY _olake_timestamp DESC) = 1
-)
-GROUP BY status ORDER BY status;
-```
-
-It returned 10 customers, and 45 orders worth 25579.19 in total, on the 2X-Small serverless warehouse.
+Upsert keeps one row per key, so a plain `SELECT` is the current state of each entity. After the second sync the queries above returned 10 customers, one per `id`, and 45 orders worth 25579.19 in total, on the 2X-Small serverless warehouse. No `QUALIFY` or view is needed.
 
 </TabItem>
 </I.CatalogTabs>
@@ -235,34 +221,38 @@ To see the change path work, the run on this page produced 12 more messages afte
 1   {"id":1,"customer_id":2,"product":"Headphones","amount":99.19,"status":"delivered", ...}
 ```
 
-The second sync read **12 records (2.26 KB)** from the two topics and finished in **27 seconds** end to end. Each message became a new row, with no delete files: `customers` now holds 12 rows and `orders` 48.
+The second sync read **12 records (2.26 KB)** from the two topics and finished in **46 seconds** end to end. For `customers` that meant one new data file with 4 rows: the 2 new keys plus the new versions of the 2 repeated keys. One deletion vector retires the 2 old versions.
 
-Every customer row carries `_op_type` `c`, because Kafka has no snapshot phase and Append never updates a row. `_kafka_offset` shows which message each row came from. The latest-row query from step 6 returns Liam Carter as `gold`, Zara Ali in Abu Dhabi, and the two new customers: 10 rows, one per key.
+OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedDVs=1`, `addedRecords=4`, `addedPositionalDeletes=2`, with no equality or positional delete files. The `orders` table has the same shape with 8 rows and 3 deletes.
+
+<Figure src='/img/docs/integrations/kafka-to-databricks/olake-sync-log-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit report for orders after the change sync, showing addedDataFiles 1, addedDVs 1 and addedRecords 8' caption='The change sync in the OLake UI log: one data file and one deletion vector per table, and no equality or positional delete files.' />
+
+Databricks shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there: 10 rows, one per key. The `_op_type` column shows how each row arrived (`c` for a first-seen key, `u` for a repeated key) and `_kafka_offset` shows which message it came from.
 
 **Schema changes.** When a new field appears in the messages, OLake Go adds it as a column on the next sync, and Databricks shows it. A field whose type changes in an incompatible way fails the sync rather than corrupt the table. Full rules are on the [schema evolution page](/docs/features/schema/).
 
 ## Query the same tables from DuckDB and Spark
 
-Nothing is exported, copied or refreshed. Both engines read the files OLake Go wrote, through the same Unity Catalog endpoint, with storage credentials vended by Databricks. The same `QUALIFY` pattern works in DuckDB; Spark uses a `ROW_NUMBER()` subquery.
+Nothing is exported, copied or refreshed. Both engines read the files OLake Go wrote, through the same Unity Catalog endpoint, with storage credentials vended by Databricks. DuckDB from duckdb-iceberg 1.5.3 and Spark with Iceberg 1.8 or later read the deletion vectors.
 
 <Tabs groupId="engine" queryString="engine">
 <TabItem value="duckdb" label="DuckDB" default>
 
 <I.Partial id="engines/duckdb/connect-unity" schema="kafka_to_databricks_topics" idCol="id" />
 
-DuckDB 1.5.5 returned the same 12 customer rows as Databricks, and the same 10 with `QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY _olake_timestamp DESC) = 1`.
+DuckDB 1.5.5 returned the same 10 customers, and the same 45 orders worth 25579.19, as Databricks.
 
 </TabItem>
 <TabItem value="spark" label="Apache Spark">
 
 <I.Partial id="engines/spark/connect-unity" schema="kafka_to_databricks_topics" idCol="id" />
 
-Spark 4.0.1 with Iceberg 1.10.0 returned the same 10 customers and the same `orders` roll-up as Databricks and DuckDB in the run on this page. It used `ROW_NUMBER() OVER (PARTITION BY id ORDER BY _olake_timestamp DESC)` in a subquery.
+Spark 4.0.1 with Iceberg 1.10.0 returned the same 10 customers and the same `orders` totals as Databricks and DuckDB in the run on this page.
 
 </TabItem>
 </Tabs>
 
-An `orders` roll-up over the latest row per id matched the messages in all three engines. It gave 16 delivered orders for 8659.68, 18 placed for 10522.26, 11 shipped for 6397.25.
+An `orders` roll-up by status matched the messages in all three engines. It gave 16 delivered orders for 8659.68, 18 placed for 10522.26, 11 shipped for 6397.25.
 
 ## Data types: Kafka JSON to Iceberg to Databricks
 
@@ -317,7 +307,7 @@ The topic pattern is a full regular expression anchored by you. `^orders$` match
 Upsert is not supported for this query engine.
 ```
 
-With Databricks among the target query engines, OLake Go v1.1.0 offers only Append for Kafka streams. Its Kafka upsert writes positional delete files, and the job is set to deletion vectors for Unity Catalog. Keep Append and read through the latest-row query from step 6.
+Databricks reads deletion vectors only, and before these versions a Kafka upsert always wrote positional deletes. Upgrade the Kafka source to v1.1.1 or later and OLake UI to v0.8.2 or later. Then hard-reload the browser, since the old UI code can stay cached and keep showing the message.
 
 ### 4. A sync ends early after a consumer-group rebalance
 
@@ -339,7 +329,7 @@ Three settings cover nearly every failure. **External data access** may be off o
 | [Databricks Structured Streaming with the Kafka source](https://docs.databricks.com/gcp/en/connect/streaming/kafka) (checked Oct 2026) | Seconds, while the stream runs | With your own `MERGE` in `foreachBatch` | Tables written by a Databricks streaming job | A Databricks job or pipeline running on Databricks compute |
 | [Lakeflow Connect](https://docs.databricks.com/gcp/en/ingestion/lakeflow-connect/) | Kafka is not among its managed connectors (checked Oct 2026) | Not applicable | Not applicable | Not applicable |
 | [Apache Iceberg Kafka Connect sink](https://iceberg.apache.org/docs/latest/kafka-connect/) (checked Oct 2026) | Minutes, by commit interval | Append, or row-level changes when id columns and the Debezium or DMS transform are configured | Iceberg tables in a catalog you choose | A Kafka Connect cluster with the sink |
-| **OLake Go to Iceberg on Unity Catalog (this guide)** | On a schedule down to one minute | Append only for Databricks in v1.1.0; latest row per key at query time | Apache Iceberg tables that Databricks, DuckDB, Spark and Trino all read | One Docker Compose stack, open source; your storage plus your own compute |
+| **OLake Go to Iceberg on Unity Catalog (this guide)** | On a schedule down to one minute | Upsert on a deduplication key, written as deletion vectors; Append for event logs | Apache Iceberg tables that Databricks, DuckDB, Spark and Trino all read | One Docker Compose stack, open source; your storage plus your own compute |
 
 Structured Streaming is the simpler choice when you need seconds of latency and a cluster can run all day. OLake Go suits topics that are fine on a schedule, and it keeps the ingestion off Databricks compute.
 
@@ -348,7 +338,8 @@ Structured Streaming is the simpler choice when you need seconds of latency and 
 ## When not to use this
 
 - **You need seconds of latency.** OLake Go drains the topic on a schedule, one minute at the shortest. Use Structured Streaming for a continuous feed.
-- **You need one row per key in the table itself.** Upsert on Kafka is not offered for Databricks in OLake Go v1.1.0, so the table holds every message. Use a view over the latest-row query, or merge downstream.
+- **You are on an older OLake version.** Before Kafka source v1.1.1 and OLake UI v0.8.2, only Append is offered for Kafka with Databricks. Upgrade both, or keep Append and pick the latest row per key at query time.
+- **The partition count will change while the job runs in Upsert mode.** The same key would then hash to a different partition, and concurrent partition readers could leave a stale row behind. Finish the repartition, then create the job.
 - **Messages are not JSON or Avro.** Protobuf, plain text and binary payloads cannot be mapped to columns.
 
 ## FAQs
