@@ -1,0 +1,282 @@
+---
+title: "GitOps with Docker Compose | Manage OLake Pipelines as Files"
+seo_title: "OLake GitOps with Docker Compose"
+description: "Define sources, destinations, jobs, and streams as JSON files. OLake UI on Docker Compose watches the folder and keeps those objects in sync."
+sidebar_label: Docker Compose
+---
+
+# GitOps with Docker Compose
+
+Instead of creating a source, destination, job and selecting the streams through the OLake UI, you can describe them as plain JSON files in a folder. OLake UI watches that folder and when a file is added or changed, it gets applied and syncs the change.
+
+The folder can be a Git checkout (for instance, it can be kept up to date with `git pull`, a cron job, or a `git-sync` sidecar), so you get a full Git workflow.
+
+## Prerequisites
+ 
+- OLake UI and the worker running from the standard [Docker Compose](/docs/install/olake-ui/) stack, using images that include GitOps.
+- OLake Go version `v1.0.0` or later.
+- A folder to hold the JSON files. 
+
+
+## Enable GitOps
+ 
+On the `olake-ui` service in your `docker-compose-v1.yml`, set `GITOPS_MODE` and mount your folder:
+ 
+```yaml
+services:
+  olake-ui:
+    environment:
+      GITOPS_MODE: file
+    volumes:
+      - ./olake-gitops:/etc/olake/gitops
+```
+
+`OLAKE_GITOPS_MODE: file` turns on the folder watcher.
+
+OLake UI reads the files from `/etc/olake/gitops`. Restart the service to apply the change:
+
+OLake UI needs **read access** to the folder, and **write access** for the state file. If the folder is read-only, point `OLAKE_GITOPS_STATE_FILE` at a writable path. OLake UI starts only if it can write the state file. A missing or read-only location is reported at startup.
+
+```bash
+docker compose up -d olake-ui
+```
+
+## Define your objects
+ 
+Each file describes one object, using the same fields as the OLake API plus a `kind`. A complete setup needs four files: a source, a destination, a job that connects them, and the streams to sync.
+
+### File rules
+ 
+- The value for `kind` can be one of `source`, `destination`, `job` or `streams`.
+- `projectId` is required in every file. `userId` is also required for `source`, `destination` and `job`.
+- OLake Go reads every `*.json` file in the folder you mounted, and in the folders that are inside it (For instance, each job can have its own folder).
+- File names and folders do not matter. An object is identified by the value of its `kind` and `name` (streams are identified by their `job`).
+- OLake Go waits 5 seconds after the last change to a file before syncing it, so saving several files in a row is safe.
+
+
+<Tabs>
+<TabItem value="source" label="Source" default>
+
+### Source
+
+```json title="source.json"
+{
+  "kind": "source",
+  "projectId": "123",
+  "userId": 1,
+  "name": "pg_prod",
+  "type": "postgres",
+  "version": "v1.0.0",
+  "config": {
+    "host": "postgres",
+    "port": 5432,
+    "database": "app",
+    "username": "olake",
+    "password": "change-me"
+  }
+}
+```
+
+</TabItem>
+<TabItem value="destination" label="Destination">
+
+### Destination
+
+```json title="destination.json"
+{
+  "kind": "destination",
+  "projectId": "123",
+  "userId": 1,
+  "name": "lake",
+  "type": "iceberg",
+  "version": "v1.0.0",
+  "config": {
+    "type": "ICEBERG",
+    "writer": {
+      "type": "glue",
+      "iceberg_s3_path": "s3://my-bucket/warehouse",
+      "aws_region": "ap-south-1"
+    }
+  }
+}
+```
+
+</TabItem>
+<TabItem value="job" label="Job">
+
+### Job
+
+The job refers to the source and destination by `name`.
+
+```json title="job.json"
+{
+  "kind": "job",
+  "projectId": "123",
+  "userId": 1,
+  "name": "orders_sync",
+  "source": "pg_prod",
+  "destination": "lake",
+  "frequency": "0 */6 * * *",
+  "activate": true
+}
+```
+
+</TabItem>
+<TabItem value="streams" label="Streams">
+
+### Streams
+
+```json title="streams.json"
+{
+  "kind": "streams",
+  "projectId": "123",
+  "job": "orders_sync",
+  "streams": {
+    "selected_streams": {
+      "public": [
+        {
+          "partition_regex": "",
+          "stream_name": "sample_data",
+          "sync_mode": "cdc"
+        }
+      ]
+    }
+  }
+}
+```
+
+The streams file refers to a particular job. In the above case, the streams file got attached to the `orders_sync` job.
+
+1. Run the `discover` command with your source and destination configuration. See [Discover Command](/docs/install/docker-cli/#discover-command) for usage.
+2. From the output, copy the entire `selected_streams` block.
+3. Paste it as the value of `streams`, then make the necessary changes to the selected streams as required.
+
+</TabItem>
+</Tabs>
+
+Once the files are in the folder, OLake Go applies them without any further action. You can add them in any order: the job waits until its source, destination and streams exist. 
+
+:::warning Credentials
+Credentials live in these files, and Docker mode has no Secret object. Keep the folder private and never commit real passwords to a public repository. To keep credentials out of the files, reference them with `${env:...}` or use a cloud secret manager.
+ 
+`${secrets:...}` references are not available in file mode.
+:::
+
+## Credentials and secrets
+ 
+You have two ways to provide credentials in a source or destination `config`:
+ 
+- **Plain values**, as in the examples above. The password sits in the file, so this suits local testing.
+- **Secret references** (recommended). Use this when you want the whole config in Git and only the credentials outside it. Rotated credentials are picked up by themselves.
+
+### Secret references
+ 
+Set any string field in a source or destination `config` to a reference instead of the value. OLake fetches the value when it syncs and stores the resolved config in its database (encrypted when [`OLAKE_SECRET_KEY`](#encrypt-stored-configs-with-olake_secret_key) is set).
+
+```json
+"config": {
+  "host": "pg.prod.internal",
+  "username": "${aws-sm:olake/prod/pg#username}",
+  "password": "${aws-sm:olake/prod/pg#password}"
+}
+```
+
+The format is `${<provider>:<path>[#<key>]}`. These providers are supported:
+ 
+| Provider | Reference |
+|----------|-----------|
+| Environment variable | `${env:<NAME>}` |
+| AWS Secrets Manager | `${aws-sm:<name or ARN>[#key]}` |
+| GCP Secret Manager | `${gcp-sm:<secret-id>[#key]}` or `${gcp-sm:projects/<project>/secrets/<id>[/versions/<v>][#key]}` |
+| Azure Key Vault | `${azure-kv:<vault-name>/<secret-name>[/<version>][#key]}` |
+
+A few rules apply to every provider:
+ 
+- The reference must be the whole value. 
+- `#key` reads one key of a secret that holds a JSON object, such as `{"username":"...","password":"..."}`. Without `#key`, the whole secret value is used as a string.
+- The value keeps its JSON type. For instance, <br/> Instead of writing `{"password":hello_olake}` in the file, set `"password": "${...#password}"` so OLake Go reads the password field from the secret when it applies the file, so the config still gets "hello_olake" without actually exposing the password.
+- References work in nested objects too, such as `ssh_config.password` or `writer.aws_secret_key`.
+- References work only in source and destination configs. Job and streams files do not hold credentials.
+
+### Encrypt stored configs with OLAKE_SECRET_KEY
+ 
+`OLAKE_SECRET_KEY` is the key OLake Go uses to encrypt source and destination configs in its database. The worker decrypts them to run syncs, so OLake UI and the worker must have the same value.
+ 
+- **Recommended for every production install**, with or without secret references. Without it, configs are stored in plain text, including passwords and resolved secrets.
+- **Not required for secret references.** OLake Go stores the resolved values in its database like any other config: encrypted when the key is set, in plain text otherwise.
+- **Value:** a long random string (OLake derives an AES-256 key from it), or an AWS KMS key ARN (`arn:aws:kms:...`). Generate a random string with `openssl rand -base64 32`. With KMS, OLake UI and the worker need AWS credentials allowed to use `kms:Encrypt` and `kms:Decrypt` on the key.
+:::caution
+Set the key once, on a fresh install. Do not add, change or remove `OLAKE_SECRET_KEY` on an install that already has sources or destinations: OLake cannot read configs that were stored with a different key, or with no key.
+:::
+
+## How failures are handled
+ 
+| Type | Examples | Status | What OLake does |
+|------|----------|--------|-----------------|
+| Retryable | OLake database or Temporal briefly unreachable; a job waiting for its source, destination or streams | `Pending` | Retries every 30 seconds. After 30 minutes of an infrastructure outage, it becomes `Failed`. |
+| Non-retryable | Invalid JSON, missing field, unknown type, wrong credentials, unsupported version | `Failed` | Logs the reason, records it in the state file, and waits for you to change something. |
+
+Fixing a failed source, destination or streams file re-runs the dependent job. You do not need to edit the job file.
+
+## Failure indicator containers
+ 
+When an object becomes `Failed`, the OLake worker starts a small `busybox` container named `olake-failed-<kind>-<name>`. It prints the failure reason and keeps running, so it is visible in `docker ps`. OLake Go removes it automatically once the object is `Ready` again.
+ 
+`<name>` is the object's name (for streams, the job name) in lower case, with any character other than a letter, digit or `-` replaced by `-`. For example, the source `pg_prod` gives `olake-failed-source-pg-prod`.
+
+```bash
+# List all failed objects
+docker ps --filter label=olake.io/indicator=true
+ 
+# Read the failure reason
+docker logs olake-failed-source-pg-prod
+```
+
+:::tip
+Set up an alert that fires whenever a container with `olake.io/indicator=true` exists. You can use cAdvisor, a Docker events listener, or a simple cron check on `docker ps`.
+:::
+
+## Resync manually
+ 
+Editing a file already makes OLake re-apply it, so most fixes need nothing more. The exception is when the problem was outside the file. OLake still sees the same file content, so it keeps skipping the `Failed` object. Common cases:
+ 
+- You created a missing secret.
+- You fixed a password in the database.
+- An infrastructure outage that lasted more than 30 minutes has ended.
+
+For these, add a `reconcileRequest` field to the file. It is a nudge that tells OLake to try again, without changing anything else about the object.
+
+1. Open the file of the failed object and add `reconcileRequest` at the top level. The value can be any number or string.
+   ```diff title="source.json"
+     {
+    "kind": "source",
+    "reconcileRequest": 1,
+    "projectId": "123",
+    "userId": 1,
+    "name": "pg_prod",
+    "type": "postgres",
+    "version": "v1.0.0",
+    "config": { "host": "postgres", "port": 5432, "database": "app", "username": "olake", "password": "${env:PG_PASSWORD}" }
+    }
+   ```
+
+2. Save the file. After the usual 5-second wait, OLake syncs the object again
+
+3. Confirm it worked. OLake stores the value it handled as `reconcileHandled` in the state file, next to the object's phase and message. The key is `<kind>//<name>` (for streams, use their `job`):
+   ```bash
+   jq '.["source//pg_prod"] | {phase, message, reconcileHandled}' olake-gitops/.olake-gitops-state.json
+   ```
+
+To resync the same object again later, change the value, for example from `1` to `2`. It only has to differ from the previous one, so a counter is fine.
+
+:::caution
+Do not delete the whole state file to resync one object. OLake would treat every file as new and sync it from scratch, interrupting running syncs.
+:::
+
+## Important behavior
+ 
+- **Create and update only.** Deleting a file drops the object from GitOps, but the source, destination or job is kept in OLake.
+- **Do not rename** sources, destinations or jobs.
+- **Keep objects unique.** If two files describe the same `kind` and `name`, they conflict and the last one wins.
+- **Stream changes clear data.** When a stream's configuration changes, OLake clears the data for the changed streams and re-syncs them.
+

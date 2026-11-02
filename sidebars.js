@@ -60,6 +60,14 @@ const docSidebar = {
       ],
     },
     { type: 'doc', id: 'install/kubernetes', label: 'Kubernetes/Helm' },
+    {
+      type: 'category',
+      label: 'GitOps',
+      items: [
+        { type: 'doc', id: 'install/gitops/docker', label: 'Docker Compose' },
+        { type: 'doc', id: 'install/gitops/kubernetes', label: 'Kubernetes' },
+      ],
+    },
 
     // MOVE AND MANAGE DATA
     sectionHeader("MOVE AND MANAGE DATA"),
