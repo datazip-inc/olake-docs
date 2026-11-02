@@ -16,7 +16,7 @@ export function AwsAccessKeyDescription() {
       for setup details.
       <br />
       <strong>Kubernetes:</strong> set up pod IAM in{' '}
-      <a href="/docs/install/kubernetes/#cloud-iam-integration">Cloud IAM Integration</a>.
+      <a href="/docs/install/kubernetes/#cloud-integration">Cloud Integration</a>.
     </>
   );
 }
@@ -37,7 +37,7 @@ export function AwsSecretKeyDescription() {
       for setup details.
       <br />
       <strong>Kubernetes:</strong> set up pod IAM in{' '}
-      <a href="/docs/install/kubernetes/#cloud-iam-integration">Cloud IAM Integration</a>.
+      <a href="/docs/install/kubernetes/#cloud-integration">Cloud Integration</a>.
     </>
   );
 }
