@@ -809,6 +809,69 @@ global:
     linkerd.io/inject: enabled
 ```
 
+### Extra Volumes for Connector Pods
+
+Use `global.extraJobVolumes` and `global.extraJobVolumeMounts` to mount files from Kubernetes ConfigMaps or Secrets into every connector pod (sync, discover, check) that OLake spawns. The primary use case is TLS certificates for sources that require mTLS or a custom CA.
+
+#### Step 1 — Create the ConfigMap or Secret
+
+```bash
+# CA certificate from a file
+kubectl create configmap my-ca-certs --from-file=ca.crt=/path/to/ca.crt -n olake
+
+# Client cert and key from files
+kubectl create secret generic my-client-key \
+  --from-file=client.crt=/path/to/client.crt \
+  --from-file=client.key=/path/to/client.key \
+  -n olake
+```
+
+#### Step 2 — Configure the Helm values
+
+```yaml
+global:
+  extraJobVolumes:
+    - name: custom-ca
+      configMap:
+        name: my-ca-certs
+    - name: client-key
+      secret:
+        secretName: my-client-key
+
+  extraJobVolumeMounts:
+    - name: custom-ca
+      mountPath: /etc/ssl/custom-certs
+      readOnly: true
+    - name: client-key
+      mountPath: /etc/ssl/client-keys
+      readOnly: true
+```
+
+#### Step 3 — Use the mounted paths in connector config
+
+In the source connector's SSL configuration, set `cert_source` to `"path"` and reference the container paths:
+
+```json
+{
+  "ssl": {
+    "mode": "verify-full",
+    "cert_source": "path",
+    "server_ca_path": "/etc/ssl/custom-certs/ca.crt",
+    "client_cert_path": "/etc/ssl/client-keys/client.crt",
+    "client_key_path": "/etc/ssl/client-keys/client.key"
+  }
+}
+```
+
+#### Validation rules
+
+- Volume names `job-storage` and `index-storage` are reserved — do not reuse them.
+- `mountPath` cannot be `/` or under `/mnt/config` (used internally by OLake).
+- Duplicate `mountPath` values are rejected.
+- Do not mount over `/etc/ssl/certs` — it hides the container's default trusted CA bundle.
+- If the ConfigMap or Secret value is invalid, OLake clears the volume cache and logs a warning — no extra mounts are applied until the value is fixed. Check worker logs.
+- `subPath` mounts do not pick up ConfigMap/Secret updates without restarting the pod.
+
 ### Prometheus Metrics Configuration
 
 To expose OLake Go's Prometheus compatible `/metrics` endpoint, enable it in your `values.yaml` under `olakeUI.env`:
