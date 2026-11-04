@@ -1,21 +1,27 @@
-// Suppress the "ResizeObserver loop completed with undelivered notifications." browser error
-// This error is benign, but Chrome prints it whenever a ResizeObserver callback
-// causes a reflow that in turn triggers another synchronous ResizeObserver event.
-// It tends to appear frequently during development (e.g. in webpack-dev-server's
-// overlay) and can confuse developers even though it does not break anything.
+// Suppress the "ResizeObserver loop completed with undelivered notifications." browser error.
+// It is benign: Chrome prints it whenever a ResizeObserver callback causes a reflow that triggers
+// another ResizeObserver notification in the same frame. It confuses developers (and shows in
+// webpack-dev-server's overlay) without breaking anything.
 //
-// We listen for the global `error` event and stop the propagation for this
-// specific ResizeObserver message so that it never reaches the console.
-// ------------------------------
+// Two mechanisms, both for exactly the ResizeObserver messages and nothing else:
+//   1. stop the global `error` event from propagating, and
+//   2. drop matching console.error calls.
+// (This file replaces the former suppress-resize-observer.js, which did the same job.)
 if (typeof window !== 'undefined') {
+  const isResizeObserverNoise = (msg) =>
+    typeof msg === 'string' &&
+    (msg.includes('ResizeObserver loop completed with undelivered notifications') ||
+      msg.includes('ResizeObserver loop limit exceeded'))
+
   window.addEventListener('error', (e) => {
-    const msg = e?.message
-    if (
-      msg === 'ResizeObserver loop completed with undelivered notifications.' ||
-      msg === 'ResizeObserver loop limit exceeded'
-    ) {
-      // Prevent the message from showing in the console
+    if (isResizeObserverNoise(e && e.message)) {
       e.stopImmediatePropagation()
     }
   })
+
+  const originalConsoleError = console.error
+  console.error = function (...args) {
+    if (isResizeObserverNoise(args[0])) return
+    originalConsoleError.apply(console, args)
+  }
 }

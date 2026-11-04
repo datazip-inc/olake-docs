@@ -1,24 +1,30 @@
 // src/components/community/improved/ActiveContributors.tsx
 import React, { useEffect, useState } from 'react'
-import Link from '@docusaurus/Link'
-import { FaGithub, FaArrowRight } from 'react-icons/fa'
-import SectionLayout from '../SectionLayout'
-// import { ImprovedContributorCard, ContributorProps } from './components/ContributorCard'
-
-import ImprovedContributorCard from '../../../components/community/improved/ContributorCard'
-import ContributorProps from '../../../components/ContributorCard'
-
-// import { Button, SectionHeader } from './components'
-
-import Button from '../../../components/community/improved/Button'
-import PageHeader from '../../../components/community/improved/PageHeader'
-import SectionHeader from '../../../components/community/improved/SectionHeader'
-
+import { PiArrowRight, PiGithubLogo } from 'react-icons/pi'
+import Section from '@site/src/components/landing/ui/Section'
+import SectionHeading from '@site/src/components/landing/ui/SectionHeading'
+import Button from '@site/src/components/landing/ui/Button'
+import ImprovedContributorCard from './ContributorCard'
+import type { ContributorProps } from './ContributorCard'
 import contributorPoints from '../../../data/contributor-points.json'
 
+const excludedContributors = [
+  'zriyanshdz',
+  'hash-data',
+  'piyushsingariya',
+  'piyushdatazip',
+  'shubham19may',
+  'vikash390',
+  'vaibhav-datazip',
+  'vishalm0509',
+  'schitizsharma',
+  'ImDoubD-datazip',
+  'rkhameshra',
+  'tanishaAtDatazip'
+]
 
+/** The eight most active contributors, loaded from GitHub; falls back to a link when the call fails. */
 const ActiveContributors = () => {
-  const excludedContributors = ['zriyanshdz', 'hash-data', 'piyushsingariya', 'piyushdatazip', 'shubham19may', 'vikash390', 'vaibhav-datazip', 'vishalm0509', 'schitizsharma', 'ImDoubD-datazip', 'rkhameshra', 'tanishaAtDatazip']
   const [contributors, setContributors] = useState<ContributorProps[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,43 +62,43 @@ const ActiveContributors = () => {
     })
 
   return (
-    <SectionLayout className="py-20">
-      <SectionHeader
-        title={
-          <>
-            Check out our{' '}
-            <span className="text-[#193ae6] dark:text-blue-400">active contributors</span>
-          </>
-        }
-        subtitle="New connectors, ideas, bug fixes, docs, articles - join the movement!"
+    <Section>
+      <SectionHeading
+        title='Check out our active contributors'
+        body='New connectors, ideas, bug fixes, docs, articles - join the movement!'
+        align='center'
       />
 
       {loading && (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#193ae6]"></div>
-        </div>
+        <div
+          className='mt-[28px] h-[260px] animate-pulse rounded-[16px] border border-solid border-olake-line bg-olake-surface-alt lg:mt-[44px]'
+          role='status'
+          aria-label='Loading contributors'
+        />
       )}
 
       {!loading && !error && filteredContributors.length > 0 && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+          <ul className='mt-[28px] grid grid-cols-1 gap-[12px] sm:grid-cols-2 lg:mt-[44px] lg:grid-cols-4 lg:gap-[16px]'>
             {filteredContributors.slice(0, 8).map((contributor) => (
-              <ImprovedContributorCard key={contributor.id} contributor={contributor} />
+              <li key={contributor.id}>
+                <ImprovedContributorCard contributor={contributor} />
+              </li>
             ))}
-          </div>
+          </ul>
 
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Button href="/community/contributors" size="lg">
+          <div className='mt-[28px] flex flex-wrap items-center justify-center gap-[8px] lg:mt-[40px] lg:gap-[12px]'>
+            <Button href='/community/contributors' size='lg'>
               See All {filteredContributors.length} Contributors
-              <FaArrowRight className="ml-2" />
+              <PiArrowRight aria-hidden='true' />
             </Button>
-            <Button 
-              href="https://github.com/datazip-inc/olake/graphs/contributors" 
-              variant="outline" 
-              size="lg"
+            <Button
+              href='https://github.com/datazip-inc/olake/graphs/contributors'
+              variant='secondary'
+              size='lg'
               external
             >
-              <FaGithub className="mr-2" />
+              <PiGithubLogo aria-hidden='true' />
               View on GitHub
             </Button>
           </div>
@@ -100,27 +106,29 @@ const ActiveContributors = () => {
       )}
 
       {!loading && !error && filteredContributors.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">No contributors data available.</p>
-        </div>
+        <p className='mt-[28px] text-center text-[15px] text-olake-text-2 lg:mt-[44px]'>
+          No contributors data available.
+        </p>
       )}
 
       {error && (
-        <div className="text-center py-12">
-          <p className="text-red-500 mb-4">Unable to load contributors at this time.</p>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
+        <div className='mt-[28px] text-center lg:mt-[44px]'>
+          <p className='text-[15px] text-olake-ink'>Unable to load contributors at this time.</p>
+          <p className='mt-[8px] text-[14px] text-olake-text-2'>
             Visit our{' '}
-            <Link 
-              to="https://github.com/datazip-inc/olake/graphs/contributors"
-              className="text-[#193ae6] dark:text-blue-400 hover:underline"
+            <a
+              href='https://github.com/datazip-inc/olake/graphs/contributors'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-olake-blue hover:text-olake-blue-hover'
             >
               GitHub page
-            </Link>{' '}
+            </a>{' '}
             to see all contributors.
           </p>
         </div>
       )}
-    </SectionLayout>
+    </Section>
   )
 }
 

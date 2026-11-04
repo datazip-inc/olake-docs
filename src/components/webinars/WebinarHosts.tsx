@@ -1,80 +1,66 @@
 // components/webinars/WebinarHosts.tsx
 
-import React from "react";
-import Image from '@theme/IdealImage'
-import { FaLinkedin } from 'react-icons/fa';
-
+import React from 'react'
+import { PiLinkedinLogo } from 'react-icons/pi'
+import { SubHeading } from '../community/lakeside/primitives'
 
 type Host = {
-  name: string;
-  role: string;
-  bio: string;
-  image: string;
-  linkedin: string;
-};
+  name: string
+  role: string
+  bio: string
+  image: string
+  linkedin: string
+}
 
 type WebinarHostsProps = {
-  hosts: Host[];
-};
+  hosts: Host[]
+}
 
+/** "Hosted By": one outlined card per host with photo, name, role, bio and a LinkedIn link. */
 const WebinarHosts: React.FC<WebinarHostsProps> = ({ hosts }) => {
   return (
-    <section className="mb-12">
-      <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-8 text-center">
+    <section>
+      <SubHeading as='h2' className='lg:text-[30px]'>
         Hosted By
-      </h2>
-      <div className="flex flex-wrap justify-center gap-8">
+      </SubHeading>
+      <ul className='mt-[20px] grid grid-cols-1 gap-[12px] sm:grid-cols-2 lg:mt-[28px] lg:grid-cols-3 lg:gap-[16px]'>
         {hosts.map((host, index) => (
-          <div
+          <li
             key={index}
-            className="flex flex-col items-center bg-gray-100 dark:bg-slate-800 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 w-96"
+            className='flex flex-col rounded-[16px] border border-solid border-olake-line bg-olake-surface p-[20px] lg:p-[24px]'
           >
-
-
-            {/* Image */}
-            <div className="relative w-24 h-24 mb-4">
-              <Image
-                img={host.image}
+            <div className='flex items-center gap-[14px]'>
+              <img
+                src={host.image}
                 alt={`${host.name}'s profile picture`}
-                loading="lazy"
-                decoding="async"
-                className="rounded-full border-2 border-blue-600"
+                width={56}
+                height={56}
+                loading='lazy'
+                decoding='async'
+                className='block h-[56px] w-[56px] shrink-0 rounded-full border border-solid border-olake-line object-cover'
               />
+              <div className='min-w-0 grow'>
+                <h3 className='text-[17px] leading-[1.3] font-normal text-olake-ink'>
+                  {host.name}
+                </h3>
+                <p className='mt-[2px] text-[13px] leading-[1.4] text-olake-muted'>{host.role}</p>
+              </div>
+              <a
+                href={host.linkedin}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='shrink-0 text-[22px] text-olake-muted transition-colors hover:text-olake-ink'
+                aria-label={`${host.name}'s LinkedIn`}
+              >
+                <PiLinkedinLogo aria-hidden='true' />
+              </a>
             </div>
-
-            <a
-              href={host.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              className=" text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 transition-colors"
-              aria-label={`${host.name}'s LinkedIn`}
-            >
-              <FaLinkedin size={24} />
-            </a>
-
-            {/* Name and Role */}
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-                {host.name}
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                {host.role}
-              </p>
-            </div>
-
-
-            {/* Bio */}
-            <p className="mt-4 text-gray-700  dark:text-gray-200 text-sm">
-              {host.bio}
-            </p>
-
-            {/* LinkedIn Icon */}
-
-          </div>
+            <p className='mt-[16px] text-[14px] leading-[1.6] text-olake-text-2'>{host.bio}</p>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
-  );
-};
+  )
+}
 
-export default WebinarHosts;
+export default WebinarHosts

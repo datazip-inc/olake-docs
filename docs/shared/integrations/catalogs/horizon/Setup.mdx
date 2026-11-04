@@ -1,0 +1,56 @@
+Snowflake Horizon is the catalog built into every Snowflake account. OLake Go talks to it through the Iceberg REST endpoint at `https://<account_identifier>.snowflakecomputing.com/polaris/api/catalog`, and the tables it creates are Snowflake-managed Iceberg tables. Writing through this endpoint needs OLake Go 0.11.0 or later.
+
+Run the following once in a Snowsight worksheet as `ACCOUNTADMIN`. It creates a database for the tables, a role OLake Go writes as, a service user that holds the token, and the authentication policy the token needs.
+
+```sql title="Snowflake, once per account"
+USE ROLE ACCOUNTADMIN;
+
+-- A small warehouse for your own queries, and the database OLake Go writes into.
+CREATE WAREHOUSE IF NOT EXISTS OLAKE_WH WAREHOUSE_SIZE = XSMALL AUTO_SUSPEND = 60 AUTO_RESUME = TRUE;
+CREATE DATABASE IF NOT EXISTS OLAKE_DEMO;
+ALTER DATABASE OLAKE_DEMO SET CATALOG = 'SNOWFLAKE';
+ALTER DATABASE OLAKE_DEMO SET EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED';
+
+-- The role OLake Go uses. It needs to create schemas; tables are created inside them.
+CREATE ROLE IF NOT EXISTS OLAKE_ROLE;
+GRANT USAGE, CREATE SCHEMA ON DATABASE OLAKE_DEMO TO ROLE OLAKE_ROLE;
+GRANT USAGE ON WAREHOUSE OLAKE_WH TO ROLE OLAKE_ROLE;
+GRANT ROLE OLAKE_ROLE TO ROLE SYSADMIN;
+
+-- A service user for OLake Go. It holds the programmatic access token.
+CREATE USER IF NOT EXISTS OLAKE_SVC TYPE = SERVICE DEFAULT_ROLE = OLAKE_ROLE;
+GRANT ROLE OLAKE_ROLE TO USER OLAKE_SVC;
+
+-- Snowflake issues a token to a service user only under a network policy, unless an
+-- authentication policy waives that. This one waives it. Any schema can hold the policy.
+USE SCHEMA OLAKE_DEMO.PUBLIC;
+CREATE AUTHENTICATION POLICY IF NOT EXISTS olake_pat_policy
+  PAT_POLICY = (NETWORK_POLICY_EVALUATION = ENFORCED_NOT_REQUIRED);
+ALTER USER OLAKE_SVC SET AUTHENTICATION POLICY olake_pat_policy;
+
+-- The two values OLake Go asks for.
+SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS account_identifier,
+       CURRENT_REGION() AS region;
+
+-- The token. Snowflake shows the secret once; copy it straight into OLake Go.
+ALTER USER OLAKE_SVC ADD PROGRAMMATIC ACCESS TOKEN OLAKE_PAT
+  ROLE_RESTRICTION = 'OLAKE_ROLE' DAYS_TO_EXPIRY = 30;
+```
+
+What each block is for:
+
+- `CATALOG = 'SNOWFLAKE'` and `EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'` on the database make every table OLake Go creates a Snowflake-managed Iceberg table on Snowflake's own storage. No S3 bucket, IAM role or external volume on your side. To keep the files in your own bucket, create an external volume and name it here instead.
+- The authentication policy is the step people miss. Without it, the `ADD PROGRAMMATIC ACCESS TOKEN` line fails with `Network Policy is required when creating a programmatic access token for user OLAKE_SVC`. In production, attach a network policy that allows OLake Go's egress IP instead of waiving the check.
+- `ROLE_RESTRICTION` pins the token to `OLAKE_ROLE`, so a leaked token cannot act as `ACCOUNTADMIN`. Tokens expire after `DAYS_TO_EXPIRY` (15 by default, 365 at most). Rotate it before then or the sync fails with an authentication error.
+
+You can check the token outside OLake Go by exchanging it for a session token, the same call OLake Go makes on every sync:
+
+```bash title="Token check"
+curl -s -X POST "https://<account_identifier>.snowflakecomputing.com/polaris/api/catalog/v1/oauth/tokens" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode grant_type=client_credentials \
+  --data-urlencode scope=session:role:OLAKE_ROLE \
+  --data-urlencode client_secret=<your PAT>
+```
+
+A good token returns a JSON object with an `access_token`. The other authentication methods (key-pair JWT, External OAuth, workload identity federation) are on the [Horizon catalog page](/docs/writers/iceberg/catalog/rest/?rest-catalog=horizon).

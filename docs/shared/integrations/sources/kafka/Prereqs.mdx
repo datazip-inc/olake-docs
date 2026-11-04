@@ -1,0 +1,32 @@
+import CodeBlock from '@theme/CodeBlock';
+
+Kafka is already a change stream, so there is no log to switch on. OLake Go reads each topic from its retained offsets and commits the position it reached in a consumer group. Four things must be in place before the first sync.
+
+| Requirement | Value | Why it matters |
+| --- | --- | --- |
+| Message format | JSON values, or Avro with a schema registry | OLake Go turns each message into a row. Anything else (Protobuf, plain text) cannot be mapped to columns. |
+| A stable field per entity | For example `id` in the payload, or the message key | Upsert mode needs a **deduplication key** to know which earlier row a message replaces. Keep it in every message and never change it. |
+| A consumer group for OLake Go only | One group per job | OLake Go stores its offsets there. Sharing the group with another consumer, or between two jobs, moves offsets under its feet. |
+| Retention longer than your longest pause | For example 7 days | Kafka deletes messages past the retention limit. A job paused longer than that cannot read them, and they are gone. |
+
+If the cluster enforces access control lists (ACLs), the user OLake Go connects with needs `Read` and `Describe` on the topics and `Read` on its consumer group. This is what the setup looked like for the run on this page, with the scripts that ship with Apache Kafka; Redpanda's `rpk topic create` and `rpk security acl create` do the same:
+
+<CodeBlock language="bash" title="On the Kafka cluster">{`# 1. The topics, with retention long enough to cover a pause
+${(props.topics ?? '<topic_1> <topic_2>').split(' ').map((t) => `kafka-topics.sh --bootstrap-server localhost:9092 --create --topic ${t} --partitions 1 --config retention.ms=604800000`).join('\n')}
+
+# 2. If ACLs are on: a principal for OLake Go (one command per resource type)
+kafka-acls.sh --bootstrap-server localhost:9092 --add --allow-principal User:olake \\
+  --operation Read --operation Describe ${(props.topics ?? '<topic_1> <topic_2>').split(' ').map((t) => `--topic ${t}`).join(' ')}
+kafka-acls.sh --bootstrap-server localhost:9092 --add --allow-principal User:olake \\
+  --operation Read --group olake_<job_name>`}</CodeBlock>
+
+Each message needs the entity's identifier in its value, and the key is the natural place to repeat it. A record for the sample `customers` topic looks like this, with `_kafka_key` set to the same `id`:
+
+```json title="One message on the customers topic (key: 3)"
+{"id": 3, "name": "Liam Carter", "email": "liam@example.com", "city": "Austin", "tier": "gold",
+ "created_at": "2026-10-29T15:22:04+00:00", "updated_at": "2026-10-29T15:22:04+00:00"}
+```
+
+:::warning[Retention is your replay window]
+A topic with `retention.ms` of one day keeps one day of messages. If the job is paused for two, the first day is gone before OLake Go reads it, and nothing in the destination tells you. Set retention from the longest pause you can tolerate, and alert when a job has not run for a good fraction of it.
+:::

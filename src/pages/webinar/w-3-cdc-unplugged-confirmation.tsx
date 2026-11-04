@@ -1,87 +1,64 @@
-import WebinarTitle from '../../components/webinars/WebinarTitle';
-import WebinarHosts from '../../components/webinars/WebinarHosts';
-import WebinarCTA from '../../components/webinars/WebinarCTA';
-import WebinarOverview from '../../components/webinars/WebinarOverview';
-import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
-import Layout from '@theme/Layout';
-import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
-import React from "react";
-import Hr from '../../components/Hr';
-import { HOSTS } from '../../data/webinarHosts';
+import DetailPage from '@site/src/components/community/lakeside/DetailPage'
+import WebinarHosts from '../../components/webinars/WebinarHosts'
+import WebinarCTA from '../../components/webinars/WebinarCTA'
+import WebinarOverview from '../../components/webinars/WebinarOverview'
+import YouTubeEmbed from '../../components/webinars/YouTubeEmbed'
+import React from 'react'
+import Head from '@docusaurus/Head'
+import { HOSTS } from '../../data/webinarHosts'
 
-
-const hosts = [
-  HOSTS.RAJESH_ROUT,
-  HOSTS.VARUN_SARAOGI,
-  HOSTS.HARSHA_KALBALIA,
-];
-
+const hosts = [HOSTS.RAJESH_ROUT, HOSTS.VARUN_SARAOGI, HOSTS.HARSHA_KALBALIA]
 
 const WebinarPage = () => {
   const webinarData = {
     title: 'CDC Unplugged: Modern Data Integration with Real-World Insights',
-    summary: 'Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming. We will trace CDCs evolution from traditional methods to its role in modern data lakehouses, while introducing key tools to help you get started. Through real-world examples, we will offer practical guidance on implementing CDC pipelines, overcoming common challenges, and ensuring robust data governance in todays cloud-native and hybrid environments. Expect actionable best practices and insightful case studies to tie everything together.',
-  };
+    summary:
+      'Join us for a deep dive into Change Data Capture (CDC), a vital technique for enabling real-time data integration and streaming. We will trace CDCs evolution from traditional methods to its role in modern data lakehouses, while introducing key tools to help you get started. Through real-world examples, we will offer practical guidance on implementing CDC pipelines, overcoming common challenges, and ensuring robust data governance in todays cloud-native and hybrid environments. Expect actionable best practices and insightful case studies to tie everything together.'
+  }
 
   return (
-
-    <Layout
-      title={webinarData.title}
-      description={webinarData.summary}
-    >
-
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="webinar"
-          title={webinarData.title}
-        />
-        <WebinarTitle
-          title={webinarData.title}
-          tag="Webinar"
-        />
-
-        <section className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+    <>
+      <Head>
+        {/* Thank-you page after registering: reachable by link, not worth indexing */}
+        <meta name='robots' content='noindex, follow' />
+      </Head>
+      <DetailPage
+        title={webinarData.title}
+        description='Thanks for registering for CDC Unplugged. Watch the recording on Change Data Capture, from traditional methods to CDC pipelines in modern lakehouses.'
+        heading={webinarData.title}
+        tag='Webinar'
+        breadcrumb='webinar'
+      >
+        <section className='text-center'>
+          <h2 className='text-[24px] leading-[1.2] font-normal tracking-[-0.01em] text-olake-ink lg:text-[38px]'>
             Thank You for Registering!
           </h2>
-
         </section>
 
-
         {/* Embedded YouTube Video */}
-        <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="iCEXVkvDVjI" className="max-w-6xl" />
+        <section className='flex justify-center'>
+          <YouTubeEmbed videoId='iCEXVkvDVjI' className='max-w-6xl' />
 
           {/* comming soon */}
         </section>
 
         <WebinarOverview
-          date="January 09, 2025"
-          time="10:00 AM - 10:45 AM [EST], 08:30 PM - 09:15 PM [IST]"
-          duration="45 mins"
+          date='January 09, 2025'
+          time='10:00 AM - 10:45 AM [EST], 08:30 PM - 09:15 PM [IST]'
+          duration='45 mins'
           summary={webinarData.summary}
           bulletPoints={[
-            "Comprehensive Exploration of CDC",
-            "Practical Guidance and Best Practices",
+            'Comprehensive Exploration of CDC',
+            'Practical Guidance and Best Practices'
           ]}
         />
 
-        <Hr />
-        <br />
-
         <WebinarHosts hosts={hosts} />
 
-        <WebinarCTA
-          CTAText={"Ready to Join our next webinar?"}
-        />
+        <WebinarCTA CTAText={'Ready to Join our next webinar?'} />
+      </DetailPage>
+    </>
+  )
+}
 
-      </main>
-
-
-    </Layout>
-
-  );
-};
-
-
-export default WebinarPage;
+export default WebinarPage

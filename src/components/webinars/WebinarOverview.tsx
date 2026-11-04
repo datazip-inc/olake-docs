@@ -1,19 +1,36 @@
-import React from 'react';
-import {
-  FaCalendarAlt,
-  FaClock,
-  FaHourglassHalf,
-  FaCheckCircle
-} from 'react-icons/fa';
+import React from 'react'
+import { PiCalendarBlank, PiClock, PiHourglass } from 'react-icons/pi'
+import { SubHeading, Tick } from '../community/lakeside/primitives'
 
 type WebinarOverviewProps = {
-  date?: string;
-  time?: string;
-  duration?: string;
-  summary?: string;
-  bulletPoints?: string[];
-};
+  date?: string
+  time?: string
+  duration?: string
+  summary?: string
+  bulletPoints?: string[]
+}
 
+const Detail = ({
+  icon,
+  label,
+  value
+}: {
+  icon: React.ReactNode
+  label: string
+  value?: string
+}) => (
+  <li className='flex items-start gap-[12px]'>
+    <span className='mt-[2px] text-[18px] text-olake-muted' aria-hidden='true'>
+      {icon}
+    </span>
+    <div>
+      <span className='block text-[13px] text-olake-muted'>{label}:</span>
+      <p className='mt-[2px] text-[15px] leading-[1.5] text-olake-ink'>{value}</p>
+    </div>
+  </li>
+)
+
+/** Details (date, time, duration) beside the summary and its bullet points, in one outlined card. */
 const WebinarOverview: React.FC<WebinarOverviewProps> = ({
   date,
   time,
@@ -22,77 +39,37 @@ const WebinarOverview: React.FC<WebinarOverviewProps> = ({
   bulletPoints
 }) => {
   return (
-    <section className="bg-white dark:bg-slate-800 px-6 py-8 md:px-8 md:py-10 rounded-lg">
-      <div className="grid grid-cols-1 md:grid-cols-2 ">
-        {/* Webinar Details */}
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
-            Details
-          </h2>
-          <ul className="flex flex-col">
-            <li className="flex">
-              <FaCalendarAlt
-                className="text-blue-600 dark:text-blue-400 mr-3 mt-1"
-                aria-label="Date Icon"
-              />
-              <div className=''>
-                <span className="font-medium text-gray-700 dark:text-gray-300">
-                  Date:
-                </span>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">{date}</p>
-              </div>
-            </li>
-            <li className="flex items-start">
-              <FaClock
-                className="text-blue-600 dark:text-blue-400 mr-3 mt-1"
-                aria-label="Time Icon"
-              />
-              <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">
-                  Time:
-                </span>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">{time}</p>
-              </div>
-            </li>
-            <li className="flex items-start">
-              <FaHourglassHalf
-                className="text-blue-600 dark:text-blue-400 mr-3 mt-1"
-                aria-label="Duration Icon"
-              />
-              <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">
-                  Duration:
-                </span>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">{duration}</p>
-              </div>
-            </li>
-          </ul>
-        </div>
+    <section className='grid grid-cols-1 gap-[28px] rounded-[16px] border border-solid border-olake-line bg-olake-surface px-[24px] py-[28px] lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-[48px] lg:px-[40px] lg:py-[36px]'>
+      {/* Webinar Details */}
+      <div>
+        <SubHeading as='h2'>Details</SubHeading>
+        <ul className='mt-[18px] flex flex-col gap-[16px]'>
+          <Detail icon={<PiCalendarBlank />} label='Date' value={date} />
+          <Detail icon={<PiClock />} label='Time' value={time} />
+          <Detail icon={<PiHourglass />} label='Duration' value={duration} />
+        </ul>
+      </div>
 
-        {/* Webinar Summary */}
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
-            Summary
-          </h2>
-          <p className="text-gray-700 dark:text-gray-300 mb-5">{summary}</p>
-          <ul className="space-y-3">
-            {bulletPoints?.map((point, index) => (
+      {/* Webinar Summary */}
+      <div className='lg:border-0 lg:border-l lg:border-solid lg:border-olake-line lg:pl-[48px]'>
+        <SubHeading as='h2'>Summary</SubHeading>
+        <p className='mt-[18px] text-[15px] leading-[1.65] text-olake-text-2'>{summary}</p>
+        {bulletPoints && bulletPoints.length > 0 && (
+          <ul className='mt-[20px] flex flex-col gap-[12px]'>
+            {bulletPoints.map((point, index) => (
               <li
                 key={index}
-                className="flex items-start text-gray-700 text-sm dark:text-gray-400"
+                className='flex items-start gap-[10px] text-[14px] leading-[1.6] text-olake-text-2'
               >
-                {/* <FaCheckCircle
-                  className="text-green-500 mr-2 mt-2"
-                  aria-label="Bullet Point Icon"
-                /> */}
-                <span>✅ {point}</span>
+                <Tick />
+                <span>{point}</span>
               </li>
             ))}
           </ul>
-        </div>
+        )}
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default WebinarOverview;
+export default WebinarOverview

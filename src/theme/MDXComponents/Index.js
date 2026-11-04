@@ -5,12 +5,17 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Hr from '@site/src/components/Hr'
 import BlogCTA from '@site/src/components/BlogCTA'
+import FusionBlogCTA from '@site/src/components/FusionBlogCTA'
 import TestimonialCard from '@site/src/components/TestimonialCard'
+import TLDR from '@site/src/components/TLDR'
+import CollapsibleTip from '@site/src/components/CollapsibleTip';
+import Figure from '@site/src/components/Figure';
+import DocsIntroCard from '@site/src/components/docs/DocsIntroCard';
+import Video from '@site/src/components/Video';
 
 import YouTubeEmbed from '@site/src/components/webinars/YouTubeEmbed';
 
 import DocCardList from '@theme/DocCardList';
-import DocsFooter from '../../../docs/shared/DocsFooter.mdx'
 
 import DockerDiscoverMongoDB from '../../../docs/shared/commands/DockerDiscoverMongoDB.mdx'
 import DockerSyncMongoDB from '../../../docs/shared/commands/DockerSyncMongoDB.mdx'
@@ -85,6 +90,7 @@ import S3SourceConfigDetails from '../../../docs/shared/config/S3SourceConfigDet
 import S3SourceConfigCSV from '../../../docs/shared/config/S3SourceConfigCSV.mdx'
 import S3SourceConfigJSON from '../../../docs/shared/config/S3SourceConfigJSON.mdx'
 import S3SourceConfigParquet from '../../../docs/shared/config/S3SourceConfigParquet.mdx'
+import S3SourceConfigXML from '../../../docs/shared/config/S3SourceConfigXML.mdx'
 import S3ToIcebergDatatypes from '../../../docs/shared/config/S3ToIcebergDatatypes.mdx'
 
 import LocalParquetConfig from '../../../docs/shared/config/LocalParquetConfig.mdx'
@@ -112,22 +118,16 @@ import HiveIcebergWriterUIConfigDetails from '../../../docs/shared/config/HiveIc
 
 import AdditionalReferences from '../../../docs/shared/AdditionalReferences.mdx'
 import CatalogQuery from '../../../docs/shared/CatalogQuery.mdx'
-import IcebergQueryEngines from '@site/src/components/Iceberg/IcebergQueryEngines'
 
 import OLakeFeaturesTLDR from '../../../docs/shared/OLakeFeaturesTLDR.mdx'
 import SupportedSources from '../../../docs/shared/SupportedSources.mdx'
 import SupportedDestinations from '../../../docs/shared/SupportedDestinations.mdx'
 import SupportedIcebergCatalogs from '../../../docs/shared/SupportedIcebergCatalogs.mdx'
 
-import SelectedStreamsOnly from '../../../docs/shared/streams/SelectedStreamsOnly.mdx'
-import SelectedStreamsOnlyDetails from '../../../docs/shared/streams/SelectedStreamsOnlyDetails.mdx'
-import StreamsFull from '../../../docs/shared/streams/StreamsFull.mdx'
-import StreamsOnly from '../../../docs/shared/streams/StreamsOnly.mdx'
-import StreamsOnlyDetails from '../../../docs/shared/streams/StreamsOnlyDetails.mdx'
-import StreamsConfiguration from '../../../docs/shared/streams/StreamsConfiguration.mdx'
 
 import OLakePathInfo from '../../../docs/shared/OLakePathInfo.mdx'
-import StreamSelectionExample from '../../../docs/shared/StreamSelectionExample.mdx'
+import Faq from '../../components/olake/Faq';
+import Quiz from '../../components/blog/Quiz/Quiz';
 
 
 const MDXComponents = {
@@ -137,12 +137,17 @@ const MDXComponents = {
   Tpsr,
   //   img,
   //   Img: img,
-  DocsFooter,
   Tabs,
   TabItem,
   Hr,
   BlogCTA,
+  FusionBlogCTA,
   TestimonialCard,
+  TLDR,
+  CollapsibleTip,
+  Figure,
+  DocsIntroCard,
+  Video,
   DocCardList,
 
   DockerDiscoverMongoDB,
@@ -218,6 +223,7 @@ const MDXComponents = {
   S3SourceConfigCSV,
   S3SourceConfigJSON,
   S3SourceConfigParquet,
+  S3SourceConfigXML,
   S3ToIcebergDatatypes,
 
   S3Config,
@@ -246,22 +252,16 @@ const MDXComponents = {
   AdditionalReferences,
   CatalogQuery,
   YouTubeEmbed,
-  IcebergQueryEngines,
 
   OLakeFeaturesTLDR,
   SupportedSources,
   SupportedDestinations,
   SupportedIcebergCatalogs,
 
-  SelectedStreamsOnly,
-  SelectedStreamsOnlyDetails,
-  StreamsFull,
-  StreamsOnly,
-  StreamsOnlyDetails,
-  StreamsConfiguration,
 
   OLakePathInfo,
-  StreamSelectionExample
+  Faq,
+  Quiz
 };
 
 export default MDXComponents;

@@ -1,108 +1,57 @@
-import React from "react";
-import useBaseUrl from "@docusaurus/useBaseUrl";
-import { useLocation } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { PiCheck, PiShareNetwork } from 'react-icons/pi'
 
+/**
+ * "Share" button in the DocsInfo row. Uses the browser's native share sheet (Web Share API) where it
+ * exists; elsewhere it copies the page link and says so. Nothing browser-specific is read during
+ * render, so the server and client HTML match. Styles: `.olake-docsinfo__action`.
+ */
 function ShareButton(props) {
-    const location = useLocation();
-    const twitterShareURL =
-        "https://twitter.com/share?url=https://olake.io" +
-        `${location.pathname}` +
-        "&text=Check out this article on " +
-        `${props.title}` +
-        ": " +
-        "&hashtags=olake,opensource";
-    const linkedinShareURL =
-        "http://www.linkedin.com/shareArticle?mini=true&url=https://olake.io" +
-        `${location.pathname}` +
-        "&source=olake.io";
-    const facebookShareURL =
-        "https://www.facebook.com/sharer/sharer.php?u=https://olake.io" +
-        `${location.pathname}`;
-    const emailShareURL =
-        "mailto:?subject=Shared Article | " +
-        `${props.title}` +
-        " | OLake Docs " +
-        "&body=Check out this article on " +
-        `${props.title}` +
-        ": https://olake.io" +
-        `${location.pathname}`;
-    const shareIconUrl = useBaseUrl("img/icon/share-icon.svg");
+  const [copied, setCopied] = useState(false);
+  const timer = useRef(null);
 
-    const info = [
-        {
-            link: twitterShareURL,
-            lightIcon: useBaseUrl("img/icon/twitter-light-icon.svg"),
-            darkIcon: useBaseUrl("img/icon/twitter-dark-icon.svg"),
-            name: "Twitter",
-        },
-        {
-            link: linkedinShareURL,
-            lightIcon: useBaseUrl("img/icon/linkedin-light-icon.svg"),
-            darkIcon: useBaseUrl("img/icon/linkedin-dark-icon.svg"),
-            name: "LinkedIn",
-        },
-        {
-            link: facebookShareURL,
-            lightIcon: useBaseUrl("img/icon/facebook-light-icon.svg"),
-            darkIcon: useBaseUrl("img/icon/facebook-dark-icon.svg"),
-            name: "Facebook",
-        },
-        {
-            link: emailShareURL,
-            lightIcon: useBaseUrl("img/icon/email-light-icon.svg"),
-            darkIcon: useBaseUrl("img/icon/email-dark-icon.svg"),
-            name: "Email",
-        },
-    ];
+  useEffect(() => () => clearTimeout(timer.current), []);
 
-    return (
-        <div className="dropdown dropdown--hoverable pointer">
-            <button
-                className="button button--lg button--link padding-horiz--none pointer share-button inline-flex items-center"
-                style={{ fontWeight: 400, fontFamily: "inherit", fontSize: "inherit" }}
-                aria-label="Share this page"
-            >
-                <img
-                    className="margin-right--xs"
-                    src={shareIconUrl}
-                    alt=""
-                    width="18"
-                    height="16"
-                    style={{ verticalAlign: "-0.125em" }}
-                />
-                Share
-            </button>
+  const copyLink = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      // Clipboard blocked: fall back to a prompt so the visitor can still copy the link.
+      window.prompt("Copy this link", url);
+    }
+  };
 
-            <ul className="dropdown__menu">
-                {info.map((labels, idx) => (
-                    <li key={idx}>
-                        <a
-                            className="flex dropdown__link icons display-flex"
-                            href={labels.link}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                        >
-                            <img
-                                className="block dark:hidden w-5 h-5 mr-2"
-                                alt={`Share on ${labels.name}`}
-                                src={labels.lightIcon}
-                                width="20"
-                                height="20"
-                            />
-                            <img
-                                className="hidden dark:block w-5 h-5 mr-2"
-                                alt={`Share on ${labels.name}`}
-                                src={labels.darkIcon}
-                                width="20"
-                                height="20"
-                            />
-                            {labels.name}
-                        </a>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
+  const share = async () => {
+    const url = window.location.href;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: props.title, url });
+      } catch (error) {
+        // The visitor closed the share sheet (AbortError): nothing to do.
+        if (error && error.name !== "AbortError") await copyLink(url);
+      }
+      return;
+    }
+    await copyLink(url);
+  };
+
+  return (
+    <button
+      type="button"
+      className="olake-docsinfo__action share-button"
+      aria-label="Share this page"
+      onClick={share}
+    >
+      {copied ? <PiCheck aria-hidden="true" size={16} /> : <PiShareNetwork aria-hidden="true" size={16} />}
+      {copied ? "Link copied" : "Share"}
+      <span className="sr-only" role="status" aria-live="polite">
+        {copied ? "Link copied to the clipboard" : ""}
+      </span>
+    </button>
+  );
 }
 
 export default ShareButton;

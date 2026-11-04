@@ -1,87 +1,66 @@
-import WebinarTitle from '../../components/webinars/WebinarTitle';
-import WebinarHosts from '../../components/webinars/WebinarHosts';
-import WebinarCTA from '../../components/webinars/WebinarCTA';
-import WebinarOverview from '../../components/webinars/WebinarOverview';
-import React from "react";
-import Layout from '@theme/Layout';
-import CentralizedBreadcrumbs from '../../components/Breadcrumbs/CentralizedBreadcrumbs';
-import Hr from '../../components/Hr';
-import MeetupNotes from '../../components/MeetupNotes';
-import meetupData from '../../data/meetup/8th-meetup.json';
-import YouTubeEmbed from '../../components/webinars/YouTubeEmbed';
-import SlidesCarousel, { Slide } from '../../components/SlidesCarousel';
-import { HOSTS } from '../../data/webinarHosts';
+import DetailPage from '@site/src/components/community/lakeside/DetailPage'
+import WebinarHosts from '../../components/webinars/WebinarHosts'
+import WebinarCTA from '../../components/webinars/WebinarCTA'
+import WebinarOverview from '../../components/webinars/WebinarOverview'
+import React from 'react'
+import MeetupNotes from '../../components/MeetupNotes'
+import meetupData from '../../data/meetup/8th-meetup.json'
+import YouTubeEmbed from '../../components/webinars/YouTubeEmbed'
+import SlidesCarousel, { Slide } from '../../components/SlidesCarousel'
+import { HOSTS } from '../../data/webinarHosts'
 
-const hosts = [HOSTS.AKSHAY_KUMAR_SHARMA, HOSTS.SCHITIZ_SHARMA];
+const hosts = [HOSTS.AKSHAY_KUMAR_SHARMA, HOSTS.SCHITIZ_SHARMA]
 
 const decks: Slide[] = [
-  { title: '8th OLake Community Meetup', url: 'https://docs.google.com/presentation/d/1QvuMbxpsklrmvE2NVacowKcRDnZEZOmc-9FJGprKHgw/edit?usp=sharing' },
-];
+  {
+    title: '8th OLake Community Meetup',
+    url: 'https://docs.google.com/presentation/d/1QvuMbxpsklrmvE2NVacowKcRDnZEZOmc-9FJGprKHgw/edit?usp=sharing'
+  }
+]
 
 const CommunityPage = () => {
   const communityData = {
     title: 'OLake 8th Community Meetup',
-    summary: 'In this community meetup we showcased an end-to-end demo of OLake\'s latest features, including Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.',
-  };
+    summary:
+      "In this community meetup we showcased an end-to-end demo of OLake's latest features, including Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI."
+  }
 
   return (
-    <Layout
+    <DetailPage
       title={communityData.title}
       description={communityData.summary}
+      heading={communityData.title}
+      tag='Community Meetup'
+      breadcrumb='community'
     >
-      <main className="container mx-auto lg:px-36 py-12">
-        <CentralizedBreadcrumbs
-          type="community"
-          title={communityData.title}
-        />
-        <WebinarTitle
-          title={`${communityData.title}`}
-          tag="Community Meetup"
-        />
+      <section className='flex justify-center'>
+        <YouTubeEmbed videoId='V-Kj66coGhE' className='max-w-6xl' />
+      </section>
 
-       
+      <WebinarOverview
+        date='August 29, 2025'
+        time='04:30 PM - 05:30 PM IST'
+        duration='1 hour'
+        summary={communityData.summary}
+        bulletPoints={[
+          'Oracle CDC Demo: We demonstrated real-time change capture directly from Oracle databases into OLake pipelines',
+          'Filtering Capabilities: Showcased applying flexible ingestion filters to control data flow and ensure cleaner datasets',
+          'Incremental Sync: Explained syncing only changes since the last run for faster and more efficient pipeline executions',
+          'Helm Deployment: Demonstrated deploying OLake seamlessly to Kubernetes using Helm charts for simplified setup and scaling',
+          'Unified Demo: Presented how OLake connects ingestion, storage, and analytics in a production-ready open lakehouse environment',
+          'Latest Features: Explored the newest advancements in OLake and their role in the evolving open data ecosystem'
+        ]}
+      />
 
-        <section className="flex justify-center mb-12">
-          <YouTubeEmbed videoId="V-Kj66coGhE" className="max-w-6xl" />
-        </section>
+      <SlidesCarousel slides={decks} />
 
-        <Hr />
-        <br />
+      <WebinarHosts hosts={hosts} />
 
-        <WebinarOverview
-          date="August 29, 2025"
-          time="04:30 PM - 05:30 PM IST"
-          duration="1 hour"
-          summary={communityData.summary}
-          bulletPoints={[
-            "Oracle CDC Demo: We demonstrated real-time change capture directly from Oracle databases into OLake pipelines",
-            "Filtering Capabilities: Showcased applying flexible ingestion filters to control data flow and ensure cleaner datasets",
-            "Incremental Sync: Explained syncing only changes since the last run for faster and more efficient pipeline executions",
-            "Helm Deployment: Demonstrated deploying OLake seamlessly to Kubernetes using Helm charts for simplified setup and scaling",
-            "Unified Demo: Presented how OLake connects ingestion, storage, and analytics in a production-ready open lakehouse environment",
-            "Latest Features: Explored the newest advancements in OLake and their role in the evolving open data ecosystem"
-          ]}
-        />
+      <MeetupNotes data={meetupData} />
 
-        <Hr />
-        <br />
+      <WebinarCTA CTAText={'Ready to Join our next OLake community meetup?'} />
+    </DetailPage>
+  )
+}
 
-        <SlidesCarousel slides={decks} />
-
-        <Hr />
-        <br />
-
-        <WebinarHosts hosts={hosts} />
-
-        <MeetupNotes data={meetupData} />
-
-        <WebinarCTA
-          CTAText={"Ready to Join our next OLake community meetup?"}
-        />
-
-      </main>
-    </Layout>
-  );
-};
-
-export default CommunityPage;
+export default CommunityPage

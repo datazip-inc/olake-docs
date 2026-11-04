@@ -1,15 +1,10 @@
-module.exports = function tailwindPlugin(context, options) {
+// Tailwind CSS v4 through PostCSS. The theme, sources and plugins are declared in src/css/custom.css
+// (CSS-first config). Vendor prefixing is handled by @tailwindcss/postcss, so autoprefixer is gone.
+module.exports = function tailwindPlugin() {
   return {
     name: 'tailwind-plugin',
-    // corePlugins: {
-    //   preflight: false,
-    // },
     configurePostCss(postcssOptions) {
-      postcssOptions.plugins = [
-        require('postcss-import'),
-        require('tailwindcss'),
-        require('autoprefixer')
-      ]
+      postcssOptions.plugins = [require('@tailwindcss/postcss')]
       return postcssOptions
     }
   }

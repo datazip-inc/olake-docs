@@ -40,7 +40,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
   // - text-transparent with bg-clip-text ensures the gradient is visible through the text
   const defaultHeadingClasses = `
     z-10
-    bg-gradient-to-r
+    bg-linear-to-r
     from-gray-900
     to-black
     dark:from-gray-100

@@ -1,0 +1,139 @@
+import type { JsonLdSchema } from '@site/src/components/landing/seo/LandingSeo'
+import type { ProductFaqItem } from '@site/src/components/landing/product/ProductFaq'
+import { GO_FAQS } from './go/faq'
+import { FAQS as FUSION_FAQS } from './fusion/faqs'
+
+const SITE_URL = 'https://olake.io'
+// The design's helmet references https://olake.io/olake-go-og.png / olake-fusion-og.png,
+// neither of which ships in the bundle or exists in this repo. Falling back to the
+// existing site OG image rather than a broken reference.
+const FALLBACK_OG_IMAGE = `${SITE_URL}/img/logo/olake-og-card.png`
+
+// FAQPage JSON-LD built from the FAQ a page shows, so the markup always matches the visible
+// questions and answers word for word, as Google requires.
+const faqPageSchema = (faqs: ProductFaqItem[]): JsonLdSchema => ({
+  id: 'faq-page',
+  data: {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(({ q, a }) => ({
+      '@type': 'Question',
+      name: q,
+      acceptedAnswer: { '@type': 'Answer', text: a }
+    }))
+  }
+})
+
+export const GO_SEO = {
+  title: 'OLake Go — Open-Source Data Replication to Apache Iceberg & S3',
+  description:
+    'Open-source data replication tool that streams databases and streaming sources into Apache Iceberg and S3 with CDC, schema evolution and parallel chunking.',
+  twitterDescription: 'Stream any source into your lakehouse with CDC, schema evolution and parallel chunking — up to 12.5× faster than Fivetran.',
+  canonicalUrl: `${SITE_URL}/olake-go/`,
+  ogImage: FALLBACK_OG_IMAGE,
+  jsonLdSchemas: [
+    {
+      id: 'software-application',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'OLake Go',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Cross-platform',
+        description: 'Open-source data replication tool that streams databases and streaming sources into Apache Iceberg and S3 with CDC, schema evolution and parallel chunking.',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        license: 'https://www.apache.org/licenses/LICENSE-2.0',
+        url: `${SITE_URL}/olake-go/`,
+        publisher: { '@type': 'Organization', name: 'Datazip', url: SITE_URL }
+      }
+    },
+    faqPageSchema(GO_FAQS)
+  ] as JsonLdSchema[]
+}
+
+// v2's own <helmet> ships no SEO metadata at all — only @font-face + CSS.
+// Since v2 takes over `/`, this carries the title/OG/canonical and all
+// five JSON-LD objects from the legacy homepage (src/legacy/home-v1/index.jsx)
+// rather than shipping the site root with no structured data.
+export const HOME_SEO = {
+  title: 'Open Source Iceberg Ingestion & Maintenance Platform',
+  description:
+    "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
+  canonicalUrl: `${SITE_URL}/`,
+  ogImage: `${SITE_URL}/img/logo/olake-og-card.png`,
+  jsonLdSchemas: [
+    {
+      id: 'organization',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'OLake',
+        url: `${SITE_URL}/`,
+        logo: { '@type': 'ImageObject', url: 'https://olake.io/img/logo/olake-blue.svg', width: 32, height: 32 },
+        contactPoint: [{ '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@olake.io' }],
+        sameAs: ['https://github.com/datazip-inc/olake', 'https://x.com/_olake', 'https://www.linkedin.com/company/datazipio/', 'https://www.youtube.com/@olakeio'],
+        address: { '@type': 'PostalAddress', streetAddress: '16192 COASTAL HWY', addressLocality: 'LEWES', addressRegion: 'DE', postalCode: '19958', addressCountry: 'US' }
+      }
+    },
+    {
+      id: 'website',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        url: `${SITE_URL}/`,
+        name: 'Open Source Iceberg Ingestion & Maintenance Platform',
+        description:
+          'Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion\'s automated compaction and maintenance.',
+        publisher: { '@type': 'Organization', name: 'OLake' },
+        potentialAction: { '@type': 'SearchAction', target: 'https://olake.io/search?q={search_term_string}', 'query-input': 'required name=search_term_string' }
+      }
+    },
+    {
+      id: 'webpage',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        url: `${SITE_URL}/`,
+        name: 'OLake - Open Source Iceberg Ingestion & Maintenance Platform',
+        isPartOf: { '@type': 'WebSite', name: 'OLake' },
+        description:
+          "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
+        publisher: { '@type': 'Organization', name: 'OLake', logo: { '@type': 'ImageObject', url: 'https://olake.io/img/site/hero-section.svg' } },
+        primaryImageOfPage: { '@type': 'ImageObject', url: 'https://olake.io/img/site/hero-section.svg', width: 516, height: 605 }
+      }
+    },
+    {
+      id: 'breadcrumb',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` }]
+      }
+    }
+  ] as JsonLdSchema[]
+}
+
+export const FUSION_SEO = {
+  title: 'OLake Fusion — Automated Apache Iceberg Table Maintenance & Compaction',
+  description: 'Keep Apache Iceberg tables consistently performant and scalable with automated compaction and delete-file cleanup.',
+  twitterDescription: 'Automated Iceberg table maintenance — compaction and cleanup, up to 2× faster than Apache Spark.',
+  canonicalUrl: `${SITE_URL}/olake-fusion/`,
+  ogImage: FALLBACK_OG_IMAGE,
+  jsonLdSchemas: [
+    {
+      id: 'software-application',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'OLake Fusion',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Cross-platform',
+        description: 'Automated Apache Iceberg table maintenance: compaction and delete-file cleanup.',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        url: `${SITE_URL}/olake-fusion/`,
+        publisher: { '@type': 'Organization', name: 'Datazip', url: SITE_URL }
+      }
+    },
+    faqPageSchema(FUSION_FAQS)
+  ] as JsonLdSchema[]
+}

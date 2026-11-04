@@ -1,17 +1,14 @@
 import React from 'react';
-import Layout from '@theme/Layout';
+import LegalPage from '@site/src/components/pages-misc/LegalPage';
 
 const PrivacyPolicyPage = () => {
   return (
-    <Layout
+    <LegalPage
       title="Privacy Policy — OLake™ by Datazip"
       description="Privacy Policy for OLake™ by Datazip. How we collect, use, process, share, and protect your personal data under DPDPA and applicable laws."
+      heading="Privacy Policy — OLake™ by Datazip"
+      lastUpdated="Last Updated: 5 February 2026"
     >
-      <main className="container margin-vert--lg">
-        <div className="row">
-          <div className="col col--10 col--offset-1">
-            <h1>Privacy Policy — OLake™ by Datazip</h1>
-            <p className="margin-bottom--md" style={{ color: 'var(--ifm-font-color-base)' }}><strong>Last Updated: 5 February 2026</strong></p>
 
             <h2>1. INTRODUCTION</h2>
             <p>
@@ -228,7 +225,7 @@ const PrivacyPolicyPage = () => {
             <p>If you have any questions, concerns, or requests regarding this Policy or our data processing practices, please contact:</p>
             <p>
               <strong>Data Protection Officer:</strong> Shubham Baldava<br />
-              <strong>Address:</strong> #677, 1st Floor, Suite No. 1223, 27th Main, 13th Cross, HSR Layout, Sector 1, Bangalore 560102<br />
+              <strong>Address:</strong> HustleHub H203, 522, 24th Main Rd, Parangi Palaya, Sector 2, HSR Layout, Bengaluru, Karnataka 560102<br />
               <strong>Email:</strong> <a href="mailto:shubham@datazip.io">shubham@datazip.io</a><br />
               <strong>Phone:</strong> +91 9403613633
             </p>
@@ -236,18 +233,14 @@ const PrivacyPolicyPage = () => {
             <h2>18. GRIEVANCE REDRESSAL</h2>
             <p>If you have any grievances or complaints regarding the processing of your personal data, you can contact our Grievance Officer:</p>
             <p>
-              <strong>Email:</strong> <a href="mailto:sandeep@datazip.io">sandeep@datazip.io</a><br />
-              <strong>Phone:</strong> +91 9748485583
+              <strong>Email:</strong> <a href="mailto:shubham@datazip.io">shubham@datazip.io</a>
             </p>
             <p>We will acknowledge receipt of your complaint within 2 working days and resolve it within 5 working days.</p>
             <p>If you are not satisfied with our response, you have the right to file a complaint with the Data Protection Board of India.</p>
 
             <h2>19. GOVERNING LAW</h2>
             <p>This Privacy Policy is governed by the laws of India, particularly the DPDPA and its implementing rules and regulations.</p>
-          </div>
-        </div>
-      </main>
-    </Layout>
+    </LegalPage>
   );
 };
 

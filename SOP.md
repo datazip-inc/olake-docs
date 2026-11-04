@@ -86,6 +86,12 @@ olake-docs/
 │   ├── tags.yml         # Blog tag definitions
 │   └── YYYY-MM-DD-*.mdx # Blog post files
 │
+├── learn/                 # Plain-language explainers (/learn/<slug>/)
+│   └── YYYY-MM-DD-*.mdx # Explainer files (authors and tags come from blog/authors.yml and blog/tags.yml)
+│
+├── compare/               # Comparison, alternatives, pricing and best-of posts (/compare/<slug>/)
+│   └── YYYY-MM-DD-*.mdx # Post files (authors and tags come from blog/authors.yml and blog/tags.yml)
+│
 ├── docs/                 # Main documentation
 │   ├── getting-started/ # Onboarding guides
 │   ├── core/           # Core concepts
@@ -153,7 +159,6 @@ olake-docs/
 │   # - Redirects and URL rewrites
 │
 ├── sidebars.js          # Documentation sidebar structure
-├── sidebarsIcebergQE.js # Iceberg Query Engine sidebar
 ├── tailwind.config.js   # Tailwind CSS configuration
 ├── tsconfig.json        # TypeScript configuration
 ├── package.json         # Dependencies and scripts
@@ -188,11 +193,11 @@ olake-docs/
   authors: [author_id]
   tags: [tag1, tag2]
   description: Brief description
-  image: ./img/blog/YYYY/MM/cover.webp
+  image: /img/blog/cover/post-slug-cover.webp
   ---
   ```
 - **Image Organization**:
-  - Cover images: `static/img/blog/YYYY/MM/post-title-cover.webp`
+  - Cover images: `static/img/blog/cover/post-slug-cover.webp` (referenced as `/img/blog/cover/post-slug-cover.webp`)
   - Content images: `static/img/blog/YYYY/MM/post-title-1.webp`
 
 #### 2.2.3 Source Code (`/src`)
@@ -244,7 +249,7 @@ olake-docs/
 
 #### 2.4.1 Core Dependencies
 
-- Docusaurus v3.8.1
+- Docusaurus v3.10.2
 - React v18.3.1
 - TailwindCSS v3.4.17
 - TypeScript v5.0.0
@@ -439,7 +444,7 @@ graph LR
 
 #### 4.2.1 Core Framework
 
-- **Docusaurus v3.8.1**
+- **Docusaurus v3.10.2**
   - Documentation framework
   - MDX support
   - Plugin system
@@ -561,8 +566,9 @@ module.exports = {
   tagline: ' Data Lake ',
   url: 'https://olake.io/docs',
   baseUrl: '/',
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  // Broken links/anchors fail the build in CI (GitHub Actions sets CI=true) and only warn locally
+  onBrokenLinks: process.env.CI ? 'throw' : 'warn',
+  onBrokenAnchors: process.env.CI ? 'throw' : 'warn',
   favicon: 'img/favicon.ico',
   organizationName: 'datazip-inc',
   projectName: 'olake-docs',
@@ -729,12 +735,12 @@ The project integrates with several third-party services and plugins to enhance 
 
 #### 4.8.7 IndexNow
 
-- **Purpose**: Automatically notifies search engines (Bing, Yandex, etc.) when content is updated, speeding up indexing
+- **Purpose**: Automatically notifies IndexNow-participating search engines (Bing, Yandex, Naver, Seznam and others; not Google) when content is updated, speeding up indexing
 - **Configuration**: Custom plugin located at `src/plugins/indexnow/index.js`
 - **How it works**:
   - After each build, the plugin reads the generated sitemap
   - Extracts all URLs from the sitemap
-  - Submits them to IndexNow API endpoints for Bing and Yandex
+  - Submits them to the shared IndexNow endpoint (api.indexnow.org), which forwards them to all participating engines; HTTP 200 and 202 count as success, the status is logged, and a failure never fails the build. Runs only on a push to master
   - Helps get new content indexed faster than waiting for search engines to crawl naturally
 - **API Key**: Stored in `INDEXNOW_KEY` environment variable (also hardcoded as fallback)
 
@@ -1012,6 +1018,33 @@ src/
    - Clarity
    - Consistency
 
+
+### 5.7 Third-party content in `/compare` and `/learn` posts
+
+Comparison posts talk about other vendors. These rules keep them accurate, fair and cheap to maintain.
+
+**Review-site quotes (Hacker News, PeerSpot, G2, forums)**
+
+1. Quote opinions and first-hand cost or pricing experience only. Never quote an unverified factual defect ("it loses data", "it does not support X") from an anonymous commenter. If a defect matters, cite the vendor's own docs or issue tracker.
+2. Balance: for each tool use one positive and one negative quote, or none. A page that quotes only negatives about every competitor reads as a hit piece.
+3. Leave out insults and emphatic lines ("absurdly expensive", "an operational nightmare").
+4. Keep the date and the link on every quote, and keep the "one person's view" line.
+
+**No screenshots of other vendors' pages**
+
+- Do not add captures of vendor landing, pricing, plan, licence, docs or limits pages, console views or forum threads. They copy the vendor's page and go stale while staying live on our domain.
+- Our own diagrams and screenshots of OLake's UI or docs are fine.
+- Write the price, plan, limit or licence term as text, with a link to the vendor page and the check date.
+
+**Vendor claims use one pattern**
+
+- Every price, plan, limit or licence claim that comes from a vendor page carries a link to that page and ends with `(checked Oct 2026)` (the month and year it was checked), right after the link. Example: `Standard starts at $20 a month ([pricing page](https://example.com/pricing)) (checked Oct 2026).`
+- Every claim about what a competitor does not support or limits ("its docs say ...") links the page that shows it, on the same line. If the page cannot be linked, cut the claim.
+- A factual limit about a competitor always gets its link, even when that takes a post above the usual link budget. Links to outside sites in `/compare` and `/learn` are `nofollow` automatically.
+- Where table cells are not linked one by one, put a `Sources: <names with links> (checked Oct 2026)` line directly under the table. Write the month with three letters (`Oct 2026`).
+- Link the OLake repository (`https://github.com/datazip-inc/olake`) at every mention of Apache 2.0.
+- FAQ answers in `<Faq>` are JSX, so write links as `<a href={"..."}>label</a>` and code as `<code>`: a markdown link inside a plain string shows as raw text.
+- The monthly refresh skill (`/refresh-vendor-claims`) finds claims by this pattern, so use it from the first draft.
 
 ## 6. Deployment Procedures
 

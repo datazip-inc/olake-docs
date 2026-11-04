@@ -112,8 +112,38 @@ export function onClientEntry(): void {
   }
 }
 
-export function onRouteDidUpdate({ location }: { location: { hash: string } }): void {
-  if (location.hash) {
-    handleSpaNavigation()
+export function onRouteDidUpdate({
+  location,
+  previousLocation,
+}: {
+  location: { pathname: string; search: string; hash: string }
+  previousLocation?: { pathname: string; search: string; hash: string } | null
+}): void {
+  if (!location.hash) return
+
+  // Match Docusaurus core: query-string-only updates (e.g. <Tabs queryString>) should not
+  // re-run anchor correction — it would keep jumping back to the hash while the user
+  // interacts with UI further down the page (same pathname + same hash, search changed).
+  if (
+    previousLocation &&
+    location.pathname === previousLocation.pathname &&
+    location.hash === previousLocation.hash &&
+    location.search !== previousLocation.search
+  ) {
+    return
   }
+
+  // Hash-only change on the same page (an in-page link, or the OLake UI docs panel jumping to a source
+  // form section): the page is already laid out, so the browser's own scroll is right. It honours the
+  // heading's scroll-margin (clearing the sticky tab bar) and can animate; re-asserting it here would
+  // snap it instantly and hide the heading under the tab bar.
+  if (
+    previousLocation &&
+    location.pathname === previousLocation.pathname &&
+    location.search === previousLocation.search
+  ) {
+    return
+  }
+
+  handleSpaNavigation()
 }

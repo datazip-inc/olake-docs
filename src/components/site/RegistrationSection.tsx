@@ -1,4 +1,7 @@
 import React, { useRef, useEffect } from 'react'
+import Section from '@site/src/components/landing/ui/Section'
+import Card from '@site/src/components/landing/ui/Card'
+import '@site/src/components/pages-misc/pages-misc.css'
 
 declare global {
   interface Window {
@@ -10,13 +13,16 @@ declare global {
   }
 }
 
+/**
+ * The "Get in touch" block of the contact page: a card holding the HubSpot form, next to the
+ * "Interested?" pitch. The HubSpot script and form are created only when the section is near the
+ * viewport (or at once when the URL carries #olake-form-product); portal and form ids are unchanged.
+ */
 const RegistrationSection: React.FC = () => {
   const formRef = useRef<HTMLDivElement>(null)
-  const sectionRef = useRef<HTMLElement>(null)
+  const sectionRef = useRef<HTMLDivElement>(null)
   const scriptLoadedRef = useRef<boolean>(false)
   const formInitializedRef = useRef<boolean>(false)
-
-  // const isMobile = useIsMobile()
 
   // Defer HubSpot script & form creation until near viewport or anchor requested
   useEffect(() => {
@@ -80,134 +86,81 @@ const RegistrationSection: React.FC = () => {
   }, [])
 
   return (
-    <section
-      ref={sectionRef}
-      className='relative mx-auto h-auto min-h-[80vh] w-full overflow-visible p-0 pb-12 sm:w-[90%] sm:overflow-hidden sm:rounded-4xl sm:p-6'
-    >
-      {/* Background lake image (Desktop only) */}
-      <div className='absolute inset-0 z-0 hidden sm:block'>
-        <img
-          src='/img/site/registration-bg.webp'
-          alt='Lake background'
-          className='h-full w-full object-cover'
-          role='presentation'
-          loading='lazy'
-          decoding='async'
-        />
+    <Section id='olake-form-product' flush className='pb-[40px] pt-[16px] lg:pb-[64px] lg:pt-[24px]'>
+      <div
+        ref={sectionRef}
+        className='grid grid-cols-1 gap-[32px] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-[56px]'
+      >
+        <Card className='p-[24px] lg:p-[40px]'>
+          <h2 className='mb-0 text-[24px] font-normal leading-[1.2] tracking-[-0.01em] text-olake-ink lg:text-[32px]'>
+            Get in touch
+          </h2>
+          <p className='mb-0 mt-[10px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
+            Send a query and our team will reach out to you
+          </p>
+          <div className='olake-hs-form mt-[24px] min-h-[440px] lg:mt-[32px]'>
+            <div id='olake-product-form' ref={formRef}></div>
+          </div>
+        </Card>
 
-        {/* Gradient overlay */}
-        <div className='absolute inset-0 bg-gradient-to-b from-[#012348]/0 via-[#012348]/40 to-[#012348]' />
-      </div>
-
-      <div className='relative z-10 mx-auto w-full px-0 py-0 sm:container sm:px-4 md:py-16'>
-        <div className='mx-auto'>
-          <div className='flex flex-col gap-0 md:grid md:grid-cols-[55%_45%] md:items-center md:gap-8 lg:gap-16 2xl:grid-cols-[50%_50%]'>
-            {/* Left side - Registration Form Card (will be replaced with HubSpot embed) */}
-            <div className='order-2 mx-auto mt-8 w-[95%] rounded-3xl bg-white p-6 shadow-[0.72px_0.72px_5.06px_0px_#0000001A] dark:bg-gray-800 sm:mt-0 sm:w-auto sm:rounded-2xl sm:p-6 md:order-1 md:ml-0 md:rounded-3xl md:p-8 lg:ml-16 lg:p-10'>
-              <div className='mb-4 sm:mb-6 md:mb-8'>
-                <h3 className='mb-1 text-sm font-bold text-blue-600 dark:text-blue-400 sm:mb-2 sm:text-xl'>
-                  OLake
+        <div className='lg:pt-[12px]'>
+          <h2 className='mb-0 text-[24px] font-normal leading-[1.2] tracking-[-0.01em] text-olake-ink lg:text-[38px]'>
+            Interested?
+          </h2>
+          <ul className='mb-0 list-none p-0 mt-[24px] flex flex-col gap-[24px] border-0 border-t border-solid border-olake-line-rule pt-[24px] lg:mt-[32px] lg:pt-[32px]'>
+            <li className='flex items-start gap-[16px]'>
+              <img
+                src='/img/site/iceberg-logo.svg'
+                alt='Iceberg catalog logo'
+                width={24}
+                height={24}
+                loading='lazy'
+                decoding='async'
+                className='mt-[2px] size-[24px] shrink-0'
+              />
+              <div>
+                <h3 className='mb-0 text-[17px] font-normal leading-[1.3] text-olake-ink lg:text-[20px]'>
+                  Iceberg Native
                 </h3>
-                <h2 className='mb-2 text-lg font-bold text-gray-900 dark:text-white sm:text-2xl md:text-3xl'>
-                  Get in touch
-                </h2>
-                <p className='text-[10px] text-[#696969] dark:text-gray-300 sm:text-base'>
-                  Send a query and our team will reach out to you
+                <p className='mb-0 mt-[6px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
+                  Instead of directly transforming data from Databases during extraction, we first
+                  pull it in its native format.
                 </p>
               </div>
-
-              <div className='min-h-[400px]'>
-                <div id='olake-product-form' ref={formRef}></div>
-              </div>
-
-              {/* HubSpot form container - hidden, will be used for actual form submission */}
-
-              <div className='invisible mt-6 text-[7px] sm:text-xs' aria-hidden>
-                OLake makes data replication faster by parallelising full loads, leveraging change
-                streams for real-time sync, and pulling data in a lake house
-              </div>
-            </div>
-
-            {/* Right side - Feature Text */}
-            <div className='relative order-1 mx-auto flex h-[70vh] w-full min-w-0 flex-col justify-end overflow-hidden px-4 pb-16 pt-10 text-white md:order-2 md:ml-0 md:mt-10 md:h-auto md:px-6 md:pb-16'>
-              {/* Mobile Background Image */}
-              <div className='absolute inset-0 -z-10 sm:hidden'>
-                <img
-                  src='/img/site/registration-bg.webp'
-                  alt='Lake background'
-                  className='h-full w-full object-cover'
-                  role='presentation'
-                  loading='lazy'
-                  decoding='async'
+            </li>
+            <li className='flex items-start gap-[16px]'>
+              <svg
+                className='mt-[1px] size-[24px] shrink-0 text-olake-blue'
+                width='24'
+                height='24'
+                viewBox='0 0 24 24'
+                fill='none'
+                xmlns='http://www.w3.org/2000/svg'
+                role='img'
+                aria-label='Lightning bolt icon representing speed'
+              >
+                <path
+                  d='M13 10V3L4 14H11V21L20 10H13Z'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
                 />
-                <div className='absolute inset-0 bg-gradient-to-b from-[#012348]/0 via-[#012348]/40 to-[#012348]' />
+              </svg>
+              <div>
+                <h3 className='mb-0 text-[17px] font-normal leading-[1.3] text-olake-ink lg:text-[20px]'>
+                  Faster &amp; More Efficient
+                </h3>
+                <p className='mb-0 mt-[6px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
+                  OLake makes data replication faster by parallelising full loads, leveraging
+                  change streams for real-time sync, and pulling data in a lake house.
+                </p>
               </div>
-
-              <div className='mb-6 md:mb-8'>
-                <h3 className='mb-2 text-sm font-medium md:mb-6 md:text-2xl'>OLake</h3>
-                <h2 className='mb-6 text-[32px] font-medium md:mb-16 md:text-3xl lg:text-5xl'>
-                  Interested?
-                </h2>
-              </div>
-
-              <div className='space-y-6 md:space-y-10'>
-                {/* Feature 1 */}
-                <div>
-                  <div className='mb-3 flex items-start gap-4'>
-                    <img
-                      src='/img/site/iceberg-logo.svg'
-                      className='mt-1 size-[10px] sm:size-6'
-                      alt='Iceberg catalog logo'
-                      loading='lazy'
-                      decoding='async'
-                    />
-                    <div className='flex max-w-[90%] flex-col gap-2'>
-                      <div className='text-[11px] font-bold md:text-xl lg:text-xl'>
-                        Iceberg Native
-                      </div>
-                      <div className='break-words pr-4 text-[11px] text-gray-100 md:text-sm'>
-                        Instead of directly transforming data from Databases during extraction, we
-                        first pull it in its native format.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Feature 2 */}
-                <div>
-                  <div className='flex items-start gap-4 md:mb-3'>
-                    <svg
-                      className='mt-1 size-[11px] flex-shrink-0 sm:size-6'
-                      viewBox='0 0 24 24'
-                      fill='none'
-                      xmlns='http://www.w3.org/2000/svg'
-                      aria-label='Lightning bolt icon representing speed'
-                    >
-                      <path
-                        d='M13 10V3L4 14H11V21L20 10H13Z'
-                        stroke='white'
-                        strokeWidth='2'
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                      />
-                    </svg>
-                    <div className='flex flex-col gap-2'>
-                      <div className='text-[10px] font-bold md:text-xl lg:text-xl'>
-                        Faster & More Efficient
-                      </div>
-                      <div className='break-words pr-4 text-[11px] text-gray-100 md:text-sm'>
-                      OLake makes data replication faster by parallelising full loads,
-                      leveraging change streams for real-time sync, and pulling data in a lake house.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </li>
+          </ul>
         </div>
       </div>
-    </section>
+    </Section>
   )
 }
 

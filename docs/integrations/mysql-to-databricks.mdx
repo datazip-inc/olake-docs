@@ -1,0 +1,361 @@
+---
+title: "MySQL to Databricks: CDC via Apache Iceberg"
+description: "Replicate MySQL to Databricks with binlog CDC: OLake Go writes Iceberg tables into Unity Catalog, and Databricks, DuckDB and Spark all query them."
+sidebar_label: MySQL to Databricks
+image: /img/docs/integrations/mysql-to-databricks/cover.webp
+keywords:
+  - mysql to databricks
+  - mysql to databricks cdc
+  - mysql to databricks replication
+  - mysql to databricks migration
+  - databricks iceberg tables
+  - unity catalog iceberg
+integration:
+  source: mysql
+  engine: databricks
+  catalogs: [unity]
+  default: unity
+  author: shubham
+  reviewer: nayan
+  tested:
+    date: "2026-10-30"
+    olake: v1.1.0
+    catalogs: [unity]
+    engines:
+      - "Databricks (Unity Catalog managed Iceberg tables, 2X-Small serverless SQL warehouse, GCP)"
+      - "DuckDB 1.5.5"
+      - "Apache Spark 4.0.1 with Iceberg 1.10.0"
+    summary: "A 2-table MySQL 8.4 database (8 customers, 40 orders) synced with Full Refresh + CDC and deletion vectors as the Iceberg update/delete format into Unity Catalog, then 7 inserts and 5 updates replayed through a second sync. Databricks, DuckDB and Spark returned identical rows."
+  faq:
+    - q: "How do I replicate MySQL to Databricks without a managed connector?"
+      a: "Run OLake Go (open source, Apache 2.0) against a MySQL server with row-based binary logging turned on, and point it at Unity Catalog's Iceberg REST endpoint. The first sync copies the tables in full, every later sync replays only the changes from the binlog, and the tables appear in Databricks as Unity Catalog managed Iceberg tables. No Kafka, Debezium or Databricks ingestion pipeline sits in the path."
+    - q: "Does OLake Go copy the existing MySQL data before it starts reading the binlog?"
+      a: "Yes, automatically. A job in Full Refresh + CDC mode records the binlog position, copies every selected table in parallel chunks, then switches to the binlog from that position. Nothing written during the copy is lost, and there is no separate backfill job."
+    - q: "Which Iceberg delete format does OLake Go write for Databricks?"
+      a: "Deletion vectors, on Iceberg v3 tables. Under Unity Catalog, Databricks reads deletion vectors and rejects commits that carry equality deletes. Setting Databricks as a target query engine on the job makes OLake Go pick deletion vectors from the first sync, so there is no format to choose."
+    - q: "How is this different from the Lakeflow Connect MySQL connector?"
+      a: "Lakeflow Connect lists MySQL among its managed CDC database connectors; it runs on Databricks serverless compute and writes streaming tables governed by Unity Catalog (checked Oct 2026). OLake Go runs in your own Docker and writes Iceberg tables, so DuckDB and Spark read the same rows Databricks does. Pick Lakeflow Connect when Databricks is the only reader."
+    - q: "Which MySQL data types change on the way to Databricks?"
+      a: "`decimal` columns arrive in Databricks as `DOUBLE`, so round at query time when you need exact decimal arithmetic. `datetime` and `timestamp` become `TIMESTAMP` in UTC. `json`, `enum`, `time` and `bit(1)` arrive as `STRING`, and integers and strings map one to one."
+    - q: "How much binlog does MySQL need to keep for OLake Go?"
+      a: "Enough to cover your longest pause. OLake Go saves the binlog position after every sync and resumes from it; if MySQL has already expired that file, the next sync cannot resume and needs a fresh snapshot. Seven days (`binlog_expire_logs_seconds = 604800`) is a safe default for a job that runs at least daily."
+---
+
+import * as I from '@site/src/components/integrations';
+
+MySQL to Databricks usually means Lakeflow Connect, a Debezium and Kafka pipeline, or nightly dumps picked up by Auto Loader. This guide takes a different route. OLake Go reads MySQL changes from the binary log and commits them as Apache Iceberg tables into Unity Catalog.
+
+The tables land as Unity Catalog managed Iceberg tables, with the files in the catalog's managed storage. Nothing else is in the path: no Kafka, no Debezium, no Databricks ingestion pipeline. DuckDB and Spark read the same tables through the same catalog.
+
+<I.IntegrationByline />
+
+<TLDR title='Key takeaways'>
+
+- OLake Go replicates MySQL into Databricks as Iceberg tables: a full historical snapshot first, then change data capture (CDC) from the binlog, with no Kafka or Debezium in between.
+- The tables are Unity Catalog managed Iceberg tables. You query them from the Databricks SQL editor or a notebook right away, with no external table and no refresh.
+- The same tables, written once by OLake Go, are also queryable from DuckDB and Spark through Unity Catalog. In the run on this page all three engines returned identical rows.
+
+</TLDR>
+
+**The short answer.** To replicate MySQL to Databricks with change data capture (CDC), run OLake Go with MySQL's binary log as the source and Unity Catalog as the Iceberg destination, with Databricks as a target query engine. The first sync copies each table in full (the historical snapshot), and every later sync replays inserts, updates and deletes from the binlog. Databricks, DuckDB and Spark then query the same Iceberg tables, with no second copy.
+
+## How MySQL CDC reaches Databricks here
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 40}}}%%
+flowchart TB
+  subgraph my["MySQL"]
+    T[(customers, orders)]
+    LOG[binary log, ROW format, read from the saved position]
+    T ~~~ LOG
+  end
+  subgraph olake["OLake Go"]
+    W[Iceberg writer]
+  end
+  subgraph db["Databricks"]
+    H[Unity Catalog, Iceberg REST endpoint]
+    S[(Managed storage of the catalog)]
+  end
+  Q[Query engines: Databricks SQL, DuckDB, Spark]
+  T -- "first sync (historical snapshot): parallel reads over table chunks" --> W
+  LOG -- "later syncs: inserts, updates, deletes" --> W
+  H -. "1. vended storage credentials" .-> W
+  W -- "2. Parquet data files and deletion vectors" --> S
+  W -- "3. commit snapshot" --> H
+  H -- "table metadata and read credentials" --> Q
+  S -- "data files and deletion vectors" --> Q
+```
+
+Two things happen in order, and OLake Go does both on its own. The first sync records the current binlog position, then reads each table in parallel chunks and writes Parquet data files: that is the historical load. Every later sync opens the binlog at the saved position and replays the inserts, updates and deletes since.
+
+Nothing written during the snapshot is lost, and there is no separate backfill job. An update or delete retires the old row with a deletion vector, a small bitmap per data file that marks the replaced positions.
+
+Each sync ends with one commit to Unity Catalog. Databricks sees the new snapshot on its next query, and DuckDB and Spark see it on their next catalog load.
+
+One thing to keep an eye on: the binlog is MySQL's replay window. MySQL deletes binlog files after `binlog_expire_logs_seconds`, and a job paused for longer than that cannot resume without a fresh snapshot. Keep retention longer than your longest planned pause, and alert on `SHOW BINARY LOGS` size if disk is tight.
+
+## What you need
+
+- **MySQL 5.7 or later** with the binlog on in `ROW` format and a user that can read it. The tables on this page ran on MySQL 8.4. Hosted MySQL on Amazon Relational Database Service (RDS), Aurora, Azure or Cloud SQL works the same way; step 1 links each guide.
+- **A Databricks workspace with Unity Catalog**, a catalog with managed storage, and an admin who can turn on external data access and grant `EXTERNAL USE SCHEMA`. The run on this page used a workspace on Google Cloud.
+- **OLake UI** from the [Docker Compose install](/docs/install/olake-ui/). The run on this page used OLake Go v1.1.0.
+- **Docker**, and about 30 minutes.
+
+## Step 1: Prepare MySQL for CDC
+
+Most readers point OLake Go at tables they already have. If you want to follow along with the exact data from this page, create these two tables first:
+
+<details>
+<summary>The two sample tables used on this page</summary>
+
+```sql title="Sample schema"
+CREATE TABLE customers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100), email VARCHAR(200), city VARCHAR(100), tier VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);
+
+CREATE TABLE orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id));
+
+-- Then insert whatever you like. This page started with 8 customers and 40 orders.
+```
+
+</details>
+
+<I.Partial id="sources/mysql/prereqs" tables="customers, orders" />
+
+## Step 2: Set up Unity Catalog in Databricks
+
+Databricks reads Iceberg tables through Unity Catalog, the catalog built into every Databricks workspace. OLake Go writes straight into it, so the tables become Unity Catalog managed Iceberg tables. They show up in Catalog Explorer and the SQL editor the moment a sync commits.
+
+The files sit in the catalog's managed storage, which is backed by an external location in your own cloud account. DuckDB and Spark reach the same tables through the same Unity Catalog endpoint.
+
+<I.CatalogStrip />
+
+<I.CatalogTabs>
+<TabItem value="unity">
+
+<I.Partial id="catalogs/unity/setup" />
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 3: Connect MySQL to OLake Go
+
+<I.Partial id="sources/mysql/connect">
+
+Here is the source form from the run on this page. MySQL ran in another container, so the host is `host.docker.internal`; the user is the replication user from step 1.
+
+<Figure src='/img/docs/integrations/mysql-to-databricks/olake-source-mysql-cdc.webp' alt='OLake UI Edit source form for MySQL on OLake Go v1.1.0 with Enable CDC on, initial wait time 10, host host.docker.internal, database shop, user olake and SSL disabled' caption='The MySQL source in OLake UI: Enable CDC on, with the replication user from step 1.' width='760px' />
+
+**Set up source** runs the connection test and the binlog checks (`binlog_access`, `log_bin`, `binlog_format`, `binlog_row_metadata`) before anything is saved. When one fails, the dialog names the setting and its recommended value.
+
+</I.Partial>
+
+## Step 4: Configure the Iceberg destination
+
+<I.CatalogTabs>
+<TabItem value="unity">
+
+<I.Partial id="catalogs/unity/writer">
+
+The run on this page wrote into a catalog called `datazip`, with a personal access token that expires after seven days. The snippets below use `lakehouse`; replace it with your catalog name.
+
+</I.Partial>
+
+</TabItem>
+</I.CatalogTabs>
+
+## Step 5: Create the job and run the first sync
+
+<I.Partial id="jobs/create" engines="Databricks, plus DuckDB and Apache Spark if they will read the tables too" upsert="Deletion Vector" updateType="dv" image="olakego/source-mysql:latest" namespace="shop">
+
+Three target query engines were set on this job, and Databricks narrows the delete formats to one: deletion vectors on Iceberg v3 tables. OLake Go sets that format on every stream, so there is nothing to pick.
+
+<Figure src='/img/docs/integrations/mysql-to-databricks/olake-streams.webp' alt='OLake UI Streams Selection page with the shop database, customers and orders selected, sync mode Full Refresh + CDC, ingestion mode Upsert and upsert type Deletion Vector on Iceberg format version V3' caption='Each stream: Full Refresh + CDC, Upsert, and Deletion Vector on Iceberg v3, the format OLake Go resolved for Databricks.' />
+
+<Figure src='/img/docs/integrations/mysql-to-databricks/olake-job-history-two-syncs.webp' alt='OLake UI Job Logs and History for mysql_to_databricks showing two completed syncs, the first in 25 seconds and the second in 22 seconds' caption='Job history: the 25 s historical snapshot, then the 22 s change-only sync.' />
+
+</I.Partial>
+
+On this page the first run copied 8 customers and 40 orders (48 records, 2.10 KB) and finished in **25 seconds**, container start included. OLake Go names the Unity Catalog schema after the job and the source database, so `mysql_to_databricks` on database `shop` produced `mysql_to_databricks_shop`. The **Iceberg DB** field at the top of the Streams page changes it before the first sync.
+
+## Step 6: Query the tables in Databricks
+
+<I.CatalogTabs>
+<TabItem value="unity">
+
+<I.Partial id="engines/databricks/query-unity" schema="mysql_to_databricks_shop" idCol="id" amount="round(sum(amount), 2)" />
+
+<Figure src='/img/docs/integrations/mysql-to-databricks/databricks-sql-editor-customers.webp' alt='Databricks SQL editor running SELECT on datazip.mysql_to_databricks_shop.customers on the 2X-Small SQL warehouse, returning 10 rows with id, name, city and tier' caption='The MySQL customers table in the Databricks SQL editor after both syncs: 10 rows, read through Unity Catalog.' />
+
+MySQL tables carry two more OLake Go columns, `_cdc_binlog_file_name` and `_cdc_binlog_file_pos`, which record where in the binlog each changed row came from.
+
+</TabItem>
+</I.CatalogTabs>
+
+<I.Cta />
+
+## Step 7: Change rows in MySQL and sync again
+
+To see the change path work, the run on this page made 12 changes in MySQL after the first sync:
+
+```sql title="Changes made in MySQL between the two syncs"
+INSERT INTO customers (name, email, city, tier) VALUES
+  ('Maya Patel', 'maya@example.com', 'Pune', 'silver'),
+  ('Lucas Silva', 'lucas@example.com', 'São Paulo', 'bronze');
+INSERT INTO orders (customer_id, product, amount, status) VALUES
+  (9, 'Laptop', 1299.00, 'placed'), (9, 'Mouse', 25.50, 'placed'),
+  (10, 'Monitor', 349.99, 'placed'), (3, 'Keyboard', 89.00, 'placed'), (7, 'Webcam', 79.90, 'placed');
+UPDATE customers SET tier = 'gold',      updated_at = NOW() WHERE name = 'Liam Carter';
+UPDATE customers SET city = 'Abu Dhabi', updated_at = NOW() WHERE name = 'Zara Ali';
+UPDATE orders    SET status = 'delivered', updated_at = NOW() WHERE id IN (1, 4, 7);
+```
+
+The second sync read **12 records (563 bytes)** from the binlog and finished in **22 seconds** end to end. For `customers` that meant one new data file with 4 rows: 2 inserts plus the new versions of 2 updated rows. One deletion vector retires the 2 old versions.
+
+OLake Go's commit report in the sync log shows it directly: `addedDataFiles=1`, `addedRecords=4`, `addedDVs=1` and `addedPositionalDeletes=2`. The `orders` table has the same shape with 8 rows and 3 deleted positions, and the equality delete count stays at 0.
+
+<Figure src='/img/docs/integrations/mysql-to-databricks/olake-sync-log-commit.webp' alt='OLake UI sync log filtered to the Iceberg commit reports for customers and orders after the change sync, showing addedDataFiles 1, addedDVs 1, addedRecords 4 and 8, and addedPositionalDeletes 2 and 3' caption='The change-only sync in the OLake UI log: one data file and one deletion vector per table, zero equality deletes.' />
+
+Databricks shows the result on the next query, with no refresh. Liam Carter is `gold`, Zara Ali moved to Abu Dhabi, and the two new customers are there. The `_op_type` column shows how each row arrived: `r` for the 6 untouched snapshot rows, `c` for the 2 inserts and `u` for the 2 updates.
+
+**Schema changes.** When a column is added in MySQL, OLake Go adds it to the Iceberg table on the next sync and commits the new schema to Unity Catalog. Widening changes such as `int` to `bigint` are applied, while narrowing ones fail the sync rather than corrupt the table. `binlog_row_metadata = FULL` lets OLake Go see the new column names in the binlog; full rules are on the [schema evolution page](/docs/features/schema/).
+
+## Query the same tables from DuckDB and Spark
+
+Nothing is exported, copied or refreshed. Both engines read the files OLake Go wrote, through the same Unity Catalog endpoint, with storage credentials vended by Databricks.
+
+<Tabs groupId="engine" queryString="engine">
+<TabItem value="duckdb" label="DuckDB" default>
+
+<I.Partial id="engines/duckdb/connect-unity" schema="mysql_to_databricks_shop" idCol="id" />
+
+DuckDB 1.5.5 returned the same 10 customers and the same `orders` roll-up as Databricks in the run on this page.
+
+</TabItem>
+<TabItem value="spark" label="Apache Spark">
+
+<I.Partial id="engines/spark/connect-unity" schema="mysql_to_databricks_shop" idCol="id" />
+
+Spark 4.0.1 with Iceberg 1.10.0 returned the same 10 customers and the same `orders` roll-up as Databricks and DuckDB in the run on this page.
+
+</TabItem>
+</Tabs>
+
+An `orders` roll-up matched MySQL to the cent in all three engines. It gave 16 delivered orders for 8659.68, 18 placed for 10522.26, 11 shipped for 6397.25.
+
+## Data types: MySQL to Iceberg to Databricks
+
+OLake Go maps MySQL types to Iceberg types, and Databricks maps Iceberg types to its own. Most columns pass through unchanged; decimals and date-times are the ones to know.
+
+| MySQL | Iceberg (written by OLake Go) | Databricks shows | Notes |
+| --- | --- | --- | --- |
+| `int`, `mediumint`, `smallint`, `tinyint` (signed or unsigned) | `int` | `INT` | The `id` and `customer_id` columns on this page arrived as `INT`. |
+| `bigint`, `bigint unsigned` | `long` | `BIGINT` | |
+| `decimal(p,s)` | `double` | `DOUBLE` | `DESCRIBE` showed `orders.amount` as `DOUBLE` in this run, and its sums matched MySQL to the cent. Round at query time when you need exact decimal arithmetic. |
+| `float` | `float` | `FLOAT` | |
+| `double`, `real` | `double` | `DOUBLE` | |
+| `datetime`, `timestamp` | `timestamptz` (UTC) | `TIMESTAMP` | `datetime` has no zone in MySQL; it is read as UTC. |
+| `char`, `varchar`, `text` family, `enum`, `json`, `time`, `bit(1)` | `string` | `STRING` | `time` arrives as text. |
+
+MySQL types in the table come from the [MySQL connector reference](/docs/connectors/mysql/#data-type-mapping); the Databricks side comes from `DESCRIBE` on the tables of this run.
+
+## Cost and maintenance
+
+- **Storage** is the cloud bucket behind the catalog's managed location. You pay your cloud's storage rates for the Parquet data files and deletion vectors.
+- **Compute.** OLake Go runs wherever you run Docker and does not use a Databricks warehouse or cluster to write. Databricks compute is spent only when you query; the checks on this page ran on a 2X-Small serverless SQL warehouse.
+- **Maintenance.** Unity Catalog runs snapshot expiration and file compaction on managed Iceberg tables when predictive optimization is on ([Databricks: Iceberg tables](https://docs.databricks.com/gcp/en/iceberg/) (checked Oct 2026)). Check that it is on for the catalog OLake Go writes to. Spark's `rewrite_data_files` also works through the same Unity Catalog endpoint.
+- **Token rotation.** A personal access token expires on the date set when it was created, and an expired token fails the next sync at the first catalog call. Use a service principal with OAuth machine-to-machine credentials for production jobs.
+- **Binlog disk.** Seven days of binlog on a busy server can be tens of gigabytes. Size the volume for it, or shorten retention once the job runs reliably every hour.
+
+## Troubleshooting
+
+### 1. The first sync stops with a statistics error
+
+```text
+failed to get or split chunks: stats not populated for table[shop.orders]. Please run ANALYZE TABLE to update table statistics
+```
+
+OLake Go plans the parallel snapshot from `information_schema` row estimates, and a freshly created or freshly loaded table has none. Run `ANALYZE TABLE <table>;` for each table in the job, then sync again.
+
+### 2. The source test fails on the binlog
+
+```text
+binlog_format: current STATEMENT, recommended ROW
+```
+
+The test dialog names the setting. `binlog_format` and `binlog_row_metadata` can be changed at runtime with `SET GLOBAL`; put them in `my.cnf` (or the parameter group) too, or they revert on restart. `log_bin` itself needs a restart.
+
+### 3. The next sync cannot find its binlog position
+
+```text
+idle timeout reached, exiting binlog syncer
+```
+
+Two causes. If `binlog_expire_logs_seconds` already removed the saved binlog file, run a fresh full snapshot and lengthen retention. If the file exists but the server is slow to seek to the position, raise **Initial Wait Time** on the source; 10 seconds was enough for the two-table database on this page.
+
+### 4. Stream discovery fails with a bad connection
+
+```text
+failed to ping database: driver: bad connection
+```
+
+The connection dropped while OLake Go was listing the streams, which happened once in the run on this page while several jobs discovered at the same moment. Open the job's streams again; the retry discovered both tables.
+
+### 5. The destination test fails with a permission error
+
+Three settings cover nearly every failure: **External data access** is off on the metastore, the principal lacks `EXTERNAL USE SCHEMA` on the catalog, or the catalog name in the destination is wrong. `ALL PRIVILEGES` does not include `EXTERNAL USE SCHEMA`, so a catalog owner still has to grant it explicitly. Run the grants from step 2 again for the principal that owns the token.
+
+### 6. Databricks rejects a commit with "Can not create a Path from a null string"
+
+```text
+Can not create a Path from a null string [ErrorCode: 2015]
+```
+
+Unity Catalog returns this when a client commits equality delete files to a managed Iceberg table ([Databricks: access tables from Iceberg clients](https://docs.databricks.com/gcp/en/external-access/iceberg) (checked Oct 2026)). Set Databricks as a target query engine on the job, so OLake Go writes deletion vectors. Start any table that was written with another delete format again from a full refresh.
+
+<details>
+<summary>How this compares with other ways to move MySQL data to Databricks</summary>
+
+| Method | Freshness | Updates and deletes | Where the data lands | What you run |
+| --- | --- | --- | --- | --- |
+| [Lakeflow Connect MySQL connector](https://docs.databricks.com/gcp/en/ingestion/lakeflow-connect/) (checked Oct 2026) | CDC, run by Databricks | Yes, through CDC | Streaming tables governed by Unity Catalog | Nothing to host; runs on Databricks serverless compute |
+| Debezium, Kafka and [Structured Streaming from Kafka](https://docs.databricks.com/gcp/en/connect/streaming/kafka) (checked Oct 2026) | Seconds | Yes, with your own merge logic | Kafka topics, then tables written by a Databricks streaming job | Kafka, Kafka Connect, Debezium and a running Databricks job |
+| `mysqldump` or `SELECT ... INTO OUTFILE` to a bucket, then [COPY INTO](https://docs.databricks.com/gcp/en/ingestion/cloud-object-storage/copy-into/) or [Auto Loader](https://docs.databricks.com/gcp/en/ingestion/cloud-object-storage/auto-loader/) (checked Oct 2026) | Hours to daily | No; full reloads or your own merge | Tables written by a Databricks job | An export script, a bucket and a Databricks job |
+| **OLake Go to Iceberg on Unity Catalog (this guide)** | CDC on a schedule down to one minute | Yes, as deletion vectors | Apache Iceberg tables that Databricks, DuckDB and Spark all read | One Docker Compose stack, open source; your storage plus your own compute |
+
+Lakeflow Connect is the simpler choice when Databricks is the only reader and you want Databricks to run the pipeline. Writing Iceberg once avoids a second copy as soon as another engine needs the same rows.
+
+</details>
+
+## When not to use this
+
+- **Tables have no primary key.** Inserts replicate; updates and deletes cannot be matched to a row and are not applied. Add a primary key or a unique index first.
+- **Every query must run on Databricks-native tables.** OLake Go writes managed Iceberg tables. If a pipeline needs native Delta Lake features on these rows, load them into a Delta table downstream.
+
+## FAQs
+
+<I.IntegrationFaq />
+
+<I.HowWeTested />
+
+## Related guides
+
+<I.RelatedIntegrations />
+
+Deeper reading on this site:
+
+- [MySQL to Apache Iceberg with OLake Go](/blog/mysql-to-iceberg-query-engines/)
+- [Equality vs positional deletes vs deletion vectors](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors/)
+- [Which engines read which delete formats](/blog/iceberg-delete-formats-interoperability-olake-go/)
+- [OLake Go ingestion benchmarks](/docs/benchmarks/ingestion/)
+
+<I.IntegrationJsonLd />
+
+<I.Cta title='Start with your own MySQL' body='The quickstart runs OLake UI with Docker Compose. Create the source, the Unity Catalog destination and the job as above, and the first sync lands your tables in Databricks.' />
