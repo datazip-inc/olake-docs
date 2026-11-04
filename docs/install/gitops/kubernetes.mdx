@@ -1,6 +1,6 @@
 ---
 title: "GitOps with Kubernetes (Helm) | Manage OLake Go Pipelines as Files"
-seo_title: "OLake GitOps with Docker Compose"
+seo_title: "OLake GitOps with Kubernetes"
 description: "Manage OLake Go sources, destinations, jobs and streams as labelled Kubernetes objects, without using the OLake UI."
 ---
 
@@ -14,16 +14,19 @@ Instead of creating a source, destination, job and selecting the streams through
 ## How it works
 
 1. **Enable GitOps** in your Helm values.
-2. **Connect a Git repository** to your GitOps tool (Argo CD, Flux or similar). The repository can be empty.
-3. **Add manifests to the repository and push them** at any time, in any order: a source, a destination, a job and its streams. The GitOps tool watches the repository and applies each new or changed manifest to the cluster. OLake UI picks up each object as it is applied. The source and destination are created in OLake UI as soon as they are applied. When a job has its source, destination and streams, OLake UI creates the job and runs it on the schedule set in its frequency cron expression.
+2. **Connect a Git repository** to your GitOps tool (Argo CD, Flux or similar).
+3. **Add manifests to the repository and push them** in any order: a source, a destination, a job and its streams. The GitOps tool watches the repository and applies each new or changed manifest to the cluster. OLake UI picks up each object as it is applied. The source and destination are created in OLake UI as soon as they are applied. When a job has its source, destination and streams, OLake UI creates the job and runs it on the schedule set in its frequency cron expression.
 
 Every later change follows the same path. Edit the manifest, push it to the repository, and the GitOps tool applies it.
 
 ## Prerequisites
  
 - OLake UI installed with the Helm chart, in the same Kubernetes cluster and namespace as your ConfigMaps. OLake UI must run in the cluster, because it uses the in-cluster identity.
-- OLake UI and OLake worker images with GitOps support.
-- Source drivers `v1.0.0` or later. Placeholder for worker and UI version.
+- The following versions are required for GitOps:
+  - OLake UI: `0.9.0` or later
+  - OLake Go: `1.0.0` or later
+  - OLake Worker: `0.5.0` or later
+  - OLake Helm chart: `0.0.34` or later
 - A Git repository, and a GitOps tool that is pointing to this Git repository.
 
 ## Step 1: Enable GitOps in OLake UI
@@ -51,7 +54,6 @@ gitops:
 | `gitops.serviceAccount.create` | Creates a service account for OLake UI when there is no job service account. |
 | `gitops.serviceAccount.name` | With `create: true`, the name of the new service account (default `<release>-ui`). With `create: false`, the name of an existing service account to use. |
 | `gitops.serviceAccount.annotations` | Annotations for that service account, for example an IAM role for IRSA or a client ID for Azure Workload Identity. |
-| `global.env.OLAKE_SECRET_KEY` | Encryption key for stored configs. Goes to OLake UI and the worker. |
 | `olakeUI.env` | Extra OLake UI settings, such as `OLAKE_GITOPS_SECRETS_*`. Plain values only. See [Environment variables](#environment-variables). |
 | `olakeUI.podLabels` | Extra pod labels, for example `azure.workload.identity/use: "true"`. |
  
@@ -104,7 +106,7 @@ job.yaml
 streams.yaml
 ```
 
-You don't have to add them together. Push some now and the rest later, in any order. A job is created only after its source, destination and streams objects all exist.
+You don't have to add them together. They can be added in any order. A job is created only after its source, destination and streams objects all exist.
 
 Every object is a ConfigMap (or Secret) with two labels and a few `data` keys. Every object must set `projectId`, and every source, destination and job must also set `userId`. GitOps does not fill in a default for either. In a standard OLake Go install the project ID is `123` and the first user's ID is `1`, as in the examples below.
 
@@ -123,7 +125,7 @@ metadata:
 
 <Tabs>
 <TabItem value="source" label="Source" default>
-A source is a ConfigMap (`kind: ConfigMap`, or a [Secret](/docs/install/gitops/claude-kubernetes/#2-kubernetes-secret)) labelled `olake.io/kind: source`. Its `config` is JSON with these fields:
+A source is a ConfigMap (`kind: ConfigMap`, or a [Secret](#2-kubernetes-secret)) labelled `olake.io/kind: source`. Its `config` is JSON with these fields:
  
 - `name`: the name of the source in OLake Go.
 - `type`: which source you are using, such as `postgres`.
@@ -158,7 +160,7 @@ data:
  
 </TabItem>
 <TabItem value="destination" label="Destination">
-A destination is a ConfigMap (`kind: ConfigMap`, or a [Secret](/docs/install/gitops/claude-kubernetes/#2-kubernetes-secret)) labelled `olake.io/kind: destination`. Its `config` is JSON with these fields:
+A destination is a ConfigMap (`kind: ConfigMap`, or a [Secret](#2-kubernetes-secret)) labelled `olake.io/kind: destination`. Its `config` is JSON with these fields:
  
 - `name`: the name of the destination in OLake Go.
 - `type`: which destination you are using, such as `iceberg`.
@@ -227,7 +229,7 @@ data:
 A streams object is a ConfigMap (and can never be a Secret) labelled `olake.io/kind: streams`. 
  
 - `job`: the ConfigMap name (`metadata.name`) of the job, for example `orders-sync`. This is not the job's name inside its config. The job's OLake ID also works.
-- `config`: streams the job syncs and the per-stream configuration in `selected_streams.json`. See [Stream Properties](/docs/understanding/terminologies/olake/) for more details.
+- `config`: streams the job syncs and the per-stream configuration in `selected_streams.json`. See [Stream Properties](/docs/understanding/terminologies/olake/) for more details about stream level configuration.
 
 ```yaml title="streams.yaml"
 apiVersion: v1
@@ -258,7 +260,7 @@ To get the `config` content:
 </TabItem>
 </Tabs>
 
-:::warning Use the right name in each link
+:::warning Use the right name in each field
 Jobs and streams refer to other objects in different ways:
 
 | Field | Use | Example |
@@ -287,8 +289,8 @@ To change the pipeline later, edit the manifests and push them. The GitOps tool 
  
 There are two ways to keep passwords out of Git:
  
-- **Secret references** (recommended). Keep the source or destination as a ConfigMap in Git, and replace each credential with a reference. The whole config stays in Git, only the credentials stay outside it, and rotated credentials are picked up by themselves.
-- **Kubernetes Secret** The whole source or destination as a Secret. Use this when you would rather not reference credentials.
+- **Secret references** (recommended). Keep the source or destination as a ConfigMap in Git, and replace each credential with a reference. The whole config stays in Git, only the credentials stay outside it. OLake Go reads the secrets again on an interval (default `1h`, set by [`OLAKE_GITOPS_SECRETS_REFRESH_INTERVAL`](#environment-variables)), so rotated credentials are picked up without a restart.
+- **Kubernetes Secret.** The whole source or destination as a Secret. Use this when you would rather not reference credentials.
 
 :::note
 `OLAKE_SECRET_KEY` encrypts source and destination configs in the OLake Go database. To know how to set it in Helm, see [Encryption Configuration](/docs/install/kubernetes/#encryption-configuration).
@@ -480,7 +482,7 @@ Fixing a failed source, destination or streams object re-runs the dependent job.
 
 ## Failure indicator Pods
  
-Whenever an object becomes `Failed`, the OLake worker starts a small indicator Pod in your namespace. It prints the failure reason and exits with an error, so it shows up in any Pod-failure monitoring you already have. It stays until the object is `Ready` again, then OLake Go removes it automatically.
+Whenever an object becomes `Failed`, the OLake worker starts an indicator Pod in your namespace. It prints the failure reason and exits with an error, so it shows up in any Pod-failure monitoring you already have. It stays until the object is `Ready` again, then OLake Go removes it automatically.
  
 | Property | Value |
 |----------|-------|
@@ -512,7 +514,8 @@ Editing an object already makes OLake Go re-apply it, so most fixes need nothing
 - The OLake Go database was down for more than 30 minutes.
 - A missing secret now exists.
 - A password was fixed in the database.
-- A secret was rotated.
+- A secret was rotated and you want OLake Go to use it now, without waiting for the next refresh.
+
 For these, set the `olake.io/reconcile-request` annotation. It tells OLake Go to try again now, without a Git commit. It works in every phase (`Ready`, `Pending` or `Failed`) and for every kind.
  
 1. Set the annotation to a new value. Any value works, as long as it differs from the last one. The current time is the easiest:
@@ -546,7 +549,7 @@ For these, set the `olake.io/reconcile-request` annotation. It tells OLake Go to
 - **Editing a job during a clear destination is fine.** The change waits (`Pending`) and applies when the clear finishes.
 - **Restarts are safe.** Restarting OLake UI does not re-apply every job or interrupt running syncs.
 - **Do not replace annotations.** Normal `kubectl apply` and a normal GitOps tool sync keep OLake Go's annotations. `kubectl replace`, forced server-side apply, or a GitOps tool set to replace objects clears them. OLake Go then checks every object again: unchanged sources and destinations stay as they are, and each job runs stream discovery again. A job is updated, and its running sync stopped, only if discovery finds a change in the source.
-- **Keep OLake Go's status annotations out of your manifests.** You can add your own annotations to a manifest, including `olake.io/reconcile-request`. Just don't set `olake.io/phase`, `olake.io/message`, `olake.io/entity-id`, `olake.io/observed-hash` or `olake.io/reconcile-handled`. OLake Go writes these itself, and setting them in a manifest loses its status.
+- **Keep OLake Go's status annotations out of your manifests.** You can add your own annotations to a manifest, including `olake.io/reconcile-request`. Just don't set `olake.io/phase`, `olake.io/message`, `olake.io/entity-id`, `olake.io/observed-hash` or `olake.io/reconcile-handled`. OLake Go writes these itself, and if a manifest sets them, OLake Go loses the object's status.
 
 ## Environment variables
 
