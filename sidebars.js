@@ -231,6 +231,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/oracle-to-iceberg', label: 'Oracle to Iceberg' },
             { type: 'doc', id: 'integrations/sql-server-to-iceberg', label: 'SQL Server to Iceberg' },
             { type: 'doc', id: 'integrations/kafka-to-iceberg', label: 'Kafka to Iceberg' },
+            { type: 'doc', id: 'integrations/postgres-to-aistor', label: 'Postgres to MinIO AIStor' },
           ],
         },
         {
@@ -262,6 +263,7 @@ const docSidebar = {
             { type: 'doc', id: 'integrations/catalogs/unity', label: 'Unity Catalog' },
             { type: 'doc', id: 'integrations/catalogs/biglake', label: 'BigLake' },
             { type: 'doc', id: 'integrations/catalogs/s3tables', label: 'Amazon S3 Tables' },
+            { type: 'doc', id: 'integrations/catalogs/aistor', label: 'MinIO AIStor Tables' },
           ],
         },
       ],

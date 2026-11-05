@@ -14,6 +14,7 @@ export type CatalogId =
   | 'unity'
   | 'biglake'
   | 's3tables'
+  | 'aistor'
   | 'nessie'
   | 'hive'
   | 'jdbc'
@@ -27,7 +28,7 @@ export interface Catalog {
   /** Position in every list: lower first. */
   rank: number
   /** Who runs it. */
-  vendor: 'aws' | 'gcp' | 'snowflake' | 'databricks' | 'oss'
+  vendor: 'aws' | 'gcp' | 'snowflake' | 'databricks' | 'minio' | 'oss'
   /** Managed service or something you host. */
   hosting: 'managed' | 'self-hosted'
   /** Setup page on this site. */
@@ -124,11 +125,22 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     fitsWhen: 'You want AWS to run compaction and snapshot cleanup for you.',
     logo: '/img/logo/s3.webp'
   },
+  aistor: {
+    id: 'aistor',
+    label: 'MinIO AIStor Tables',
+    catalogType: 'rest',
+    rank: 8,
+    vendor: 'minio',
+    hosting: 'self-hosted',
+    docsPath: '/docs/integrations/catalogs/aistor/',
+    authTypes: ['SigV4 (signing name s3tables)', 'OAuth2 client credentials'],
+    fitsWhen: 'You keep data in MinIO AIStor and want the Iceberg catalog built into the object store itself.'
+  },
   nessie: {
     id: 'nessie',
     label: 'Nessie',
     catalogType: 'nessie',
-    rank: 8,
+    rank: 9,
     vendor: 'oss',
     hosting: 'self-hosted',
     docsPath: '/docs/writers/iceberg/catalog/rest/?rest-catalog=nessie',
@@ -140,7 +152,7 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     id: 'hive',
     label: 'Hive Metastore',
     catalogType: 'hive',
-    rank: 9,
+    rank: 10,
     vendor: 'oss',
     hosting: 'self-hosted',
     docsPath: '/docs/writers/iceberg/catalog/hive/',
@@ -152,7 +164,7 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     id: 'jdbc',
     label: 'JDBC',
     catalogType: 'jdbc',
-    rank: 10,
+    rank: 11,
     vendor: 'oss',
     hosting: 'self-hosted',
     docsPath: '/docs/writers/iceberg/catalog/jdbc/',
@@ -164,7 +176,7 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     id: 'rest',
     label: 'Generic REST',
     catalogType: 'rest',
-    rank: 11,
+    rank: 12,
     vendor: 'oss',
     hosting: 'self-hosted',
     docsPath: '/docs/writers/iceberg/catalog/rest/?rest-catalog=generic',
