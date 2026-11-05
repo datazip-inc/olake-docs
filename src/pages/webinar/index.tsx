@@ -219,6 +219,18 @@ const WebinarsPage = () => {
   // Define webinars data directly
   const webinars = [
     {
+      title: 'Apache Iceberg for Beginners: Build a Lakehouse Anywhere ft. MinIO',
+      subtitle:
+        'Brenna Buuck, Developer Evangelist at MinIO, explains what a data lakehouse is, how Apache Iceberg tables, metadata and the REST catalog work, what is new in Iceberg v3, and how to run a high-performance Iceberg lakehouse on cloud, on-prem or hybrid infrastructure.',
+      route: '/webinar/w-15-iceberg-for-beginners-minio',
+      img: `/img/webinars/w-15-iceberg-for-beginners-minio.webp`,
+      alt: 'Apache Iceberg for Beginners: Build a Lakehouse Anywhere ft. MinIO',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '4 November 2026'
+    },
+    {
       title: 'Iceberg for Agents: Building AI-Ready Data Pipelines',
       subtitle:
         "AI agents fail in production because they're overwhelmed with data but starved for context. LLM models aren't the problem. The bottleneck is the data stack: fragmented silos, inconsistent definitions, and logic hidden in tribal knowledge. In this session, Andrew Madsen shows how Apache Iceberg becomes the backbone of AI-ready pipelines, elevating your implementation from a storage format to a live context layer that powers structured RAG, schema-aware agents, and autonomous reasoning.",
