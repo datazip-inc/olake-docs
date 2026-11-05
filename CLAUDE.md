@@ -31,3 +31,10 @@ One page per (source, query engine) pair, each backed by a pipeline that was act
 - **After a shared change** (`docs/shared/integrations/**`, `src/data/integrations/**`): run `node scripts/integrations/check.mjs --report`, rebuild, and re-read every page the report lists.
 - **Writing rules:** no em dashes or curly quotes, paragraphs of three sentences at most, acronyms expanded on first use, every number from the run or from a dated source, OLake Go's limits stated plainly, no "best" or "fastest" without a source.
 - Renaming or removing a page needs a redirect in `docusaurus.config.js` in the same change.
+
+### Keeping pages current
+
+- **UI field names** come from the `title` fields in the connector `spec.json` files in the olake repo (`destination/*/resources/spec.json`, `drivers/*/resources/spec.json`) and from the shared `docs/shared/config/*UIConfigDetails` components. Never name a UI field after a `destination.json` key. `node scripts/integrations/spec-labels.mjs` lists the titles per catalog type and source, and flags required fields with no default whose label the shared docs never mention.
+- **Defaults and required fields** come from the spec and the driver code, not from a lab helper or a run's config (the lab turns Normalization on for every stream). Known cases: Normalization is on by default only for relational sources (off for MongoDB, Kafka and S3), MySQL's Initial Wait Time is required with no default, and both MySQL and Postgres enforce a 120-second minimum.
+- **Local URLs** come from the official quickstart (OLake UI is `http://localhost:8000`), not from lab compose files.
+- **After OLake releases and before a docs sweep**, run `node scripts/integrations/changes-since-checkpoint.mjs` (sibling `../olake` and `../olake-ui` checkouts; `--patch` shows the spec diffs). It lists new tags and the commits since `scripts/integrations/CHECKPOINT.json` that touch specs, constants, stream types, `drivers/abstract` and the UI ingestion module. Check each against the pages, then update `CHECKPOINT.json` (date, tag, commit) in the same change.
