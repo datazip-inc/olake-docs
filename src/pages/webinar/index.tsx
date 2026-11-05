@@ -228,7 +228,7 @@ const WebinarsPage = () => {
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
-      date: '4 November 2026'
+      date: '22 September 2026'
     },
     {
       title: 'Iceberg for Agents: Building AI-Ready Data Pipelines',
