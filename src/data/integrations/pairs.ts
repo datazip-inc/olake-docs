@@ -519,5 +519,15 @@ export const PAIRS: Pair[] = [
     defaultCatalog: 'polaris',
     tested: ['polaris'],
     alsoRead: ['duckdb', 'trino']
+  },
+  {
+    source: 'postgres',
+    engine: 'iceberg',
+    slug: 'postgres-to-aistor',
+    status: 'live',
+    catalogs: ['aistor'],
+    defaultCatalog: 'aistor',
+    tested: ['aistor'],
+    alsoRead: ['spark', 'duckdb', 'trino']
   }
 ]
