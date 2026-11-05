@@ -119,7 +119,7 @@ Example results for a table that fails on the Helm chart's default 4g executor:
 | --- | --- | --- |
 | 20,000,000 | 1,000,000 | 32,000 |
 
-`equality_delete_record_count` is the number to watch: the changed keys in that partition, where a row changed twice counts twice. Here it's 20 million, which needs 5.26 GB, more than the Helm chart's default 4g: see the [calculator](#calculator).
+`equality_delete_record_count` is the number to watch: the changed keys in that partition, where a row changed twice counts twice. Here it's 20 million, which needs 5.94 GB, more than the Helm chart's default 4g: see the [calculator](#calculator).
 
 <details>
 <summary><strong>Using another query engine?</strong></summary>
@@ -143,10 +143,12 @@ Filled in with the example table above, on the Helm chart's default 4g executor.
 
 <OomMemoryCalculator />
 
-<details>
-<summary><strong>Keys longer than 32 characters?</strong></summary>
+<a id="find-key-length"></a>
 
-The calculator's default key length covers keys of up to 32 characters. To check yours, first find the key column, then its longest value.
+<details>
+<summary><strong>Not using <code>_olake_id</code>? How to find the key length</strong></summary>
+
+The calculator's key length defaults to 32 characters, the length of OLake Go's `_olake_id` hash. For other keys, first find the key column, then its longest value.
 
 ```sql
 /* The key columns: the column with a non-null value_count in readable_metrics.
@@ -182,12 +184,13 @@ The calculator uses this formula. Use it to check a result, or to work it out by
 | `largest_delete_file_rows` | Rows in the largest delete file | Query 2 |
 | `max_rows_per_mb` | The most rows per MB of any data file | Query 3 |
 | `target_file_size_mb` | Your target file size, 128 or more | Default 512, unless you changed it in [Configuration](/docs/fusion/compaction/configuration/) |
+| `max_key_length` | The longest key, in characters | Default 32. [How to find it](#find-key-length) |
 
 **Constants:**
 
 | Constant | Value | What it is |
 | --- | --- | --- |
-| `KEY_BYTES` | 250 B | Memory per key: about 218 B of Java objects plus 1 B per character, covering keys of up to 32 characters. For longer keys, use 218 + the key length, for example 254 B for a 36-character UUID. |
+| `BASE_KEY_BYTES` | 250 B | Memory per key, before the key's own characters. |
 | `BUFFER` | × 1.3 | Headroom for Spark and Java |
 
 **Calculation:**
@@ -196,7 +199,7 @@ The calculator uses this formula. Use it to check a result, or to work it out by
 | --- | --- | --- |
 | 1 | `rows_per_task` = `target_file_size_mb` × `max_rows_per_mb` | The most rows one task can hold |
 | 2 | `changed_keys_per_task` = min(`rows_per_task`, `changed_keys_in_partition`) | The changed keys one task holds |
-| 3 | `memory_needed` = (`changed_keys_per_task` + `largest_delete_file_rows`) × `KEY_BYTES` × `BUFFER` | Rounded up to a whole GB, the value for `spark.executor.memory` |
+| 3 | `memory_needed` = (`changed_keys_per_task` + `largest_delete_file_rows`) × (`BASE_KEY_BYTES` + `max_key_length`) × `BUFFER` | Rounded up to a whole GB, the value for `spark.executor.memory` |
 
 - A data file bigger than the target is a task of its own: if its `record_count` is more than `rows_per_task`, use that instead.
 - For `spark.executor.memoryOverhead`, see [problem B](#4-problem-b-the-pod-went-over-its-memory-limit).
@@ -205,14 +208,14 @@ The calculator uses this formula. Use it to check a result, or to work it out by
 
 1. **Rows per task.** A task holds at most 512 MB × 32,000 rows per MB = **16,384,000** rows.
 2. **Changed keys per task.** The partition has 20,000,000 changed keys, more than one task can hold, so each task holds at most **16,384,000** of them.
-3. **Memory needed.** Add the 1,000,000 rows of the largest delete file, which is read while those keys are held: (16,384,000 + 1,000,000) × 250 B × 1.3 = **5.26 GB**.
-4. **Executor memory.** 5.26 GB is more than 4g, so the task fails with `OutOfMemoryError`: set `spark.executor.memory=6g`, as in [fix A](#fix-a).
-5. **Overhead.** 6g is 6 GB or less, so also set `spark.executor.memoryOverheadFactor=0.15` (922 MB instead of the default 614 MB), as in [fix B](#fix-b).
+3. **Memory needed.** Add the 1,000,000 rows of the largest delete file, which is read while those keys are held: (16,384,000 + 1,000,000) × (250 + 32) B × 1.3 = **5.94 GB**.
+4. **Executor memory.** 5.94 GB is more than 4g, so the task fails with `OutOfMemoryError`: set `spark.executor.memory=6g`, as in [fix A](#fix-a).
+5. **Overhead.** 6g is 6 GB or less, so also set `spark.executor.memoryOverheadFactor=0.15` (921 MB instead of the default 614 MB), as in [fix B](#fix-b).
 
 </details>
 
 :::note[Good to know]
-- **Quick check:** expect about 0.3 GB per million changed keys a task holds.
+- **Quick check:** expect about 0.34 GB per million changed keys a task holds, with 32-character keys.
 - **Same unit:** the calculator's GB and the `g` in `spark.executor.memory` are the same, so 6 GB is `6g`.
 - **Size for any number of updates:** enter a very large `changed_keys_in_partition`. The calculator caps it at the most rows one task can hold, which gives the most memory a task can ever need.
 - **On the safe side:** `changed_keys_in_partition` counts a key that changed twice as two, so the real need can be lower.
@@ -312,9 +315,9 @@ If `spark.executor.memory` is 6 GB or less, set the overhead to at least 15 % of
 | --- | --- | --- |
 | 1g | 384 MB | 384 MB |
 | 2g | 384 MB | 384 MB |
-| 3g | 384 MB | 461 MB |
-| 4g | 410 MB | 614 MB |
-| 6g | 614 MB | 922 MB |
+| 3g | 384 MB | 460 MB |
+| 4g | 409 MB | 614 MB |
+| 6g | 614 MB | 921 MB |
 
 <Tabs>
 <TabItem value="docker" label="Docker setup" default>

@@ -2,8 +2,7 @@ import React, {useState} from 'react';
 import styles from './OomMemoryCalculator.module.css';
 
 const GIB = 1073741824;
-const KEY_BYTES = 250;
-const FIXED_BYTES = 218;
+const BASE_KEY_BYTES = 250;
 const BUFFER = 1.3;
 const DEFAULT_MEMORY = {helm: '4', docker: '1'} as const;
 
@@ -27,7 +26,7 @@ export default function OomMemoryCalculator() {
   let result: React.ReactNode = <div>Fill in every field with a positive number.</div>;
   let steps: React.ReactNode = null;
   if (valid) {
-    const perKey = Math.max(KEY_BYTES, FIXED_BYTES + L);
+    const perKey = BASE_KEY_BYTES + L;
     const rows = t * perMb;
     const K = Math.min(rows, D);
     const raw = ((K + R) * perKey * BUFFER) / GIB;
@@ -69,8 +68,7 @@ export default function OomMemoryCalculator() {
     steps = (
       <>
         <div>
-          KEY_BYTES = {L > 32 ? `218 + ${L} = ` : ''}
-          <b>{perKey} B</b>
+          bytes per key = 250 + {L} = <b>{perKey} B</b>
         </div>
         <div>
           rows_per_task = {fmt(t)} × {fmt(perMb)} = <b>{fmt(rows)}</b>
@@ -111,7 +109,7 @@ export default function OomMemoryCalculator() {
         {field(<><code>largest_delete_file_rows</code></>, r, setR, <>From <a href="#check-your-table">query 2</a>. The value shown is only the example.</>)}
         {field(<><code>max_rows_per_mb</code></>, rowsPerMb, setRowsPerMb, <>From <a href="#check-your-table">query 3</a>. The value shown is only the example.</>)}
         {field(<><code>target_file_size_mb</code></>, target, setTarget, <>Default 512. Change it only if you set another target in <a href="/docs/fusion/compaction/configuration/">Configuration</a>.</>)}
-        {field('Key length (characters)', keyLength, setKeyLength, <>Default 32, which covers numeric keys and OLake Go&apos;s <code>_olake_id</code>. Change it only for longer keys, for example 36 for a UUID (see <a href="#why-it-happens">changed keys</a>).</>)}
+        {field('Key length (characters)', keyLength, setKeyLength, <>Default 32, the length of OLake Go&apos;s <code>_olake_id</code> hash. Not using it? <a href="#find-key-length">How to find the key length</a>.</>)}
         <label className={styles.field}>
           Setup
           <select
