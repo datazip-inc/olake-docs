@@ -58,7 +58,8 @@ const config = {
   customFields: {
     latestOlakeVersion: latestOlakeRelease.version,
     latestOlakeReleaseLabel: latestOlakeRelease.label,
-    latestOlakeReleasePath: latestOlakeRelease.docPath
+    latestOlakeReleasePath: latestOlakeRelease.docPath,
+    askAssistantApiUrl: process.env.ASK_OLAKE_API_URL || 'https://ask-olake-nh7j.onrender.com',
   },
 
   // Set the production url of your site here
