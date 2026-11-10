@@ -36,3 +36,26 @@ jobs:
         run: npm run typecheck
       - name: Test build website
         run: npm run build
+      # Fails on a redirect loop, a redirect to a missing page, or more than 2,000 rules
+      - name: Check the Cloudflare redirect rules
+        run: node scripts/cloudflare/prepare-build.mjs build
+
+      # A preview URL for the pull request. Off until the repository variable CLOUDFLARE_PREVIEWS
+      # is "true". Pull requests from forks get no secrets, so they stop at the checks above.
+      - name: Deploy a preview to Cloudflare
+        id: preview
+        if: vars.CLOUDFLARE_PREVIEWS == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.159.0'
+          command: preview --name pr-${{ github.event.pull_request.number }}
+      - name: Test the preview
+        if: steps.preview.outputs.preview-url != ''
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.preview-url }}
+        run: |
+          echo "Preview: $PREVIEW_URL" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/cloudflare/test-deploy.mjs build "$PREVIEW_URL" --json test-deploy.json > /dev/null \
+            || { node -e "const r=require('./test-deploy.json');console.log(r.allFailures.slice(0,50).join('\n'));"; exit 1; }

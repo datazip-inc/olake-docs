@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
@@ -63,3 +63,59 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  # olake.io on Cloudflare Workers static assets (see cloudflare/README.md).
+  # Runs next to the GitHub Pages deploy until the domain is moved, then replaces it.
+  # Off until the repository variable CLOUDFLARE_ACCOUNT_ID is set.
+  deploy-cloudflare:
+    name: Deploy to Cloudflare
+    if: vars.CLOUDFLARE_ACCOUNT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # One Cloudflare deploy at a time, and never cancel one that is running.
+    concurrency:
+      group: cloudflare-production
+      cancel-in-progress: false
+    env:
+      # Where this Worker is reachable: its workers.dev URL before the domain is moved,
+      # https://olake.io after. Unset means no post-deploy test.
+      SITE_URL: ${{ vars.CLOUDFLARE_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # showLastUpdateTime / showLastUpdateAuthor read git history
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+      - name: Build website
+        run: npm run build
+
+      # Keeps the hashed JS and CSS of the last 7 days of deploys, so a tab that still holds
+      # older HTML keeps working after this deploy.
+      - name: Carry forward the assets of earlier deploys
+        run: node scripts/cloudflare/carry-assets.mjs build --from "${SITE_URL:-https://olake.io}"
+      - name: Write _redirects and _headers, drop the redirect stubs
+        run: node scripts/cloudflare/prepare-build.mjs build
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.159.0'
+          command: deploy
+
+      - name: Test redirects, sitemap URLs and the 404 page on the deployed site
+        if: env.SITE_URL != ''
+        run: |
+          sleep 20
+          node scripts/cloudflare/test-deploy.mjs build "$SITE_URL" --json test-deploy.json > /dev/null \
+            || { node -e "const r=require('./test-deploy.json');console.log(r.allFailures.slice(0,50).join('\n'));"; exit 1; }
+          node -e "const r=require('./test-deploy.json');console.log(JSON.stringify({redirects:r.redirects,sitemap:r.sitemap},null,2))"
