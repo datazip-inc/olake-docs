@@ -51,6 +51,24 @@ const encodeSource = (p) =>
     .map((s) => encodeURIComponent(s).replace(/\*/g, '%2A'))
     .join('/')
 
+// The stub HTML-escapes its target, so "?a=1&b=2" is written as "?a=1&amp;b=2"
+const ENTITIES = {
+  '&amp;': '&',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&#x27;': "'",
+  '&lt;': '<',
+  '&gt;': '>'
+}
+const decodeEntities = (text) =>
+  text.replace(/&(?:amp|quot|lt|gt|#39|#x27);/gi, (entity) => ENTITIES[entity.toLowerCase()])
+
+// "/a/?q=1#top" -> ["/a/", "?q=1", "#top"]
+const splitTarget = (target) => {
+  const [, pathname, query = '', hash = ''] = /^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(target)
+  return [pathname, query, hash]
+}
+
 const stubs = new Map() // "/old/" -> target
 const stubFiles = []
 const pages = [] // "/docs/" for every real page
@@ -58,7 +76,7 @@ for (const file of walk(buildDir)) {
   let target = null
   if (fs.statSync(file).size <= 2000) {
     const match = STUB.exec(fs.readFileSync(file, 'utf8'))
-    if (match) target = match[1]
+    if (match) target = decodeEntities(match[1])
   }
   if (target) {
     stubs.set(urlOf(file), target)
@@ -82,7 +100,10 @@ for (const [source, firstTarget] of [...stubs].sort()) {
       break
     }
     seen.add(next)
-    target = stubs.get(next)
+    // Keep the ?query and #anchor of the earlier hop unless the next hop sets its own
+    const [, query, hash] = splitTarget(target)
+    const [nextPath, nextQuery, nextHash] = splitTarget(stubs.get(next))
+    target = `${nextPath}${nextQuery || query}${nextHash || hash}`
   }
   if (target.startsWith('/')) {
     const targetPath = pathOf(target)

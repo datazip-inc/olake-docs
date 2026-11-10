@@ -6,10 +6,10 @@ The site is built in GitHub Actions and uploaded to a Cloudflare Worker named `o
 
 | Step | Script | What it does |
 |---|---|---|
-| 1 | `npm run build` | The normal Docusaurus build. |
-| 2 | `scripts/cloudflare/carry-assets.mjs` | Downloads the hashed `/assets/` files of the last 7 days of deploys from the live site, so a browser tab that still holds older HTML keeps working. Publishes `asset-manifest.json` for the next deploy. |
+| 1 | `build` job | The normal Docusaurus build, run once per merge. The Cloudflare job downloads its output (the `github-pages` artifact). |
+| 2 | `scripts/cloudflare/carry-assets.mjs` | Downloads the hashed `/assets/` files of the last 7 days of deploys from the live site, so a browser tab that still holds older HTML keeps working. Publishes `asset-manifest.json` for the next deploy. If the live site cannot be read, the job stops (rerun it) so the older assets are not lost. |
 | 3 | `scripts/cloudflare/prepare-build.mjs` | Turns the redirect stub pages into 301 rules in `build/_redirects`, adds one `/page /page/ 301` rule per page, deletes the stubs, and copies `cloudflare/_headers` to `build/_headers`. |
-| 4 | `wrangler deploy` | Uploads `build/` as a new version of the Worker. The switch is atomic. |
+| 4 | `npx wrangler deploy` | Uploads `build/` as a new version of the Worker. The switch is atomic. |
 | 5 | `scripts/cloudflare/test-deploy.mjs` | Requests every redirect rule, every sitemap URL and a set of unknown paths on the deployed site, and fails the job on any wrong answer. |
 
 Redirects are still edited only in `docusaurus.config.js`. Response headers are edited in `cloudflare/_headers`.
@@ -44,4 +44,4 @@ A bad deploy: `npx wrangler rollback` (or Workers, `olake-docs`, Deployments in 
 
 ## Moving the domain
 
-`wrangler.jsonc` has no `routes` entry on purpose. The first deploy that carries a route with `"custom_domain": true` moves olake.io to this Worker, so that line is added only on the day of the move, after the zone settings are reviewed. After the move, set `workers_dev` to `false` and remove the GitHub Pages jobs from `deploy.yml`.
+`wrangler.jsonc` has no `routes` entry on purpose. The first deploy that carries a route with `"custom_domain": true` moves olake.io to this Worker, so that line is added only on the day of the move, after the zone settings are reviewed. After the move, set `workers_dev` to `false` and remove the GitHub Pages `deploy` job from `deploy.yml`. Keep the `build` job: the Cloudflare job uses its artifact.

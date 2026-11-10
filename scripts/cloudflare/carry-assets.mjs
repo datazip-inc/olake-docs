@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Keeps the hashed files of earlier deploys in the new build for a few days.
 //
-//   node scripts/cloudflare/carry-assets.mjs [buildDir] [--from https://olake.io] [--days 7]
+//   node scripts/cloudflare/carry-assets.mjs [buildDir] [--from https://olake.io] [--days 7] [--lenient]
 //
 // Why: every Docusaurus build renames the JS and CSS files whose content changed
 // (main.<hash>.js and so on), and a deploy replaces the whole site. A browser tab that still holds
@@ -13,8 +13,9 @@
 //    fresh build in the last <days> days, is downloaded from the live site into the new build.
 // 3. It writes the new asset-manifest.json.
 //
-// Nothing here can fail a deploy: when the live site has no manifest yet, or a file cannot be
-// fetched, the script warns and carries on.
+// A site with no manifest yet (404) is fine: nothing is carried. Any other failure to read the
+// manifest or an older asset stops the deploy, because publishing without them would drop them
+// for good, and a rerun can still fetch them. --lenient turns that into a warning.
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,6 +30,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const buildDir = path.resolve(positional[0] || path.join(repoRoot, 'build'))
 const from = flag('--from', process.env.CARRY_ASSETS_FROM || 'https://olake.io').replace(/\/$/, '')
 const days = Number(flag('--days', process.env.CARRY_ASSETS_DAYS || 7))
+const lenient = args.includes('--lenient')
 const MANIFEST = 'asset-manifest.json'
 const MAX_CARRIED = 5000 // far below the Workers file limit; a guard against runaway growth
 const CONCURRENCY = 12
@@ -52,46 +54,68 @@ const files = Object.fromEntries(current.map((file) => [file, new Date(now).toIS
 // Only names we would have produced ourselves: under assets/, no "..", no odd characters
 const SAFE = /^assets\/[A-Za-z0-9._~@/-]+$/
 
-async function fetchPrevious() {
-  try {
-    const response = await fetch(`${from}/${MANIFEST}`, {
-      headers: { 'cache-control': 'no-cache' }
-    })
-    if (!response.ok) return { note: `${from}/${MANIFEST} answered ${response.status}` }
-    const manifest = await response.json()
-    if (!manifest || typeof manifest.files !== 'object')
-      return { note: 'the manifest has no "files" object' }
-    return { manifest }
-  } catch (error) {
-    return { note: `could not read ${from}/${MANIFEST}: ${error.message}` }
-  }
-}
+const TIMEOUT_MS = 30000
+const ATTEMPTS = 4
 
-async function download(file) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+// One GET with a timeout. Network errors, 429 and 5xx are retried: they say nothing about
+// whether the file exists.
+async function get(url, headers = {}) {
+  let last = 'no answer'
+  for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt - 1)))
     try {
-      const response = await fetch(`${from}/${file}`)
-      const type = response.headers.get('content-type') || ''
-      // A missing file answers with the HTML 404 page
-      if (!response.ok || type.includes('text/html')) return false
-      const target = path.join(buildDir, file)
-      fs.mkdirSync(path.dirname(target), { recursive: true })
-      fs.writeFileSync(target, Buffer.from(await response.arrayBuffer()))
-      return true
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)))
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) })
+      if (response.status === 429 || response.status >= 500) {
+        last = `status ${response.status}`
+        continue
+      }
+      const body = Buffer.from(await response.arrayBuffer())
+      return { status: response.status, type: response.headers.get('content-type') || '', body }
+    } catch (error) {
+      last = error.message
     }
   }
-  return false
+  return { error: last }
 }
 
-const { manifest, note } = await fetchPrevious()
+// Stops the deploy: publishing now would drop the older assets for good, a rerun can still get them.
+function stop(message) {
+  if (lenient) {
+    console.log(`[cloudflare] WARNING (--lenient): ${message}`)
+    return
+  }
+  console.error(
+    `[cloudflare] ${message}\n` +
+      '[cloudflare] Not deploying, because the assets of earlier deploys would be lost. ' +
+      'Run the job again, or pass --lenient to deploy without them.'
+  )
+  process.exit(1)
+}
+
+let manifest = null
+const previous = await get(`${from}/${MANIFEST}`, { 'cache-control': 'no-cache' })
+if (previous.status === 404) {
+  // The first deploy, or a site that is not served from this Worker yet
+  console.log(`[cloudflare] no assets carried forward: ${from}/${MANIFEST} does not exist yet`)
+} else if (previous.status === 200) {
+  try {
+    manifest = JSON.parse(previous.body.toString('utf8'))
+  } catch {
+    manifest = null
+  }
+  if (!manifest || typeof manifest.files !== 'object' || manifest.files === null) {
+    manifest = null
+    stop(`${from}/${MANIFEST} is not a valid manifest`)
+  }
+} else {
+  stop(`could not read ${from}/${MANIFEST}: ${previous.error || `status ${previous.status}`}`)
+}
+
 let carried = 0
 let expired = 0
-let failed = 0
-if (!manifest) {
-  console.log(`[cloudflare] no assets carried forward: ${note}`)
-} else {
+let gone = 0
+const unreachable = []
+if (manifest) {
   const wanted = []
   for (const [file, lastCurrent] of Object.entries(manifest.files)) {
     if (file in files || !SAFE.test(file) || file.includes('..')) continue
@@ -111,19 +135,31 @@ if (!manifest) {
       while (next < queue.length) {
         const [file, lastCurrent] = queue[next]
         next += 1
-        if (await download(file)) {
+        const answer = await get(`${from}/${file}`)
+        if (answer.error) {
+          unreachable.push(`${file} (${answer.error})`)
+        } else if (answer.status !== 200 || answer.type.includes('text/html')) {
+          // A missing file answers 404 with the HTML not-found page: it is really gone
+          gone += 1
+        } else {
+          const target = path.join(buildDir, file)
+          fs.mkdirSync(path.dirname(target), { recursive: true })
+          fs.writeFileSync(target, answer.body)
           files[file] = lastCurrent
           carried += 1
-        } else {
-          failed += 1
         }
       }
     })
   )
   console.log(
     `[cloudflare] assets: ${current.length} in this build, ${carried} carried forward from ${from}, ` +
-      `${expired} older than ${days} days dropped, ${failed} could not be fetched`
+      `${expired} older than ${days} days dropped, ${gone} no longer on the site`
   )
+  if (unreachable.length)
+    stop(
+      `${unreachable.length} older asset(s) could not be fetched after ${ATTEMPTS} attempts:\n  ` +
+        unreachable.slice(0, 10).join('\n  ')
+    )
 }
 
 fs.writeFileSync(
