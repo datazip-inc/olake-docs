@@ -380,6 +380,7 @@ const fusionDocSidebar = {
         { type: 'doc',  id: 'fusion/compaction/configuration', label: 'Configuration' },
       ],
     },
+    { type: 'doc', id: 'fusion/cleanup/configuration', label: 'Cleanup' },
     { type: 'doc', id: 'fusion/maintenance/runs-and-logs', label: 'Runs & Logs' },
     { type: 'doc', id: 'fusion/maintenance/metrics', label: 'Metrics' },
 
