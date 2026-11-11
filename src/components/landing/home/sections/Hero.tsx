@@ -33,9 +33,10 @@ function InstallCommand() {
       />
       <div className='flex h-[40px] items-center justify-between gap-[6px] rounded-[8px] border border-solid border-olake-btn-border bg-olake-surface-alt pr-[8px] pl-[8px] shadow-[var(--olake-shadow-command)] sm:gap-[8px] sm:pl-[16px] lg:h-[48px] lg:pr-[24px] lg:pl-[30px]'>
         {/* Scrolls sideways only; spans the box's height so the scrollbar sits on its bottom edge, clear of the text */}
-        <span className='flex min-w-0 items-center self-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:thin]'>
+        {/* Right edge fades so the cut reads as "scroll for more"; the text's pr matches the fade, so the end clears it when scrolled */}
+        <span className='flex min-w-0 items-center self-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:thin] [mask-image:linear-gradient(to_right,#000_calc(100%_-_32px),transparent)]'>
           {/* Trimmed to cap height so the line centres in the box whatever the font; py keeps descenders unclipped */}
-          <span className='py-[5px] font-mono text-[9px] whitespace-nowrap text-olake-muted [text-box:trim-both_cap_alphabetic] min-[375px]:text-[10px] sm:text-[13px] lg:text-[15px]'>
+          <span className='py-[5px] pr-[32px] font-mono text-[9px] whitespace-nowrap text-olake-muted [text-box:trim-both_cap_alphabetic] min-[375px]:text-[10px] sm:text-[13px] lg:text-[15px]'>
             {HERO.installCommand}
           </span>
         </span>
