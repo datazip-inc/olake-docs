@@ -42,6 +42,21 @@ node scripts/cloudflare/test-deploy.mjs build http://127.0.0.1:8791
 
 A bad deploy: `npx wrangler rollback` (or Workers, `olake-docs`, Deployments in the dashboard). The previous version is live again at once.
 
-## Moving the domain
+## The domain
 
-`wrangler.jsonc` has no `routes` entry on purpose. The first deploy that carries a route with `"custom_domain": true` moves olake.io to this Worker, so that line is added only on the day of the move, after the zone settings are reviewed. After the move, set `workers_dev` to `false` and remove the GitHub Pages `deploy` job from `deploy.yml`. Keep the `build` job: the Cloudflare job uses its artifact.
+`wrangler.jsonc` attaches `olake.io` to the Worker as a custom domain (`routes`, `"custom_domain": true`). Cloudflare then owns the DNS records and the certificate of `olake.io`. In GitHub Actions, `wrangler deploy` replaces DNS records that conflict with a custom domain without asking, so the first deploy with this entry replaced the GitHub Pages `A` and `AAAA` records.
+
+`www.olake.io` is a proxied DNS record plus the redirect rule `www-to-apex` (Rules, Redirect Rules), which answers 301 to `https://olake.io`. The Configuration Rule `docs-site-no-html-rewrite` turns off Email Obfuscation and Browser Integrity Check for `olake.io`.
+
+Wrangler removes custom domains that are not in `wrangler.jsonc`, so a hostname added in the dashboard disappears on the next deploy.
+
+### Back to GitHub Pages
+
+1. Remove the `routes` entry and merge. The deploy detaches `olake.io` and deletes its DNS record.
+2. In the Cloudflare dashboard, DNS, add the GitHub Pages records again, DNS only: `A` `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` and `AAAA` `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`.
+
+The site is down between the two steps, so do step 2 as soon as the deploy job ends. GitHub renews its certificate for `olake.io` only while the records point to GitHub, so after that certificate expires a return shows a certificate error for up to an hour.
+
+### After the move is confirmed
+
+Set the repository variable `CLOUDFLARE_SITE_URL` to `https://olake.io`, set `workers_dev` to `false`, and remove the GitHub Pages `deploy` job from `deploy.yml`. Keep the `build` job: the Cloudflare job uses its artifact.
