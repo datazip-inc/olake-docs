@@ -1064,8 +1064,8 @@ npm run serve
 
 ```bash
 
-# Deploy to GitHub Pages
-npm run deploy
+# There is no manual deploy. A merge to master builds the site and deploys it to
+# Cloudflare Workers (.github/workflows/deploy.yml, cloudflare/README.md).
 ```
 
 #### 6.2.4 Deployment Verification

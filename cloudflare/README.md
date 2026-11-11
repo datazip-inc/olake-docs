@@ -35,7 +35,7 @@ node scripts/cloudflare/test-deploy.mjs build http://127.0.0.1:8791
 |---|---|---|
 | `CLOUDFLARE_ACCOUNT_ID` | variable | The Cloudflare account ID. The Cloudflare job is skipped while this is empty. |
 | `CLOUDFLARE_API_TOKEN` | secret | A token from the "Edit Cloudflare Workers" template, limited to this account. |
-| `CLOUDFLARE_SITE_URL` | variable | Where the Worker is reachable: its `workers.dev` URL before the domain is moved, `https://olake.io` after. Used for the asset carry-forward and the post-deploy test. |
+| `CLOUDFLARE_SITE_URL` | variable | `https://olake.io`. Used for the asset carry-forward and the post-deploy test. |
 | `CLOUDFLARE_PREVIEWS` | variable | `true` turns on a preview URL per pull request in `test-deploy.yml`. |
 
 ## Roll back
@@ -44,7 +44,7 @@ A bad deploy: `npx wrangler rollback` (or Workers, `olake-docs`, Deployments in 
 
 ## The domain
 
-`wrangler.jsonc` attaches `olake.io` to the Worker as a custom domain (`routes`, `"custom_domain": true`). Cloudflare then owns the DNS records and the certificate of `olake.io`. In GitHub Actions, `wrangler deploy` replaces DNS records that conflict with a custom domain without asking, so the first deploy with this entry replaced the GitHub Pages `A` and `AAAA` records.
+`wrangler.jsonc` attaches `olake.io` to the Worker as a custom domain (`routes`, `"custom_domain": true`). Cloudflare then owns the DNS records and the certificate of `olake.io`. Cloudflare refuses to attach a custom domain while other `A`, `AAAA` or `CNAME` records exist for the hostname (error 100117), and Wrangler does not remove them. On the day of the move (2026-11-11) the GitHub Pages `A` and `AAAA` records were deleted by hand and the deploy job was run again.
 
 `www.olake.io` is a proxied DNS record plus the redirect rule `www-to-apex` (Rules, Redirect Rules), which answers 301 to `https://olake.io`. The Configuration Rule `docs-site-no-html-rewrite` turns off Email Obfuscation and Browser Integrity Check for `olake.io`.
 
@@ -52,11 +52,10 @@ Wrangler removes custom domains that are not in `wrangler.jsonc`, so a hostname 
 
 ### Back to GitHub Pages
 
-1. Remove the `routes` entry and merge. The deploy detaches `olake.io` and deletes its DNS record.
+The GitHub Pages deploy job was removed after the move, so the way back has three steps.
+
+1. Put the `deploy` job (`actions/deploy-pages`) back in `deploy.yml` from the git history, and remove the `routes` entry from `wrangler.jsonc`. Merge. The deploy publishes to GitHub Pages, detaches `olake.io` from the Worker and deletes its DNS record.
 2. In the Cloudflare dashboard, DNS, add the GitHub Pages records again, DNS only: `A` `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` and `AAAA` `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`.
+3. Turn the `www` record back to DNS only and disable the redirect rule `www-to-apex`, so GitHub can answer for `www` again.
 
-The site is down between the two steps, so do step 2 as soon as the deploy job ends. GitHub renews its certificate for `olake.io` only while the records point to GitHub, so after that certificate expires a return shows a certificate error for up to an hour.
-
-### After the move is confirmed
-
-Set the repository variable `CLOUDFLARE_SITE_URL` to `https://olake.io`, set `workers_dev` to `false`, and remove the GitHub Pages `deploy` job from `deploy.yml`. Keep the `build` job: the Cloudflare job uses its artifact.
+The site is down between steps 1 and 2, so do step 2 as soon as the deploy job ends. GitHub renews its certificate for `olake.io` only while the records point to GitHub, so a return shows a certificate error until GitHub has issued a new one (up to an hour).
