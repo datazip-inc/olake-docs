@@ -32,9 +32,12 @@ function InstallCommand() {
         className='pointer-events-none absolute right-[45%] -bottom-[10px] -left-[5px] -z-10 h-[40px] rounded-full bg-linear-to-l from-transparent to-(--olake-glow-lavender) blur-[8px]'
       />
       <div className='flex h-[40px] items-center justify-between gap-[6px] rounded-[8px] border border-solid border-olake-btn-border bg-olake-surface-alt pr-[8px] pl-[8px] shadow-[var(--olake-shadow-command)] sm:gap-[8px] sm:pl-[16px] lg:h-[48px] lg:pr-[24px] lg:pl-[30px]'>
-        {/* Trimmed to cap height so the line centres in the box whatever the font; py keeps descenders unclipped */}
-        <span className='min-w-0 truncate py-[5px] font-mono text-[9px] text-olake-muted [text-box:trim-both_cap_alphabetic] min-[375px]:text-[10px] sm:text-[13px] lg:text-[15px]'>
-          {HERO.installCommand}
+        {/* Scrolls sideways only; spans the box's height so the scrollbar sits on its bottom edge, clear of the text */}
+        <span className='flex min-w-0 items-center self-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:thin]'>
+          {/* Trimmed to cap height so the line centres in the box whatever the font; py keeps descenders unclipped */}
+          <span className='py-[5px] font-mono text-[9px] whitespace-nowrap text-olake-muted [text-box:trim-both_cap_alphabetic] min-[375px]:text-[10px] sm:text-[13px] lg:text-[15px]'>
+            {HERO.installCommand}
+          </span>
         </span>
         {/* 44px tap target below lg, with negative margins so it takes only the icon's width */}
         <button
