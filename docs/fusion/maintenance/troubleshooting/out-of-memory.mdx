@@ -1,0 +1,371 @@
+---
+title: Compaction Out of Memory
+description: "Fix OLake Fusion compaction runs that fail with OutOfMemoryError or exit code 137: check your Iceberg table and give the executor enough memory."
+sidebar_label: Out of Memory
+sidebar_position: 1
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import AnchoredDetails from '@site/src/components/docs/AnchoredDetails';
+import OomDiagram from '@site/src/components/docs/OomDiagram';
+import OomMemoryCalculator from '@site/src/components/docs/OomMemoryCalculator';
+
+# Compaction Ran Out of Memory? Check Your Table and Fix It
+
+If compaction keeps failing on a table that receives a lot of updates, the compaction executor probably doesn't have enough memory for it. This page shows how to find which of two memory problems you have, how much memory the table needs, and how to set it.
+
+## 1. Which Problem Do You Have?
+
+If compaction on a table that receives updates shows **Failed** every time it runs, open the failed task's reason in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/) and match it here:
+
+| The failed task's reason shows | Problem | Most common on |
+| --- | --- | --- |
+| `java.lang.OutOfMemoryError: Java heap space` | [A. The executor's memory is full](#3-problem-a-the-executors-memory-is-full) | [Docker setup](/docs/fusion/install/olake-ui/) (1 GB executor) |
+| `exit code 137` and `OOMKilled`, with no `OutOfMemoryError` | [B. The pod went over its memory limit](#4-problem-b-the-pod-went-over-its-memory-limit) | Kubernetes with the [OLake Helm chart](/docs/fusion/install/kubernetes-compaction/) (4 GB executor) |
+
+:::tip[Seeing both?]
+If you see `exit code 137`, fix problem B first, then check problem A. Once the pod has room, a table with many updates can still fill the executor memory.
+:::
+
+:::note
+A failed run commits nothing, so your data is safe. The table just isn't compacted until the problem is fixed.
+:::
+
+## 2. How Compaction Uses Memory
+
+Fusion splits a table's compaction into tasks of about the [target file size](/docs/fusion/compaction/configuration/), 512 MB by default. Each task runs on one Spark executor from start to end. The executor runs in a Kubernetes pod (on the Docker setup too, inside its local cluster), and the pod's memory has two parts:
+
+| Part | Set by | Holds | Problem |
+| --- | --- | --- | --- |
+| **Executor memory** (Java heap) | `spark.executor.memory` | Where the task works; mostly its changed keys | A, when it fills up |
+| **Memory overhead** | `spark.executor.memoryOverhead`: default 10 %, at least 384 MB | Java outside the heap: class metadata, thread stacks, compiled code, garbage-collector data, network and file buffers ("VM overheads, interned strings, other native overheads" in Spark's words) | B, when it's too small |
+| **Pod limit** | Executor memory + overhead; Spark sets it as the pod's `resources.limits.memory` | Everything the executor uses; Kubernetes stops the pod above it | B: usually a small overhead, sometimes a nearly full executor memory |
+
+Sources: Spark's [configuration](https://spark.apache.org/docs/3.5.8/configuration.html), [memory tuning](https://spark.apache.org/docs/3.5.8/tuning.html#memory-management-overview) and [Kubernetes](https://spark.apache.org/docs/3.5.8/running-on-kubernetes.html#pod-template) docs, for Spark 3.5, which Fusion uses.
+
+<OomDiagram />
+
+Adding more executors doesn't help with either problem, because each task runs on a single executor.
+
+## 3. Problem A: The Executor's Memory Is Full
+
+**Symptom:** the failed task's reason contains:
+
+```
+java.lang.OutOfMemoryError: Java heap space
+```
+
+### Why It Happens
+
+When a table gets an update or a delete, many writers don't rewrite the old row. They write its key (primary key or identifier columns) to an *equality delete file*, meaning "drop any older row with this key". Each of those keys is a **changed key**. To learn more, see [Merge-on-Read vs Copy-on-Write in Apache Iceberg](/blog/mor-vs-cow/) and [Iceberg Delete Formats for CDC](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors/).
+
+Compaction removes those old rows, so each task keeps the changed keys of its rows in memory until it ends. The task fails when they don't fit in the executor memory, which is more likely with:
+
+- **Many updates** since the last compaction
+- **A large target file size**, so each task covers more rows
+- **A small executor**, such as the Docker setup's default 1 GB
+
+Insert-only tables and big data files alone don't cause it. [How Much Memory You Need](#how-much-memory-you-need) works out the memory for your table.
+
+:::note[Using OLake Go to sync?]
+On tables synced by [OLake Go](/docs/), the key is [`_olake_id`](/docs/understanding/terminologies/general/#3-record-identification-_olake_id), built from the source primary key. Only streams in Upsert mode, the default, write changed keys; Append mode doesn't (see [Upsert vs Append](/docs/understanding/terminologies/olake/#7-modes-to-ingest-data-upsert-vs-append)). The first sync after a full load also writes one for every inserted row. For how OLake Go picks a delete format, see [Iceberg Delete Format Interoperability in OLake Go](/blog/iceberg-delete-formats-interoperability-olake-go/).
+:::
+
+### How Much Memory You Need
+
+Run the three queries below, put the results in the calculator, and set the value it gives.
+
+#### Check Your Table
+
+Run these in Fusion's Terminal or in your own query engine; the examples are Spark SQL. They only read the table's [metadata tables](https://iceberg.apache.org/docs/1.7.2/spark-queries/#inspecting-tables), so they're fast and safe on any table. Replace `my_catalog.my_db.my_table` with your table.
+
+:::warning
+In Fusion's Terminal, run only metadata queries like these. A `count(*)` or `SELECT *` on the table itself runs inside the Fusion server's memory and can crash it. Use `/* */` for comments, not `--`.
+:::
+
+**Query 1: changed keys in the busiest partition** (an unpartitioned table returns one row)
+
+```sql
+/* Changed keys per partition, busiest first.
+   equality_delete_record_count in the top row is changed_keys_in_partition. */
+SELECT *
+FROM my_catalog.my_db.my_table.partitions
+ORDER BY equality_delete_record_count DESC
+LIMIT 5;
+```
+
+**Query 2: rows in the largest delete file**
+
+```sql
+/* Rows in the largest equality delete file (content = 2 means equality delete files). */
+SELECT max(record_count) AS largest_delete_file_rows
+FROM my_catalog.my_db.my_table.files
+WHERE content = 2;
+```
+
+**Query 3: the most rows per MB of any data file**
+
+```sql
+/* The most rows per MB of any data file (content = 0 means data files).
+   Leaves out files bigger than the target file size: 512 MB by default. */
+SELECT max(record_count * 1048576.0 / file_size_in_bytes) AS max_rows_per_mb
+FROM my_catalog.my_db.my_table.files
+WHERE content = 0 AND file_size_in_bytes < 512 * 1024 * 1024;
+```
+
+Example results for a table that fails on the Helm chart's default 4g executor:
+
+| equality_delete_record_count | largest_delete_file_rows | max_rows_per_mb |
+| --- | --- | --- |
+| 20,000,000 | 1,000,000 | 32,000 |
+
+`equality_delete_record_count` is the number to watch: the changed keys in that partition, where a row changed twice counts twice. Here it's 20 million, which needs 5.94 GB, more than the Helm chart's default 4g: see the [calculator](#calculator).
+
+<details>
+<summary><strong>Using another query engine?</strong></summary>
+
+Most engines can read the same Iceberg metadata; only the table name changes. If your engine's `partitions` table has no equality-delete count, sum `record_count` from the `files` table where `content = 2`, grouped by `partition`.
+
+| Engine | Metadata tables |
+| --- | --- |
+| Trino, Athena | `"my_table$files"`, `"my_table$partitions"` |
+| Flink, StarRocks | `my_table$files`, `my_table$partitions` |
+| Hive | `my_db.my_table.files`, `my_db.my_table.partitions` |
+| DuckDB | `iceberg_metadata('...')` |
+
+If your engine can't show Iceberg metadata (for example Snowflake, BigQuery or Databricks), use [PyIceberg](https://py.iceberg.apache.org/api/#inspecting-tables)'s `table.inspect.files()` and `table.inspect.partitions()`.
+
+</details>
+
+#### Calculator
+
+Filled in with the example table above, on the Helm chart's default 4g executor. To check a result by hand, see [How it's calculated](#how-its-calculated).
+
+<OomMemoryCalculator />
+
+<AnchoredDetails id="find-key-length" summary={<strong>Not using <code>_olake_id</code>? How to find the key length</strong>}>
+
+The calculator's key length defaults to 32 characters, the length of OLake Go's `_olake_id` hash. For other keys, first find the key column, then its longest value.
+
+```sql
+/* The key columns: the column with a non-null value_count in readable_metrics.
+   equality_ids holds their field IDs. Reads metadata only. */
+SELECT equality_ids, readable_metrics
+FROM my_catalog.my_db.my_table.files
+WHERE content = 2
+LIMIT 1;
+```
+
+Metadata stores at most 16 characters of each value, so it can't give the longest key. Get that from the source database instead, for example on PostgreSQL:
+
+```sql
+/* Longest primary key value in the source table (replace id and the table name) */
+SELECT max(length(id::text)) AS max_key_length
+FROM public.my_source_table;
+```
+
+On tables synced by OLake Go the key column is `_olake_id`. It's 32 characters when the source table has a composite primary key or none, so you can keep the default; with a single-column primary key it's that column's value as text.
+
+</AnchoredDetails>
+
+<AnchoredDetails id="how-its-calculated" summary={<strong>How it's calculated</strong>}>
+
+The calculator uses this formula. Use it to check a result, or to work it out by hand.
+
+**Inputs**, from the queries:
+
+| Input | What it is | Where to get it |
+| --- | --- | --- |
+| `changed_keys_in_partition` | Changed keys in the busiest partition | Query 1: `equality_delete_record_count` in the top row |
+| `largest_delete_file_rows` | Rows in the largest delete file | Query 2 |
+| `max_rows_per_mb` | The most rows per MB of any data file | Query 3 |
+| `target_file_size_mb` | Your target file size, 128 or more | Default 512, unless you changed it in [Configuration](/docs/fusion/compaction/configuration/) |
+| `max_key_length` | The longest key, in characters | Default 32. [How to find it](#find-key-length) |
+
+**Constants:**
+
+| Constant | Value | What it is |
+| --- | --- | --- |
+| `BASE_KEY_BYTES` | 250 B | Memory per key, before the key's own characters. |
+| `BUFFER` | × 1.3 | Headroom for Spark and Java |
+
+**Calculation:**
+
+| Step | Formula | What it gives |
+| --- | --- | --- |
+| 1 | `rows_per_task` = `target_file_size_mb` × `max_rows_per_mb` | The most rows one task can hold |
+| 2 | `changed_keys_per_task` = min(`rows_per_task`, `changed_keys_in_partition`) | The changed keys one task holds |
+| 3 | `memory_needed` = (`changed_keys_per_task` + `largest_delete_file_rows`) × (`BASE_KEY_BYTES` + `max_key_length`) × `BUFFER` | Rounded up to a whole GB, the value for `spark.executor.memory` |
+
+- A data file bigger than the target is a task of its own: if its `record_count` is more than `rows_per_task`, use that instead.
+- For `spark.executor.memoryOverhead`, see [problem B](#4-problem-b-the-pod-went-over-its-memory-limit).
+
+**Worked example**: an [OLake Helm](/docs/fusion/install/kubernetes-compaction/) deployment with the chart's default `spark.executor.memory` of 4g, compacting the example table above at the default 512 MB target file size:
+
+1. **Rows per task.** A task holds at most 512 MB × 32,000 rows per MB = **16,384,000** rows.
+2. **Changed keys per task.** The partition has 20,000,000 changed keys, more than one task can hold, so each task holds at most **16,384,000** of them.
+3. **Memory needed.** Add the 1,000,000 rows of the largest delete file, which is read while those keys are held: (16,384,000 + 1,000,000) × (250 + 32) B × 1.3 = **5.94 GB**.
+4. **Executor memory.** 5.94 GB is more than 4g, so the task fails with `OutOfMemoryError`: set `spark.executor.memory=6g`, as in [fix A](#fix-a).
+5. **Overhead.** 6g is 6 GB or less, so also set `spark.executor.memoryOverheadFactor=0.15` (921 MB instead of the default 614 MB), as in [fix B](#fix-b).
+
+</AnchoredDetails>
+
+:::note[Good to know]
+- **Quick check:** expect about 0.34 GB per million changed keys a task holds, with 32-character keys.
+- **Same unit:** the calculator's GB and the `g` in `spark.executor.memory` are the same, so 6 GB is `6g`.
+- **Size for any number of updates:** enter a very large `changed_keys_in_partition`. The calculator caps it at the most rows one task can hold, which gives the most memory a task can ever need.
+- **On the safe side:** `changed_keys_in_partition` counts a key that changed twice as two, so the real need can be lower.
+- **More than one core:** with `spark.executor.cores` above 1, an executor runs that many tasks at once, so multiply the memory by the number of cores.
+:::
+
+### Fix It: Raise the Executor Memory {#fix-a}
+
+Set `spark.executor.memory` to the value from the [calculator](#calculator). The next scheduled compaction picks up the change and should show **Success**.
+
+<Tabs>
+<TabItem value="docker" label="Docker setup" default>
+
+On the [Docker Compose setup](/docs/fusion/install/olake-ui/) (OLake UI `docker-compose-v1.yml`), edit the optimizer deployment in the local cluster:
+
+```bash
+# Run kubectl inside the Docker setup's local Kubernetes cluster
+alias fusion-kubectl='docker exec -i fusion-cluster-control-plane kubectl --kubeconfig /etc/kubernetes/admin.conf'
+
+# Save the optimizer deployment to a file
+fusion-kubectl -n spark get deploy fusion-optimizer -o yaml > fo.yaml
+
+# Change the executor memory from the default 1g to 3g
+# (macOS sed; on Linux use: sed -i 's/.../.../' fo.yaml)
+sed -i '' 's/spark.executor.memory=1g/spark.executor.memory=3g/' fo.yaml
+
+# Apply the change; this restarts the optimizer
+fusion-kubectl replace -f - < fo.yaml
+
+# Wait until the new optimizer is running
+fusion-kubectl -n spark rollout status deploy/fusion-optimizer
+```
+
+Replace `3g` with your value. Make sure Docker Desktop has about 1 GB free beyond the executor memory, for example 4 GB for a 3g executor.
+
+:::note
+`docker compose up` recreates the stack with the default 1g, so redo this after it.
+:::
+
+</TabItem>
+<TabItem value="helm" label="Kubernetes (Helm)">
+
+Set the value in your values file and run `helm upgrade` (see [Customizing the Spark optimizer](/docs/fusion/install/kubernetes-compaction/#customizing-fusion-spark-optimizer-configuration)):
+
+```yaml
+fusion:
+  optimizer:
+    spark:
+      extraConfig:
+        # Executor memory per task. The chart's default is 4g.
+        spark.executor.memory: "6g"
+```
+
+Replace `6g` with your value.
+
+</TabItem>
+</Tabs>
+
+If the executor memory is 6 GB or less, also apply the fix for [problem B](#4-problem-b-the-pod-went-over-its-memory-limit), or the pod can be stopped before its memory is full.
+
+### Check It Worked
+
+After the next compaction shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/), run query 1 again. `equality_delete_record_count` should be 0.
+
+## 4. Problem B: The Pod Went Over Its Memory Limit
+
+**Symptom:** the failed task's reason contains `exit code 137` and `OOMKilled`, and there is no `OutOfMemoryError`:
+
+```
+The executor with id 4 exited with exit code 137(SIGKILL, possible container OOM).
+     termination reason: OOMKilled
+```
+
+A new executor pod starts for each retry, and `kubectl -n <namespace> get pods` shows them ending as `OOMKilled`.
+
+### Why It Happens
+
+The pod's memory limit is `spark.executor.memory` + `spark.executor.memoryOverhead`. Kubernetes stops the pod when the executor goes over it, for one of two reasons:
+
+- **The overhead is too small.** Java needs about 330 MB plus 3.6 % of the executor memory outside the heap, about 0.5 GB for a 4 GB executor. The default overhead, 10 % with a 384 MB minimum, is less than that for executors of 6 GB or less, so the pod is stopped even when its executor memory is half empty.
+- **The executor memory is nearly full.** Even with enough overhead, the two together can go over the limit.
+
+To tell which, work out `memory_needed` with [problem A's formula](#how-much-memory-you-need):
+
+| `memory_needed` | Cause | Fix |
+| --- | --- | --- |
+| Well below `spark.executor.memory` | The overhead is too small | [Raise the overhead](#fix-b) |
+| Close to or above `spark.executor.memory` | The executor memory is nearly full | Raise the overhead and [the executor memory](#fix-a) |
+
+The two fixes don't conflict, so if you're unsure, apply both.
+
+### Fix It: Raise the Overhead {#fix-b}
+
+If `spark.executor.memory` is 6 GB or less, raise the overhead with one setting (see Spark's [configuration](https://spark.apache.org/docs/3.5.8/configuration.html#application-properties)):
+
+- **Below 4 GB:** set `spark.executor.memoryOverhead=512m`. A percentage doesn't help here, because Spark's 384 MB minimum applies up to about 3.8 GB.
+- **4 GB to 6 GB:** set `spark.executor.memoryOverheadFactor=0.15`, 15 % instead of the default 10 %.
+- **Above 6 GB:** the default 10 % is enough.
+
+| `spark.executor.memory` | Overhead by default | Set | Overhead after |
+| --- | --- | --- | --- |
+| 1g | 384 MB | `spark.executor.memoryOverhead=512m` | 512 MB |
+| 2g | 384 MB | `spark.executor.memoryOverhead=512m` | 512 MB |
+| 3g | 384 MB | `spark.executor.memoryOverhead=512m` | 512 MB |
+| 4g | 409 MB | `spark.executor.memoryOverheadFactor=0.15` | 614 MB |
+| 6g | 614 MB | `spark.executor.memoryOverheadFactor=0.15` | 921 MB |
+
+Set only one of the two. Spark ignores the factor when `spark.executor.memoryOverhead` is set.
+
+<Tabs>
+<TabItem value="docker" label="Docker setup" default>
+
+Add the setting to the optimizer deployment in the local cluster:
+
+```bash
+# Run kubectl inside the Docker setup's local Kubernetes cluster
+alias fusion-kubectl='docker exec -i fusion-cluster-control-plane kubectl --kubeconfig /etc/kubernetes/admin.conf'
+
+# Add spark.executor.memoryOverhead=512m to the optimizer's Spark settings
+# (default 384 MB below 4g); this restarts the optimizer.
+# For a 4g to 6g executor, use spark.executor.memoryOverheadFactor=0.15 instead.
+fusion-kubectl -n spark patch deploy fusion-optimizer --type=json -p '[
+  {"op":"add","path":"/spec/template/spec/containers/0/args/0","value":"--conf"},
+  {"op":"add","path":"/spec/template/spec/containers/0/args/1","value":"spark.executor.memoryOverhead=512m"}]'
+
+# Wait until the new optimizer is running
+fusion-kubectl -n spark rollout status deploy/fusion-optimizer
+```
+
+:::note
+`docker compose up` recreates the stack with the default overhead, so redo this after it.
+:::
+
+</TabItem>
+<TabItem value="helm" label="Kubernetes (Helm)">
+
+Add the setting to your values file and run `helm upgrade` (see [Customizing the Spark optimizer](/docs/fusion/install/kubernetes-compaction/#customizing-fusion-spark-optimizer-configuration)):
+
+```yaml
+fusion:
+  optimizer:
+    spark:
+      extraConfig:
+        # 4g to 6g executor (the chart's default is 4g): overhead as a share of
+        # the executor memory. Spark's default is 0.10.
+        spark.executor.memoryOverheadFactor: "0.15"
+        # Below 4g, use a fixed overhead instead of the line above:
+        # spark.executor.memoryOverhead: "512m"
+```
+
+</TabItem>
+</Tabs>
+
+### Check It Worked
+
+After the next compaction, the executor pods are no longer `OOMKilled` and the run shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/). If the task now fails with `java.lang.OutOfMemoryError` instead, the executor memory is the limit: go to [problem A](#3-problem-a-the-executors-memory-is-full).
