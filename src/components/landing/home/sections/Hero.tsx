@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import Button from '../../ui/Button'
 import { PiCheckLight, PiCopyLight, PiGithubLogo } from 'react-icons/pi'
 import { HERO } from '@site/src/data/landing/home/hero'
+import { copyText } from '@site/src/lib/utils'
 /** Same outlined mark the navbar and footer use. */
 const GithubMark = () => <PiGithubLogo size={17} aria-hidden='true' />
 
@@ -13,11 +14,7 @@ function InstallCommand() {
   useEffect(() => () => clearTimeout(timer.current), [])
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(HERO.installCommand)
-    } catch {
-      return
-    }
+    if (!(await copyText(HERO.installCommand))) return
     setCopied(true)
     clearTimeout(timer.current)
     timer.current = setTimeout(() => setCopied(false), 1800)
@@ -28,22 +25,23 @@ function InstallCommand() {
     <div className='relative isolate mt-[24px] w-full max-w-[522px] lg:mx-auto lg:mt-[37px]'>
       <span
         aria-hidden='true'
-        className='pointer-events-none absolute -top-[12px] right-0 left-[40%] -z-10 h-[51px] bg-linear-to-r from-transparent to-[rgba(68,78,183,0.4)] blur-[7px]'
+        className='pointer-events-none absolute -top-[12px] right-0 left-[40%] -z-10 h-[51px] bg-linear-to-r from-transparent to-(--olake-glow-blue) blur-[7px]'
       />
       <span
         aria-hidden='true'
-        className='pointer-events-none absolute right-[45%] -bottom-[10px] -left-[5px] -z-10 h-[40px] rounded-full bg-linear-to-l from-transparent to-[rgba(72,72,150,0.16)] blur-[8px]'
+        className='pointer-events-none absolute right-[45%] -bottom-[10px] -left-[5px] -z-10 h-[40px] rounded-full bg-linear-to-l from-transparent to-(--olake-glow-lavender) blur-[8px]'
       />
-      <div className='flex h-[40px] items-center justify-between gap-[6px] rounded-[8px] border border-solid border-olake-btn-border bg-olake-surface-alt pr-[8px] pl-[8px] shadow-[0_5px_19px_rgba(72,72,160,0.1)] sm:gap-[8px] sm:pl-[16px] lg:h-[48px] lg:pr-[24px] lg:pl-[30px]'>
-        {/* `pt` drops the line 1.5px, where the design sits it in the box */}
-        <span className='min-w-0 overflow-x-auto font-mono text-[10px] whitespace-nowrap text-olake-muted sm:text-[13px] lg:pt-[3px] lg:text-[15px]'>
+      <div className='flex h-[40px] items-center justify-between gap-[6px] rounded-[8px] border border-solid border-olake-btn-border bg-olake-surface-alt pr-[8px] pl-[8px] shadow-[var(--olake-shadow-command)] sm:gap-[8px] sm:pl-[16px] lg:h-[48px] lg:pr-[24px] lg:pl-[30px]'>
+        {/* Trimmed to cap height so the line centres in the box whatever the font; py keeps descenders unclipped */}
+        <span className='min-w-0 truncate py-[5px] font-mono text-[9px] text-olake-muted [text-box:trim-both_cap_alphabetic] min-[375px]:text-[10px] sm:text-[13px] lg:text-[15px]'>
           {HERO.installCommand}
         </span>
+        {/* 44px tap target below lg, with negative margins so it takes only the icon's width */}
         <button
           type='button'
           onClick={copy}
           aria-label='Copy install command'
-          className='flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-olake-muted transition-colors hover:text-olake-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue max-md:-mx-[14px]'
+          className='-mx-[14px] flex size-[44px] shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-olake-muted transition-colors hover:text-olake-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olake-blue lg:mx-0 lg:size-auto'
         >
           <Icon aria-hidden='true' className='size-[16px] lg:size-[22px]' />
         </button>

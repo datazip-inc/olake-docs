@@ -1,31 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { PiCheck, PiCopy } from 'react-icons/pi'
 import Card from '../ui/Card'
-import { cn } from '@site/src/lib/utils'
+import { cn, copyText } from '@site/src/lib/utils'
 import type { Swatch } from '@site/src/data/landing/branding'
-
-/** Copies with the async Clipboard API, falling back to a hidden textarea where it is unavailable. */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    try {
-      const area = document.createElement('textarea')
-      area.value = text
-      area.setAttribute('readonly', '')
-      area.style.position = 'fixed'
-      area.style.opacity = '0'
-      document.body.appendChild(area)
-      area.select()
-      const ok = document.execCommand('copy')
-      document.body.removeChild(area)
-      return ok
-    } catch {
-      return false
-    }
-  }
-}
 
 export default function ColorSwatch({ swatch }: { swatch: Swatch }) {
   const [copied, setCopied] = useState(false)
