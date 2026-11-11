@@ -1,0 +1,242 @@
+---
+title: "Hilbert Curve Clustering in Apache Iceberg 1.12: How It Works and When to Use It"
+description: "Apache Iceberg 1.12 adds Hilbert curve clustering to Spark's rewrite_data_files. Learn how it works, how it compares with Z-order, and how to choose between them."
+slug: iceberg-hilbert-curve-clustering
+tags: [apache-iceberg, compaction, clustering, z-order, hilbert-curve, spark]
+image: /img/blog/cover/hilbert-vs-z-order-cover.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Hilbert curve vs Z-order clustering in Apache Iceberg](/img/blog/cover/hilbert-vs-z-order-cover.webp)
+
+Imagine a warehouse with thousands of cardboard boxes. Each box has a label listing what's inside, such as "order from March 3 to March 9" or "customer IDs 10,000 to 12,500." Now when someone asks for a specific order, the worker doesn't open every box. They now just have to read the labels and only open the boxes whose range could contain it.
+
+A query engine reads an Apache Iceberg table in a very similar way. The boxes are the data files and the labels are the minimum and maximum value Apache Iceberg records for each column in each file. A table with a narrow label is considered well-organized, because with the narrow label an engine can rule out most files without opening them. A badly organized table has labels so wide that almost every file looks like it might hold the answer, so the engine ends up opening all of them.
+
+![File skipping with min/max ranges](/img/blog/2026/11/file-skipping-min-max-ranges.webp)
+
+Simple sort makes the labels narrow if the queries filter on a single column. When queries filter on two or three columns together, no single sort can keep each column narrow. Apache Iceberg uses space-filling curves to sort the data by multiple columns together. So far, Z-order has been available, but Apache Iceberg 1.12 introduced the Hilbert curve.
+
+In this blog, we will explore clustering approaches from the ground up, and a practical way to decide which one a table needs.
+
+## How Iceberg decides which files to skip
+
+Let's take a look at what Iceberg is trying to improve with the release of Apache Iceberg 1.12.0.
+
+Every Iceberg table keeps a set of metadata files called manifests. For each data file, the manifest records statistics such as the lowest and highest values of each column. When a query arrives with a filter like `pickup_time BETWEEN '17:00' AND '19:00'`, the engine checks each file's recorded range for `pickup_time`. If the file's range doesn't overlap the filter's range at all, the file gets skipped without being read.
+
+This is called data skipping, and how well it works depends entirely on how the rows were arranged when the files were written. If rows with similar values end up in the same files, each file's range is narrow and easy to rule out. If similar rows are scattered everywhere, every file's range stretches across almost all possible values, and nothing gets skipped.
+
+![Pickup time file ranges and skipped files](/img/blog/2026/11/pickup-time-file-ranges-skipped.webp)
+
+Partitioning helps at a broader level by splitting the table into folders, for example, partitioning by pickup date. Clustering decides which rows go into the same files inside each folder.
+
+## The problem with sorting on one column
+
+Many in-production queries filter on more than one column at a time. Consider a ride-sharing company with a trips table of a few hundred million rows. Every trip has three columns that analysts filter on constantly: `pickup_latitude`, `pickup_longitude`, and `pickup_time`.
+
+An analyst asks a simple query: show every trip that started in downtown Toronto between 5 PM and 7 PM last Friday. Now there will be three range filters at once, one on latitude, one on longitude, and one on time.
+
+Now sort the table to help the query.
+
+If the table is sorted on a single column, for example, `pickup_time`, the engine can skip every file outside Friday evening, but it still has to read trips from every location in the city during that window. Each file in that window mixes trips from the airport, the suburbs, and downtown, so its latitude and longitude ranges cover almost the whole city, and the location filters can't skip any files.
+
+Sorting by `pickup_latitude` just flips the problem. Location filtering gets better, but each file now mixes trips from every hour of every day, so the time filter stops helping.
+
+The trips table needs a way to keep rows together when they're close on all three columns at once. Space-filling curves do exactly that.
+
+## Space-filling curves: one route through every neighborhood
+
+Divide the city into a grid, where each cell is a small neighborhood. Now draw one walking route that passes through every square once, and number the squares in the order you visit them.
+
+This numbering turns a two-dimensional map into a one-dimensional list, which is exactly what a sort order requires. Now sort the rows by their cell number, write the files in that order, and each file ends up holding one stretch of the route.
+
+The goal is a route that stays in one part of the city for long stretches, so each file covers a small area and its latitude and longitude ranges stay narrow.
+
+This works with more than two columns as well. Add `pickup_time`, and the grid becomes a cube. The goal is still the same: trips that started close together around the same time should get nearby numbers and end up in the same file.
+
+Z-order and Hilbert are two different ways of planning that route.
+
+## Z-order: the route Iceberg already had
+
+### How Z-order builds its numbers
+
+Z-order gives each square a number by mixing the bits of its row and column, taking one bit from each in turn.
+
+Here's how it works on a 4x4 grid, where rows and columns are numbered 0 to 3. Take row 3, column 2 as an example and find its Z-order value in three steps.
+
+**Step 1: Write both numbers in binary.**
+
+```text
+Row 3     →  11
+Column 2  →  10
+```
+
+**Step 2: Interleave the bits.** Take one bit from the row, then one bit from the column, and repeat until all bits are used:
+
+```text
+first bit of row:      1
+first bit of column:   1
+second bit of row:     1
+second bit of column:  0
+together, these form the binary number 1110
+```
+
+**Step 3: Convert it to decimal.** 1110 is 8 + 4 + 2 + 0 = 14.
+
+So the square in row 3, column 2 gets the Z-order value 14, and in the full grid below, 14 sits in exactly that box. The process also works in reverse: split 1110 back into alternating bits, 11 and 10, and you get row 3, column 2 again.
+
+![Z-order values on a 4x4 grid](/img/blog/2026/11/z-order-value-4x4-grid.webp)
+
+### What the Z-order route looks like
+
+Do this for all 16 squares, and you get this grid:
+
+|           | col 0 | col 1 | col 2 | col 3 |
+| --------- | :---: | :---: | :---: | :---: |
+| **row 0** |   0   |   1   |   4   |   5   |
+| **row 1** |   2   |   3   |   6   |   7   |
+| **row 2** |   8   |   9   |  12   |  13   |
+| **row 3** |  10   |  11   |  14   |  15   |
+
+Follow the numbers 0 to 3, and they draw a small "Z" in the top-left corner. Numbers 4 to 7 draw another Z in the top-right, 8 to 11 in the bottom-left, and 12 to 15 in the bottom-right. Together, the four small Zs make one big Z, and on larger grids the same pattern repeats at every size.
+
+![Z-order curve across 16 squares](/img/blog/2026/11/z-order-curve-16-squares.webp)
+
+### Where Z-order jumps
+
+Now let's take a closer look at the jump from 7 to 8. Square 7 sits at the far right of row 1, and square 8 sits at the far left of row 2. Their numbers may be right next to each other, but on the map they're at opposite ends of the grid.
+
+It's like a delivery driver who just finished a delivery on the east side of town and then drives all the way to the west side for the next stop, even though several houses on the way still need a delivery later. That's what happens at every boundary between the Zs, and on a real table with millions of cells these jumps occur at every scale.
+
+A jump on its own is not harmful. It becomes a problem when a data file happens to start before a jump and end after it, because then that file holds rows from two areas, and its min and max range stretches to cover both.
+
+## Hilbert curve: the route 1.12 adds
+
+### How Hilbert builds its route
+
+Hilbert uses the same binary row and column numbers as Z-order, but it reads them one pair at a time, from the largest blocks of the grid down to single squares. Each pair picks a quarter of the current block, and the quarters are visited in a U shape: top-left is 0, top-right is 1, bottom-right is 2, and bottom-left is 3. As row and column bits, that order is 00, 01, 11, 10, the 2-bit Gray code, so the quarter number for row bit `r` and column bit `c` is `q = 2 × r + (r XOR c)`. The running total grows as `H = 4 × H + q`. Before the next pair is read, the remaining bits are adjusted based on the quarter just picked, so each quarter starts right next to where the previous one ended. In quarter 0 (top-left), the row and column bits swap places. In quarter 3 (bottom-left), they swap places and each bit flips, so 0 becomes 1 and 1 becomes 0. Quarters 1 and 2 are read as they are.
+
+Take the same square as before: row 3 (binary 11) and column 2 (binary 10).
+
+**Step 1: Read the first bits.** Row bit 1 and column bit 1 point to the bottom-right quarter: `q = 2 × 1 + (1 XOR 1) = 2`. Running total: `H = 4 × 0 + 2 = 2`.
+
+**Step 2: Read the second bits.** Row bit 1 and column bit 0 point to the bottom-left square inside that quarter: `q = 2 × 1 + (1 XOR 0) = 3`. Running total: `H = 4 × 2 + 3 = 11`.
+
+So the square at row 3, column 2 gets the Hilbert value 11, where Z-order gave it 14. In the grid below, 11 sits in exactly that box. The bottom-right quarter is quarter 2, so no adjustment was needed along the way.
+
+A square in a mirrored quarter shows the rule at work. Take row 1 (binary 01) and column 0 (binary 00).
+
+**Step 1: Read the first bits.** Row bit 0 and column bit 0 point to the top-left quarter: `q = 2 × 0 + (0 XOR 0) = 0`. Running total: `H = 0`. Since this is quarter 0, the remaining bits swap, so row bit 1 and column bit 0 become row bit 0 and column bit 1.
+
+**Step 2: Read the swapped bits.** `q = 2 × 0 + (0 XOR 1) = 1`. Running total: `H = 4 × 0 + 1 = 1`. Without the swap, the formula would give 3, but the grid shows 1 at row 1, column 0.
+
+|           | col 0 | col 1 | col 2 | col 3 |
+| --------- | :---: | :---: | :---: | :---: |
+| **row 0** |   0   |   3   |   4   |   5   |
+| **row 1** |   1   |   2   |   7   |   6   |
+| **row 2** |  14   |  13   |   8   |   9   |
+| **row 3** |  15   |  12   |  11   |  10   |
+
+These adjustments are the difference from Z-order. Z-order reads each block in the same Z pattern. Hilbert flips or rotates the U within some quarters before reading the next pair of bits. In the top-left quarter, the U runs down, right, and back up, ending at row 0, column 1, right beside where the top-right quarter starts. The U in the bottom-left quarter starts at row 3, column 1, right where the bottom-right quarter ended, and ends at row 3, column 0. That turn keeps each step between neighbors. That's also why Hilbert is more expensive to compute.
+
+### Why that matters for files
+
+Because every step is a short one, any continuous stretch of Hilbert numbers covers one connected area of the grid rather than scattered pieces. A data file holds exactly that kind of continuous stretch, so files clustered along a Hilbert curve tend to have tighter ranges on every clustered column, which means more files get skipped when a query filters on those columns together.
+
+## Z-order vs. Hilbert: same file, different range
+
+Suppose a data file holds the rows for cells 6, 7, 8, and 9. Look back at the two grids. With Z-order, cells 6 and 7 sit at the right end of row 1, while 8 and 9 jump to the left end of row 2. With Hilbert, all four sit together in one 2x2 block.
+
+|             | File's range                  | Cells covered by the range | Cells actually in the file |
+| ----------- | ----------------------------- | :------------------------: | :------------------------: |
+| **Z-order** | Rows 1 to 2, columns 0 to 3   |             8              |             4              |
+| **Hilbert** | Rows 1 to 2, columns 2 to 3   |             4              |             4              |
+
+Now picture a query that asks for anything in column 0. The Z-ordered file has to be opened, because its range includes column 0. The Hilbert-ordered file can be skipped. Multiply that by thousands of files and three filtered columns, and it's clear why the choice of curve affects how much data a query reads.
+
+![Same file, different ranges](/img/blog/2026/11/same-file-different-range.webp)
+
+To be fair to Z-order, the two curves behave identically when a file boundary lines up exactly with one of the quarters, such as a file holding cells 0 to 3. Real files, however, hold whatever number of rows fits the target file size, so their boundaries rarely line up that neatly, and Hilbert's steadier route helps most in exactly those cases.
+
+## The fine print
+
+Hilbert clustering is a solid improvement, but two limits are worth knowing before adopting it.
+
+**Neighbors on the curve are always neighbors on the grid, but not the other way around.** Look at the Hilbert grid again. Cell 2 (row 1, column 1) and cell 13 (row 2, column 1) are directly on top of each other, yet they're 11 steps apart on the route. Every space-filling curve has seams like this, because a single line can't keep every pair of neighbors close. Hilbert has fewer and smaller breaks than Z-order, but it doesn't eliminate them.
+
+**Hilbert costs more to compute.** Z-order only rearranges bits. Hilbert has to track rotations and flips at every level of the grid, and that work grows with the number of columns and the precision of the curve. Since clustering happens during periodic compaction rather than on every query, the extra CPU is usually a reasonable trade, but it will show up in compaction job times.
+
+## The cost of clustering on several columns
+
+Both curves share one cost that has nothing to do with jumps. When a table is clustered on `d` columns and written into `N` files, a query that filters on just one of those columns still scans about `N^((d-1)/d)` files. On the trips table, clustered on three columns and written into 1,000 files, each column is divided into about 10 ranges, so a filter on `pickup_time` alone rules out 9 of them and still reads about 100 files. That's far fewer than all 1,000, but a plain sort on `pickup_time` would read fewer still. The cost comes from spreading the data across several columns rather than from the shape of the route.
+
+## Z-order and Hilbert side by side
+
+|                            | Z-order                                       | Hilbert                                                    |
+| -------------------------- | --------------------------------------------- | ---------------------------------------------------------- |
+| **How the order is built** | Interleaves the bits of each column           | Recursive subdivision with rotations and flips             |
+| **Consecutive positions**  | Can jump across the data at square boundaries | Always neighboring cells                                   |
+| **File ranges**            | Can widen when a file spans a jump            | Usually tighter                                            |
+| **Compute cost**           | Low                                           | Higher, grows with column count                            |
+| **Best fit**               | Multi-column filters when compute is tight    | Range filters on related dimensions such as location and time |
+| **Availability in Iceberg** | Existing releases                            | 1.12, Spark 4.1 for now                                    |
+
+## How to run Hilbert clustering in Spark
+
+Hilbert clustering uses the same `rewrite_data_files` procedure as Z-order. The pull request that added it shows it as a sort strategy, with a `hilbert(...)` sort order listing the columns to cluster on. For the trips table, that looks like this:
+
+```sql
+CALL catalog_name.system.rewrite_data_files(
+  table => 'db.trips',
+  strategy => 'sort',
+  sort_order => 'hilbert(pickup_latitude, pickup_longitude, pickup_time)'
+);
+```
+
+The Z-order version of the same job only changes one line:
+
+```sql
+CALL catalog_name.system.rewrite_data_files(
+  table => 'db.trips',
+  strategy => 'sort',
+  sort_order => 'zorder(pickup_latitude, pickup_longitude, pickup_time)'
+);
+```
+
+Before scheduling it, keep these points in mind:
+
+- **Spark version.** At the time of writing, Hilbert ordering for compaction is implemented only for Spark 4.1, and an open issue tracks porting it to Spark 4.0 and 3.5. Clusters on older versions will need to upgrade or wait for the backport.
+- **No table format change.** Like Z-order, Hilbert is a compaction strategy that runs in the engine and isn't stored in table metadata, so it doesn't affect the table format or its version. Any engine that reads the table afterward, whether Trino, Flink, or something else, simply sees files that are better organized.
+- **New data isn't clustered automatically.** Because the ordering belongs to the compaction job rather than the table, rows written after the rewrite arrive in their usual order. Clustering is something to schedule, not a one-time setting. Many teams limit each run to recent partitions using the procedure's `where` argument, for example `where => "pickup_time >= '2026-11-01'"`, so the job stays small.
+- **Which files get rewritten.** By default, the procedure uses the same rules as bin-pack compaction to decide which files to rewrite, which mostly targets small or poorly sized files. To recluster an entire table, such as when switching from Z-order to Hilbert, add `options => map('rewrite-all', 'true')`, and plan for the cost of rewriting everything.
+
+## How to choose between them
+
+Start with the queries rather than the curves. A quick way to decide:
+
+- **One column appears in almost every filter.** Use a plain sort order on that column. It's the cheapest option and gives the tightest ranges on that column.
+- **Two or more columns appear together with roughly equal weight, and they behave like coordinates** (latitude and longitude, or location and time). Try Hilbert first.
+- **Several columns matter, but compaction runs very often or compute is tight.** Z-order is still a good default.
+- **The cluster isn't on Spark 4.1 yet.** Z-order is the only curve available for now.
+
+Whichever curve you choose, keep the column list short. Each column added to the clustering key weakens the locality of the others, so include only the columns that actually appear together in real filters. Clustering on six columns because they "might" be filtered on usually gives weaker results than clustering on the two that always are.
+
+## Testing it on your tables
+
+When the right choice isn't obvious, a small experiment settles it. Dremio's preview of the release gives similar advice: test both curves on the columns that appear most often in your filters. A simple way to do that:
+
+1. Make two copies of a representative slice of the table, for example one month of data, using `CREATE TABLE ... AS SELECT`.
+2. Cluster one copy with Z-order and the other with Hilbert, using the same columns and target file size.
+3. Pick five to ten real queries from the analysts' query history, especially the slow ones that filter on the clustered columns.
+4. Run each query against both copies and record the number of data files scanned, not just the time taken. Files scanned is what the curve directly affects, while run time also depends on cluster load and caching. The Spark UI and Iceberg's scan metrics both show how many files a query read.
+5. Record how long each compaction job took, since Hilbert's extra compute cost is part of the decision.
+
+If Hilbert scans noticeably fewer files on the queries that matter, and its compaction time fits the maintenance window, switch over. If the difference is small, Z-order's lower cost may make it the better choice.
+
+## Conclusion
+
+Hilbert clustering gives Apache Iceberg 1.12 a second space-filling curve that keeps related rows closer together than Z-order does, which leads to tighter file ranges and more skipped files when queries filter on several columns at once. That benefit comes with a higher compute cost during compaction, and for now it is limited to Spark 4.1, so Z-order still has a clear place on clusters where compaction runs often or an upgrade isn't possible yet. The right choice depends less on the curves themselves and more on how a table is queried, which is why the most reliable way to decide is to cluster a representative slice both ways, compare the number of files each query scans, and weigh that against how long each compaction job takes.
+
+<BlogCTA/>
