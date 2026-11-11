@@ -55,7 +55,13 @@ export default function OomMemoryCalculator() {
         </div>
         {setup === 'helm' && Math.max(mem, set) <= 6 && (
           <div>
-            On Kubernetes at 6 GB or less, also raise the overhead to 15 % (<a href="#fix-b">fix B</a>).
+            On Kubernetes at 6 GB or less, also raise the overhead:{' '}
+            {Math.max(mem, set) < 4 ? (
+              <code>spark.executor.memoryOverhead=512m</code>
+            ) : (
+              <code>spark.executor.memoryOverheadFactor=0.15</code>
+            )}{' '}
+            (<a href="#fix-b">fix B</a>).
           </div>
         )}
         {setup === 'docker' && (

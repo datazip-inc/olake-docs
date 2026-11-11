@@ -304,17 +304,23 @@ To tell which, work out `memory_needed` with [problem A's formula](#how-much-mem
 
 The two fixes don't conflict, so if you're unsure, apply both.
 
-### Fix It: Raise the Overhead to 15 % {#fix-b}
+### Fix It: Raise the Overhead {#fix-b}
 
-If `spark.executor.memory` is 6 GB or less, set the overhead to at least 15 % of it instead of the default 10 %, with [`spark.executor.memoryOverheadFactor`](https://spark.apache.org/docs/3.5.8/configuration.html#application-properties). Spark still keeps its 384 MB minimum. Above 6 GB the default 10 % is enough.
+If `spark.executor.memory` is 6 GB or less, raise the overhead with one setting (see Spark's [configuration](https://spark.apache.org/docs/3.5.8/configuration.html#application-properties)):
 
-| `spark.executor.memory` | Overhead at 10 % (default) | Overhead at 15 % |
-| --- | --- | --- |
-| 1g | 384 MB | 384 MB |
-| 2g | 384 MB | 384 MB |
-| 3g | 384 MB | 460 MB |
-| 4g | 409 MB | 614 MB |
-| 6g | 614 MB | 921 MB |
+- **Below 4 GB:** set `spark.executor.memoryOverhead=512m`. A percentage doesn't help here, because Spark's 384 MB minimum applies up to about 3.8 GB.
+- **4 GB to 6 GB:** set `spark.executor.memoryOverheadFactor=0.15`, 15 % instead of the default 10 %.
+- **Above 6 GB:** the default 10 % is enough.
+
+| `spark.executor.memory` | Overhead by default | Set | Overhead after |
+| --- | --- | --- | --- |
+| 1g | 384 MB | `spark.executor.memoryOverhead=512m` | 512 MB |
+| 2g | 384 MB | `spark.executor.memoryOverhead=512m` | 512 MB |
+| 3g | 384 MB | `spark.executor.memoryOverhead=512m` | 512 MB |
+| 4g | 409 MB | `spark.executor.memoryOverheadFactor=0.15` | 614 MB |
+| 6g | 614 MB | `spark.executor.memoryOverheadFactor=0.15` | 921 MB |
+
+Set only one of the two. Spark ignores the factor when `spark.executor.memoryOverhead` is set.
 
 <Tabs>
 <TabItem value="docker" label="Docker setup" default>
@@ -325,11 +331,12 @@ Add the setting to the optimizer deployment in the local cluster:
 # Run kubectl inside the Docker setup's local Kubernetes cluster
 alias fusion-kubectl='docker exec -i fusion-cluster-control-plane kubectl --kubeconfig /etc/kubernetes/admin.conf'
 
-# Add spark.executor.memoryOverheadFactor=0.15 to the optimizer's Spark settings
-# (default 0.10); this restarts the optimizer
+# Add spark.executor.memoryOverhead=512m to the optimizer's Spark settings
+# (default 384 MB below 4g); this restarts the optimizer.
+# For a 4g to 6g executor, use spark.executor.memoryOverheadFactor=0.15 instead.
 fusion-kubectl -n spark patch deploy fusion-optimizer --type=json -p '[
   {"op":"add","path":"/spec/template/spec/containers/0/args/0","value":"--conf"},
-  {"op":"add","path":"/spec/template/spec/containers/0/args/1","value":"spark.executor.memoryOverheadFactor=0.15"}]'
+  {"op":"add","path":"/spec/template/spec/containers/0/args/1","value":"spark.executor.memoryOverhead=512m"}]'
 
 # Wait until the new optimizer is running
 fusion-kubectl -n spark rollout status deploy/fusion-optimizer
@@ -349,9 +356,11 @@ fusion:
   optimizer:
     spark:
       extraConfig:
-        # Overhead as a share of the executor memory. Spark's default is 0.10,
-        # with a 384 MB minimum either way.
+        # 4g to 6g executor (the chart's default is 4g): overhead as a share of
+        # the executor memory. Spark's default is 0.10.
         spark.executor.memoryOverheadFactor: "0.15"
+        # Below 4g, use a fixed overhead instead of the line above:
+        # spark.executor.memoryOverhead: "512m"
 ```
 
 </TabItem>
