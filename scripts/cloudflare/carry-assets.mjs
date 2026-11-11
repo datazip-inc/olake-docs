@@ -9,9 +9,10 @@
 // until it is reloaded. Cloudflare Workers does not keep old assets, so this script does:
 //
 // 1. It reads <from>/asset-manifest.json, the list the previous deploy published.
-// 2. Every /assets/ file on that list that the new build no longer has, and that was part of a
-//    fresh build in the last <days> days, is downloaded from the live site into the new build.
-// 3. It writes the new asset-manifest.json.
+// 2. Every /assets/ file on that list that the new build no longer has, and that was replaced in
+//    the last <days> days, is downloaded from the live site into the new build.
+// 3. It writes the new asset-manifest.json: null for a file of this build, and for a carried file
+//    the time of the deploy that replaced it.
 //
 // A site with no manifest yet (404) is fine: nothing is carried. Any other failure to read the
 // manifest or an older asset stops the deploy, because publishing without them would drop them
@@ -49,7 +50,7 @@ const assetsDir = path.join(buildDir, 'assets')
 const current = walk(assetsDir).map((file) =>
   path.relative(buildDir, file).split(path.sep).join('/')
 )
-const files = Object.fromEntries(current.map((file) => [file, new Date(now).toISOString()]))
+const files = Object.fromEntries(current.map((file) => [file, null]))
 
 // Only names we would have produced ourselves: under assets/, no "..", no odd characters
 const SAFE = /^assets\/[A-Za-z0-9._~@/-]+$/
@@ -117,14 +118,16 @@ let gone = 0
 const unreachable = []
 if (manifest) {
   const wanted = []
-  for (const [file, lastCurrent] of Object.entries(manifest.files)) {
+  for (const [file, replacedAt] of Object.entries(manifest.files)) {
     if (file in files || !SAFE.test(file) || file.includes('..')) continue
-    const age = now - Date.parse(lastCurrent)
+    // null = a file of the previous build: it was live until now, so its days start now
+    const since = replacedAt ?? new Date(now).toISOString()
+    const age = now - Date.parse(since)
     if (!Number.isFinite(age) || age > days * 86400000) {
       expired += 1
       continue
     }
-    wanted.push([file, lastCurrent])
+    wanted.push([file, since])
   }
   // Newest first, so the guard drops the oldest files
   wanted.sort((a, b) => Date.parse(b[1]) - Date.parse(a[1]))
@@ -133,7 +136,7 @@ if (manifest) {
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
       while (next < queue.length) {
-        const [file, lastCurrent] = queue[next]
+        const [file, since] = queue[next]
         next += 1
         const answer = await get(`${from}/${file}`)
         if (answer.error) {
@@ -145,7 +148,7 @@ if (manifest) {
           const target = path.join(buildDir, file)
           fs.mkdirSync(path.dirname(target), { recursive: true })
           fs.writeFileSync(target, answer.body)
-          files[file] = lastCurrent
+          files[file] = since
           carried += 1
         }
       }
