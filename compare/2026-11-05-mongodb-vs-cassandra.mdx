@@ -1,0 +1,290 @@
+---
+slug: mongodb-vs-cassandra
+title: "MongoDB vs Cassandra: Differences and How to Choose"
+description: "MongoDB vs Cassandra compared from each project's own docs: data model, consistency, queries, scaling, limits and licence, plus where each one fits."
+tags: [comparison, mongodb, versus]
+authors: [priyansh]
+image: /img/blog/cover/mongodb-vs-cassandra-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+import quiz from '@site/src/data/quizzes/mongodb-vs-cassandra.json';
+
+![MongoDB versus Cassandra cover showing a documents icon, a database icon and a check mark for your pick](/img/blog/cover/mongodb-vs-cassandra-cover.webp)
+
+<TLDR title='Key takeaways'>
+
+The short version. Pick MongoDB if you don't know yet what you'll ask your data, and your records are nested documents you read or write whole. Pick Cassandra if you already know your queries, you write a ton of data, and you want any node to accept a write across several servers or sites.
+
+MongoDB lets you filter on many fields and has a join-like stage, so it is the more flexible one to query.
+
+Cassandra makes you design a table for every query, and in return you get a masterless layout that its own docs call write-optimized. As for "which is faster", we found no current, neutral, linked benchmark, so that claim needs your own test.
+
+- MongoDB stores JSON-like documents. Cassandra stores rows in tables, and a "partition key" decides which server in the ring holds each row.
+- Cassandra's [docs](https://cassandra.apache.org/doc/5.0/cassandra/developing/cql/dml.html) say joins are not supported, so you build one table per query and copy data between tables. MongoDB can filter on many fields and has a join-like `$lookup` stage. 
+- Cassandra is eventually consistent by default, and you pick a consistency level for each operation. MongoDB's replica sets send writes to one primary, and its default write concern is "majority".
+- Both have transactions, just different kinds. MongoDB has multi-document ACID transactions. Cassandra's own guarantees page lists lightweight transactions and batched writes, not general multi-table ACID.
+- The Cassandra project is Apache-2.0 licensed. MongoDB's server is under the Server Side Public License (SSPL), so don't call it plain "open source". MongoDB wrote that licence itself in 2018.
+
+</TLDR>
+
+Every fact below comes from the Apache Cassandra and MongoDB docs or pricing pages, read on October 1, 2026, with the page linked beside the claim. We did not run either database ourselves. This is a careful read of their documents, not a lab test, and where a page gave no number, we say so.
+
+## MongoDB vs Cassandra at a glance
+
+Sources for each row are in the sections after the table.
+
+| | MongoDB | Cassandra |
+| --- | --- | --- |
+| Data model | JSON-like documents (stored as BSON, a binary form of JSON) in collections | Rows in tables, with a partition key that decides where data lives |
+| Query style | Query language with filters, aggregation stages and `$lookup` | Cassandra Query Language (CQL), no joins or sub-queries |
+| Layout | Replica sets with one primary, plus optional sharding | Ring of peer nodes, no primary |
+| Consistency | Majority write concern by default | Eventual by default, tunable per operation |
+| Transactions | Multi-document ACID transactions | Lightweight transactions and batches |
+| Spreading data | Hashed or ranged sharding; you can reshard | Hash of the partition key |
+| Size limit to know | 16 MiB per document | About 100 MB per partition (guideline) |
+| Licence | SSPL version 1 (server) | Apache License 2.0 |
+| Cost of the software | Free Community server; Atlas hosted tiers from $0 (checked Oct 2026) | Free; the project publishes no paid tier |
+| Current version we checked | 9.0 series | 5.0.9, released August 7, 2026 |
+
+Sources: [MongoDB pricing page](https://www.mongodb.com/pricing) (checked Oct 2026). Plans change often, so confirm on the vendor's page before you decide.
+
+## So what are these two, exactly?
+
+**Apache Cassandra** is an open-source database built for very large data spread over many servers. The download page lists 5.0.9 as the latest general release, dated August 7, 2026, with 4.1.12 as the previous stable line. It's released under the Apache License 2.0 and run by the Apache Software Foundation.
+
+**MongoDB** calls itself a document database that stores flexible, JSON-like documents. Its server code uses the Server Side Public License, version 1 (SSPL), dated October 16, 2018. We don't rate that licence either way, and we skip the plain label "open source" because the licence file names the SSPL.
+
+MongoDB comes in three flavours: the hosted Atlas service, a free Community server and a paid Enterprise Advanced edition. Cassandra has no vendor edition from the project itself, though commercial vendors sell hosted and supported versions.
+
+## Data model: documents vs partitioned tables
+
+Picture an order with three line items. In MongoDB, the transactions page says embedded documents and arrays can capture relationships in one document instead of spreading them over many collections. So the order and its items can sit together, and one read hands you the whole order.
+
+Cassandra works the other way round. Its data modeling page says modeling is query-driven, joins are not supported, and all required fields must be grouped in a single table. Each query gets its own table, so data ends up copied across tables (denormalization).
+
+### One order, two designs
+
+Here's an invented shop order, just to show the shape. It's our own illustration, not a sample from either project. In MongoDB, one document holds the order and its lines.
+
+```javascript
+db.orders.insertOne({
+  _id: 1001,
+  customer: "Asha",
+  items: [ { sku: "A1", qty: 2 }, { sku: "B7", qty: 1 } ]
+})
+```
+
+Cassandra starts from the question instead. Say the app asks "show me all orders for one customer, newest first". You build a table for that question, with the customer as the partition key.
+
+Need "show me one order by its number" too? Build a second table and write the order into both.
+
+In plain terms, Cassandra tables come from the list of questions your app will ask. A new question later often means a new table. MongoDB flips it: you design documents around how the app reads them, and a new question can often be handled with an index.
+
+## Query power and indexes
+
+Cassandra Query Language (CQL) looks a lot like SQL, so it feels familiar for about five minutes. Then the CQL reference tells you it does not execute joins or sub-queries, and a query reads from a single table. By default CQL only allows queries that avoid a full scan of all partitions, and `ALLOW FILTERING` is the option that "explicitly executes a full scan".
+
+MongoDB is far more relaxed here. Its aggregation pipeline is "one or more stages that process documents", such as `$match`, `$group` and `$sort`, according to its aggregation docs. And the `$lookup` stage is a left outer join to another collection in the same database.
+
+### The same lookup, in each
+
+Both projects document a basic lookup. MongoDB's `find` "selects documents in a collection or view and returns a cursor", and the find reference gives `db.bios.find( { _id: 5 } )` as an equality example. Cassandra's CQL reference gives `SELECT name, occupation FROM users WHERE userid IN (199, 200, 207);`.
+
+Looks similar, but the rule behind each line is not. In CQL, the `WHERE` clause relates to `PRIMARY KEY` columns or a column with a secondary index, per the same reference. A MongoDB filter can name any field, and an index only makes it faster.
+
+CQL does have `GROUP BY` and aggregate functions, though only within one table. And MongoDB's extra freedom isn't free. An unindexed query on a large collection can be slow, and each index adds cost to writes.
+
+One more thing. Cassandra 5.0 also offers secondary indexes, so older claims that it has none are out of date. We found no neutral test of how they perform against MongoDB's indexes, so we make no claim either way.
+
+## Consistency and availability (the big trade-off)
+
+Two words trip people up here. Consistency means every reader sees the latest write, and availability means every request gets an answer. Cassandra's [guarantees page](https://cassandra.apache.org/doc/5.0/cassandra/architecture/guarantees.html) says it chooses availability and partition tolerance, "compromising on data consistency to some extent", and that writes to a single table are eventually consistent.
+
+Cassandra's architecture page says you set a consistency level per operation. `ONE` needs a single replica to respond, `QUORUM` needs a majority, and `ALL` needs every replica. It also says concurrent updates to the same key are settled by "last-write-wins", where the newest timestamp is the winning value.
+
+In a replica set, writes go to the primary, and MongoDB's [write concern page](https://www.mongodb.com/docs/manual/reference/write-concern/) says the default global write concern is majority. The exception is a replica set with arbiters, where the default can be `{ w: 1 }`. You can choose weaker or stronger settings, so MongoDB is tunable too.
+
+![MongoDB writes go to one primary that copies to secondaries, while Cassandra hashes the partition key and any replica accepts](/img/blog/2026/10/mongodb-vs-cassandra-write-paths.webp)
+
+What changes in practice is where a write lands. MongoDB's replication page says only the primary takes writes, and that an election starts after 10 seconds without contact by default, with a median election time that should not typically exceed 12 seconds.
+
+In Cassandra, any replica for a key can accept a write. That's what the project means by multi-master.
+
+Its architecture page says that when a node fails, reads stop routing to it and writes are typically stored as hints (saved copies replayed later). Neither design is free. Our read: Cassandra trades up-to-date reads for uptime, and MongoDB accepts a short pause in writes during an election in exchange for simpler reasoning.
+
+## Keeping the copies in line
+
+Copies of your data drift apart sometimes. Cassandra's architecture page names three repair tools for that: read repair, hinted handoff and anti-entropy repair, where replicas compare hash trees (called Merkle trees) to find mismatched data. The docs call them "best-effort techniques" to drive replicas toward the same state, so our read is that whoever runs Cassandra signs up for regular repair work.
+
+MongoDB's secondaries copy the primary's log. A secondary that loses its connection can sync again *only* if it returns within the oplog window, the span of history the log still holds, per the oplog page.
+
+## Transactions and data safety
+
+ACID stands for atomicity, consistency, isolation and durability. The plain meaning: a group of changes all happen, or none of them do.
+
+MongoDB's docs say it supports ACID transactions according to the configured read and write concern. Multi-document transactions need featureCompatibilityVersion 4.0 on a replica set and 4.2 on a sharded cluster. There's a catch, and MongoDB says so itself: a distributed transaction usually costs more than single-document writes.
+
+Cassandra's story is smaller. Its guarantees page lists lightweight transactions with linearizable consistency, and batched writes across multiple tables that "succeed completely or not at all".
+
+The CQL reference also says all updates to one partition key in a batch are performed in isolation. Conditional writes (the `IF` clause) use Paxos and "incur a non-negligible performance cost", so use them sparingly. We found no general multi-table ACID transaction in the 5.0 documents we read.
+
+So the old line "MongoDB has no transactions" is wrong. And "Cassandra has ACID transactions like a bank database" is wrong too. Cassandra fits best when each write stands alone, or when one-row conditional writes are enough.
+
+## Writes, reads and the speed question
+
+Cassandra's storage engine page says the engine is optimized for write-oriented workloads, using log-structured merge trees and an append-only approach. It also names the costs: some read performance and write amplification from compaction, which is background work that merges stored files.
+
+MongoDB's own [compare page](https://www.mongodb.com/resources/compare/cassandra-vs-mongodb) says Cassandra is optimized for writes and MongoDB for both reads and writes. Keep in mind that's the rival vendor talking, and we found no head-to-head result behind it.
+
+The pages that rank for this search do give numbers, but none we read link a test. Knowi's article lists roughly 1 million writes a second against 35 to 40 thousand, and says it relies on third-party benchmarks and field reports without naming them.
+
+So we won't repeat those figures. A fair test uses current versions (Cassandra 5.0 and the MongoDB 9.0 series), your own data shape, your real queries and the consistency settings you plan to run in production.
+
+## Scaling out
+
+Scaling out means adding servers instead of buying a bigger one. Both databases do it, just in different ways.
+
+MongoDB's sharding page describes two strategies, hashed and ranged. You pick a shard key, and MongoDB calls that choice a trade-off between even distribution and common query patterns. Its [resharding page](https://www.mongodb.com/docs/manual/core/sharding-reshard-a-collection/) says that from version 8.0 you can reshard on the same shard key, and that the minimum duration of a resharding operation is 5 minutes.
+
+Cassandra hashes the partition key to place data. It then copies each partition to as many nodes as the replication factor (RF) says. With RF=3, the data is written to three distinct replicas.
+
+For several sites, its `NetworkTopologyStrategy` takes a replication factor for each datacenter. The data modeling page gives a guideline of under 100,000 values and under 100 MB for each partition. A poor partition key can hurt you here too.
+
+MongoDB's compare page says Cassandra cannot change its partition key without a costly manual re-shard. That's MongoDB's view of its rival, and we didn't find the same statement in Cassandra's docs. Treat it as a vendor claim.
+
+## Limits that can bite
+
+The limits the projects state:
+
+| | MongoDB | Cassandra |
+| --- | --- | --- |
+| Biggest unit | 16 MiB per document, 100 nesting levels, 64 indexes per collection ([limits](https://www.mongodb.com/docs/manual/reference/limits/)) | Guideline of under 100,000 values and 100 MB per partition |
+| Joins | `$lookup` within one database, slow if unindexed | Not supported; copy data into more tables |
+| New question later | Add an index or change the query | Often a new table |
+| Consistency risk | Default read concern `local` can return data that is later rolled back (docs) | Eventual consistency and last-write-wins can return old data |
+| Write cost | Each index and each transaction adds cost | Lightweight transactions cost Paxos rounds; compaction adds background work |
+| Licence | SSPL, read the terms before building a hosted product on it | Apache License 2.0 |
+
+Start with the first row of each. MongoDB's 16 MiB cap rarely matters for an order, but it does for a record that grows without end. Cassandra's partition size matters for a key such as "one sensor, every reading, forever".
+
+## Cost and licence
+
+Cassandra the software is free, and the project publishes no paid tier. "Free" still leaves you paying for servers, staff time, repairs and any vendor support or hosted service. We didn't compare hosted Cassandra prices here because each provider charges differently.
+
+MongoDB's pricing page shows three Atlas tiers. Free is "$0/hour, Free forever", Flex "can cost between $8 and $30 for a month's usage", and Dedicated starts at $0.08 an hour, which the page shows as $56.94 a month (checked Oct 2026). The Community server is free to download.
+
+For Enterprise Advanced, we found no published price.
+
+## Where MongoDB fits
+
+Choose MongoDB if:
+
+- You can't list all your queries up front, such as product catalogs or user profiles where each record is a nested document read whole.
+- You want filters on many fields and multi-document transactions. Cassandra's docs say joins are not supported and full scans need `ALLOW FILTERING`.
+- You want time series collections, for which we found no equivalent in the Cassandra pages we read, or one hosted option (Atlas).
+
+## Where Cassandra fits
+
+Choose Cassandra if:
+
+- You know your queries and write constantly, such as sensor readings, event logs or message history, where each query asks for one partition's data in order.
+- You want no single primary. Its docs describe replicas on different racks and a replication factor for each datacenter.
+- A weaker consistency level is fine for most of your traffic, which Cassandra's docs describe as the trade it makes.
+
+## What people say out loud
+
+We also read public threads and review pages for both databases. It's a small, uneven sample, not a survey.
+
+| | What users say |
+| --- | --- |
+| MongoDB | Praise: a PeerSpot reviewer (November 2025) calls Atlas ["a very elastic solution"](https://www.peerspot.com/products/mongodb-atlas-reviews). Complaint: the same review says "pricing is an area where MongoDB Atlas could improve". |
+| Cassandra | Praise: a Hacker News commenter (August 2026, thread "The road to ACID transactions in Cassandra 6") says Cassandra has a ["demonstrably better cost and availability slo"](https://news.ycombinator.com/item?id=49402787) than anything else they ran, "as long as you have a competent team". Complaint: another commenter in the same thread lists ["the joys of the 'repair' cronjob"](https://news.ycombinator.com/item?id=49395239). |
+
+These are individual opinions; one person's view, with its date and link.
+
+## Which should you pick?
+
+| Your situation | Lean toward | Why, with the source |
+| --- | --- | --- |
+| Queries not known yet, shape changing | MongoDB | Flexible documents; you add indexes as questions arrive |
+| Fixed list of queries, huge write volume | Cassandra | Query-first tables on a write-oriented storage engine |
+| Need multi-document ACID transactions | MongoDB | Documented from 4.0 on replica sets and 4.2 on sharded clusters |
+| Writes accepted by any replica, several sites | Cassandra | Multi-master replication with tunable consistency |
+| Lots of filtering and aggregation | MongoDB | Aggregation stages and `$lookup`; Cassandra has no joins |
+| Want an Apache-licensed project | Cassandra | Apache License 2.0; MongoDB's server is SSPL |
+| Team already runs one well | Keep that one | Switching has a real cost |
+
+![MongoDB fits varied questions and nested documents; Cassandra fits known queries, heavy writes and many replicas across sites](/img/blog/2026/10/mongodb-vs-cassandra-which-fits.webp)
+
+If it is still close, pick the one your team can run at 3 a.m. Five short questions:
+
+<Quiz {...quiz} />
+
+## How to test both on your own data
+
+1. Load a copy of your real data, at real size, into both on similar hardware.
+2. Write the list of your ten most common queries. In Cassandra, build a table for each one.
+3. Run your busiest write path with the consistency settings you would use in production.
+4. Add one new question you did not plan for, and note how long each database takes to answer it.
+5. Kill one node during a write test and check what the app sees.
+
+## Myths, checked against the docs
+
+- **"Cassandra has no secondary indexes."** Out of date. Cassandra 5.0 documents secondary indexes, including a newer kind called Storage Attached Indexes.
+- **"MongoDB has no transactions."** Wrong. Its docs describe multi-document ACID transactions.
+- **"Cassandra is always faster for writes."** Its docs call the engine write-optimized, but we found no neutral linked test.
+- **"Cassandra needs no schema design."** Wrong. Its docs say modeling is query-driven and you design tables per query.
+- **"MongoDB is just one server."** Not so. It supports replica sets and sharded clusters.
+
+## How common is each one?
+
+In the Stack Overflow 2025 Developer Survey, [MongoDB was used by 24% of all respondents and Cassandra by 2.9%](https://survey.stackoverflow.co/2025/technology). Keep in mind that counts usage among that survey's respondents. It says nothing about quality.
+
+## Moving data out for analytics
+
+Copying the app database into a warehouse or lake by reading its change log is called [change data capture](/learn/what-is-change-data-capture/) (CDC).
+
+For MongoDB, OLake Go, our open-source tool, does this: a full load, then change capture, into Apache Iceberg or Parquet on storage you choose (see [our MongoDB docs](/docs/connectors/mongodb/)). For the tools that do this, see [MongoDB CDC tools compared](/compare/mongodb-cdc-tools/).
+
+<Faq showHeading={false} data={[
+  {
+    question: "Q1. Is Cassandra better than MongoDB?",
+    answer: "Neither fits every case. Cassandra suits known queries, heavy writes and no single primary. MongoDB suits changing queries, nested documents, aggregation and multi-document transactions."
+  },
+  {
+    question: "Q2. Is Cassandra faster than MongoDB?",
+    answer: "We can't say from public sources. The pages we read give figures without a linked test, and one comes from a rival database vendor. Cassandra's docs call its engine write-optimized, but you'll want to test your own workload on current versions."
+  },
+  {
+    question: "Q3. Does Cassandra support ACID transactions?",
+    answer: "Not in the general multi-table sense, going by the 5.0 docs we read. Its guarantees page lists lightweight transactions with linearizable consistency and batched writes that succeed completely or not at all. Conditional writes use Paxos, and they cost more."
+  },
+  {
+    question: "Q4. Does MongoDB support ACID transactions?",
+    answer: "Yes, it does. MongoDB's docs say it supports ACID transactions according to the read and write concern. Multi-document transactions need featureCompatibilityVersion 4.0 on a replica set and 4.2 on a sharded cluster."
+  },
+  {
+    question: "Q5. Can Cassandra do joins?",
+    answer: "No. The CQL reference says it does not execute joins or sub-queries, and a query reads from a single table. So you copy data into more tables, one per query."
+  },
+  {
+    question: "Q6. Are MongoDB and Cassandra open source?",
+    answer: "Cassandra is under the Apache License 2.0. MongoDB's server is under the Server Side Public License version 1, so say SSPL rather than reaching for a general open-source label. The Community server is free to download."
+  },
+  {
+    question: "Q7. Which is easier to learn?",
+    answer: "Going by the docs, MongoDB. Its queries take a filter on any field, while Cassandra's CQL looks like SQL but its docs limit the WHERE clause to primary key columns or indexed columns. The harder part in Cassandra is table design, since the data modeling page says each query is backed by its own table."
+  },
+  {
+    question: "Q8. How much do they cost?",
+    answer: "Cassandra the software is free, and the project publishes no paid tier. MongoDB Atlas shows Free, Flex (about $8 to $30 a month) and Dedicated (from $0.08 an hour) tiers on its pricing page (checked Oct 2026)."
+  }
+]} />
+
+## Conclusion
+
+MongoDB suits you if your data is nested documents, your questions keep changing and you want transactions across documents. Cassandra suits you if you know your queries, write constantly and want any replica to take a write.
+
+Check versions first, then test your own queries. We found no current, neutral benchmark to make the call for you.
+
+<BlogCTA/>
