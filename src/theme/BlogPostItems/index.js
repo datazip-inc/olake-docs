@@ -30,6 +30,7 @@ export default function BlogPostItems({ items, featured = false }) {
           priority={index === 0}
           featured={featured && index === 0}
           half={index >= halfFrom}
+          showAuthor={false}
           formatDate={formatDate}
         />
       ))}

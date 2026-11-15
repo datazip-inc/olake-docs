@@ -1,0 +1,26 @@
+Unity Catalog is the catalog built into every Databricks workspace. OLake Go writes to it through Unity Catalog's Iceberg REST (representational state transfer) endpoint at `https://<workspace-url>/api/2.1/unity-catalog/iceberg-rest`, and the tables it creates are Unity Catalog managed Iceberg tables. Databricks allows writes through this endpoint for managed Iceberg tables only ([Databricks: access tables from Iceberg clients](https://docs.databricks.com/gcp/en/external-access/iceberg), checked 2026-10-30).
+
+Four things must be in place in the workspace, once:
+
+| Setting | Where | Why it matters |
+| --- | --- | --- |
+| **External data access** on the metastore | Catalog, the gear icon, **Metastore**, then **External data access** | Without it the Iceberg REST endpoint refuses every client that is not Databricks itself. |
+| A catalog with managed storage | Catalog, **Create catalog**, with a storage location backed by an external location | OLake Go creates one schema per job inside it. The catalog name is the `warehouse` value every client uses. |
+| `EXTERNAL USE SCHEMA` for the writing principal | On the catalog, so it covers the schemas OLake Go creates | Unity Catalog checks this privilege, on top of the usual ones, before it serves a table to an outside engine. |
+| A personal access token or a service principal | Settings, **Developer**, **Access tokens** | OLake Go sends it as a bearer token on every catalog call. |
+
+```sql title="Databricks SQL editor, once per catalog (replace the principal)"
+-- The catalog OLake Go writes into. Its managed storage holds the Iceberg files.
+CREATE CATALOG IF NOT EXISTS lakehouse MANAGED LOCATION '<external location URL>/lakehouse';
+
+-- What the writing principal needs: browse and create schemas, then read and write tables in them
+GRANT USE CATALOG, CREATE SCHEMA ON CATALOG lakehouse TO `olake@example.com`;
+GRANT USE SCHEMA, CREATE TABLE, SELECT, MODIFY ON CATALOG lakehouse TO `olake@example.com`;
+GRANT EXTERNAL USE SCHEMA ON CATALOG lakehouse TO `olake@example.com`;
+```
+
+Granting on the catalog makes the privileges inherit to every schema OLake Go creates later. `EXTERNAL USE SCHEMA` is not part of `ALL PRIVILEGES`, and only the catalog owner can grant it ([Databricks: Unity Catalog privileges](https://docs.databricks.com/gcp/en/data-governance/unity-catalog/manage-privileges/privileges), checked 2026-10-30). A service principal with OAuth machine-to-machine credentials is the better choice in production. The other authentication methods are on the [Unity Catalog destination page](/docs/writers/iceberg/catalog/rest/?rest-catalog=unity).
+
+:::warning[Databricks reads deletion vectors only]
+Unity Catalog accepts updates to a managed Iceberg table only as copy-on-write files or as Iceberg v3 deletion vectors. It rejects equality delete files with `Can not create a Path from a null string [ErrorCode: 2015]`. Set Databricks as a target query engine on the job, and OLake Go writes deletion vectors from the first sync.
+:::

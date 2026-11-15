@@ -336,9 +336,11 @@ Per-job index storage (for positional delete or deletion vector writes) requires
 - OLake worker **0.3.11 and above**.
 :::
 
-### Cloud IAM Integration
+### Cloud Integration
 
-OLake Go's activity pods (the pods by which the actual data sync is performed) can be allowed to securely access cloud resources(AWS Glue or S3) using IAM roles.
+OLake Go's activity pods (the pods by which the actual data sync is performed) can access cloud resources with a cloud identity.
+
+#### AWS and GCP
 
 ```yaml
 global:
@@ -353,12 +355,29 @@ global:
       
       # GCP Workload Identity
       iam.gke.io/gcp-service-account: "olake-job@project.iam.gserviceaccount.com"
-      
-      # Azure Workload Identity
-      azure.workload.identity/client-id: "12345678-1234-1234-1234-123456789012"
 ```
+
 :::note
-Note: For detailed instructions on the creation of IAM roles and service accounts, the official documentation for AWS IRSA, GCP Workload Identity, or Azure Workload Identity should be referred to. For a minimal Glue and S3 IAM access policy please refer [here](/docs/writers/iceberg/catalog/glue/#2-aws-iam-permissions).
+Note: For detailed instructions on the creation of IAM roles and service accounts, the official documentation for AWS IRSA or GCP Workload Identity should be referred to. For a minimal Glue and S3 IAM access policy please refer [here](/docs/writers/iceberg/catalog/glue/#2-aws-iam-permissions).
+:::
+
+#### Azure
+
+Enable the OIDC issuer and workload identity on your AKS cluster. When you create the federated credential, set the subject to `system:serviceaccount:<namespace>:olake-job`. Replace `<namespace>` with the Kubernetes namespace where you installed OLake Go. The values below use that same service account name and add the label the job pod needs to use this identity.
+
+```yaml
+global:
+  jobServiceAccount:
+    create: true
+    name: olake-job
+    annotations:
+      azure.workload.identity/client-id: "AZURE-CLIENT-ID-HERE"
+  jobPodLabels:
+    azure.workload.identity/use: "true"
+```
+
+:::note 
+The `azure.workload.identity/client-id` annotation is optional if you enter the Client ID in the OLake UI. In that case, you can leave `annotations` empty (`annotations: {}`). If you leave the Client ID field in the UI empty, the annotation is required, and the sync fails without it.
 :::
 
 ### Encryption Configuration
@@ -742,7 +761,7 @@ global:
 ```
 
 :::note
-- **Cloud registries:** For cloud-managed registries (Amazon ECR, Google Artifact Registry, Azure ACR), IAM-based authentication (IRSA / Workload Identity) is preferred over static credentials. See [Cloud IAM Integration](#cloud-iam-integration).
+- **Cloud registries:** For cloud-managed registries (Amazon ECR, Google Artifact Registry, Azure ACR), IAM-based authentication (IRSA / Workload Identity) is preferred over static credentials. See [Cloud Integration](#cloud-integration).
 :::
 
 ### Security Context Configuration
@@ -789,6 +808,59 @@ global:
     sidecar.istio.io/inject: "true"
     linkerd.io/inject: enabled
 ```
+
+### Extra Job Volumes for Connector Pods
+
+:::info
+The following versions are required:
+OLake Go 1.1.2 and above.
+OLake Worker 0.5.1 and above.
+OLake Helm Chart 0.0.35 and above.
+OLake UI 0.9.1 and above.
+:::
+
+Use `global.extraJobVolumes` and `global.extraJobVolumeMounts` to mount files, such as a custom CA bundle or a client key, from Kubernetes ConfigMaps or Secrets into the connector job pods.
+
+#### Step 1: Configure the Helm values
+
+Configure the mounts using your ConfigMaps and Secrets:
+
+```yaml
+global:
+  extraJobVolumes:
+    - name: custom-ca
+      configMap:
+        name: my-ca-certs
+    - name: client-key
+      secret:
+        secretName: my-client-key
+
+  extraJobVolumeMounts:
+    - name: custom-ca
+      mountPath: /etc/ssl/custom-certs
+    - name: client-key
+      mountPath: /etc/ssl/client-keys
+```
+
+#### Step 2: Use the mounted paths in connector config
+
+In the source's SSL configuration, set **Certificate Input** to **Certificate File Path** and enter the mounted file paths, such as `/etc/ssl/custom-certs/ca.crt`.
+
+:::note
+If test connection fails with file not found, check the worker logs.
+:::
+
+#### Validation rules
+
+- Every `name` in `extraJobVolumeMounts` must match an entry in `extraJobVolumes`.
+- Volume names `job-storage` and `index-storage` are reserved. Do not reuse them.
+- `mountPath` cannot be `/` or inside the shared config directory (`/mnt/config`).
+- Duplicate `mountPath` values are rejected.
+- All mounts are read-only.
+- Referenced ConfigMaps and Secrets must exist in the release namespace.
+- Do not mount over `/etc/ssl/certs`, as it hides the container's default trusted CA bundle.
+- If `extraJobVolumes` or `extraJobVolumeMounts` is invalid, OLake worker logs a warning and applies no extra mounts until the values are fixed. Check the OLake worker logs for details.
+- A mount that uses `subPath` does not pick up later ConfigMap/Secret updates. Restart the pod, or run a new job, to get the new content.
 
 ### Prometheus Metrics Configuration
 

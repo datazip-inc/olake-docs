@@ -1,0 +1,286 @@
+---
+title: Migrate from Streams v1 (streams.json) to Streams v2
+description: Move from the legacy streams.json to selected_streams.json and available_streams.json. Learn what changed, why, and the exact commands and flags to switch.
+sidebar_position: 3
+sidebar_label: Migrate to Streams v2
+keywords: [migrate streams.json, selected_streams.json, available_streams.json, OLake Go streams config]
+---
+
+import StreamsFormatNotice from '@site/docs/shared/streams/StreamsFormatNotice.mdx';
+
+# Migrate from Streams v1 (`streams.json`) to Streams v2
+
+<StreamsFormatNotice />
+
+Streams v2 replaces the single Streams v1 file, `streams.json`, with two files: one that you maintain and one that OLake Go writes during discovery.
+Migration is optional; existing workflows that use `streams.json` continue to work until Streams v1 is removed.
+This page describes what changed and how to switch to Streams v2.
+
+## 1. Do I Need to Migrate?
+
+No, not immediately. Legacy `streams.json` remains supported for `discover`, `sync`, and `clear-destination`.
+OLake Go logs a deprecation warning when you use it.
+
+`streams.json` is deprecated and will be removed in a future release.
+Plan to migrate on your own schedule, and complete migration before upgrading past the release that drops Streams v1 support.
+For most CLI deployments, migration consists of updating command flags; OLake UI migrates jobs automatically.
+
+## 2. Why the Change
+
+The legacy `streams.json` combined two types of data:
+
+- A large, machine-written schema (`streams[]`).
+- A smaller set of user-defined settings (`selected_streams`).
+
+Editable settings were distributed across both structures. For example, `sync_mode` and `destination_table` appeared in `streams[]`.
+
+Streams v2 separates these concerns:
+
+| File | Who writes it | What it holds | Do you edit it? |
+|---|---|---|---|
+| `selected_streams.json` | You (discover writes the first copy) | Streams to sync and every per-stream setting | Yes |
+| `available_streams.json` | `discover` | Every stream OLake Go found: schema, supported sync modes, primary keys, cursor candidates, defaults | No, read-only |
+
+This yields a single file to edit, smaller diffs, clearer reviews, and safer re-discover operations.
+
+## 3. Before and After
+
+**Before: one file, `streams.json`.**
+
+```json title="streams.json"
+{
+  "selected_streams": {
+    "public": [
+      {
+        "stream_name": "orders",
+        "partition_regex": "",
+        "normalization": true,
+        "append_mode": false
+      }
+    ]
+  },
+  "streams": [
+    {
+      "stream": {
+        "name": "orders",
+        "namespace": "public",
+        "type_schema": { "properties": { "...": "..." } },
+        "supported_sync_modes": ["cdc", "full_refresh", "incremental", "strict_cdc"],
+        "source_defined_primary_key": ["id"],
+        "available_cursor_fields": ["id", "updated_at"],
+        "sync_mode": "incremental",
+        "cursor_field": "updated_at",
+        "destination_database": "analytics",
+        "destination_table": "orders_raw"
+      }
+    }
+  ]
+}
+```
+
+**After: two files.** The following illustrates the target state after you move editable settings into `selected_streams.json`.
+
+```json title="selected_streams.json (you edit this)"
+{
+  "selected_streams": {
+    "public": [
+      {
+        "stream_name": "orders",
+        "sync_mode": "incremental",
+        "cursor_field": "updated_at",
+        "partition_regex": "",
+        "normalization": true,
+        "append_mode": false,
+        "destination_database": "analytics",
+        "destination_table": "orders_raw"
+      }
+    ]
+  }
+}
+```
+
+```json title="available_streams.json (read-only, written by discover)"
+{
+  "streams": [
+    {
+      "stream": {
+        "name": "orders",
+        "namespace": "public",
+        "type_schema": { "properties": { "...": "..." } },
+        "supported_sync_modes": ["cdc", "full_refresh", "incremental", "strict_cdc"],
+        "source_defined_primary_key": ["id"],
+        "available_cursor_fields": ["id", "updated_at"],
+        "sync_mode": "incremental",
+        "cursor_field": "updated_at",
+        "destination_database": "analytics",
+        "destination_table": "orders_raw"
+      }
+    }
+  ]
+}
+```
+
+After conversion, `sync_mode`, `cursor_field`, and `destination_*` may still appear in `available_streams.json`.
+Those values continue to apply according to [the precedence rule](#precedence-rule).
+
+### Precedence Rule
+
+A value in `selected_streams.json` takes precedence.
+If a field is not set there, OLake Go uses the value in `available_streams.json` (or the stream's `default_stream_properties`).
+
+When you next edit a stream, move `sync_mode`, `cursor_field`, `destination_database`, and `destination_table` into `selected_streams.json`.
+
+## 4. Flag Mapping
+
+| Command | Legacy flag | New flags |
+|---|---|---|
+| `discover` (re-run, keep edits) | `--streams <path>` | `--selected-streams <path>` and `--available-streams <path>` |
+| `discover` (compare) | `--streams <old>` and `--difference <new>` | `--selected-streams`, `--available-streams`, `--difference-selected-streams`, `--difference-available-streams` |
+| `sync` | `--streams <path>` (or `--catalog`) | `--selected-streams <path>` and `--available-streams <path>` |
+| `clear-destination` | `--streams <path>` | `--selected-streams <path>` and `--available-streams <path>` |
+
+`--streams`, `--catalog`, and `--difference` remain supported. `--streams` and `--catalog` log this warning:
+
+```text
+--streams is deprecated and will be removed in a future release; use --available-streams and --selected-streams instead
+```
+
+`--difference` logs this warning:
+
+```text
+--difference is deprecated and will be removed in a future release; use --difference-available-streams and --difference-selected-streams instead
+```
+
+## 5. Migrate the OLake Go CLI
+
+Each `discover` run on a Streams v2 writes three files in sync:
+`streams.json`, `selected_streams.json`, and `available_streams.json`.
+For most setups, migration therefore requires only a flag change.
+
+All examples assume your files are in `/mnt/config`.
+
+### Step 1. Make Sure You Have the Two New Files
+
+**After you run `discover` command**, the two new files should already exist alongside `streams.json` with equivalent settings. Proceed to Step 2.
+
+**If your `streams.json` was produced by an older version**, run re-discover to generate the two files. This connects to the source and preserves your existing edits.
+
+```bash
+discover --config /mnt/config/source.json \
+  --streams /mnt/config/streams.json
+```
+
+OLake Go writes all three files. New tables are not selected automatically.
+
+Open `selected_streams.json` and verify that every stream you sync is listed. Do not edit `available_streams.json`.
+
+### Step 2. Change the Flags
+
+Replace `--streams` (or `--catalog`) with `--selected-streams` and `--available-streams` in every command, script, and scheduler definition.
+
+```bash title="sync"
+sync --config /mnt/config/source.json \
+  --destination /mnt/config/destination.json \
+  --selected-streams /mnt/config/selected_streams.json \
+  --available-streams /mnt/config/available_streams.json \
+  --state /mnt/config/state.json
+```
+
+```bash title="clear-destination"
+clear-destination --destination /mnt/config/destination.json \
+  --selected-streams /mnt/config/selected_streams.json \
+  --available-streams /mnt/config/available_streams.json \
+  --state /mnt/config/state.json
+```
+
+```bash title="discover (re-run and keep edits)"
+discover --config /mnt/config/source.json \
+  --selected-streams /mnt/config/selected_streams.json \
+  --available-streams /mnt/config/available_streams.json
+```
+
+Do not pass `--streams` together with the new flags. `state.json` requires no changes.
+
+### Step 3. Edit Only `selected_streams.json` From Now On
+
+After you switch, apply every stream configuration change in `selected_streams.json`.
+
+:::warning[Migration is one-way]
+After you switch, do not revert to `--streams`. Downgrade to Streams v1 is not supported.
+For example, if `selected_streams.json` sets `sync_mode` to `full_refresh` while the stream was `incremental` in the legacy file, `streams.json` may still record `incremental`.
+Reverting would change how those streams sync without an explicit configuration update.
+:::
+
+## 6. OLake UI Users
+
+No manual action is required. OLake UI migrates jobs automatically:
+
+- **When OLake UI starts**, it converts every job whose source connector version supports Streams v2.
+- **When you upgrade a source's version in the UI**, it converts that source's jobs.
+- A job that cannot be converted remains on `streams.json` and continues to run as before.
+
+After a source runs a version that supports Streams v2, you cannot downgrade that source below that version.
+The UI blocks the change and returns an error similar to:
+
+```text
+invalid streams format: source version <version> is below <minimum version> and job_id[<id>] uses the split format
+```
+
+## 7. What Stays the Same
+
+- `state.json` is unchanged; no state migration is required.
+- `source.json`, `destination.json`, and the `check` and `spec` commands are unchanged.
+- Scripts that still pass `--streams` continue to work until Streams v1 is removed.
+
+## 8. Common Mistakes
+
+| Mistake | Error code | Message |
+|---|---|---|
+| Pass only one of `--available-streams` or `--selected-streams` | `config.incomplete_catalog_flag_pair` | `--available-streams and --selected-streams must be passed` |
+| Pass `--streams` together with both `--available-streams` and `--selected-streams` | `config.conflicting_catalog_flags` | `--streams cannot be combined with --available-streams/--selected-streams` |
+| Run `sync` or `clear-destination` with no streams flags | `config.flag_missing` | `--streams or --available-streams and --selected-streams not passed` |
+| Pass only one flag of the difference pair | `config.incomplete_difference_flag_pair` | `--difference-available-streams and --difference-selected-streams must be passed together` |
+| Use `--difference` with the new difference pair | `config.conflicting_difference_flags` | `--difference cannot be combined with --difference-available-streams/--difference-selected-streams` |
+| `available_streams.json` has no streams | `catalog.available_streams_empty` | `available_streams file <path> has no streams[]` |
+
+Additional considerations:
+
+- A stream in `selected_streams.json` with no match in `available_streams.json` is skipped with a warning:
+  `Skipping; selected stream <ns>.<name> has no matching entry in streams[]. Rediscover or check the streams file.`
+- Re-discover does not add new tables to `selected_streams.json`. Add them manually.
+- Re-discover removes entries for tables that no longer exist in the source.
+
+## 9. FAQ
+
+### 1. What Are Streams v1 and v2?
+
+Streams v1 is the legacy single file, `streams.json`. Streams v2 is the pair `selected_streams.json` + `available_streams.json`.
+Streams v1 is deprecated; use Streams v2 for new setups.
+
+### 2. I Use the OLake UI. Do I Need to Do Anything?
+
+No. OLake UI converts your jobs at startup and when you upgrade a source version. See [OLake UI Users](#6-olake-ui-users).
+
+### 3. Can I Downgrade a Source After the UI Migrates Its Jobs?
+
+No. The UI prevents downgrade below the first version that supports Streams v2.
+
+### 4. Can I Go Back to `streams.json`?
+
+No. Migration is one-way. `streams.json` does not reflect `sync_mode`, `cursor_field`, `destination_database`, and `destination_table` values set in `selected_streams.json`, so reverting would change how those streams sync.
+
+### 5. Is Migration Just a Flag Change?
+
+Yes, if you already ran `discover` on a Streams v2 capable release (OLake Go Version 1.0.0 or later). Those runs already wrote the two new files in sync with `streams.json`.
+
+### 6. When Is `streams.json` Removed?
+
+In a future release. OLake Go has not announced a removal date. It logs a deprecation warning until removal.
+
+### 7. Do I Need to Migrate My State File?
+
+No. `state.json` is unchanged.
+
+### 8. Where Is the Old Format Documented?
+
+See the [legacy `streams.json` reference](/docs/core/configs/streams-legacy). For Streams v2, see the [streams reference](/docs/install/docker-cli/#streams-config).

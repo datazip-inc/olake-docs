@@ -1,0 +1,234 @@
+---
+slug: what-is-data-replication
+title: "What Is Data Replication? Types and When to Use Each"
+description: "Data replication explained in plain English: sync vs async, snapshot vs log-based copying, one-way vs two-way, with a pick-by-job table and dated limits."
+tags: [data-ingestion, data-pipeline-tools, thought-leadership]
+authors: [priyansh]
+image: /img/blog/cover/what-is-data-replication-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+import quiz from '@site/src/data/quizzes/what-is-data-replication.json';
+
+![Cover for what is data replication showing a primary database copying changes to a replica](/img/blog/cover/what-is-data-replication-cover.webp)
+
+<TLDR title='Key takeaways'>
+
+Data replication means keeping copies of the same data in more than one place, and keeping those copies fresh. The word hides four separate choices. When are changes copied (synchronous or asynchronous)?
+
+How are they found (snapshot, key-based or log-based)? Which way do they flow (one-way or two-way)? How much gets copied (everything or part)?
+
+Pick by job: a standby for failover, a read copy for speed, or a copy in a warehouse or data lake for reports.
+
+And one thing trips people up. Replication is not a backup, because a replica copies your mistakes too.
+
+For the reporting copy, OLake Go copies PostgreSQL, MySQL and MariaDB, MongoDB and SQL Server changes into Apache Iceberg.
+
+- **Replication keeps a live copy current.** A backup is a point-in-time copy you restore from. You'll usually want both, because they do different jobs.
+- **Synchronous is safe but slower. Asynchronous is fast but a bit behind.** PostgreSQL's docs say its log shipping is asynchronous, so a crash can lose the last few changes ([high availability docs](https://www.postgresql.org/docs/current/warm-standby.html)) (checked Oct 2026).
+- **Reading the change log is the most complete copy method.** Snapshots miss everything between runs, and key-based copying never sees deleted rows.
+- **Two-way replication is the hardest kind.** Oracle GoldenGate's own FAQ warns of update conflicts, replication loops and data divergence ([GoldenGate FAQ](https://docs.oracle.com/en/database/goldengate/core/26/coredoc/ogg-frequently-asked-questions.html)).
+- **Match the type to the job.** Failover, read speed and reporting each need a different setup, and none of them replaces a backup.
+- **For the reporting copy in a lake, OLake Go reads the change log.** It supports PostgreSQL, MySQL and MariaDB, MongoDB and SQL Server and writes Apache Iceberg or Parquet (see [One line on OLake](#one-line-on-olake)).
+
+</TLDR>
+
+Last reviewed October 2026. Every limit below comes from a documentation or vendor page, and the link sits right next to the claim so you can check us.
+
+## So, what is data replication?
+
+Strip away the jargon and it's this: you create and maintain several copies of the same data in different places. International Business Machines (IBM) says the goal is availability, reliability and resilience. AWS lists availability, disaster recovery and compliance as the main reasons.
+
+Picture a shop with a paper ledger and a photocopy kept in the safe. Every evening you copy the new pages, so a fire in the shop doesn't destroy the records.
+
+Data replication does the same thing for a database. It is automatic, and much faster than you with a photocopier.
+
+AWS splits the work into five stages:
+
+1. Pick the source data.
+2. Detect what changed.
+3. Move the changes.
+4. Apply them on the target.
+5. Check that both sides match, for example by comparing checksums (short fingerprints of the data).
+
+Stage two has its own name in databases: [change data capture (CDC)](/learn/what-is-change-data-capture/). AWS treats it as one stage inside replication.
+
+The first copy is usually a full load, a one-time copy of everything that exists. After that, the tool only follows new changes.
+
+## Data replication types, at a glance
+
+Most pages dump "types" of replication into one long list. That list mixes four different questions together. Answer them one at a time and the choice gets much easier.
+
+| Question | Options | Better choice when | Named limit |
+| --- | --- | --- | --- |
+| **When is data copied?** | Synchronous or asynchronous | Synchronous when you cannot lose a committed change. Asynchronous when the copy is far away or speed matters. | Synchronous adds delay to every write. Asynchronous can lose the last changes in a crash. |
+| **How are changes found?** | Snapshot, key-based, log-based | Snapshot for small, rarely changing tables. Log-based when you need every insert, update and delete. | Snapshots miss changes between runs. Key-based copying misses deletes. Log-based needs access to the database log. |
+| **Which way does data flow?** | One-way, two-way, many-way | One-way for almost every case. Two-way only when two sites must both accept writes. | Two-way needs a plan for conflicts. AWS Database Migration Service (DMS) says its two-way mode has no conflict detection. |
+| **How much is copied?** | Full or partial | Partial when a copy only needs some tables, or one region's rows. | Partial copies need rules about what is included, and queries that touch missing data get harder. |
+
+Sources: [AWS Database Migration Service CDC docs](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Task.CDC.html) (checked Oct 2026).
+
+Each row gets its own section below, and every limit comes with a source.
+
+## The other names you'll see for replication types
+
+You've probably seen other guides list transactional, snapshot, merge and peer-to-peer replication as the types. Those names come from [Microsoft's SQL Server documentation](https://learn.microsoft.com/en-us/sql/relational-databases/replication/types-of-replication) (checked Oct 2026). They map neatly onto the four questions above.
+
+| Name you will see | What Microsoft says it does | Which of our questions it answers |
+| --- | --- | --- |
+| **Transactional** | Delivers changes to the subscriber as they occur, in near real time, in the same order and inside the same transaction boundaries | How changes are found (log-based style), one-way |
+| **Snapshot** | Sends the data exactly as it was at one moment and does not monitor for updates | How changes are found (snapshot) |
+| **Merge** | Lets both sides change data, tracks changes with triggers, and syncs when the subscriber connects | Direction (two-way), good for offline sites |
+| **Peer-to-peer** | Built on transactional replication, passes consistent changes between several servers in near real time | Direction (many-way) |
+| **Bidirectional** | Two servers each publish to the other | Direction (two-way) |
+
+Microsoft also says each type usually starts with an initial snapshot, and that for some applications the snapshot alone is enough. One thing to know: these are SQL Server terms. Other databases use different words for the same ideas, so match by behaviour, not by name.
+
+## Synchronous vs. asynchronous replication
+
+Timing comes first. With synchronous replication, the primary database waits for the copy to confirm before it tells the app "saved". Asynchronous replication does it the other way round: it tells the app first and sends the copy afterwards.
+
+IBM says synchronous replication means no data is lost, while asynchronous replication needs much less bandwidth and costs less. AWS says asynchronous copying runs with some lag and carries a slightly higher risk of data loss. So you're trading safety against speed and cost.
+
+![Synchronous replication waits for the copy before confirming a write, while asynchronous replication confirms first and copies later](/img/blog/2026/10/what-is-data-replication-sync-vs-async.webp)
+
+Real databases show the same trade-off, and their docs are blunt about it:
+
+- **PostgreSQL.** Its high availability docs say streaming replication is asynchronous by default, with a small delay that is typically under one second if the standby can keep up. With synchronous replication, each commit waits until it is written to disk on both servers, so data can be lost only if both crash at the same time (checked Oct 2026).
+- **SQL Server.** [Microsoft's Always On page](https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/availability-modes-always-on-availability-groups), dated June 2025, says asynchronous mode suits replicas far apart. The only failover it supports is a forced failover with possible data loss. Synchronous mode adds some transaction delay (checked Oct 2026).
+- **MySQL.** The [MySQL 8.4 manual](https://dev.mysql.com/doc/refman/8.4/en/replication.html) says replication is asynchronous by default. It also offers semisynchronous replication, where the source waits for at least one replica to acknowledge. Fully synchronous replication belongs to NDB Cluster (checked Oct 2026).
+
+So which should you choose? Pick synchronous when losing even one committed order is unacceptable and the two servers sit close together. Go asynchronous when the copy lives in another region, or when a slower write would annoy your users.
+
+## Snapshot, key-based and log-based: how changes get found
+
+Next question: how does the tool know what to copy? Three common ways exist, and each one has a gap.
+
+![Three copy methods, snapshot, key-based and log-based, each shown with the step it needs and what it misses](/img/blog/2026/10/what-is-data-replication-copy-methods.webp)
+
+**Snapshot replication** copies the data as it stands at one moment. That's the whole trick. AWS says nothing is captured between snapshots, and IBM adds that it isn't useful as a backup because it doesn't watch for changes, though it can help you recover from an accidental delete.
+
+**Key-based (incremental) replication** asks the source for rows that are newer than the last run, using a timestamp or ever-growing ID column. Redis points out that it can't see deleted rows, because a deleted row is no longer there to be found. It also needs a reliable timestamp or ID column, and that's not always there.
+
+**Log-based replication** reads the database's own change log, which records every insert, update and delete in order. AWS says it copies only the specific changes, in near real time.
+
+Setup is the cost, because you need log access on the source. For PostgreSQL, the [docs](https://www.postgresql.org/docs/current/logical-replication-restrictions.html) also say built-in logical replication does not copy table structure changes or sequence values (checked Oct 2026).
+
+AWS also lists event-driven triggers, where small programs inside the database record each change. They exist, but the three above are the ones most guides compare, so that's where we'll stay.
+
+Snapshots suit small tables that rarely change, like a list of country codes. Log-based copying wins when deletes matter or the table is large and busy. Key-based copying makes sense only when you can't get log access and you trust the timestamp column.
+
+## One-way, two-way and multi-primary
+
+Direction is the third choice, and it decides how much trouble you're in for. One-way is the calm option: a primary sends changes to replicas, and only the primary takes writes.
+
+[MongoDB's replica set docs](https://www.mongodb.com/docs/manual/replication/) describe this shape. Only the primary accepts writes, and if it goes silent for 10 seconds by default, the others hold an election to choose a new one. MongoDB says the median time for that election should not typically exceed 12 seconds under default settings (its figure, checked Oct 2026).
+
+Two-way (also called bidirectional) and multi-primary setups let more than one server accept writes. That helps when two offices must work offline or in different regions, but the price is conflicts.
+
+- Oracle GoldenGate's FAQ says bidirectional setups are more complex and can cause update conflicts, replication loops and data divergence (checked Oct 2026).
+- AWS Database Migration Service (DMS) says its bidirectional mode is not a full multi-master solution and has no conflict detection or resolution (checked Oct 2026).
+- PostgreSQL's replication overview says asynchronous multi-writer setups resolve conflicts by user choice or rules, and that PostgreSQL does not offer synchronous multi-writer replication on its own (checked Oct 2026).
+
+Our read: choose one-way unless a business reason forces two-way. And if it does, write down who wins when two sites change the same record, before you build anything.
+
+## Full vs. partial replication
+
+The last choice is scope, or how much you copy. Full replication copies the entire database to each replica. Partial replication copies selected tables, or only the rows one region needs.
+
+Full copies are easy to reason about, but they need storage and network capacity at every site. Partial copies are lighter, but you have to decide what's in and what's out. PostgreSQL's log shipping, which moves its write-ahead log (WAL), copies the whole server's WAL, according to its docs (checked Oct 2026), while its logical replication works table by table.
+
+That difference matters. If all you want is the orders table in a reporting system, whole-server copying is the wrong tool.
+
+## Data replication strategies, by job
+
+A strategy is just the combination you pick for a goal. This table starts from the job, because you probably know the job before you know the vocabulary.
+
+| Job | Usual combination | Better choice when | Named limit |
+| --- | --- | --- | --- |
+| **Failover standby** | One-way, log-based, synchronous or asynchronous | You need a server ready to take over fast | Async can lose the last changes. PostgreSQL says restoring a backup takes much longer than failing over to a standby |
+| **Faster reads** | One-way, asynchronous, to read replicas | Reads far outnumber writes | Replicas lag, so a read right after a write may be stale |
+| **Another region** | One-way, asynchronous | Users or rules require data near them | Distance makes synchronous writes slow |
+| **Reports in a warehouse or lake** | One-way, snapshot or log-based, usually asynchronous | Analysts need data without slowing the main database | Snapshots miss changes between runs. Log-based needs access to the source log, and each tool supports only some databases and destinations |
+| **Two offices, both writing** | Two-way, asynchronous | Both sites must keep working when the link drops | Conflicts must be solved by rules or people |
+| **Moving to a new database** | One-time full load, then log-based catch-up | You want a short cutover window | The two copies must be checked before you switch |
+
+Each of these jobs has plenty of vendor tools.
+
+## A worked example, with one PostgreSQL database and two copies
+
+Say a shop runs one PostgreSQL database for orders. It wants two things: a standby in case the server dies, and a copy for the finance team's reports. PostgreSQL's own documentation describes both, so this example needs no extra tool.
+
+**Copy one, the standby.** The shop uses WAL shipping, where the standby reads a stream of the primary's change records.
+
+The PostgreSQL docs say a standby kept current this way holds almost all the primary's data and can quickly become the new primary. Timing can be synchronous or asynchronous, and the copy covers the entire server (checked Oct 2026). A standby that also answers read-only queries is called a hot standby.
+
+The standby sits in another building, so the shop picks asynchronous. It accepts that the last second or so of orders could be missing after a crash. That's the exact trade-off the docs describe.
+
+**Copy two, the reporting copy.** The finance team needs only three tables. PostgreSQL logical replication works per table and sends a stream of data changes to another server, but the restrictions page says it doesn't copy structure changes or sequence data (checked Oct 2026). So the shop plans to apply any table structure change on both servers by hand.
+
+That's the whole decision in miniature. One database, two jobs, two different setups. Neither is a backup, so the shop still keeps its scheduled backups.
+
+What if the finance copy has to land in a warehouse or lake instead of another PostgreSQL server? Then you need a tool that reads the log and writes somewhere else.
+
+## When replication is the wrong tool
+
+Replication isn't magic, and it's better to name its limits before you build.
+
+- **It's not a backup.** A replica applies every change from the primary, including a wrong delete or a bad update. Redis says most production setups use both replication and backup, because replication covers an outage and backup covers corruption.
+- **Backups still matter for recovery speed.** PostgreSQL's docs say rolling forward from an archived backup takes considerably longer than failing over to a warm standby (checked Oct 2026). So backups give you disaster recovery, not high availability.
+- **Nothing guarantees zero loss.** IBM says that if there is lag between a change and its copy during a failure, data could be lost.
+- **Not everything is real time.** AWS describes scheduled, asynchronous replication, and AWS DMS says its CDC does not provide real-time replication and has no latency guarantee (SLA) for CDC (checked Oct 2026).
+- **A nightly export is enough for some jobs.** A weekly report on a small table doesn't need a log reader running all day.
+
+## Questions to ask before you pick a setup
+
+Run through these in order. They map straight back to the tables above.
+
+1. **What happens if the last few changes are lost?** If the answer is "we can't allow that", look at synchronous replication and accept the slower writes.
+2. **How far apart are the copies?** Different regions push you toward asynchronous.
+3. **Do deletes matter in the copy?** If yes, rule out key-based copying.
+4. **Can you read the source database's change log?** If not, snapshots or key-based copying may be all you've got.
+5. **Does more than one place need to write?** If yes, decide in advance how conflicts are settled.
+6. **Do you also have backups?** If not, fix that first.
+
+## What practitioners say
+
+Most public chatter about replication is about the tools around the databases, not the idea itself. Here is a short pair of quotes for AWS Database Migration Service (DMS) from public pages, each opened in October 2026.
+
+- **AWS DMS.** A [commenter](https://news.ycombinator.com/item?id=39049790) on the Hacker News thread ["We migrated our PostgreSQL database with 11 seconds downtime"](https://news.ycombinator.com/item?id=39048317) (January 2024) says DMS has "always been more than up to the task". A reviewer on [PeerSpot](https://www.peerspot.com/products/aws-database-migration-service-reviews) (July 2025) calls the solution stable but says "one drawback I experienced was with balance and sync."
+
+Each quote is one person's view, with its date and link. They are single comments and reviews, not surveys. Treat them as colour.
+
+## One line on OLake
+
+If your goal is the reporting-copy case, copying database changes into Apache Iceberg tables, OLake Go is built for that job.
+
+OLake Go is open source under Apache 2.0 ([OLake on GitHub](https://github.com/datazip-inc/olake)). It reads change logs for [PostgreSQL](/docs/connectors/postgres/), [MySQL and MariaDB](/docs/connectors/mysql/), [MongoDB](/docs/connectors/mongodb/) and [SQL Server](/docs/connectors/mssql/) (see our [docs](/docs/)) and writes Iceberg or Parquet on storage you control. It does a full load first and then follows changes, and [Oracle](/docs/connectors/oracle/) and [Db2](/docs/connectors/db2/) load by full refresh or incremental runs.
+
+For a standby or failover copy, use your database's own replication. OLake Go is built for the reporting copy in Iceberg. For a ranked list of tools, see [best data replication tools](/compare/best-data-replication-tools/), and for how change capture works, see [what is change data capture](/learn/what-is-change-data-capture/).
+
+Want to see what stuck? Here is a quick check.
+
+<Quiz {...quiz} />
+
+## FAQs
+
+<Faq showHeading={false} data={[
+  {question: "Q1. What is data replication in simple words?", answer: <>It means keeping copies of the same data in more than one place and keeping them up to date. The copies protect you if a server fails, and they can also make reads faster or feed reports. It's not the same as a backup, which is a copy you restore from later.</>},
+  {question: "Q2. What is database replication?", answer: <>It's data replication done by or for a database. A primary database sends its changes to one or more replicas. Postgres, MySQL, MongoDB and SQL Server each have built-in versions, and the rules for timing and failover differ between them.</>},
+  {question: "Q3. What is the difference between synchronous and asynchronous replication?", answer: <>Synchronous replication waits for the copy to confirm before the app is told the write is saved. No committed change is lost, but writes are slower. Asynchronous replication confirms first and copies afterwards, so it's faster, but the copy can run a little behind. The PostgreSQL docs describe this trade-off (checked Oct 2026).</>},
+  {question: "Q4. Is data replication the same as a backup?", answer: <>No. Replication keeps a live copy current, and that includes mistakes such as a wrong delete. A backup is a point-in-time copy you restore from. The PostgreSQL docs say restoring a backup takes much longer than failing over to a standby, so most teams run both (checked Oct 2026).</>},
+  {question: "Q5. What is the difference between data replication and change data capture?", answer: <>Change data capture (CDC) is the step that finds what changed, usually by reading the database log. AWS treats it as one stage inside replication. In practice, log-based CDC is a common way to run replication (see our <a href={"/learn/what-is-change-data-capture/"}>change data capture explainer</a>).</>},
+  {question: "Q6. What are the main data replication strategies?", answer: <>A strategy mixes four choices: timing (synchronous or asynchronous), method (snapshot, key-based or log-based), direction (one-way or two-way) and scope (full or partial). Failover usually means one-way and log-based. Reporting copies usually mean one-way and asynchronous. Two-way is the hardest because of conflicts. See <a href={"/compare/best-data-replication-tools/"}>best data replication tools</a> for tools by job.</>},
+  {question: "Q7. Can replication lose data?", answer: <>Yes, it can. IBM says lag between a change and its copy during a failure could cause data loss, and AWS says asynchronous replication carries a slightly higher risk of it. Synchronous replication cuts the risk, and the PostgreSQL docs say data is lost only if both servers fail at once (checked Oct 2026). Still, no setup removes the risk completely.</>}
+]} />
+
+## Conclusion
+
+Data replication is simple at heart: keep copies of your data in more than one place. The hard part is choosing, and that choice is really four small ones about timing, method, direction and scope.
+
+So start from the job. Use your database's built-in replication for failover and reads, a log-based tool for copies in a warehouse or lake (OLake Go does this for Iceberg), and backups for recovery.
+
+Save two-way replication for the few cases that truly need it. Read each vendor's limits before you commit (yes, the boring reading is worth it).
+
+<BlogCTA/>

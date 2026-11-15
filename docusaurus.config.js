@@ -51,7 +51,7 @@ const latestOlakeRelease = getLatestOlakeRelease()
 const config = {
   title: 'OLake',
   tagline:
-    'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
   favicon: 'img/logo/olake-blue.svg',
 
   // Exposed to components via useDocusaurusContext().siteConfig.customFields
@@ -509,6 +509,12 @@ const config = {
           // Author pages removed for authors without posts
           { to: '/blog/authors', from: '/blog/authors/pavan' },
           { to: '/blog/authors', from: '/blog/authors/arsham' },
+          // The per-engine MySQL to Iceberg posts were merged into one post with an engine tab each
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=clickhouse', from: '/blog/mysql-to-iceberg-clickhouse' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=presto', from: '/blog/mysql-to-apache-iceberg-presto' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=spark', from: '/blog/mysql-to-iceberg-spark' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=trino', from: '/blog/mysql-to-apache-iceberg-trino' },
+          { to: '/blog/mysql-to-iceberg-query-engines/?engine=duckdb', from: '/blog/mysql-to-apache-iceberg-query-duckdb' },
           // The separate Iceberg blog (/iceberg) was merged into the main blog: posts keep their slugs
           { to: '/blog/data-partitioning-in-s3/', from: '/iceberg/data-partitioning-in-s3/' },
           { to: '/blog/mor-vs-cow/', from: '/iceberg/mor-vs-cow/' },
@@ -547,29 +553,29 @@ const config = {
           { to: '/blog/tags/snowflake/', from: '/iceberg/tags/snowflake/' },
           { to: '/blog/tags/trino/', from: '/iceberg/tags/trino/' },
           { to: '/blog/tags/iceberg/', from: '/iceberg/tags/iceberg/page/2/' },
-          // The Iceberg query engine compatibility section (/iceberg/query-engine) was removed: the hub goes to the
-          // compatibility doc, every other page to the closest post
-          { to: '/docs/understanding/compatibility-engines/', from: '/iceberg/query-engine/' },
-          { to: '/blog/olake-iceberg-athena/', from: '/iceberg/query-engine/athena/' },
-          { to: '/blog/olake-iceberg-trino/', from: '/iceberg/query-engine/trino/' },
-          { to: '/blog/databricks-vs-iceberg/', from: '/iceberg/query-engine/databricks/' },
-          { to: '/blog/olake-glue-snowflake/', from: '/iceberg/query-engine/snowflake/' },
+          // The Iceberg query engine section (/iceberg/query-engine) was removed: the hub goes to the Integrations
+          // overview, each engine with an integrations hub goes to that hub, the rest to the closest post
+          { to: '/docs/integrations/', from: '/iceberg/query-engine/' },
+          { to: '/docs/integrations/athena/', from: '/iceberg/query-engine/athena/' },
+          { to: '/docs/integrations/trino/', from: '/iceberg/query-engine/trino/' },
+          { to: '/docs/integrations/databricks/', from: '/iceberg/query-engine/databricks/' },
+          { to: '/docs/integrations/snowflake/', from: '/iceberg/query-engine/snowflake/' },
+          { to: '/docs/integrations/clickhouse/', from: '/iceberg/query-engine/clickhouse/' },
+          { to: '/docs/integrations/doris/', from: '/iceberg/query-engine/doris/' },
+          { to: '/docs/integrations/presto/', from: '/iceberg/query-engine/presto/' },
+          { to: '/docs/integrations/bigquery/', from: '/iceberg/query-engine/bigquery/' },
+          { to: '/docs/integrations/spark/', from: '/iceberg/query-engine/spark/' },
+          { to: '/docs/integrations/duckdb/', from: '/iceberg/query-engine/duckdb/' },
+          { to: '/docs/integrations/starburst/', from: '/iceberg/query-engine/starburst/' },
+          { to: '/docs/integrations/starrocks/', from: '/iceberg/query-engine/starrocks/' },
           { to: '/blog/apache-iceberg-hive-comparison/', from: '/iceberg/query-engine/hive/' },
-          { to: '/blog/build-data-lakehouse-iceberg-clickhouse-olake/', from: '/iceberg/query-engine/clickhouse/' },
-          { to: '/blog/postgres-iceberg-doris-lakehouse-olake/', from: '/iceberg/query-engine/doris/' },
-          { to: '/blog/building-open-data-lakehouse-with-olake-presto/', from: '/iceberg/query-engine/presto/' },
-          { to: '/blog/postgres-cdc-bigquery-iceberg-biglake/', from: '/iceberg/query-engine/bigquery/' },
-          { to: '/blog/iceberg-query-engine-interoperability-spark-databricks/', from: '/iceberg/query-engine/spark/' },
           {
             to: '/blog/iceberg-query-engine-interoperability-spark-databricks/',
             from: [
               '/iceberg/query-engine/flink/',
-              '/iceberg/query-engine/duckdb/',
               '/iceberg/query-engine/impala/',
               '/iceberg/query-engine/dreamio/',
-              '/iceberg/query-engine/dremio/',
-              '/iceberg/query-engine/starburst/',
-              '/iceberg/query-engine/starrocks/'
+              '/iceberg/query-engine/dremio/'
             ]
           },
           // Posts that were published in /blog and moved to /compare and /learn: keep their old URLs working
@@ -1148,19 +1154,19 @@ const config = {
             from: '/blog/olake-vs-aws-dms-benchmark'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsConfiguration'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsOnly'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsOnlyDetails'
           },
           {
-            to: '/docs/understanding/terminologies/olake',
+            to: '/docs/core/configs/streams-legacy',
             from: '/docs/shared/streams/StreamsFull'
           },
           {
@@ -1247,8 +1253,12 @@ const config = {
           },
 
           {
-            to: '/docs/core/configs/catalog',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/docs/configs/catalog'
+          },
+          {
+            to: '/docs/install/docker-cli/#streams-config',
+            from: '/docs/core/configs/catalog'
           },
           {
             to: '/blog/tags',
@@ -1280,7 +1290,7 @@ const config = {
             from: '/docs/olake/mongodb/colake-connectors-for-olake'
           },
           {
-            to: '/docs/core/configs/catalog',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/core/configs/catalog'
           },
           {
@@ -1441,7 +1451,7 @@ const config = {
             from: '/docs/connectors'
           },
           {
-            to: '/docs/core/configs/catalog/',
+            to: '/docs/install/docker-cli/#streams-config',
             from: '/iceberg/docs/core/configs/catalog/'
           },
           {

@@ -201,7 +201,7 @@ static/img/blog/2025/05/flatten-array-2.webp
 | `CNAME`             | Do **not** delete `static/CNAME`; GitHub Pages needs it for **olake.io**.                       |
 | Public files        | Any asset in `static` is publicly accessible (e.g. `/reddit.json`).                             |
 | Next.js             | We may switch to the Next.js plug-in later for Lighthouse gains.                                |
-| Embedding media     | Images: Markdown `![Alt](/img/...)`; use raw HTML for size control.<br/>Videos: embed via HTML. |
+| Embedding media     | Images: Markdown `![Alt](/img/...)`; use `<Figure>` for a caption or a size limit.<br/>Short silent screen recordings: animated WebP in a `<Figure>`.<br/>Longer videos: YouTube with `<Video youtubeId='...' title='...' />`. No MP4 files under `static/`: the host does not serve byte ranges, so they do not play in Safari. |
 | MDX & HTML          | MDX accepts all HTML except **tables** (use Markdown tables).                                   |
 | Docusaurus features | Components like `<Tabs>`, `<TabItem>`, `:::info`, etc. are native—see their docs.               |
 
@@ -247,7 +247,7 @@ Breaking these has cost search traffic before. Run `npm run build` and `npm run 
 * **Taxonomy pages** (blog, customer-stories, learn and compare archive, authors, tags) get their title, description and H1 from the swizzled components in `src/theme` (`Blog/useBlogInstance.js`). Titles carry no post count (the count made SEO audits report "title changed" on every new post). A new blog instance must be added there, or its pages fall back to the "Blog" wording. `/learn/` and `/compare/` are the third and fourth instances (`learn-blog` and `compare-blog`, folders `learn/` and `compare/`): their list pages are in the sitemap, their archive, tag and author pages are not, and `/<section>/page/N/` is `noindex, follow`. Existing comparison posts keep their `/blog/` URLs. When adding a folder of posts, also update `POST_DIRS` in `scripts/lint-content.js`, `CONTENT_DIRS` in `scripts/generate-og-images.js` and the `@source` list in `src/css/custom.css`.
 * **Sitemap exclusions** live in the sitemap options of `docusaurus.config.js` (tags, authors, archive, search, `docs/shared`, confirmation pages, pagination). `docs/shared` is not built as pages at all.
 * **One `og:type`, one H1, one JSON-LD per schema.** Pages under `src/pages` get `og:type=website` from `src/theme/Layout`; posts emit `article`. Emit JSON-LD with `src/components/JsonLd`, not `<Head><script dangerouslySetInnerHTML>` (Helmet drops it).
-* **Images.** Keep every image under about 300 KB (WebP; no GIFs, use short muted looping video).
+* **Images.** Keep every still image under about 300 KB (WebP; no GIFs). A short silent screen recording is an animated WebP of 15 seconds at most, 8 frames a second, under about 700 KB. Anything longer goes on YouTube.
 
 ---
 

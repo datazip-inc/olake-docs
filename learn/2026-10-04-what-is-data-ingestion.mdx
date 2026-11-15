@@ -1,0 +1,246 @@
+---
+slug: what-is-data-ingestion
+title: "What Is Data Ingestion? Methods, Limits and Examples"
+description: "Data ingestion means copying data from its sources into a warehouse or lake. Five methods compared, each with a named limit, plus a worked example."
+tags: [data-ingestion, etl, data-pipeline-tools, thought-leadership]
+authors: [priyansh]
+image: /img/blog/cover/what-is-data-ingestion-cover.webp
+---
+import BlogCTA from '@site/src/components/BlogCTA';
+import quiz from '@site/src/data/quizzes/what-is-data-ingestion.json';
+
+![Cover for what is data ingestion showing sources flowing through an ingestion step into a warehouse or lake](/img/blog/cover/what-is-data-ingestion-cover.webp)
+
+<TLDR title='Key takeaways'>
+
+Data ingestion is copying data from where it's born (databases, files, apps) to a place where people can analyse it, like a data warehouse or a data lake. You've got five common ways to do it: a full copy on a schedule, an incremental copy, reading the database's change log, loading files in small batches, and streaming events. Every one gives something up.
+
+The choice usually comes down to two questions: how fresh does the data need to be, and do you need to catch deletes? Cleaning and reshaping the data is a separate job that comes later. For database changes into Apache Iceberg, OLake Go reads the change log of PostgreSQL, MySQL and MariaDB, MongoDB and SQL Server.
+
+- **Data ingestion** is step one of getting data somewhere you can analyse it. Amazon Web Services (AWS) defines it as collecting data from various sources and copying it to a target system for storage and analysis.
+- **Vendors disagree on one detail.** Databricks says ingestion moves raw data without transformation, while International Business Machines (IBM) lists transformation as one of five ingestion steps. Our safe rule of thumb: ingestion is the copying, and heavy reshaping belongs to the next step.
+- **Five methods exist, and every one has a catch.** A full copy is simple but heavy. A timestamp query misses deletes. Reading the change log needs setup and disk space. File micro-batches make no latency promise, and streaming costs more.
+- **A retry must NOT create duplicates.** BigQuery, Snowflake and PostgreSQL each document a different way to make this safe, and it matters as much as speed.
+- **Freshness has a price.** Fivetran's database connectors sync every 15 minutes by default ([connector docs](https://fivetran.com/docs/connectors/databases)), and 1-minute syncs start at its Enterprise plan ([pricing page](https://www.fivetran.com/pricing)) (checked Oct 2026), so decide how fresh a report really needs to be before you pay for more.
+- **OLake Go covers the change-log method for four databases.** It reads the change log of PostgreSQL, MySQL and MariaDB, MongoDB and SQL Server and writes Apache Iceberg or Parquet (see [our docs](/docs/)).
+
+</TLDR>
+
+Vendor facts below link the page they come from. The worked example uses invented numbers, and it says so.
+
+## What is data ingestion, in plain words
+
+Picture a restaurant chain. Sales sit in the till system, online orders sit in an app, and staff hours live in a spreadsheet somebody keeps "temporarily". A manager who wants one report has to get all three into one place first, and ingestion is the job of getting them there.
+
+Put technically, ingestion picks up data from sources and lands it in a destination. Sources can be databases, files, web services (called APIs, short for application programming interfaces) or event feeds from apps and sensors. A destination is usually a data warehouse (a database built for reports), a data lake (cheap storage for files in many formats) or a lakehouse (a lake with table features added).
+
+International Business Machines (IBM) gives a very close definition: collecting data from various sources and making it available for storage, processing and analysis. It adds that the data can be structured, semi-structured or unstructured before it is routed to lakes, warehouses or databases.
+
+### Three definitions, one disagreement
+
+The big pages don't agree on whether ingestion includes changing the data.
+
+Databricks describes it as moving raw data into a platform without transformation. Informatica's article says the data lands with minimal transformation, and that integration follows it.
+
+IBM goes further and lists five steps inside an ingestion pipeline: discovery, acquisition, validation, transformation and loading. Open three tabs and you get three answers.
+
+So here's our working rule. Ingestion covers picking the data up, checking it arrived whole, and landing it. Cleaning, joining and modelling count as the next stage, which is where extract, transform, load ([ETL](/learn/etl-pipelines/)) and extract, load, transform (ELT) live.
+
+## Where ingestion stops and other terms start
+
+Data folks love overlapping words, so it's easy to mix ingestion up with five neighbours. The table gives each one a line and says where it differs.
+
+| Term | What it means | How it differs from ingestion | Source |
+|---|---|---|---|
+| [Data pipeline](/learn/what-is-a-data-pipeline/) | The whole chain that moves and prepares data | Ingestion is its first step | AWS says ingestion is the first step in any data pipeline |
+| Data integration | Combining data from many sources into one coherent view | Ingestion is one part of it | IBM says ingestion is just one part of integration |
+| [ETL and ELT](/learn/etl-pipelines/) | Extract, transform, load, or extract, load, transform | They add the transform step and fix its order | Microsoft says they differ solely in where the transformation happens |
+| Data replication | Keeping copies of the same data in several places | Its stated goal is availability, reliability and resilience | IBM defines replication as creating and maintaining multiple copies of the same data in different locations |
+| Data migration | Moving data from one system to another | Often a one-off project, though some tools add ongoing change capture | AWS defines migration as moving data from one environment to another |
+
+Sources: IBM integration, IBM replication, Microsoft (checked Oct 2026)
+
+IBM says ingestion is one part of data integration, and that integration goes on into analysis and visualisation. The picture below shows the split we use here.
+
+![Ingestion picks up data and lands it safely; cleaning, joining and reporting come after the data has landed](/img/blog/2026/10/what-is-data-ingestion-scope.webp)
+
+Fair warning, the word "pipeline" also has a narrower meaning inside some products. Microsoft, for instance, uses it in Azure Data Factory for a group of activities that perform one task.
+
+## Five ways to ingest data, compared
+
+Answer first, details after. The table lists the five common methods, what each suits, and one limit that the vendors' own documentation states.
+
+| Method | Good for | A named limit, with source |
+|---|---|---|
+| Full copy on a schedule | Small tables, files, a first load | Copies everything every time, so cost grows with table size (our arithmetic below) |
+| Incremental copy by timestamp | Large tables that have an "updated at" column | Confluent says timestamp-based capture handles only soft deletes, and adds load because rows must be scanned |
+| Log-based change data capture (CDC) | Every insert, update and delete, with low delay | PostgreSQL says an unused replication slot keeps WAL on disk and can shut the database down |
+| File micro-batches | Files that land in cloud storage | Snowflake says it does not guarantee load latency, and files are not guaranteed to load in staged order |
+| Event streaming | Data produced as events, needed at once | The flow never stops, so someone must run it all day (our reading); AWS calls micro-batch a cost-effective way to get near-real-time |
+
+Sources: Confluent, [PostgreSQL](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), [Snowflake](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) (checked Oct 2026).
+
+The next five sections unpack each row. In a hurry? Jump to "Which method fits" and come back later.
+
+### 1. Full copy on a schedule
+
+The brute-force option. The tool reads the whole source table, writes it to the destination, and repeats on a schedule. A first load usually works this way, and so does any source that can't say what changed.
+
+It's simple, and it catches deletes, because a row missing from the new copy is gone. The catch? Every run moves every row, including the ones that never changed.
+
+### 2. Incremental copy by timestamp
+
+Now the tool gets smarter. It remembers when it last ran and asks only for rows changed since, and that remembered point is called a watermark. You need a column that holds a reliable "last updated" time.
+
+Confluent's guide to change data capture (CDC) lists three limits of this timestamp approach. First, it can only handle soft deletes (a row marked as deleted), not real deletes.
+
+Second, it adds load on the source because rows must be scanned. Third, it needs changes to the database schema.
+
+### 3. Log-based change data capture
+
+Here the tool reads the database's own change log, the file where the database records every change in order. Because it reads the log and not the tables, it sees real deletes too. Our [change data capture explainer](/learn/what-is-change-data-capture/) covers the idea in more depth.
+
+Confluent says log-based CDC captures inserts, updates and deletes and needs no schema change. It also admits that log formats are not standardised and rolled-back changes must be filtered out (checked Oct 2026).
+
+The source has its own catches too. PostgreSQL calls its change log the write-ahead log (WAL), and its documentation warns that replication slots persist across crashes. A slot holds back removal of needed WAL even when no one is connected, so it quietly eats storage.
+
+In extreme cases the database could shut down. An unneeded slot should be dropped (checked Oct 2026).
+
+**What practitioners say.** People who run this report that it needs care and upkeep. In a November 2025 [Hacker News thread on the Postgres WAL](https://news.ycombinator.com/item?id=45956255), one commenter writes "I would recommend defaulting to it" about Debezium, then adds "Even with Debezium I have run into myriad issues."
+
+That is one person's view, with its date and link.
+
+Two more catches come from the vendors. [Confluent's MySQL connector documentation](https://docs.confluent.io/cloud/current/connectors/cc-mysql-source-cdc-v2-debezium/cc-mysql-source-cdc-v2-debezium.html) says that a connector stopped longer than the binlog (MySQL's change log) retention period may find its files purged, which can make it fail or need a full snapshot. It recommends 7 days of retention (checked Oct 2026).
+
+[AWS says](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Task.CDC.html) its Database Migration Service (DMS) change capture is not real-time replication and carries no latency SLA (service level agreement), so "CDC" doesn't mean "instant" (checked Oct 2026). Good to know before someone promises you real time.
+
+### 4. File micro-batches
+
+Think of a mailroom that opens parcels as they arrive. Some systems pick up files as they land in cloud storage and load them in small groups. Snowflake's Snowpipe is one: it loads files after they are in a stage, and Snowflake says new data is typically available for queries within minutes.
+
+The same page lists the catches. Snowflake doesn't guarantee load latency and says to test with a representative set of files. It also says Snowpipe generally loads older files first but doesn't guarantee that files load in the order they were staged (checked Oct 2026).
+
+### 5. Event streaming
+
+In streaming, data moves the moment it's created, as a flow of small messages called events. It suits things like sensor readings or clicks, where waiting minutes is too long. AWS lists streaming and micro-batch as separate types and calls micro-batch a cost-effective way to get near-real-time.
+
+AWS says streaming ensures access to the most recent data but can be resource-intensive. It adds that data engineers must handle system or network errors and lag, which can cause data loss (checked Oct 2026).
+
+When a vendor says "near real time", ask for the measured delay on a table your size. A tool may not be real time by default. For example, Fivetran's database connector docs say database connectors sync new and modified data every 15 minutes by default, and its pricing page lists 1-minute syncs from the Enterprise plan up (checked Oct 2026).
+
+### What about APIs?
+
+You might be wondering where APIs fit. IBM lists API-based ingestion as its own method: it collects data from applications, services and platforms through application programming interfaces (APIs). We don't give it a sixth row, because an API pull is usually a scheduled or incremental copy, and the limit is set by the other side.
+
+That limit is a rate limit, and it can bite. [GitHub's documentation](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api) gives 60 requests per hour for unauthenticated calls and 5,000 requests per hour for authenticated ones (checked Oct 2026). That's about 83 requests a minute at best, so a source with many pages of results sets your sync speed, not your tool.
+
+### How vendor names map to these five methods
+
+AWS lists five types and IBM lists seven methods. The words overlap, but not one to one, so here's a quick translator.
+
+| Vendor term | Closest method here | Note |
+|---|---|---|
+| Batch (AWS, IBM) | Full copy or incremental copy | AWS says batch works best when timing is not relevant, and restarting a slow batch with errors can be expensive and complex |
+| Streaming, real-time (AWS, IBM) | Event streaming | AWS says it can be resource-intensive |
+| Micro-batch (AWS, IBM) | File micro-batches | Snowflake's Snowpipe is a named example |
+| Event-driven (AWS) | File micro-batches or event streaming | Collection is triggered by a specific event |
+| Change data capture (AWS, IBM) | Log-based CDC | AWS says it ingests only database changes, not whole datasets |
+| API-based (IBM) | Any of the above | Bound by the source's rate limits |
+| Lambda architecture (IBM) | A mix of batch and streaming | Not a method on its own |
+
+## Where teams use ingestion
+
+Why does the method matter in real life? IBM lists use cases that show it.
+
+Cloud modernization moves data from legacy systems, on-premises databases and warehouses into cloud environments, which is a first full copy followed by ongoing changes. Data observability tools need data made available so teams can assess its reliability, freshness, completeness and consistency, so freshness has to be measured, not guessed.
+
+## A worked example with invented numbers
+
+Say a shop has an orders table with 10,000,000 rows. In one 30-day month, 2,000,000 rows are updated once each and 50,000 rows are deleted. These numbers are made up to show the arithmetic, and the single update per row is a simplification.
+
+| Method | Rows read or sent in the month | Catches the 50,000 deletes? |
+|---|---|---|
+| Nightly full copy | 10,000,000 x 30 = 300,000,000 | Yes, deleted rows are missing from the next copy |
+| Nightly timestamp copy | About 2,000,000 | No, a deleted row has no timestamp left to find |
+| Log-based CDC | About 2,050,000 change events | Yes, each delete is an event in the log |
+
+Compared with the timestamp copy, the full copy moves about 150 times more rows. But the cheap timestamp copy leaves 50,000 deleted orders sitting in the destination, and nobody gets an error.
+
+Log-based CDC moves about as few rows and sees the deletes. Our read: it's the best fit on paper, but it needs the source set up and watched, as the PostgreSQL warning above shows.
+
+## Which method fits
+
+Four questions settle most cases, so answer them in order.
+
+1. **How fresh must the data be?** If a report that's an hour old is fine, a scheduled copy is enough. If you need minutes, look at CDC or file micro-batches.
+2. **Do deletes matter?** If yes, a timestamp copy is the wrong tool. You need a full copy or CDC.
+3. **Can you change the source?** CDC needs settings on the database and someone watching disk space. If you don't own the database, scheduled copies may be the ONLY option.
+4. **How big is the table?** A small table can happily use a full copy forever. Once a full run takes too long or costs too much, it's time for an incremental method.
+
+![Scheduled copies suit hourly freshness; log reading suits teams needing every change and delete who can set up the source](/img/blog/2026/10/what-is-data-ingestion-which-fits.webp)
+
+**Where OLake Go fits.** For the change-log method, OLake Go is open source ([OLake on GitHub](https://github.com/datazip-inc/olake)). It reads the change log of PostgreSQL, MySQL and MariaDB, MongoDB and SQL Server and writes Apache Iceberg or Parquet to storage you choose. It also runs full-refresh or incremental copies for other databases and S3 (see [our docs](/docs/)).
+
+## What goes wrong in ingestion
+
+Speed is the loud problem. The quiet ones (duplicates, missed changes, a source that changes under you) are the ones that hurt later, and the vendors document how they handle each.
+
+**Retries that duplicate data.** Loads fail sometimes, and a retry must not add the same rows twice.
+
+BigQuery says a load job is atomic, so either all records are inserted or none are. It advises creating the table with a `WRITE_TRUNCATE` load when inserting all data in one job, which matters when retrying a failed job (checked Oct 2026).
+
+Snowflake says Snowpipe ignores any staged file whose path and name match a file in its load record, even a corrected file staged again under the same name (checked Oct 2026).
+
+CDC has the same problem in a different outfit. PostgreSQL's documentation says a logical slot emits each change once in normal operation. After a crash it might send recent changes again, so the receiving client must handle the same message more than once (checked Oct 2026).
+
+The term for a load that is safe to repeat is idempotence. Big word, simple idea.
+
+**Limits on how often you can load.** BigQuery's default quota is 1,500 loads per table per day, and its batch loading page says that is enough to run a load job every 5 minutes when loading incrementally (checked Oct 2026).
+
+**Changes in the source.** Someone adds a column and your pipeline falls over. IBM names schema drift among the challenges: structural changes in source data cause pipeline mismatches. Debezium's PostgreSQL docs say logical decoding does not support DDL (schema change) commands, so the connector cannot report schema change events to consumers (checked Oct 2026).
+
+**Cleaning at the door.** IBM says organizations often cleanse data during ingestion by standardizing formats and fixing duplicate or missing values. That's the same blurred line from earlier, so write down which checks run before landing and which run after.
+
+**Security.** IBM and AWS both list security among the challenges of ingestion. Neither gives a single fix, and the right controls depend on the rules that apply to you. Check them with whoever owns compliance.
+
+## Where the data lands, and what it costs to load
+
+Ingestion ends where the data lands. The three common destinations are a warehouse, a lake and a lakehouse, and your pick affects cost and tooling.
+
+A cost note: BigQuery's batch loading page says there is no charge for batch loading using the shared slot pool. Data transfer charges apply if the bucket is in a different location than the dataset (checked Oct 2026).
+
+That covers the load step only, so storage and queries need their own price check. The rest of the cost sits in the tool that reads the source and in the people who run it.
+
+Lakes keep files, and an open table format such as Apache Iceberg adds table features on top of those files.
+
+## Conclusion
+
+So, the short version. Data ingestion is the copying step: pick data up from where it lives and land it where people can analyse it. The hard part isn't the copy, it's how the copy behaves when things change, fail or repeat.
+
+Go with a scheduled copy when an hour of delay is fine and the table is small. Choose an incremental copy for large tables, as long as deletes don't matter to you.
+
+Reach for log-based CDC when every change counts, and be ready to set up and watch the source. OLake Go does this for PostgreSQL, MySQL and MariaDB, MongoDB and SQL Server. Whatever you pick, ask what happens on a retry before you ask how fast it runs.
+
+Before you build anything, write down five answers: how fresh, whether deletes count, whether you may change the source, how big your largest table is, and what a retry does. That one page will serve you better than any tool list.
+
+Last reviewed October 2026.
+
+Want to check what stuck? Here are five quick questions.
+
+<Quiz {...quiz} />
+
+## FAQs
+
+<Faq showHeading={false} data={[
+{question:"Q1. What is data ingestion in simple terms?", answer:<>It's collecting data from its sources, such as databases, files and apps, and copying it to a place where it can be stored and analysed, such as a data warehouse or data lake. AWS and IBM both define it this way.</>},
+{question:"Q2. What does data ingestion mean in a data pipeline?", answer:<>It's the first step. AWS calls data ingestion the first step in any data pipeline, and the later steps clean, reshape and use the data. Our <a href={"/learn/what-is-a-data-pipeline/"}>data pipeline guide</a> covers the whole chain.</>},
+{question:"Q3. What is the difference between data ingestion and ETL?", answer:<>Think of ingestion as the copying. ETL adds a transform step before the data is loaded, and ELT does the transform after loading. Microsoft says the two differ solely in where the transformation takes place. Vendors also disagree on whether ingestion itself includes some transformation. See our <a href={"/learn/etl-pipelines/"}>ETL pipelines guide</a> for more.</>},
+{question:"Q4. What is the difference between data ingestion and data integration?", answer:<>IBM says ingestion is one part of data integration. Integration keeps going after the data lands, into combining, mapping, quality checks and analysis.</>},
+{question:"Q5. What are the types of data ingestion?", answer:<>You'll usually hear about batch, streaming, micro-batch, event-driven and change data capture. AWS lists all five. We group them into five methods by how the data is picked up: full copy, incremental copy, log-based CDC, file micro-batches and event streaming.</>},
+{question:"Q6. Is change data capture the same as real-time ingestion?", answer:<>No, and this one trips people up. CDC is a way of finding changes by reading a database's change log. AWS says its Database Migration Service change capture is not real-time replication and has no latency SLA (checked Oct 2026), so the delay depends on the source, the network and the tool.</>},
+{question:"Q7. What is the difference between batch and streaming ingestion?", answer:<>AWS says batch ingestion collects data over a designated period and loads a group at once, at scheduled intervals. Streaming collects data as soon as it is generated, which AWS says gives the most recent data but can be resource-intensive (checked Oct 2026).</>},
+{question:"Q8. Is API ingestion a separate method?", answer:<>IBM lists it as one, because the source is an API. In practice it behaves like a scheduled or incremental copy. The source's rate limit, such as GitHub's 5,000 requests per hour for authenticated users (checked Oct 2026), caps how fast it can run.</>},
+{question:"Q9. How do I stop an ingestion job from creating duplicates?", answer:<>Make the load safe to repeat. BigQuery load jobs are atomic, so a failed load leaves nothing half written. Snowpipe ignores a staged file whose path and name match a file in its load record. PostgreSQL says clients of logical decoding must handle a change that arrives more than once (checked Oct 2026).</>}
+]} />
+
+<BlogCTA/>
