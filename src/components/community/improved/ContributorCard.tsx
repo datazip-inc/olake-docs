@@ -44,7 +44,7 @@ export const ImprovedContributorCard: React.FC<{ contributor: ContributorProps }
     setLoadingPRs(true)
     try {
       const response = await fetch(
-        `https://api.github.com/search/issues?q=is:pr+repo:datazip-inc/olake+author:${contributor.login}&per_page=5`
+        `https://api.github.com/search/issues?q=is:pr+repo:datazip-inc/olake+repo:datazip-inc/olake-go+author:${contributor.login}&per_page=5`
       )
       const data = await response.json()
       setPrs(data.items || [])
