@@ -30,14 +30,11 @@ function useYieldBeforeNavigation() {
       }, 0)
     }
 
-    const pathnameOf = (to: unknown): string | undefined => {
-      if (typeof to === 'string') return to.split(/[?#]/)[0] || undefined
-      if (to && typeof to === 'object') return (to as { pathname?: string }).pathname
-      return undefined
-    }
-
     const push = history.push
-    const yieldingPush = ((...args: Parameters<typeof push>) => {
+    const pathnameOf = (to: Parameters<typeof push>[0]) =>
+      typeof to === 'string' ? to.split(/[?#]/)[0] || undefined : to.pathname
+
+    const yieldingPush: typeof push = (...args) => {
       const pathname = pathnameOf(args[0])
       if (!inClick || !pathname || pathname === history.location.pathname) return push(...args)
 
@@ -50,7 +47,7 @@ function useYieldBeforeNavigation() {
       // After the next paint. The second timer covers a tab that gets no animation frame.
       window.requestAnimationFrame(() => window.setTimeout(run, 0))
       window.setTimeout(run, 150)
-    }) as typeof push
+    }
 
     history.push = yieldingPush
     window.addEventListener('click', onClick, true)
