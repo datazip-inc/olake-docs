@@ -48,7 +48,7 @@ const AboutTeam = () => {
       }
     ],
     sameAs: [
-      'https://github.com/datazip-inc/olake',
+      'https://github.com/datazip-inc/olake-go',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'

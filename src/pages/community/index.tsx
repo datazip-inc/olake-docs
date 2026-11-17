@@ -55,7 +55,7 @@ const CommunityIndexPage = () => {
       }
     ],
     'sameAs': [
-      'https://github.com/datazip-inc/olake',
+      'https://github.com/datazip-inc/olake-go',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
@@ -409,7 +409,7 @@ const CommunityIndexPage = () => {
 
         <div className='mt-[28px] flex justify-center lg:mt-[40px]'>
           <Button
-            href='https://github.com/datazip-inc/olake/discussions'
+            href='https://github.com/datazip-inc/olake-go/discussions'
             variant='secondary'
             size='lg'
             external

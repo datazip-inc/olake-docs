@@ -7,7 +7,7 @@ const BlogCTA = () => (
     title='OLake Go'
     body='Replicate databases, Kafka, and S3 into Apache Iceberg with OLake Go, an open source EL engine built for Iceberg from the ground up.'
     slackUrl={SLACK_URL}
-    githubUrl='https://github.com/datazip-inc/olake'
+    githubUrl='https://github.com/datazip-inc/olake-go'
     githubLabel='Explore OLake GitHub'
   />
 )

@@ -30,7 +30,7 @@ const ContributorsPage = () => {
     'url': 'https://olake.io/',
     'logo': 'https://olake.io/img/logo/olake-blue.svg',
     'sameAs': [
-      'https://github.com/datazip-inc/olake',
+      'https://github.com/datazip-inc/olake-go',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
@@ -129,13 +129,13 @@ const ContributorsPage = () => {
         '@type': 'ListItem',
         'position': 2,
         'name': 'View on GitHub',
-        'item': 'https://github.com/datazip-inc/olake'
+        'item': 'https://github.com/datazip-inc/olake-go'
       },
       {
         '@type': 'ListItem',
         'position': 3,
         'name': 'Find Good First Issues',
-        'item': 'https://github.com/datazip-inc/olake/issues'
+        'item': 'https://github.com/datazip-inc/olake-go/issues'
       }
     ]
   }
@@ -174,7 +174,7 @@ const ContributorsPage = () => {
       try {
         setLoading(true)
         const response = await fetch(
-          'https://api.github.com/repos/datazip-inc/olake/contributors?per_page=100'
+          'https://api.github.com/repos/datazip-inc/olake-go/contributors?per_page=100'
         )
 
         if (!response.ok) {
@@ -264,7 +264,7 @@ const ContributorsPage = () => {
                 <PiStar aria-hidden='true' /> Become a Contributor
               </Button>
               <Button
-                href='https://github.com/datazip-inc/olake'
+                href='https://github.com/datazip-inc/olake-go'
                 variant='secondary'
                 size='lg'
                 external
@@ -429,7 +429,7 @@ const ContributorsPage = () => {
               <PiGitBranch aria-hidden='true' /> Start Contributing
             </Button>
             <Button
-              href='https://github.com/datazip-inc/olake/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22'
+              href='https://github.com/datazip-inc/olake-go/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22'
               variant='secondary'
               size='lg'
               external

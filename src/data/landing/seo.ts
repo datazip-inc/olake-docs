@@ -71,7 +71,7 @@ export const HOME_SEO = {
         url: `${SITE_URL}/`,
         logo: { '@type': 'ImageObject', url: 'https://olake.io/img/logo/olake-blue.svg', width: 32, height: 32 },
         contactPoint: [{ '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@olake.io' }],
-        sameAs: ['https://github.com/datazip-inc/olake', 'https://x.com/_olake', 'https://www.linkedin.com/company/datazipio/', 'https://www.youtube.com/@olakeio'],
+        sameAs: ['https://github.com/datazip-inc/olake-go', 'https://x.com/_olake', 'https://www.linkedin.com/company/datazipio/', 'https://www.youtube.com/@olakeio'],
         address: { '@type': 'PostalAddress', streetAddress: '16192 COASTAL HWY', addressLocality: 'LEWES', addressRegion: 'DE', postalCode: '19958', addressCountry: 'US' }
       }
     },

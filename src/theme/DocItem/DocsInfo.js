@@ -25,7 +25,7 @@ function DocsInfo(props) {
     "https://github.com/datazip-inc/olake-docs/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with olake.io" +
     location.pathname;
   const openOLakeIssueURL =
-    "https://github.com/datazip-inc/olake/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with OLake, coming from the doc site at URL - olake.io" +
+    "https://github.com/datazip-inc/olake-go/issues/new?assignees=&labels=&template=---doc-error-report.md&title=Issue with OLake, coming from the doc site at URL - olake.io" +
     location.pathname;
 
   return (
