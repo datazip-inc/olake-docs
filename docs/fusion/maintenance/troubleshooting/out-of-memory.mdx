@@ -15,32 +15,30 @@ import OomMemoryCalculator from '@site/src/components/docs/OomMemoryCalculator';
 
 If compaction keeps failing on a table that receives a lot of updates, the compaction executor probably doesn't have enough memory for it. This page shows how to find which of two memory problems you have, how much memory the table needs, and how to set it.
 
-## 1. Which Problem Do You Have?
+## Which Problem Do You Have?
 
-If compaction on a table that receives updates shows **Failed** every time it runs, open the failed task's reason in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/) and match it here:
+Open the failed task's reason in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/) and look for one of these errors:
 
-| The failed task's reason shows | Problem | Most common on |
-| --- | --- | --- |
-| `java.lang.OutOfMemoryError: Java heap space` | [A. The executor's memory is full](#3-problem-a-the-executors-memory-is-full) | [Docker setup](/docs/fusion/install/olake-ui/) (1 GB executor) |
-| `exit code 137` and `OOMKilled`, with no `OutOfMemoryError` | [B. The pod went over its memory limit](#4-problem-b-the-pod-went-over-its-memory-limit) | Kubernetes with the [OLake Helm chart](/docs/fusion/install/kubernetes-compaction/) (4 GB executor) |
+- **`OutOfMemoryError: Java heap space`**: the executor's memory is full. The task's data doesn't fit in the executor memory (the Java heap), so Java stops the task. Most common on the [Docker Compose setup](/docs/fusion/install/olake-ui/), where the executor has 1 GB. See [Problem A](#problem-a).
+- **`exit code 137` and `OOMKilled`**: the pod went over its memory limit. The executor uses more memory than its pod's limit, so the pod is stopped. Most common on Kubernetes with the [OLake Helm chart](/docs/fusion/install/kubernetes-compaction/), where the executor has 4 GB. See [Problem B](#problem-b).
 
 :::tip[Seeing both?]
-If you see `exit code 137`, fix problem B first, then check problem A. Once the pod has room, a table with many updates can still fill the executor memory.
+If you see `exit code 137`, fix [problem B](#problem-b) first, then check [problem A](#problem-a). Once the pod has room, a table with many updates can still fill the executor memory.
 :::
 
 :::note
 A failed run commits nothing, so your data is safe. The table just isn't compacted until the problem is fixed.
 :::
 
-## 2. How Compaction Uses Memory
+## How Compaction Uses Memory
 
 Fusion splits a table's compaction into tasks of about the [target file size](/docs/fusion/compaction/configuration/), 512 MB by default. Each task runs on one Spark executor from start to end. The executor runs in a Kubernetes pod (on the Docker setup too, inside its local cluster), and the pod's memory has two parts:
 
 | Part | Set by | Holds | Problem |
 | --- | --- | --- | --- |
-| **Executor memory** (Java heap) | `spark.executor.memory` | Where the task works; mostly its changed keys | A, when it fills up |
-| **Memory overhead** | `spark.executor.memoryOverhead`: default 10 %, at least 384 MB | Java outside the heap: class metadata, thread stacks, compiled code, garbage-collector data, network and file buffers ("VM overheads, interned strings, other native overheads" in Spark's words) | B, when it's too small |
-| **Pod limit** | Executor memory + overhead; Spark sets it as the pod's `resources.limits.memory` | Everything the executor uses; Kubernetes stops the pod above it | B: usually a small overhead, sometimes a nearly full executor memory |
+| **Executor memory** (Java heap) | `spark.executor.memory` | Where the task works; mostly its changed keys | [A](#problem-a), when it fills up |
+| **Memory overhead** | `spark.executor.memoryOverhead`: default 10 %, at least 384 MB | Java outside the heap: class metadata, thread stacks, compiled code, garbage-collector data, network and file buffers ("VM overheads, interned strings, other native overheads" in Spark's words) | [B](#problem-b), when it's too small |
+| **Pod limit** | Executor memory + overhead; Spark sets it as the pod's `resources.limits.memory` | Everything the executor uses; Kubernetes stops the pod above it | [B](#problem-b): usually a small overhead, sometimes a nearly full executor memory |
 
 Sources: Spark's [configuration](https://spark.apache.org/docs/3.5.8/configuration.html), [memory tuning](https://spark.apache.org/docs/3.5.8/tuning.html#memory-management-overview) and [Kubernetes](https://spark.apache.org/docs/3.5.8/running-on-kubernetes.html#pod-template) docs, for Spark 3.5, which Fusion uses.
 
@@ -48,7 +46,7 @@ Sources: Spark's [configuration](https://spark.apache.org/docs/3.5.8/configurati
 
 Adding more executors doesn't help with either problem, because each task runs on a single executor.
 
-## 3. Problem A: The Executor's Memory Is Full
+## Problem A: The Executor's Memory Is Full {#problem-a}
 
 **Symptom:** the failed task's reason contains:
 
@@ -199,7 +197,7 @@ The calculator uses this formula. Use it to check a result, or to work it out by
 | 3 | `memory_needed` = (`changed_keys_per_task` + `largest_delete_file_rows`) × (`BASE_KEY_BYTES` + `max_key_length`) × `BUFFER` | Rounded up to a whole GB, the value for `spark.executor.memory` |
 
 - A data file bigger than the target is a task of its own: if its `record_count` is more than `rows_per_task`, use that instead.
-- For `spark.executor.memoryOverhead`, see [problem B](#4-problem-b-the-pod-went-over-its-memory-limit).
+- For `spark.executor.memoryOverhead`, see [problem B](#problem-b).
 
 **Worked example**: an [OLake Helm](/docs/fusion/install/kubernetes-compaction/) deployment with the chart's default `spark.executor.memory` of 4g, compacting the example table above at the default 512 MB target file size:
 
@@ -271,13 +269,13 @@ Replace `6g` with your value.
 </TabItem>
 </Tabs>
 
-If the executor memory is 6 GB or less, also apply the fix for [problem B](#4-problem-b-the-pod-went-over-its-memory-limit), or the pod can be stopped before its memory is full.
+If the executor memory is 6 GB or less, also apply the fix for [problem B](#problem-b), or the pod can be stopped before its memory is full.
 
 ### Check It Worked
 
 After the next compaction shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/), run query 1 again. `equality_delete_record_count` should be 0.
 
-## 4. Problem B: The Pod Went Over Its Memory Limit
+## Problem B: The Pod Went Over Its Memory Limit {#problem-b}
 
 **Symptom:** the failed task's reason contains `exit code 137` and `OOMKilled`, and there is no `OutOfMemoryError`:
 
@@ -368,4 +366,4 @@ fusion:
 
 ### Check It Worked
 
-After the next compaction, the executor pods are no longer `OOMKilled` and the run shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/). If the task now fails with `java.lang.OutOfMemoryError` instead, the executor memory is the limit: go to [problem A](#3-problem-a-the-executors-memory-is-full).
+After the next compaction, the executor pods are no longer `OOMKilled` and the run shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/). If the task now fails with `java.lang.OutOfMemoryError` instead, the executor memory is the limit: go to [problem A](#problem-a).
