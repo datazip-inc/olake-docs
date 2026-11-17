@@ -1451,6 +1451,10 @@ const config = {
             from: '/docs/connectors'
           },
           {
+            to: '/docs/connectors/kafka/',
+            from: '/docs/connectors/kafka/overview'
+          },
+          {
             to: '/docs/install/docker-cli/#streams-config',
             from: '/iceberg/docs/core/configs/catalog/'
           },
