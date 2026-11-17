@@ -42,6 +42,11 @@ import DuckdbQueryPolaris from './engines/duckdb/Query-polaris.mdx'
 import TrinoConnectPolaris from './engines/trino/Connect-polaris.mdx'
 import SparkConnectPolaris from './engines/spark/Connect-polaris.mdx'
 import ClickhouseQueryPolaris from './engines/clickhouse/Query-polaris.mdx'
+import AistorSetup from './catalogs/aistor/Setup.mdx'
+import AistorWriter from './catalogs/aistor/Writer.mdx'
+import DuckdbConnectAistor from './engines/duckdb/Connect-aistor.mdx'
+import TrinoConnectAistor from './engines/trino/Connect-aistor.mdx'
+import SparkConnectAistor from './engines/spark/Connect-aistor.mdx'
 import RedshiftQueryGlue from './engines/redshift/Query-glue.mdx'
 import AthenaConnectGlue from './engines/athena/Connect-glue.mdx'
 import DuckdbConnectGlue from './engines/duckdb/Connect-glue.mdx'
@@ -91,6 +96,11 @@ export const PARTIALS = {
   'engines/trino/connect-polaris': TrinoConnectPolaris,
   'engines/spark/connect-polaris': SparkConnectPolaris,
   'engines/clickhouse/query-polaris': ClickhouseQueryPolaris,
+  'catalogs/aistor/setup': AistorSetup,
+  'catalogs/aistor/writer': AistorWriter,
+  'engines/duckdb/connect-aistor': DuckdbConnectAistor,
+  'engines/trino/connect-aistor': TrinoConnectAistor,
+  'engines/spark/connect-aistor': SparkConnectAistor,
   'engines/redshift/query-glue': RedshiftQueryGlue,
   'engines/athena/connect-glue': AthenaConnectGlue,
   'engines/duckdb/connect-glue': DuckdbConnectGlue,

@@ -228,7 +228,7 @@ const ProposalGuidelinesPage = () => {
               title='OLake Slack community'
             />
             <LinkCard
-              href='https://github.com/datazip-inc/olake/issues'
+              href='https://github.com/datazip-inc/olake-go/issues'
               external
               icon={<PiGitBranch />}
               title='GitHub issues / discussions'

@@ -1,0 +1,32 @@
+MinIO AIStor is MinIO's commercial object store. Its **AIStor Tables** feature puts an Iceberg REST catalog inside the store itself, at the `/_iceberg` path on the S3 port, so there is no Polaris, Glue or metastore to run next to it. OLake Go writes through that catalog with Signature Version 4 (SigV4) signing, and Spark, Trino and DuckDB read from the same endpoint.
+
+Two things need to exist before OLake Go can write: an AIStor server with Tables enabled, and a *warehouse* in it. The run on this page used one AIStor node in Docker with a free tier license, which MinIO limits to a single compute resource ([MinIO: deploy AIStor as a container](https://docs.min.io/aistor/installation/container/install/), checked Nov 2026).
+
+```bash title="AIStor, single node in Docker"
+docker run -dt \
+  -p 9000:9000 -p 9001:9001 \
+  -v $HOME/minio/data:/mnt/data \
+  -v $HOME/minio/minio.license:/minio.license \
+  -e MINIO_ROOT_USER=<root-user> -e MINIO_ROOT_PASSWORD=<root-password> \
+  --name aistor-server \
+  quay.io/minio/aistor/minio:latest minio server /mnt/data \
+  --console-address ":9001" --license /minio.license
+```
+
+Port 9000 serves both the S3 API and the Iceberg REST catalog; port 9001 is the AIStor console. The license file comes from MinIO's pricing page (the free tier) or from SUBNET.
+
+Then create the warehouse with the MinIO client. Tables needs AIStor `RELEASE.2026-02-02T23-40-11Z` or later and `mc` `RELEASE.2026-02-03T00-12-26Z` or later ([MinIO: AIStor Tables](https://docs.min.io/aistor/administration/aistor-tables/), checked Nov 2026).
+
+```bash title="Warehouse, once"
+mc alias set aistor http://<aistor-host>:9000 <root-user> <root-password>
+mc table warehouse create aistor olake
+mc table warehouse list aistor
+```
+
+What each part is for:
+
+- The **warehouse** name is what OLake Go and every engine use as the catalog's warehouse. It is a plain name (`olake`), never an `s3://` path.
+- The catalog signs requests with SigV4 under the service name `s3tables`. The region is required by SigV4 but not checked by AIStor, so any non-empty value works.
+- OLake Go needs an access key that may create namespaces and tables in the warehouse and write its files. The run on this page used the root user in a lab. In production, create a dedicated user with `mc admin user add` and attach a policy scoped to the warehouse ([MinIO: AIStor Tables](https://docs.min.io/aistor/administration/aistor-tables/)).
+
+You can check the catalog before OLake Go touches it: `mc table warehouse list` returns the warehouse, and a REST client pointed at `http://<aistor-host>:9000/_iceberg` with the same keys lists its namespaces.

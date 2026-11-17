@@ -1042,7 +1042,7 @@ Comparison posts talk about other vendors. These rules keep them accurate, fair 
 - Every claim about what a competitor does not support or limits ("its docs say ...") links the page that shows it, on the same line. If the page cannot be linked, cut the claim.
 - A factual limit about a competitor always gets its link, even when that takes a post above the usual link budget. Links to outside sites in `/compare` and `/learn` are `nofollow` automatically.
 - Where table cells are not linked one by one, put a `Sources: <names with links> (checked Oct 2026)` line directly under the table. Write the month with three letters (`Oct 2026`).
-- Link the OLake repository (`https://github.com/datazip-inc/olake`) at every mention of Apache 2.0.
+- Link the OLake repository (`https://github.com/datazip-inc/olake-go`) at every mention of Apache 2.0.
 - FAQ answers in `<Faq>` are JSX, so write links as `<a href={"..."}>label</a>` and code as `<code>`: a markdown link inside a plain string shows as raw text.
 - The monthly refresh skill (`/refresh-vendor-claims`) finds claims by this pattern, so use it from the first draft.
 

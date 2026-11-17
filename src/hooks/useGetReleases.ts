@@ -2,7 +2,7 @@ import { usePluginData } from '@docusaurus/useGlobalData'
 import { useEffect, useState } from 'react'
 import { IGlobalData } from '@site/src/types/download'
 
-const STARS_API_URL = 'https://api.github.com/repos/datazip-inc/olake'
+const STARS_API_URL = 'https://api.github.com/repos/datazip-inc/olake-go'
 const STARS_CACHE_KEY = 'olake:gh-stars'
 const STARS_TTL_MS = 24 * 60 * 60 * 1000
 

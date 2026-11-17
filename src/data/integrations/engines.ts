@@ -238,13 +238,15 @@ export const ENGINES: Record<EngineId, Engine> = {
       nessie: { reads: 'yes', how: 'Nessie catalog' },
       unity: { reads: 'yes', how: 'REST catalog' },
       horizon: { reads: 'yes', how: 'REST catalog' },
-      biglake: { reads: 'yes', how: 'REST catalog with Google auth' }
+      biglake: { reads: 'yes', how: 'REST catalog with Google auth' },
+      aistor: { reads: 'yes', how: 'REST catalog with SigV4 (signing name s3tables)', note: 'iceberg.rest-catalog.security=SIGV4 on Trino 477 and later' }
     },
     defaultCatalog: 'glue',
     docsUrl: 'https://trino.io/docs/current/connector/iceberg.html',
     sources: [
       { title: 'Trino: Iceberg connector', url: 'https://trino.io/docs/current/connector/iceberg.html', checked: '2026-10-12' },
-      { title: 'Trino release 480', url: 'https://trino.io/docs/current/release/release-480.html', checked: '2026-10-12' }
+      { title: 'Trino release 480', url: 'https://trino.io/docs/current/release/release-480.html', checked: '2026-10-12' },
+      { title: 'MinIO: Connecting query engines to AIStor Tables', url: 'https://docs.min.io/aistor/developers/aistor-tables/connect-query-engines/', checked: '2026-11-04' }
     ]
   },
   starburst: {
@@ -258,12 +260,14 @@ export const ENGINES: Record<EngineId, Engine> = {
       glue: { reads: 'yes', how: 'Glue catalog' },
       polaris: { reads: 'yes', how: 'Polaris catalog (public preview in Galaxy)' },
       s3tables: { reads: 'yes', how: 'S3 Tables (public preview in Galaxy)' },
-      lakekeeper: { reads: 'partial', how: 'Galaxy supports Lakekeeper on Azure storage only' }
+      lakekeeper: { reads: 'partial', how: 'Galaxy supports Lakekeeper on Azure storage only' },
+      aistor: { reads: 'yes', how: 'Trino Iceberg REST connector with SigV4 (signing name s3tables)' }
     },
     defaultCatalog: 'glue',
     docsUrl: 'https://docs.starburst.io/latest/connector/iceberg.html',
     sources: [
-      { title: 'Starburst Galaxy: catalogs', url: 'https://docs.starburst.io/starburst-galaxy/working-with-data/create-catalogs/index.html', checked: '2026-10-12' }
+      { title: 'Starburst Galaxy: catalogs', url: 'https://docs.starburst.io/starburst-galaxy/working-with-data/create-catalogs/index.html', checked: '2026-10-12' },
+      { title: 'MinIO: Connecting query engines to AIStor Tables', url: 'https://docs.min.io/aistor/developers/aistor-tables/connect-query-engines/', checked: '2026-11-04' }
     ]
   },
   presto: {
@@ -304,12 +308,14 @@ export const ENGINES: Record<EngineId, Engine> = {
       nessie: { reads: 'yes', how: 'type=nessie' },
       hive: { reads: 'yes', how: 'type=hive' },
       jdbc: { reads: 'yes', how: 'type=jdbc' },
-      rest: { reads: 'yes', how: 'type=rest' }
+      rest: { reads: 'yes', how: 'type=rest' },
+      aistor: { reads: 'yes', how: 'REST catalog with rest.sigv4-enabled and rest.signing-name=s3tables' }
     },
     defaultCatalog: 'glue',
     docsUrl: 'https://iceberg.apache.org/docs/latest/spark-configuration/',
     sources: [
-      { title: 'Iceberg: Spark configuration', url: 'https://iceberg.apache.org/docs/latest/spark-configuration/', checked: '2026-10-12' }
+      { title: 'Iceberg: Spark configuration', url: 'https://iceberg.apache.org/docs/latest/spark-configuration/', checked: '2026-10-12' },
+      { title: 'MinIO: Connecting query engines to AIStor Tables', url: 'https://docs.min.io/aistor/developers/aistor-tables/connect-query-engines/', checked: '2026-11-04' }
     ]
   },
   duckdb: {
@@ -328,13 +334,15 @@ export const ENGINES: Record<EngineId, Engine> = {
       biglake: { reads: 'yes', how: 'ATTACH with a Google access token' },
       s3tables: { reads: 'yes', how: 'ATTACH with ENDPOINT_TYPE s3_tables' },
       hive: { reads: 'no', how: 'DuckDB attaches REST catalogs only' },
-      jdbc: { reads: 'no', how: 'DuckDB attaches REST catalogs only' }
+      jdbc: { reads: 'no', how: 'DuckDB attaches REST catalogs only' },
+      aistor: { reads: 'yes', how: 'ATTACH with AUTHORIZATION_TYPE sigv4 and SIGV4_SERVICE s3tables', note: 'DuckDB 1.5 or later; single-level namespaces only' }
     },
     defaultCatalog: 'glue',
     docsUrl: 'https://duckdb.org/docs/current/core_extensions/iceberg/catalogs.html',
     sources: [
       { title: 'DuckDB: Iceberg REST catalogs', url: 'https://duckdb.org/docs/current/core_extensions/iceberg/catalogs.html', checked: '2026-10-12' },
-      { title: 'DuckDB: new Iceberg features (v3 support)', url: 'https://duckdb.org/2026/05/29/new-iceberg-features', checked: '2026-10-12' }
+      { title: 'DuckDB: new Iceberg features (v3 support)', url: 'https://duckdb.org/2026/05/29/new-iceberg-features', checked: '2026-10-12' },
+      { title: 'MinIO: Connecting query engines to AIStor Tables', url: 'https://docs.min.io/aistor/developers/aistor-tables/connect-query-engines/', checked: '2026-11-04' }
     ]
   },
   clickhouse: {
@@ -352,13 +360,15 @@ export const ENGINES: Record<EngineId, Engine> = {
       unity: { reads: 'yes', how: 'DataLakeCatalog with catalog_type unity (external locations only)' },
       nessie: { reads: 'yes', how: 'DataLakeCatalog with catalog_type rest' },
       hive: { reads: 'partial', how: 'experimental hive catalog' },
-      jdbc: { reads: 'no', how: 'no JDBC catalog support' }
+      jdbc: { reads: 'no', how: 'no JDBC catalog support' },
+      aistor: { reads: 'yes', how: 'REST with an OAuth2 bearer token from the catalog token endpoint', note: 'ClickHouse cannot sign catalog requests with SigV4' }
     },
     defaultCatalog: 'glue',
     docsUrl: 'https://clickhouse.com/docs/engines/table-engines/integrations/iceberg',
     sources: [
       { title: 'ClickHouse: Iceberg table engine', url: 'https://clickhouse.com/docs/engines/table-engines/integrations/iceberg', checked: '2026-10-12' },
-      { title: 'ClickHouse PR 110781 (deletion vectors)', url: 'https://github.com/ClickHouse/ClickHouse/pull/110781', checked: '2026-10-12' }
+      { title: 'ClickHouse PR 110781 (deletion vectors)', url: 'https://github.com/ClickHouse/ClickHouse/pull/110781', checked: '2026-10-12' },
+      { title: 'MinIO: Connecting query engines to AIStor Tables', url: 'https://docs.min.io/aistor/developers/aistor-tables/connect-query-engines/', checked: '2026-11-04' }
     ]
   },
   doris: {
@@ -418,13 +428,15 @@ export const ENGINES: Record<EngineId, Engine> = {
       nessie: { reads: 'yes', how: 'Nessie or REST client' },
       hive: { reads: 'yes', how: 'Hive Metastore client' },
       jdbc: { reads: 'yes', how: 'Iceberg JDBC catalog' },
-      rest: { reads: 'yes', how: 'any Iceberg REST client' }
+      rest: { reads: 'yes', how: 'any Iceberg REST client' },
+      aistor: { reads: 'yes', how: 'Iceberg REST catalog built into the object store' }
     },
     defaultCatalog: 'polaris',
     docsUrl: 'https://iceberg.apache.org/spec/',
     sources: [
       { title: 'Apache Iceberg: table spec', url: 'https://iceberg.apache.org/spec/', checked: '2026-10-30' },
-      { title: 'Apache Iceberg: REST catalog spec', url: 'https://iceberg.apache.org/rest-catalog-spec/', checked: '2026-10-30' }
+      { title: 'Apache Iceberg: REST catalog spec', url: 'https://iceberg.apache.org/rest-catalog-spec/', checked: '2026-10-30' },
+      { title: 'MinIO: Connecting query engines to AIStor Tables', url: 'https://docs.min.io/aistor/developers/aistor-tables/connect-query-engines/', checked: '2026-11-04' }
     ]
   },
   fabric: {

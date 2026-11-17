@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
@@ -63,3 +63,64 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  # olake.io on Cloudflare Workers static assets (see cloudflare/README.md).
+  # Runs next to the GitHub Pages deploy until the domain is moved, then replaces it.
+  # Off until the repository variable CLOUDFLARE_ACCOUNT_ID is set.
+  deploy-cloudflare:
+    name: Deploy to Cloudflare
+    if: vars.CLOUDFLARE_ACCOUNT_ID != ''
+    # Uses the files the build job produced: one build per merge, so both hosts serve the same
+    # output and the build's own hooks (IndexNow) run once.
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # One Cloudflare deploy at a time, and never cancel one that is running.
+    concurrency:
+      group: cloudflare-production
+      cancel-in-progress: false
+    env:
+      # Where this Worker is reachable: its workers.dev URL before the domain is moved,
+      # https://olake.io after. Unset means no post-deploy test.
+      SITE_URL: ${{ vars.CLOUDFLARE_SITE_URL }}
+    steps:
+      # Only for the scripts, cloudflare/_headers and wrangler.jsonc: no history, no npm install
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download the build
+        uses: actions/download-artifact@v8
+        with:
+          name: github-pages
+          path: pages-artifact
+      - name: Unpack the build
+        run: |
+          mkdir build
+          tar -xf pages-artifact/artifact.tar -C build
+          rm -rf pages-artifact
+          test -f build/index.html
+
+      # Keeps the hashed JS and CSS of the last 7 days of deploys, so a tab that still holds
+      # older HTML keeps working after this deploy.
+      - name: Carry forward the assets of earlier deploys
+        run: node scripts/cloudflare/carry-assets.mjs build --from "${SITE_URL:-https://olake.io}"
+      - name: Write _redirects and _headers, drop the redirect stubs
+        run: node scripts/cloudflare/prepare-build.mjs build
+
+      - name: Deploy
+        run: npx --yes wrangler@4.159.0 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Test redirects, sitemap URLs and the 404 page on the deployed site
+        if: env.SITE_URL != ''
+        run: |
+          sleep 20
+          node scripts/cloudflare/test-deploy.mjs build "$SITE_URL" --json test-deploy.json > /dev/null \
+            || { node -e "const r=require('./test-deploy.json');console.log(r.allFailures.slice(0,50).join('\n'));"; exit 1; }
+          node -e "const r=require('./test-deploy.json');console.log(JSON.stringify({redirects:r.redirects,sitemap:r.sitemap},null,2))"

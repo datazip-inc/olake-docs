@@ -209,5 +209,12 @@ export const HOSTS = {
         image: "/img/authors/ankit.webp",
         linkedin: "https://www.linkedin.com/in/hashcode-ankit/",
     },
+    BRENNA_BUUCK: {
+        name: "Brenna Buuck",
+        role: "Developer Evangelist, MinIO",
+        bio: "Brenna is a Developer Evangelist at MinIO and has worked as a data engineer for 11 years. She works with teams running Apache Iceberg lakehouses in production and shares what she learns about building high-performance data platforms on cloud, on-prem and hybrid infrastructure.",
+        image: "/img/authors/brenna-buuck.webp",
+        linkedin: "https://www.linkedin.com/in/brennabuuck/",
+    },
 };
 

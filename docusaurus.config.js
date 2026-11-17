@@ -1539,7 +1539,7 @@ const config = {
             from: '/docs/connectors/getting-started/olake-ui/'
           },
           {
-            to: 'https://github.com/datazip-inc/olake',
+            to: 'https://github.com/datazip-inc/olake-go',
             from: '/github'
           }
         ]

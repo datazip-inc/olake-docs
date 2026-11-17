@@ -126,7 +126,7 @@ const WebinarsPage = () => {
     'url': 'https://olake.io/',
     'logo': 'https://olake.io/img/logo/olake-blue.svg',
     'sameAs': [
-      'https://github.com/datazip-inc/olake',
+      'https://github.com/datazip-inc/olake-go',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
@@ -218,6 +218,18 @@ const WebinarsPage = () => {
 
   // Define webinars data directly
   const webinars = [
+    {
+      title: 'Apache Iceberg for Beginners: Build a Lakehouse Anywhere ft. MinIO',
+      subtitle:
+        'Brenna Buuck, Developer Evangelist at MinIO, explains what a data lakehouse is, how Apache Iceberg tables, metadata and the REST catalog work, what is new in Iceberg v3, and how to run a high-performance Iceberg lakehouse on cloud, on-prem or hybrid infrastructure.',
+      route: '/webinar/w-15-iceberg-for-beginners-minio',
+      img: `/img/webinars/w-15-iceberg-for-beginners-minio.webp`,
+      alt: 'Apache Iceberg for Beginners: Build a Lakehouse Anywhere ft. MinIO',
+      status: 'archived',
+      button: 'secondary',
+      CTA: 'Watch Now',
+      date: '22 September 2026'
+    },
     {
       title: 'Iceberg for Agents: Building AI-Ready Data Pipelines',
       subtitle:

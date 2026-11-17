@@ -2,7 +2,7 @@
  * Navigation model for the Lakeside navbar (pill on the landing pages, bar everywhere else) and for
  * the docs mobile drawer. The hrefs are the site's existing routes.
  */
-export const GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake'
+export const GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake-go'
 export const FUSION_GITHUB_REPO_URL = 'https://github.com/datazip-inc/olake-fusion'
 export const SLACK_URL = '/slack/'
 export const GO_QUICKSTART = '/docs/getting-started/quickstart/'
