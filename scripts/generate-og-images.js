@@ -20,18 +20,21 @@
  * Posts without a local raster cover use the site card (static/img/logo/olake-og-card.png).
  *
  * Freshness is decided by content, never by file times (mtimes mean nothing on a CI clone): the
- * manifest scripts/og-images.manifest.json stores the SHA-256 of every source cover that the
- * committed JPEG was rendered from. An output is current when it exists and the manifest hash for
- * its cover equals the cover's hash now.
+ * SHA-256 of the source cover that a committed JPEG was rendered from is stored, and an output is
+ * current when it exists and that hash equals the cover's hash now. A hash lives in its own file
+ * under scripts/og-hashes/ (same path as the card, .sha256 instead of .jpg), so a post pull request
+ * only adds files and two of them never edit the same one. The older shared manifest
+ * scripts/og-images.manifest.json is read as a fallback for covers rendered before that change and
+ * is no longer written.
  *
  * Usage (not part of `npm run build`; run it by hand after adding or changing a cover):
- *   npm run og-images                  render only the missing or stale images, update the manifest
+ *   npm run og-images                  render only the missing or stale images, write their hash files
  *   npm run og-images -- --force       re-render every image
  *   npm run og-images -- --check       write nothing; exit 1 if an image is missing or stale (CI)
  *   npm run og-images -- --adopt-existing
- *                                      record hashes for images that already exist without
- *                                      re-rendering them (one-off, to create the manifest)
- * Generated files and the manifest are committed so `npm start` works without running the script.
+ *                                      write hash files for images that already exist without
+ *                                      re-rendering them (one-off)
+ * Generated files and hash files are committed so `npm start` works without running the script.
  */
 
 const crypto = require('crypto')
@@ -43,6 +46,7 @@ const sharp = require('sharp')
 const ROOT = path.resolve(__dirname, '..')
 const STATIC = path.join(ROOT, 'static')
 const MANIFEST = path.join(__dirname, 'og-images.manifest.json')
+const HASH_DIR = path.join(__dirname, 'og-hashes')
 const CONTENT_DIRS = ['blog', 'customer-stories', 'learn', 'compare']
 const W = 1200
 const H = 630
@@ -140,15 +144,19 @@ function readManifest() {
   }
 }
 
-function writeManifest(entries) {
-  const covers = {}
-  for (const key of Object.keys(entries).sort()) covers[key] = entries[key]
-  const body = { _comment: 'Source cover content hashes for static/img/og. Maintained by scripts/generate-og-images.js.', covers }
-  const text = JSON.stringify(body, null, 2) + '\n'
-  // Do not touch the file when nothing changed
-  if (!fs.existsSync(MANIFEST) || fs.readFileSync(MANIFEST, 'utf8') !== text) {
-    fs.writeFileSync(MANIFEST, text)
-  }
+/** '/img/blog/a/b.webp' -> scripts/og-hashes/blog/a/b.sha256 */
+const hashFile = (cover) =>
+  path.join(HASH_DIR, ogPath(cover).replace(/^\/img\/og\//, '').replace(/\.jpg$/, '.sha256'))
+
+function readStoredHash(cover, legacy) {
+  const file = hashFile(cover)
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : legacy[cover] || ''
+}
+
+function writeStoredHash(cover, hash) {
+  const file = hashFile(cover)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, hash + '\n')
 }
 
 async function main() {
@@ -156,8 +164,7 @@ async function main() {
   const check = process.argv.includes('--check')
   const adopt = process.argv.includes('--adopt-existing')
   const covers = readCovers()
-  const previous = readManifest()
-  const next = {}
+  const legacy = readManifest()
   let made = 0
   let adopted = 0
   let current = 0
@@ -172,13 +179,12 @@ async function main() {
     }
     const hash = sha256(srcFile)
     const exists = fs.existsSync(outFile)
-    if (!force && exists && previous[cover] === hash) {
-      next[cover] = hash
+    if (!force && exists && readStoredHash(cover, legacy) === hash) {
       current++
       continue
     }
     if (adopt && exists) {
-      next[cover] = hash
+      writeStoredHash(cover, hash)
       adopted++
       continue
     }
@@ -189,11 +195,9 @@ async function main() {
       continue
     }
     await render(srcFile, outFile)
-    next[cover] = hash
+    writeStoredHash(cover, hash)
     made++
   }
-
-  if (!check) writeManifest(next)
 
   // Images no post uses any more: reported, never deleted or failed on
   const wanted = new Set([...covers.keys()].map((c) => path.join(STATIC, ogPath(c))))
