@@ -188,7 +188,7 @@ export default function UnityIcebergWriterCLIConfigDetails({ authType }) {
       </table>
 
       <Admonition type="note" title="Catalog Name Supported for v0.3.5 and above">
-        For the <strong>catalog name</strong>, OLake Go only supports lowercase letters, numbers and
+        For the <strong>catalog name</strong>, OLake Go only supports lowercase letters, numbers (from v0.12.1) and
         underscores. Spaces and special characters are not supported.
       </Admonition>
     </>
