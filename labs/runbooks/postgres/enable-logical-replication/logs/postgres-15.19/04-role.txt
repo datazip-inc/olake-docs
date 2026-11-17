@@ -1,0 +1,87 @@
+# ./run.sh role    PostgreSQL 15.19    2026-11-16T17:50:25Z
+
+## A login role without the REPLICATION attribute
+CREATE ROLE cdc_user LOGIN PASSWORD 'cdcpw';
+CREATE ROLE
+SELECT rolname, rolsuper, rolreplication FROM pg_roles WHERE rolname = 'cdc_user';
+ rolname  | rolsuper | rolreplication 
+----------+----------+----------------
+ cdc_user | f        | f
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
+ERROR:  must be superuser or replication role to use replication slots
+$ psql "dbname=appdb user=cdc_user replication=database" -c "IDENTIFY_SYSTEM"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  must be superuser or replication role to start walsender
+
+## Fix: give the role the attribute.
+ALTER ROLE cdc_user REPLICATION;
+ALTER ROLE
+SELECT rolname, rolsuper, rolreplication FROM pg_roles WHERE rolname = 'cdc_user';
+ rolname  | rolsuper | rolreplication 
+----------+----------+----------------
+ cdc_user | f        | t
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/194A000
+(1 row)
+
+$ psql "dbname=appdb user=cdc_user replication=database" -c "IDENTIFY_SYSTEM"
+      systemid       | timeline |  xlogpos  | dbname 
+---------------------+----------+-----------+--------
+ 7708828043495649317 |        1 | 0/194A000 | appdb
+(1 row)
+
+
+## The attribute lets the role use slots. Reading tables for the first copy is a separate privilege.
+SELECT count(*) FROM orders;    -- as cdc_user
+ERROR:  permission denied for table orders
+GRANT USAGE ON SCHEMA public TO cdc_user;
+GRANT
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+GRANT
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO cdc_user;
+ALTER DEFAULT PRIVILEGES
+SELECT count(*) FROM orders;    -- as cdc_user
+ count 
+-------
+     3
+(1 row)
+
+
+## pg_hba.conf: which rows match a connection from another host
+SELECT line_number, type, database, user_name, address, auth_method FROM pg_hba_file_rules ORDER BY line_number;
+ line_number | type  |   database    | user_name |  address  |  auth_method  
+-------------+-------+---------------+-----------+-----------+---------------
+          89 | local | {all}         | {all}     |           | trust
+          91 | host  | {all}         | {all}     | 127.0.0.1 | trust
+          93 | host  | {all}         | {all}     | ::1       | trust
+          96 | local | {replication} | {all}     |           | trust
+          97 | host  | {replication} | {all}     | 127.0.0.1 | trust
+          98 | host  | {replication} | {all}     | ::1       | trust
+         100 | host  | {all}         | {all}     | all       | scram-sha-256
+(7 rows)
+
+$ psql "host=172.28.0.2 dbname=appdb user=cdc_user replication=database" -c "IDENTIFY_SYSTEM"    (a logical replication connection)
+      systemid       | timeline |  xlogpos  | dbname 
+---------------------+----------+-----------+--------
+ 7708828043495649317 |        1 | 0/19502E0 | appdb
+(1 row)
+
+$ psql "host=172.28.0.2 dbname=appdb user=cdc_user replication=true" -c "IDENTIFY_SYSTEM"    (a physical replication connection)
+psql: error: connection to server at "172.28.0.2", port 5432 failed: FATAL:  no pg_hba.conf entry for replication connection from host "172.28.0.2", user "cdc_user", no encryption
+--- server log
+2026-11-16 17:50:27.521 UTC [175] ERROR:  must be superuser or replication role to use replication slots
+2026-11-16 17:50:27.652 UTC [182] FATAL:  must be superuser or replication role to start walsender
+2026-11-16 17:50:28.478 UTC [229] ERROR:  permission denied for table orders
+2026-11-16 17:50:29.654 UTC [288] FATAL:  no pg_hba.conf entry for replication connection from host "172.28.0.2", user "cdc_user", no encryption
+---
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+

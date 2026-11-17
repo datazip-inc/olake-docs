@@ -416,4 +416,64 @@ const fusionDocSidebar = {
 // One category per query engine, built from src/data/integrations/pairs.ts so a new pair shows
 // up as soon as its status is `live`. Draft pages stay `unlisted` and out of the sidebar.
 
-export default { ...docSidebar, ...fusionDocSidebar };
+// ─── RUNBOOKS SIDEBAR ──────────────────────────────────────────────────────────
+// Set-up and operations guides backed by a reproduced failure (labs/runbooks). One category per
+// family. A page stays `unlisted` and out of the sidebar until scripts/runbooks/check.mjs passes
+// with a reviewer set.
+const runbooksSidebar = {
+  runbooksSidebar: [
+    { type: 'doc', id: 'runbooks/index', label: 'Overview' },
+    {
+      type: 'category',
+      label: 'PostgreSQL',
+      collapsed: false,
+      items: [
+        { type: 'doc', id: 'runbooks/postgres/replication-slot-filling-disk', label: 'Replication slot filling the disk' },
+        { type: 'doc', id: 'runbooks/postgres/enable-logical-replication', label: 'Enable logical replication' }
+      ]
+    },
+    {
+      type: 'category',
+      label: 'MySQL',
+      collapsed: false,
+      items: [{ type: 'doc', id: 'runbooks/mysql/binlog-retention-error-1236', label: 'Binlog retention and error 1236' }]
+    },
+    {
+      type: 'category',
+      label: 'SQL Server',
+      collapsed: false,
+      items: [{ type: 'doc', id: 'runbooks/sql-server/enable-cdc-change-tables-empty', label: 'Enable CDC and fix empty change tables' }]
+    },
+    {
+      type: 'category',
+      label: 'Debezium',
+      collapsed: false,
+      items: [
+        { type: 'doc', id: 'runbooks/debezium/connector-running-captures-nothing', label: 'Running but captures nothing' },
+        { type: 'doc', id: 'runbooks/debezium/schema-history-topic-missing', label: 'Schema history topic missing' }
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Kafka Connect',
+      collapsed: false,
+      items: [
+        { type: 'doc', id: 'runbooks/kafka-connect/connector-class-not-found', label: 'Connector class not found' },
+        { type: 'doc', id: 'runbooks/kafka-connect/task-failed-will-not-recover', label: 'Task failed, will not recover' }
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Apache Iceberg',
+      collapsed: false,
+      link: { type: 'doc', id: 'runbooks/iceberg/index' },
+      items: [
+        { type: 'doc', id: 'runbooks/iceberg/schema-evolution-errors', label: 'Schema evolution errors' },
+        { type: 'doc', id: 'runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing', label: 'Compaction rewrites nothing' },
+        { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' }
+      ]
+    }
+  ]
+};
+
+export default { ...docSidebar, ...fusionDocSidebar, ...runbooksSidebar };

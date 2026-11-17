@@ -1,0 +1,345 @@
+---
+title: "Failed to find any class that implements Connector: fixes"
+description: "Kafka Connect cannot find a connector class when plugin.path points at the wrong folder or a plug-in is half installed. Seven causes we reproduced, with fixes."
+sidebar_label: Connector class not found
+unlisted: true
+keywords:
+  - Failed to find any class that implements Connector
+  - kafka connect plugin.path
+  - kafka connect NoClassDefFoundError
+  - kafka connect ClassNotFoundException
+  - connector-plugins
+  - debezium connector plugin install
+  - confluent-hub install plugin.path
+  - plugin.discovery service_load
+  - connect-plugin-path.sh
+runbook:
+  family: kafka-connect
+  author: shubham
+  reproduced:
+    date: "2026-11-16"
+    versions:
+      - "Kafka Connect 4.3.1 on Java 21 with the Debezium PostgreSQL plug-in 3.7.1.Final"
+      - "Kafka Connect 3.2.0 on Java 11 with the Debezium PostgreSQL plug-in 1.9.7.Final"
+    lab: labs/runbooks/kafka-connect/connector-class-not-found
+    summary: "A plain Kafka Connect worker was started with no plugin.path, with plugin.path one level too deep, with two half-installed plug-ins, with a plug-in copied in while it ran, and with a wrong class name, and then with the correct layout from the Debezium archive, a Confluent Hub archive and the confluent-hub client. On 4.3.1 a plug-in without a manifest was also loaded with plugin.discovery=service_load, and on 3.2.0 a plug-in built for a newer Java."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+Kafka Connect answers `Failed to find any class that implements Connector and which name matches ...` when you create a connector whose class the worker did not load. The same text is the `trace` of a `FAILED` connector when a plug-in goes missing under a connector that already exists.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Ask the worker what it loaded with `curl -s localhost:8083/connector-plugins`. If the class is not in that list, the jars are not where `plugin.path` looks, or the worker has not been restarted since they were put there.
+
+Give each plug-in its own folder, set `plugin.path` to the parent of that folder, and restart every worker. The message itself helps: it ends with the list of connectors the worker did load.
+
+<TLDR title='Key takeaways'>
+
+- `plugin.path` names the folder that contains the plug-in folders, never the folder that holds the jars. One level too deep, both Kafka Connect 3.2.0 and 4.3.1 loaded every jar as a plug-in of its own and the connector was not found.
+- Version 4.3.1 says why in the worker log, with `Failed to discover SourceConnector` and a `NoClassDefFoundError`. Version 3.2.0 logged nothing about the plug-in it could not load.
+- A half-installed plug-in can still be listed. Without its driver jar the connector appeared in `GET /connector-plugins`, and creating it failed with `java.lang.NoClassDefFoundError: org/postgresql/Driver`.
+
+</TLDR>
+
+## The error
+
+Creating a connector on a worker that has not loaded its class, on Kafka Connect 4.3.1:
+
+```text
+HTTP 400
+{"error_code":400,"message":"Failed to find any class that implements Connector and which name matches io.debezium.connector.postgresql.PostgresConnector, available connectors are: PluginDesc{klass=class org.apache.kafka.connect.mirror.MirrorCheckpointConnector, name='org.apache.kafka.connect.mirror.MirrorCheckpointConnector', version='4.3.1', encodedVersion=4.3.1, type=source, typeName='source', location='classpath'}, PluginDesc{klass=class org.apache.kafka.connect.mirror.MirrorHeartbeatConnector, name='org.apache.kafka.connect.mirror.MirrorHeartbeatConnector', version='4.3.1', encodedVersion=4.3.1, type=source, typeName='source', location='classpath'}, PluginDesc{klass=class org.apache.kafka.connect.mirror.MirrorSourceConnector, name='org.apache.kafka.connect.mirror.MirrorSourceConnector', version='4.3.1', encodedVersion=4.3.1, type=source, typeName='source', location='classpath'}"}
+```
+
+Kafka Connect 3.2.0 sent the same message with `"error_code":500` and HTTP 500, and wrote the exception to the worker log. Version 4.3.1 wrote no log line for it.
+
+The second place it appears is the status of a connector that exists while its plug-in does not. On 4.3.1, after the plug-in was removed and the worker restarted:
+
+```json
+{
+  "name": "inventory-connector",
+  "connector": {
+    "state": "FAILED",
+    "worker_id": "0.0.0.0:8083",
+    "version": null,
+    "trace": "org.apache.kafka.connect.errors.ConnectException: Failed to find any class that implements Connector and which name matches io.debezium.connector.postgresql.PostgresConnector, available connectors are: ..."
+  },
+  "tasks": [
+    {
+      "id": 0,
+      "state": "FAILED",
+      "worker_id": "0.0.0.0:8083",
+      "version": null,
+      "trace": "org.apache.kafka.connect.errors.ConnectException: Failed to start task inventory-connector-0 since it is not a recognizable type (source or sink)\n\tat ..."
+    }
+  ],
+  "type": "unknown"
+}
+```
+
+On 3.2.0 the status call itself failed in that situation, with HTTP 500 and the message as its body.
+
+### The same failure across versions
+
+The message has not changed. It is in the source at the 0.10.2.2, 0.11.0.0, 1.1.1, 2.0.1, 3.2.0, 3.6.0, 4.3.1 and 4.4.0 tags. What changed around it is where plug-ins come from and what the worker tells you, and the table cites the Kafka Improvement Proposal (KIP) or the source file for each change.
+
+| Kafka Connect | What changed | Where it comes from |
+| --- | --- | --- |
+| Before 0.11.0 | No `plugin.path`. Connector jars are loaded from the Java class path | [KIP-146](https://cwiki.apache.org/confluence/display/KAFKA/KIP-146+-+Classloading+Isolation+in+Connect), source at [0.10.2.2](https://github.com/apache/kafka/blob/0.10.2.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorFactory.java) |
+| 0.11.0 | `plugin.path`: each plug-in gets a class loader of its own | KIP-146, marked "Released: 0.11.0.0" |
+| 3.2 | `GET /connector-plugins?connectorsOnly=false` also lists converters and transformations | Source at [3.1.2](https://github.com/apache/kafka/blob/3.1.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResource.java) and [3.2.0](https://github.com/apache/kafka/blob/3.2.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResource.java) |
+| 3.6 | `plugin.discovery`, the `connect-plugin-path.sh` tool, and the `Failed to discover` log lines | [KIP-898](https://cwiki.apache.org/confluence/display/KAFKA/KIP-898%3A+Modernize+Connect+plugin+discovery), marked "Released in 3.6.0", source at [3.6.0](https://github.com/apache/kafka/blob/3.6.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanner.java) |
+
+These differences are from the two runs on this page:
+
+| | Kafka Connect 3.2.0 | Kafka Connect 4.3.1 |
+| --- | --- | --- |
+| Answer to `POST /connectors` | HTTP 500 | HTTP 400 |
+| Worker log for a plug-in it could not load | No warning or error about it | `ERROR Failed to discover SourceConnector in <location>` and the exception |
+| Driver jar missing | HTTP 500 with an HTML error page | HTTP 400 with `Error during connection validation: java.lang.NoClassDefFoundError: org/postgresql/Driver` |
+| Status of a connector whose plug-in is gone | The status call answers HTTP 500 | Connector and task `FAILED`, `"type": "unknown"` |
+| `plugin.discovery` in the worker file | Ignored, with `The configuration 'plugin.discovery' was supplied but isn't a known config.` | Default `hybrid_warn` |
+
+## Why it happens
+
+A worker builds its list of plug-ins once, when it starts. It looks on its own class path and in every folder named in `plugin.path`, and the [Kafka documentation](https://kafka.apache.org/43/configuration/kafka-connect-configs/#connectconfigs_plugin.path) says what each of those folders may hold: "directories immediately containing jars with plugins and their dependencies", single jars that carry their dependencies, or class files.
+
+So each item directly inside a `plugin.path` folder becomes one plug-in with its own class loader. A folder of jars is one plug-in. A jar on its own is also one plug-in, cut off from the jars next to it.
+
+When you create a connector, the worker looks the class name up in that list and nothing else. If the name is not there, it answers with this error and prints the list.
+
+## Confirm the diagnosis
+
+**1. Ask the worker.** Call the worker you send the connector to. The Kafka documentation notes that "the API only checks for connectors on the worker that handles the request".
+
+```bash
+curl -s localhost:8083/connector-plugins
+curl -s 'localhost:8083/connector-plugins?connectorsOnly=false'
+```
+
+The second form needs Kafka Connect 3.2 or later and adds converters and transformations. The answer is JSON. These are the classes, types and versions that a worker with no `plugin.path` returned on 4.3.1:
+
+```text
+org.apache.kafka.connect.mirror.MirrorCheckpointConnector      source  4.3.1
+org.apache.kafka.connect.mirror.MirrorHeartbeatConnector       source  4.3.1
+org.apache.kafka.connect.mirror.MirrorSourceConnector          source  4.3.1
+```
+
+**2. Read what the worker treated as a plug-in.** At start-up it writes one `Loading plugin from:` line per plug-in, and the same block of the log shows the `plugin.path` it is using.
+
+A path that ends in a folder is right. A path that ends in `.jar` for every jar of one connector means `plugin.path` is one level too deep.
+
+```bash
+docker logs <connect-container> 2>&1 | grep -E 'Loading plugin from|plugin.path = '
+```
+
+**3. On Kafka Connect 3.6 or later, ask the tool.** It lists every plug-in under a path with two flags, `isLoadable` and `hasManifest`.
+
+```bash
+bin/connect-plugin-path.sh list --plugin-path /opt/connect-plugins
+```
+
+## Cause 1: the plug-in is not on plugin.path
+
+The `connect-distributed.properties` file that ships with Kafka has `plugin.path` commented out. A worker started from it knows the connectors on its class path and no others, which on both versions were the three MirrorMaker connectors shown above.
+
+The fix is the layout the Debezium documentation describes: extract the archive and "add the parent directory of the extracted plug-in(s)" to the plug-in path. The Debezium PostgreSQL archive unpacks to one folder:
+
+```text
+/lab/plugins/debezium-connector-postgres/debezium-api-3.7.1.Final.jar
+/lab/plugins/debezium-connector-postgres/debezium-connector-postgres-3.7.1.Final.jar
+/lab/plugins/debezium-connector-postgres/postgresql-42.7.13.jar
+/lab/plugins/debezium-connector-postgres/ (7 more jars)
+```
+
+```properties
+plugin.path=/lab/plugins
+```
+
+After a restart the worker logged the folder as one plug-in and listed the class. Creating the connector returned HTTP 201 and it reached `RUNNING` with a `RUNNING` task, on both versions.
+
+```text
+INFO Loading plugin from: /lab/plugins/debezium-connector-postgres (org.apache.kafka.connect.runtime.isolation.PluginScanner:75)
+INFO Registered loader: PluginClassLoader{pluginLocation=file:/lab/plugins/debezium-connector-postgres/} (org.apache.kafka.connect.runtime.isolation.PluginScanner:80)
+INFO Added plugin 'io.debezium.connector.postgresql.PostgresConnector' (org.apache.kafka.connect.runtime.isolation.DelegatingClassLoader:199)
+```
+
+## Cause 2: plugin.path points at the jars
+
+With `plugin.path=/lab/plugins/debezium-connector-postgres`, one level too deep, the worker treated each jar as a separate plug-in. The class was not listed and creating the connector failed with the error, on both versions.
+
+Kafka Connect 4.3.1 says what went wrong. The connector jar was loaded alone and could not see a class from the jar next to it:
+
+```text
+INFO Loading plugin from: /lab/plugins/debezium-connector-postgres/debezium-connector-postgres-3.7.1.Final.jar (org.apache.kafka.connect.runtime.isolation.PluginScanner:75)
+ERROR Failed to discover SourceConnector in /lab/plugins/debezium-connector-postgres/debezium-connector-postgres-3.7.1.Final.jar (org.apache.kafka.connect.runtime.isolation.PluginScanner:183)
+java.lang.NoClassDefFoundError: io/debezium/metadata/ConfigDescriptor
+Caused by: java.lang.ClassNotFoundException: io.debezium.metadata.ConfigDescriptor
+```
+
+Kafka Connect 3.2.0 wrote the `Loading plugin from: ... .jar` lines and no warning or error about the plug-in.
+
+The fix is cause 1: point `plugin.path` at the parent folder and restart.
+
+## Cause 3: a half-installed plug-in
+
+Two jars were removed in turn from a correct layout, and the two results differ.
+
+**A jar the connector class needs to load.** Without `debezium-connector-common` on 3.7.1, or `debezium-core` on 1.9.7, the class was not listed and creating the connector gave the error. Version 4.3.1 logged the reason and 3.2.0 logged nothing:
+
+```text
+ERROR Failed to discover SourceConnector in /lab/half-core/debezium-connector-postgres (org.apache.kafka.connect.runtime.isolation.PluginScanner:183)
+java.lang.NoClassDefFoundError: io/debezium/metadata/ConfigDescriptor
+Caused by: java.lang.ClassNotFoundException: io.debezium.metadata.ConfigDescriptor
+```
+
+**A jar it needs only when it runs.** Without the PostgreSQL driver jar the class was listed on both versions, so the first check passes. Creating the connector then failed on 4.3.1 with:
+
+```text
+HTTP 400
+{"error_code":400,"message":"Connector configuration is invalid and contains the following 1 error(s):\nError during connection validation: java.lang.NoClassDefFoundError: org/postgresql/Driver\nYou can also find the above list of errors at the endpoint `/connector-plugins/{connectorType}/config/validate`"}
+```
+
+On 3.2.0 the same call returned HTTP 500 with an HTML error page, and the cause was only in the worker log: `Caused by: java.lang.ClassNotFoundException: org.postgresql.Driver`.
+
+The fix for both is to install the whole archive again. Compare the folder with the archive listing before you restart.
+
+## Cause 4: the worker was not restarted
+
+Copying the plug-in into an empty folder on `plugin.path` while the worker ran changed nothing. Thirty seconds later the class was still not listed, on both versions. After a restart it was listed, and a connector that had been failing for want of the plug-in went back to `RUNNING` without being touched.
+
+The Debezium documentation says the same: "Restart your Kafka Connect process to pick up the new JARs."
+
+In a cluster, install the plug-in and restart on every worker. Confluent's installation page puts it this way: "Each connector must be available on each worker." The lab has one worker and did not run this part.
+
+## Cause 5: the class name is wrong
+
+With the plug-in installed, a connector with `connector.class` set to `io.debezium.connector.postgres.PostgresConnector` got the same error. The package is `postgresql`. This time the list at the end of the message is the clue, because the right name is in it:
+
+```text
+... available connectors are: PluginDesc{klass=class io.debezium.connector.postgresql.PostgresConnector, name='io.debezium.connector.postgresql.PostgresConnector', version='3.7.1.Final', encodedVersion=3.7.1.Final, type=source, typeName='source', location='file:/lab/plugins/debezium-connector-postgres/'}, ...
+```
+
+Kafka Connect also accepts the short name, `PostgresConnector`. With Debezium 1.9.7 that worked. With Debezium 3.7.1 the connector was created and its task failed:
+
+```text
+io.debezium.DebeziumException: Unable to create service io.debezium.snapshot.SnapshotterService
+Caused by: io.debezium.DebeziumException: Unable to create service io.debezium.snapshot.spi.SnapshotQuery
+Caused by: java.lang.RuntimeException: java.lang.ClassNotFoundException: PostgresConnector
+```
+
+Use the full class name, copied from `GET /connector-plugins`.
+
+## Cause 6: the plug-in needs a newer Java
+
+The Debezium 3.7.1 plug-in was put, correctly laid out, on the Kafka Connect 3.2.0 worker, which runs Java 11.0.15. The class was not listed, creating the connector gave the error, and the worker log held no warning or error about it.
+
+The [Debezium documentation](https://debezium.io/documentation/reference/stable/install-kafka-connect.html) states the requirement: "Note that Java 17 or later is required to run the Debezium connectors or Debezium UI." The jar shows it too. The connector class in the 3.7.1 jar starts with the bytes `cafebabe0000003d`, which is class file version 61, and the [Java Virtual Machine specification](https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.1) lists 61 for Java 17 and 55 as the highest version Java 11 reads.
+
+```bash
+unzip -p debezium-connector-postgres-3.7.1.Final.jar io/debezium/connector/postgresql/PostgresConnector.class | head -c 8 | xxd -p
+```
+
+The fix is a plug-in version built for the worker's Java, or a worker on a newer Java. The same 3.7.1 archive loaded on the 4.3.1 worker, which runs Java 21, and the 1.9.7 plug-in (class file version 52) loaded on the Java 11 worker.
+
+## Cause 7: service_load and a plug-in without a manifest
+
+From Kafka Connect 3.6 the worker can find plug-ins in two ways, and `plugin.discovery` chooses. The [Kafka documentation](https://kafka.apache.org/43/kafka-connect/user-guide/#plugin-discovery) says of the `service_load` setting: "Plugins which are incompatible with that mechanism may be unusable."
+
+The Debezium 1.9.7 plug-in has no `META-INF/services` manifest. On 4.3.1 with the default, `hybrid_warn`, it was listed and the worker warned:
+
+```text
+WARN One or more plugins are missing ServiceLoader manifests may not be usable with plugin.discovery=service_load: [
+file:/lab/other-version/debezium-connector-postgres/	io.debezium.connector.postgresql.PostgresConnector	source	1.9.7.Final
+]
+Read the documentation at https://kafka.apache.org/documentation.html#connect_plugindiscovery for instructions on migrating your plugins to take advantage of the performance improvements of service_load mode. To silence this warning, set plugin.discovery=only_scan in the worker config. (org.apache.kafka.connect.runtime.isolation.Plugins:125)
+```
+
+With `plugin.discovery=service_load` the same plug-in was not listed and creating the connector gave the error. The tool shows why in one line per plug-in:
+
+```text
+pluginName	firstAlias	secondAlias	pluginVersion	pluginType	isLoadable	hasManifest	pluginLocation
+io.debezium.connector.postgresql.PostgresConnector	PostgresConnector	Postgres	1.9.7.Final	source	true	false	/lab/other-version/debezium-connector-postgres
+```
+
+### Fix: add the manifests, or go back to the default
+
+```bash
+bin/connect-plugin-path.sh sync-manifests --plugin-path /lab/other-version
+```
+
+The tool answered `All loadable plugins have accurate ServiceLoader manifests.` After a restart, still with `service_load`, the class was listed. The documentation warns that the command "may alter the contents of the directories", so run it on a copy.
+
+Setting `plugin.discovery` back to `hybrid_warn` is the other fix, and a plug-in release that ships its own manifests is the lasting one. The Debezium 3.7.1 plug-in has them.
+
+## Installing from Confluent Hub
+
+Confluent Hub is now called Confluent Marketplace. Its archives have one more level than the Debezium ones, with the jars in a `lib` folder:
+
+```text
+debezium-debezium-connector-postgresql-3.2.6-4/assets
+debezium-debezium-connector-postgresql-3.2.6-4/doc
+debezium-debezium-connector-postgresql-3.2.6-4/etc
+debezium-debezium-connector-postgresql-3.2.6-4/lib
+debezium-debezium-connector-postgresql-3.2.6-4/manifest.json
+```
+
+The rule is the same. With `plugin.path` set to the folder that contains `debezium-debezium-connector-postgresql-3.2.6-4`, the class was listed, and with `plugin.path` set to the `lib` folder it was not.
+
+Version 2.5.4-3 of the archive behaved the same way on Kafka Connect 3.2.0.
+
+The `confluent-hub` client does both steps. Run against a worker file with no `plugin.path`, it installed the connector and edited the file:
+
+```bash
+confluent-hub install --no-prompt --component-dir /lab/hub-components \
+  --worker-configs /lab/worker.properties debezium/debezium-connector-postgresql:3.2.6-4
+```
+
+```text
+Downloading component Debezium PostgreSQL CDC Connector 3.2.6-4, provided by Confluent from Confluent Hub and installing into /lab/hub-components
+Adding installation directory to plugin path in the following files:
+  /lab/worker.properties
+```
+
+The file then held `plugin.path = /lab/hub-components`, and after a restart the class was listed. The client edits the files you name. A worker that takes its settings from somewhere else, such as environment variables of a container image, does not see the change.
+
+Confluent's documentation says the client commands "are deprecated in Confluent Platform 7.6" and names `confluent connect plugin install` as the replacement. The lab ran the client and not the replacement.
+
+## A converter that is not installed
+
+Converters and transformations are plug-ins too, found the same way. A connector that named `io.confluent.connect.avro.AvroConverter` on a worker without it was rejected on 4.3.1:
+
+```text
+HTTP 400
+{"error_code":400,"message":"Connector configuration is invalid and contains the following 1 error(s):\nInvalid value io.confluent.connect.avro.AvroConverter for configuration value.converter: Class io.confluent.connect.avro.AvroConverter could not be found.\nYou can also find the above list of errors at the endpoint `/connector-plugins/{connectorType}/config/validate`"}
+```
+
+The converter archive from Confluent Hub was unzipped as a second folder under `plugin.path`, next to the connector, and the worker was restarted. `GET /connector-plugins?connectorsOnly=false` then listed the converter, and validating the same configuration returned no errors. This step was run on 4.3.1 only.
+
+## Prevent it
+
+- Keep one folder per plug-in under one parent, and set `plugin.path` to the parent. Do not copy jars from one plug-in folder into another.
+- After every install or upgrade, restart the workers and compare `GET /connector-plugins` on each of them with what you expect.
+- Build the worker image with its plug-ins inside, so that every worker has the same set.
+- Before upgrading a worker to Kafka Connect 3.6 or later, or setting `plugin.discovery=service_load`, run `connect-plugin-path.sh list` on the plug-in folder.
+- Use full class names in `connector.class`.
+
+:::note[How OLake Go handles this]
+
+OLake Go does not run on Kafka Connect, so it has no worker, no `plugin.path` and no plug-ins to install. Its PostgreSQL connector, for example, "can be used within the OLake UI or run locally via Docker", as [its page](/docs/connectors/postgres/) says.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Kafka 4.3: [`plugin.path`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#connectconfigs_plugin.path), [`plugin.discovery`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#connectconfigs_plugin.discovery), [plugin discovery](https://kafka.apache.org/43/kafka-connect/user-guide/#plugin-discovery), [REST API](https://kafka.apache.org/43/kafka-connect/user-guide/#rest-api)
+- [KIP-146](https://cwiki.apache.org/confluence/display/KAFKA/KIP-146+-+Classloading+Isolation+in+Connect), class loading isolation and `plugin.path`, and [KIP-898](https://cwiki.apache.org/confluence/display/KAFKA/KIP-898%3A+Modernize+Connect+plugin+discovery), plug-in discovery
+- Debezium: [installing Kafka Connect connectors](https://debezium.io/documentation/reference/stable/install-kafka-connect.html)
+- Confluent Platform: [install self-managed connectors](https://docs.confluent.io/platform/current/connect/install.html), [Confluent Marketplace and the client deprecation](https://docs.confluent.io/platform/current/connect/confluent-hub/index.html), [the client in the 7.5 documentation](https://docs.confluent.io/platform/7.5/connect/confluent-hub/client.html)
+- Stack Overflow, the most viewed questions on this error: [53412622](https://stackoverflow.com/questions/53412622), [56958382](https://stackoverflow.com/questions/56958382)
+- Confluent forum: [Debezium Kafka Connect, error loading plugin from Confluent Hub via Docker](https://forum.confluent.io/t/debezium-kafka-connect-error-loading-plugin-from-confluent-hub-via-docker/2217)

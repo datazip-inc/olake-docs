@@ -1,0 +1,55 @@
+# ./run.sh verify    PostgreSQL 19rc2    2026-11-16T17:56:23Z
+
+## Every prerequisite at once
+SELECT current_setting('wal_level') AS wal_level,
+       (SELECT rolreplication FROM pg_roles WHERE rolname = 'cdc_user') AS role_can_replicate,
+       (SELECT count(*) FROM pg_publication_tables WHERE pubname = 'cdc_pub') AS published_tables,
+       current_setting('max_replication_slots') AS max_replication_slots,
+       current_setting('max_wal_senders') AS max_wal_senders;
+ wal_level | role_can_replicate | published_tables | max_replication_slots | max_wal_senders 
+-----------+--------------------+------------------+-----------------------+-----------------
+ logical   | t                  |                3 | 10                    | 10
+(1 row)
+
+
+## The capture role creates its slot, three changes are made, and the role reads them.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/01C5C788
+(1 row)
+
+INSERT INTO orders (customer_id, status) VALUES (20, 'new');
+INSERT 0 1
+UPDATE orders SET status = 'paid' WHERE customer_id = 20;
+UPDATE 1
+DELETE FROM orders WHERE customer_id = 20;
+DELETE 1
+SELECT lsn, xid, chr(get_byte(data, 0)) AS message FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- as cdc_user
+    lsn     | xid | message 
+------------+-----+---------
+ 0/01C5C788 | 723 | B
+ 0/01C5C788 | 723 | R
+ 0/01C5C788 | 723 | I
+ 0/01C5C848 | 723 | C
+ 0/01C5C848 | 724 | B
+ 0/01C5C848 | 724 | U
+ 0/01C5C8F8 | 724 | C
+ 0/01C5C8F8 | 725 | B
+ 0/01C5C8F8 | 725 | D
+ 0/01C5C988 | 725 | C
+(10 rows)
+
+
+## Clean up. A slot that is left behind keeps WAL.
+SELECT pg_drop_replication_slot('cdc_slot');    -- as cdc_user
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+SELECT slot_name, plugin, slot_type, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | slot_type | database | active 
+-----------+--------+-----------+----------+--------
+(0 rows)
+

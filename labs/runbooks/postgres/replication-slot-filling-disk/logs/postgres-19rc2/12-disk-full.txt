@@ -1,0 +1,63 @@
+# ./run.sh disk-full    PostgreSQL 19rc2    2026-11-16T18:54:12Z
+SELECT version();
+                                                           version                                                           
+-----------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 19rc2 (Debian 19~rc2-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+(1 row)
+
+
+## A 256 MB disk. 48 MB of it holds a file that has nothing to do with PostgreSQL.
+$ dd if=/dev/zero of=/disk/old-backup.tar bs=1M count=48; df -h /disk
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           256M  119M  138M  47% /disk
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/02015540
+(1 row)
+
+
+## Write 24 MB at a time until something gives.
+round 1: CALL write_wal(24); -> CALL 
+  disk used/free: 124M 133M   pg_wal: 32M
+round 2: CALL write_wal(24); -> CALL 
+  disk used/free: 161M 96M   pg_wal: 64M
+round 3: CALL write_wal(24); -> CALL 
+  disk used/free: 182M 75M   pg_wal: 80M
+round 4: CALL write_wal(24); -> CALL 
+  disk used/free: 202M 55M   pg_wal: 112M
+round 5: CALL write_wal(24); -> CALL 
+  disk used/free: 255M 1.4M   pg_wal: 160M
+round 6: CALL write_wal(24); -> ERROR:  could not extend file "base/16384/16443": No space left on device HINT:  Check free disk space. CONTEXT:  SQL statement "INSERT INTO orders (customer_id, status, note) 
+  disk used/free: 256M 0   pg_wal: 160M
+
+## A data file could not grow, the statement failed and the server is still up. Keep writing WAL with records that need no data page.
+1 MB record 30: SELECT pg_logical_emit_message(false, 'lab', repeat('x', 1048576)); -> PANIC:  could not write to file "pg_wal/xlogtemp.472": No space left on device server closed the connection unexpectedly 	This probably means the server terminated abnormally 
+  disk used/free: 256M 356K   pg_wal: 160M
+--- server log
+2026-11-16 18:54:18.279 UTC [226] ERROR:  could not extend file "base/16384/16443": No space left on device
+2026-11-16 18:54:18.279 UTC [226] HINT:  Check free disk space.
+2026-11-16 18:54:21.578 UTC [70] ERROR:  could not write to file "pg_wal/xlogtemp.70": No space left on device
+2026-11-16 18:54:21.885 UTC [472] PANIC:  could not write to file "pg_wal/xlogtemp.472": No space left on device
+2026-11-16 18:54:21.886 UTC [8] LOG:  client backend (PID 472) was terminated by signal 6: Aborted
+2026-11-16 18:54:21.886 UTC [8] LOG:  terminating any other active server processes
+2026-11-16 18:54:21.887 UTC [8] LOG:  all server processes terminated; reinitializing
+2026-11-16 18:54:21.906 UTC [475] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-11-16 18:54:21.909 UTC [475] LOG:  redo starts at 0/0A100100
+2026-11-16 18:54:21.923 UTC [475] LOG:  redo done at 0/0BE4EE88 system usage: CPU: user: 0.00 s, system: 0.01 s, elapsed: 0.01 s
+2026-11-16 18:54:21.924 UTC [475] FATAL:  could not write to file "pg_wal/xlogtemp.475": No space left on device
+2026-11-16 18:54:21.924 UTC [8] LOG:  startup process (PID 475) exited with exit code 1
+2026-11-16 18:54:21.924 UTC [8] LOG:  terminating any other active server processes
+2026-11-16 18:54:21.925 UTC [8] LOG:  shutting down due to startup process failure
+2026-11-16 18:54:21.926 UTC [8] LOG:  database system is shut down
+postgres exited with status 1; waiting for /tmp/start-postgres
+---
+
+## PostgreSQL is down and the disk is still full.
+$ pg_isready -h 127.0.0.1
+127.0.0.1:5432 - no response
+$ df -h /disk; du -sh /disk/pgdata/pg_wal /disk/old-backup.tar
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           256M  256M  356K 100% /disk
+160M	/disk/pgdata/pg_wal
+48M	/disk/old-backup.tar

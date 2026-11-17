@@ -1,0 +1,67 @@
+# ./run.sh idle-timeout    PostgreSQL 19rc2    2026-11-16T18:53:42Z
+
+## idle_replication_slot_timeout exists from PostgreSQL 18.
+SHOW idle_replication_slot_timeout;
+ idle_replication_slot_timeout 
+-------------------------------
+ 0
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/43497CF8
+(1 row)
+
+ALTER SYSTEM SET idle_replication_slot_timeout = '20s';
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+SELECT now(), slot_name, active, inactive_since, wal_status, invalidation_reason FROM pg_replication_slots;
+              now              | slot_name | active |        inactive_since         | wal_status | invalidation_reason 
+-------------------------------+-----------+--------+-------------------------------+------------+---------------------
+ 2026-11-16 18:53:45.835649+00 | cdc_slot  | f      | 2026-11-16 18:53:44.447522+00 | reserved   | 
+(1 row)
+
+
+## Nothing connects for 25 seconds. The next checkpoint invalidates the slot.
+SELECT now(), slot_name, active, inactive_since, wal_status, invalidation_reason FROM pg_replication_slots;
+              now              | slot_name | active |        inactive_since         | wal_status | invalidation_reason 
+-------------------------------+-----------+--------+-------------------------------+------------+---------------------
+ 2026-11-16 18:54:11.130593+00 | cdc_slot  | f      | 2026-11-16 18:53:44.447522+00 | reserved   | 
+(1 row)
+
+CHECKPOINT;
+CHECKPOINT
+SELECT now(), slot_name, active, inactive_since, wal_status, invalidation_reason FROM pg_replication_slots;
+              now              | slot_name | active |        inactive_since         | wal_status | invalidation_reason 
+-------------------------------+-----------+--------+-------------------------------+------------+---------------------
+ 2026-11-16 18:54:11.362963+00 | cdc_slot  | f      | 2026-11-16 18:53:44.447522+00 | lost       | idle_timeout
+(1 row)
+
+--- server log
+2026-11-16 18:54:11.255 UTC [73] LOG:  invalidating obsolete replication slot "cdc_slot"
+2026-11-16 18:54:11.255 UTC [73] DETAIL:  The slot's idle time of 26s exceeds the configured "idle_replication_slot_timeout" duration of 20s.
+2026-11-16 18:54:11.255 UTC [73] HINT:  You might need to increase "idle_replication_slot_timeout".
+---
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  can no longer access replication slot "cdc_slot"
+DETAIL:  This replication slot has been invalidated due to "idle_timeout".
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+ALTER SYSTEM RESET idle_replication_slot_timeout;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
