@@ -72,90 +72,98 @@ On tables synced by [OLake Go](/docs/), the key is [`_olake_id`](/docs/understan
 
 ### How Much Memory You Need
 
-Run the three queries below, put the results in the calculator, and set the value it gives.
+The memory a task needs depends on how many changed keys it holds and how long each key is. Find your table's inputs with the queries below, then enter them in the [calculator](#calculator).
 
-#### Check Your Table
+#### The Formula
 
-Run these in Fusion's Terminal or in your own query engine; the examples are Spark SQL. They only read the table's [metadata tables](https://iceberg.apache.org/docs/1.7.2/spark-queries/#inspecting-tables), so they're fast and safe on any table. Replace `my_catalog.my_db.my_table` with your table.
+```
+memory_needed = (changed_keys_per_task + largest_delete_file_rows) × (BASE_KEY_BYTES + max_key_length) × BUFFER
 
-:::warning
-In Fusion's Terminal, run only metadata queries like these. A `count(*)` or `SELECT *` on the table itself runs inside the Fusion server's memory and can crash it. Use `/* */` for comments, not `--`.
-:::
+changed_keys_per_task = min(target_file_size_mb × max_rows_per_mb, changed_keys_in_partition)
+```
 
-**Query 1: changed keys in the busiest partition** (an unpartitioned table returns one row)
+Where:
+
+- [`changed_keys_in_partition`](#changed-keys-in-partition) is the number of changed keys in the table's busiest partition.
+- [`largest_delete_file_rows`](#largest-delete-file-rows) is the number of rows in the table's largest equality delete file.
+- [`max_rows_per_mb`](#max-rows-per-mb) is the most rows per MB of any data file in the table.
+- [`target_file_size_mb`](#target-file-size-mb) is the target file size compaction splits tasks by, 512 MB by default.
+- [`max_key_length`](#find-key-length) is the length of the longest key, in characters, 32 by default.
+- `changed_keys_per_task` is the number of changed keys one task holds. It's never more than the rows a task covers.
+- `BASE_KEY_BYTES` is the memory each key takes before its own characters, a fixed 250 B.
+- `BUFFER` is headroom for Spark and Java, a fixed × 1.3.
+
+Round `memory_needed` up to a whole GB to get the value for `spark.executor.memory`.
+
+#### Find the Inputs
+
+Run the queries for the first three inputs, keep or change the two defaults, then enter all five in the [calculator](#calculator).
+
+The queries only read the table's [metadata tables](https://iceberg.apache.org/docs/1.7.2/spark-queries/#inspecting-tables), so they're fast and safe on any table. Run them in Fusion's Terminal or in your own query engine, and replace `my_catalog.my_db.my_table` with your table. They're written in Spark SQL; for other engines, see [Other query engines](#other-query-engines).
+
+#### `changed_keys_in_partition` {#changed-keys-in-partition}
+
+The changed keys in the busiest partition. It grows with every update until the next compaction, and a key that changed twice counts twice.
+
+In Spark SQL ([other engines](#other-query-engines)), use `equality_delete_record_count` in the top row. An unpartitioned table returns one row.
 
 ```sql
-/* Changed keys per partition, busiest first.
-   equality_delete_record_count in the top row is changed_keys_in_partition. */
+/* Changed keys per partition, busiest first */
 SELECT *
 FROM my_catalog.my_db.my_table.partitions
 ORDER BY equality_delete_record_count DESC
 LIMIT 5;
 ```
 
-**Query 2: rows in the largest delete file**
+#### `largest_delete_file_rows` {#largest-delete-file-rows}
+
+The rows in the largest equality delete file. A task reads it while holding its changed keys, so it adds to the peak.
+
+In Spark SQL ([other engines](#other-query-engines)):
 
 ```sql
-/* Rows in the largest equality delete file (content = 2 means equality delete files). */
+/* Rows in the largest equality delete file (content = 2) */
 SELECT max(record_count) AS largest_delete_file_rows
 FROM my_catalog.my_db.my_table.files
 WHERE content = 2;
 ```
 
-**Query 3: the most rows per MB of any data file**
+#### `max_rows_per_mb` {#max-rows-per-mb}
+
+The most rows per MB of any data file. Times the target file size, it's the most rows one task can cover.
+
+In Spark SQL ([other engines](#other-query-engines)):
 
 ```sql
-/* The most rows per MB of any data file (content = 0 means data files).
-   Leaves out files bigger than the target file size: 512 MB by default. */
+/* The most rows per MB of any data file (content = 0),
+   leaving out files bigger than the target file size: 512 MB by default */
 SELECT max(record_count * 1048576.0 / file_size_in_bytes) AS max_rows_per_mb
 FROM my_catalog.my_db.my_table.files
 WHERE content = 0 AND file_size_in_bytes < 512 * 1024 * 1024;
 ```
 
-Example results for a table that fails on the Helm chart's default 4g executor:
+A data file bigger than the target is a task of its own. If its `record_count` is more than `target_file_size_mb` × `max_rows_per_mb`, use its `record_count` instead.
 
-| equality_delete_record_count | largest_delete_file_rows | max_rows_per_mb |
-| --- | --- | --- |
-| 20,000,000 | 1,000,000 | 32,000 |
+#### `target_file_size_mb` {#target-file-size-mb}
 
-`equality_delete_record_count` is the number to watch: the changed keys in that partition, where a row changed twice counts twice. Here it's 20 million, which needs 5.94 GB, more than the Helm chart's default 4g: see the [calculator](#calculator).
+The size Fusion aims for when it splits compaction into tasks, 128 or more. Keep the default of 512 unless you changed it in [Configuration](/docs/fusion/compaction/configuration/).
 
-<details>
-<summary><strong>Using another query engine?</strong></summary>
+#### `max_key_length` {#find-key-length}
 
-Most engines can read the same Iceberg metadata; only the table name changes. If your engine's `partitions` table has no equality-delete count, sum `record_count` from the `files` table where `content = 2`, grouped by `partition`.
+The longest key, in characters. Keep the default of 32 on tables synced by OLake Go, where the key is the 32-character `_olake_id` hash, unless the source table has a single-column primary key: then `_olake_id` is that column's value as text.
 
-| Engine | Metadata tables |
-| --- | --- |
-| Trino, Athena | `"my_table$files"`, `"my_table$partitions"` |
-| Flink, StarRocks | `my_table$files`, `my_table$partitions` |
-| Hive | `my_db.my_table.files`, `my_db.my_table.partitions` |
-| DuckDB | `iceberg_metadata('...')` |
-
-If your engine can't show Iceberg metadata (for example Snowflake, BigQuery or Databricks), use [PyIceberg](https://py.iceberg.apache.org/api/#inspecting-tables)'s `table.inspect.files()` and `table.inspect.partitions()`.
-
-</details>
-
-#### Calculator
-
-Filled in with the example table above, on the Helm chart's default 4g executor. To check a result by hand, see [How it's calculated](#how-its-calculated).
-
-<OomMemoryCalculator />
-
-<AnchoredDetails id="find-key-length" summary={<strong>Not using <code>_olake_id</code>? How to find the key length</strong>}>
-
-The calculator's key length defaults to 32 characters, the length of OLake Go's `_olake_id` hash. For other keys, first find the key column, then its longest value.
+For other keys, first find the key column. In Spark SQL ([other engines](#other-query-engines)):
 
 ```sql
-/* The key columns: the column with a non-null value_count in readable_metrics.
-   equality_ids holds their field IDs. Reads metadata only. */
+/* The key column has a non-null value_count in readable_metrics.
+   equality_ids holds the key columns' field IDs. */
 SELECT equality_ids, readable_metrics
 FROM my_catalog.my_db.my_table.files
 WHERE content = 2
 LIMIT 1;
 ```
 
-Metadata stores at most 16 characters of each value, so it can't give the longest key. Get that from the source database instead, for example on PostgreSQL:
+Metadata stores at most 16 characters of each value, so get the longest key from the source database instead. For example, on PostgreSQL:
 
 ```sql
 /* Longest primary key value in the source table (replace id and the table name) */
@@ -163,47 +171,19 @@ SELECT max(length(id::text)) AS max_key_length
 FROM public.my_source_table;
 ```
 
-On tables synced by OLake Go the key column is `_olake_id`. It's 32 characters when the source table has a composite primary key or none, so you can keep the default; with a single-column primary key it's that column's value as text.
+#### Calculator
 
-</AnchoredDetails>
+Enter the five inputs and your current executor memory. The fields start with an example table that fails on a 4g executor.
 
-<AnchoredDetails id="how-its-calculated" summary={<strong>How it's calculated</strong>}>
+<OomMemoryCalculator />
 
-The calculator uses this formula. Use it to check a result, or to work it out by hand.
+<AnchoredDetails id="worked-example" summary={<strong>Worked example</strong>}>
 
-**Inputs**, from the queries:
-
-| Input | What it is | Where to get it |
-| --- | --- | --- |
-| `changed_keys_in_partition` | Changed keys in the busiest partition | Query 1: `equality_delete_record_count` in the top row |
-| `largest_delete_file_rows` | Rows in the largest delete file | Query 2 |
-| `max_rows_per_mb` | The most rows per MB of any data file | Query 3 |
-| `target_file_size_mb` | Your target file size, 128 or more | Default 512, unless you changed it in [Configuration](/docs/fusion/compaction/configuration/) |
-| `max_key_length` | The longest key, in characters | Default 32. [How to find it](#find-key-length) |
-
-**Constants:**
-
-| Constant | Value | What it is |
-| --- | --- | --- |
-| `BASE_KEY_BYTES` | 250 B | Memory per key, before the key's own characters. |
-| `BUFFER` | × 1.3 | Headroom for Spark and Java |
-
-**Calculation:**
-
-| Step | Formula | What it gives |
-| --- | --- | --- |
-| 1 | `rows_per_task` = `target_file_size_mb` × `max_rows_per_mb` | The most rows one task can hold |
-| 2 | `changed_keys_per_task` = min(`rows_per_task`, `changed_keys_in_partition`) | The changed keys one task holds |
-| 3 | `memory_needed` = (`changed_keys_per_task` + `largest_delete_file_rows`) × (`BASE_KEY_BYTES` + `max_key_length`) × `BUFFER` | Rounded up to a whole GB, the value for `spark.executor.memory` |
-
-- A data file bigger than the target is a task of its own: if its `record_count` is more than `rows_per_task`, use that instead.
-- For `spark.executor.memoryOverhead`, see [problem B](#problem-b).
-
-**Worked example**: an [OLake Helm](/docs/fusion/install/kubernetes-compaction/) deployment with the chart's default `spark.executor.memory` of 4g, compacting the example table above at the default 512 MB target file size:
+The calculator's example table, on a 4g executor at the default 512 MB target file size. The queries return 20,000,000 changed keys, 1,000,000 rows in the largest delete file and 32,000 rows per MB.
 
 1. **Rows per task.** A task holds at most 512 MB × 32,000 rows per MB = **16,384,000** rows.
 2. **Changed keys per task.** The partition has 20,000,000 changed keys, more than one task can hold, so each task holds at most **16,384,000** of them.
-3. **Memory needed.** Add the 1,000,000 rows of the largest delete file, which is read while those keys are held: (16,384,000 + 1,000,000) × (250 + 32) B × 1.3 = **5.94 GB**.
+3. **Memory needed.** Add the 1,000,000 rows of the largest delete file: (16,384,000 + 1,000,000) × (250 + 32) B × 1.3 = **5.94 GB**.
 4. **Executor memory.** 5.94 GB is more than 4g, so the task fails with `OutOfMemoryError`: set `spark.executor.memory=6g`, as in [fix A](#fix-a).
 5. **Overhead.** 6g is 6 GB or less, so also set `spark.executor.memoryOverheadFactor=0.15` (921 MB instead of the default 614 MB), as in [fix B](#fix-b).
 
@@ -212,10 +192,26 @@ The calculator uses this formula. Use it to check a result, or to work it out by
 :::note[Good to know]
 - **Quick check:** expect about 0.34 GB per million changed keys a task holds, with 32-character keys.
 - **Same unit:** the calculator's GB and the `g` in `spark.executor.memory` are the same, so 6 GB is `6g`.
+- **On the safe side:** a key that changed twice counts twice, so the real need can be lower.
 - **Size for any number of updates:** enter a very large `changed_keys_in_partition`. The calculator caps it at the most rows one task can hold, which gives the most memory a task can ever need.
-- **On the safe side:** `changed_keys_in_partition` counts a key that changed twice as two, so the real need can be lower.
 - **More than one core:** with `spark.executor.cores` above 1, an executor runs that many tasks at once, so multiply the memory by the number of cores.
+- **Overhead:** for `spark.executor.memoryOverhead`, see [problem B](#problem-b).
 :::
+
+<AnchoredDetails id="other-query-engines" summary={<strong>Using another query engine?</strong>}>
+
+Most engines read the same Iceberg metadata tables under a different name:
+
+| Engine | Metadata tables |
+| --- | --- |
+| Trino, Athena | `"my_table$files"`, `"my_table$partitions"` |
+| Flink, StarRocks | `my_table$files`, `my_table$partitions` |
+| Hive | `my_db.my_table.files`, `my_db.my_table.partitions` |
+| DuckDB | `iceberg_metadata('...')` |
+
+If your engine's `partitions` table has no equality-delete count, sum `record_count` from the `files` table where `content = 2`, grouped by `partition`. If your engine can't show Iceberg metadata (for example Snowflake, BigQuery or Databricks), use [PyIceberg](https://py.iceberg.apache.org/api/#inspecting-tables)'s `table.inspect.files()` and `table.inspect.partitions()`.
+
+</AnchoredDetails>
 
 ### Fix It: Raise the Executor Memory {#fix-a}
 
@@ -273,7 +269,7 @@ If the executor memory is 6 GB or less, also apply the fix for [problem B](#prob
 
 ### Check It Worked
 
-After the next compaction shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/), run query 1 again. `equality_delete_record_count` should be 0.
+After the next compaction shows **Success** in [Runs and Logs](/docs/fusion/maintenance/runs-and-logs/), run the [`changed_keys_in_partition` query](#changed-keys-in-partition) again. `equality_delete_record_count` should be 0.
 
 ## Problem B: The Pod Went Over Its Memory Limit {#problem-b}
 

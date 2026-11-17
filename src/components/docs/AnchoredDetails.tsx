@@ -42,7 +42,8 @@ export default function AnchoredDetails({id, summary, children}: Props) {
   }, [id, openAndScroll]);
 
   return (
-    <div id={id} ref={wrapper}>
+    // Same offset as headings (custom.css), so the jump stops below the sticky navbar
+    <div id={id} ref={wrapper} style={{scrollMarginTop: 'calc(var(--ifm-navbar-height) + 2.5rem)'}}>
       <Details summary={<summary>{summary}</summary>}>{children}</Details>
     </div>
   );
