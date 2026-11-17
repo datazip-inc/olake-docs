@@ -110,6 +110,52 @@ Similarly, writing a `BIGINT` value into a `DOUBLE` is also supported.
   </TabItem>
 </Tabs>
 
+### Decimal Columns
+
+For jobs created on OLake Go **v1.2.0 and above**, decimal source columns land as a decimal type. Before, they landed as `double`, which keeps only about 15 significant digits: a `NUMERIC(20,4)` value of `12345678901234.5678` was written as `12345678901234.568`, and sums drifted even when every value fit. Float, double and real columns keep their float types, and integer columns keep integer types, Oracle `NUMBER(p,0)` included.
+
+Which source types land as decimals is listed in each source's Data Type Mapping, such as [Postgres](/docs/connectors/postgres/#data-type-mapping) and [MySQL](/docs/connectors/mysql/#data-type-mapping).
+
+:::info[Decimal behaviour]
+- **Exact values:** a value with more digits than its column's precision or scale fails the sync with an error rather than being rounded.
+- **NaN:** Postgres `NUMERIC(p,s)` can hold `NaN`, which no decimal can. A `NaN` is written as null, and the sync logs one warning for it.
+:::
+
+<Tabs queryString="decimal-columns" groupId="decimal-columns">
+  <TabItem value="iceberg" label="Iceberg" default>
+
+| OLake Type | Iceberg Type |
+| --- | --- |
+| `decimal(p,s)`, p up to 38 | `decimal(p, s)` |
+
+Iceberg promotes `decimal(P,S)` only to `decimal(P',S)` with P' > P, so the same scale and more digits. A precision widening such as `DECIMAL(18,4)` to `DECIMAL(20,4)` evolves in place, partition columns included. Any other change fails the stream: a new scale, a change to unconstrained `NUMERIC`, or more than 38 digits.
+
+The error reads:
+
+```text
+failed to validate schema for field[b] (detected two different types in batch), expected type: decimal(9, 4), detected type: decimal(12, 6)
+```
+
+Run [Clear Destination](/docs/getting-started/job-level-properties/#8-clear-destination) to recreate the table, as for any other type Iceberg cannot widen.
+
+  </TabItem>
+  <TabItem value="parquet" label="Parquet">
+
+| OLake Type | Parquet Type |
+| --- | --- |
+| `decimal(p,s)`, p up to 9 | `INT32`, annotated `DECIMAL(p,s)` |
+| `decimal(p,s)`, p 10 to 18 | `INT64`, annotated `DECIMAL(p,s)` |
+| `decimal(p,s)`, p 19 to 38 | `FIXED_LEN_BYTE_ARRAY`, annotated `DECIMAL(p,s)` |
+
+Parquet stores a decimal the way Iceberg's spec does, so readers see `decimal(p,s)` at every precision. A fixed byte column takes the fewest bytes that hold its precision: 9 for 20 digits, 16 for 38.
+
+:::info[Parquet widening]
+Widening a column past 18 digits, such as `DECIMAL(18,4)` to `DECIMAL(20,4)`, stores it as fixed bytes in new files, while older files keep `INT64`. Each file's column is a `DECIMAL` of its own precision.
+:::
+
+  </TabItem>
+</Tabs>
+
 ## Example Scenarios
 
 ### Scenario 1: Adding a Column in Source
