@@ -28,6 +28,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Resources',
     links: [
       { label: 'Docs', href: '/docs' },
+      { label: 'Integration guides', href: '/docs/integrations/' },
       { label: 'Blog', href: '/blog' },
       { label: 'Explainers', href: '/learn' },
       { label: 'Comparisons', href: '/compare' },
