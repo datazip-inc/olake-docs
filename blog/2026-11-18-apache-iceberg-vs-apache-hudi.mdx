@@ -1,0 +1,202 @@
+---
+slug: apache-iceberg-vs-apache-hudi
+title: "Apache Iceberg vs Apache Hudi: Key Differences"
+description: "Compare Apache Iceberg vs Apache Hudi in architecture, performance, schema evolution, data ingestion, and use cases to choose the right data lakehouse format."
+date: 2026-11-18
+authors: [anshika]
+tags: [iceberg, hudi, table-format, lakehouse, comparison, cdc, olake]
+image: /img/blog/cover/apache-iceberg-vs-apache-hudi-cover.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Apache Iceberg vs Apache Hudi: Key Differences cover](/img/blog/cover/apache-iceberg-vs-apache-hudi-cover.webp)
+
+Pick a table format for a data lakehouse and the shortlist usually narrows to two names fast. Apache Iceberg and Apache Hudi both bring ACID transactions, time travel, and schema changes to plain files sitting in object storage, yet they were built to solve very different problems, and that origin still shapes how each one behaves in production.
+
+Hudi started at Uber in 2016, where a constantly changing dataset of trips and riders had to stay fresh without rewriting entire partitions every hour. Iceberg came out of Netflix a year later to fix a different headache: Hive tables that broke under concurrent writes and had to list thousands of directories just to plan a single query. One format grew up around upserts and incremental pipelines, while the other grew up around correctness and a clean, engine-neutral specification.
+
+This guide compares Apache Iceberg vs Apache Hudi across architecture, performance, schema evolution, data ingestion, and real use cases, using the current releases (Iceberg 1.12 and Hudi 1.2) as the reference point. The goal is to make the choice depend on how your workloads actually look, rather than on which project has the louder community.
+
+## What Is Apache Iceberg?
+
+Apache Iceberg is an open table format for large analytic datasets. It defines how a table's data files, schema, partitions, and history are tracked, so that many engines can read and write the same table safely at the same time. Iceberg does not store data or run queries on its own: Parquet, ORC, or Avro files hold the data, and engines such as Apache Spark, Apache Flink, Trino, Dremio, Snowflake, BigQuery, and DuckDB do the processing.
+
+Netflix engineers Ryan Blue and Dan Weeks started the project in 2017 after running into the limits of Hive tables, where table state lived in a directory listing and a metastore that could easily fall out of sync. Iceberg entered the Apache Software Foundation in 2018 and graduated to a top-level project in 2020. Iceberg 1.12.0, released on September 30, 2026, is the current Java release, and the table specification is now at version 3, which adds deletion vectors, [row lineage](/blog/apache-iceberg-row-lineage), the variant type, and geospatial types.
+
+A handful of design choices define Iceberg:
+
+- **Snapshot-based tables:** every commit produces a new snapshot, which gives time travel, rollback, and isolated reads for free.
+- **Hidden partitioning:** queries filter on a regular column such as `event_time`, and Iceberg maps that filter to partitions derived through transforms like `day()` or `bucket()`, so nobody has to remember a separate partition column.
+- **Partition evolution:** the partition layout can change over time, and old data keeps its original layout without a rewrite.
+- **Schema evolution by column ID:** columns can be added, dropped, renamed, or reordered without touching data files, because Iceberg tracks each column by a unique ID instead of its name or position.
+- **Open catalog protocol:** the REST catalog specification gives every engine a common API for finding tables and committing changes to them.
+
+Those properties are why Iceberg has become the default for platforms that want a single copy of data shared across several engines and vendors.
+
+## What Is Apache Hudi?
+
+Apache Hudi (short for Hadoop Upserts Deletes and Incrementals, pronounced "hoodie") is an open data lakehouse platform built on its own table format. Where Iceberg concentrates on a specification that engines implement, Hudi ships the format together with a storage engine, so indexing, compaction, clustering, cleaning, and ingestion tooling all live inside the project.
+
+Uber built Hudi in 2016 to apply database-style upserts and deletes to a Hadoop data lake and to let downstream jobs consume only the records that had changed. The project entered the Apache Incubator in January 2019 and became a top-level project the following year. Hudi 1.0 arrived in December 2024 with secondary indexes, expression indexes, partial updates, and non-blocking concurrency control. The latest release, Hudi 1.2, adds `VECTOR`, `BLOB`, and `VARIANT` types, support for the Lance file format, record-level indexing for Flink, and storage-based locking on S3, GCS, and Azure storage.
+
+What sets Hudi apart:
+
+- **Record keys and indexes:** each record carries a key, and indexes (bloom, bucket, record-level, secondary) map those keys to file groups, so an update touches only the files that actually hold the affected rows.
+- **Two table types:** Copy-on-Write rewrites files on update to keep reads fast, while Merge-on-Read appends changes to log files and merges them later to keep writes fast.
+- **Incremental queries:** consumers can pull only the records that changed after a given commit, which makes chained pipelines far cheaper than full rescans.
+- **Built-in table services:** compaction, clustering, cleaning, and indexing can run inline with writes or asynchronously in the background.
+- **Hudi Streamer:** a bundled utility that ingests from Kafka, database change streams, and files straight into Hudi tables.
+
+Hudi tends to show up wherever data arrives as a steady stream of changes and has to be queryable within minutes.
+
+## Apache Iceberg vs Apache Hudi: Key Differences
+
+The short version is that Iceberg is a specification first and Hudi is a platform first. Iceberg defines the table and leaves ingestion, indexing, and maintenance to the engines and tools around it, while Hudi bundles those pieces so a single project can take data from a stream to a query-ready table.
+
+![Apache Iceberg vs Apache Hudi key differences at a glance](/img/blog/2026/18/iceberg-vs-hudi-key-differences.webp)
+
+| Feature | Apache Iceberg | Apache Hudi |
+| --- | --- | --- |
+| Origin | Netflix, 2017 | Uber, 2016 |
+| Design focus | Correct, engine-neutral analytic tables | Fast upserts and incremental processing |
+| Metadata model | Snapshots, manifest lists, and manifest files | Timeline of commits plus an internal metadata table |
+| Row-level updates | Copy-on-write or merge-on-read with delete files (deletion vectors in v3) | Copy-on-Write or Merge-on-Read table types |
+| Indexing | Column statistics and partition pruning in manifests | Bloom, bucket, record-level, secondary, and expression indexes |
+| Partitioning | Hidden partitioning with partition evolution | Hive-style partition paths, set at table creation |
+| Schema evolution | Add, drop, rename, reorder, and widen types without rewrites | Add columns and widen types by default, with rename and drop through schema-on-read evolution |
+| Incremental reads | Snapshot diffs and changelog views | Native incremental and CDC queries |
+| Concurrency | Optimistic concurrency with atomic catalog commits | Optimistic concurrency, MVCC with table services, non-blocking concurrency control |
+| Ingestion tooling | External (Spark, Flink, Kafka Connect, CDC tools such as OLake) | Built in through Hudi Streamer, plus Spark and Flink writers |
+| Table maintenance | Procedures for compaction, snapshot expiration, and orphan file removal | Built-in compaction, clustering, cleaning, and indexing services |
+| Engine support | Very broad across open source engines and cloud warehouses | Strong in Spark and Flink, with readers in Trino, Presto, Hive, Athena, and others |
+
+The row that matters most for many teams is ingestion. Hudi can run an end-to-end pipeline on its own, which is convenient when the whole stack already runs on Spark or Flink. Iceberg expects a separate ingestion layer, and that is where tools like [OLake](/docs/) fit, replicating databases such as PostgreSQL, MySQL, and MongoDB into Iceberg tables through change data capture without a Spark cluster in the middle.
+
+## Architecture Comparison: Iceberg vs Hudi
+
+Both formats keep data in open files on object storage and add a metadata layer on top, but they organize that metadata in opposite ways. Iceberg describes the state of a table as a tree that is replaced on every commit, while Hudi records the history of a table as a log of actions and groups data files by record key.
+
+![Apache Iceberg metadata tree compared with the Apache Hudi timeline and file groups](/img/blog/2026/18/iceberg-vs-hudi-architecture.webp)
+
+### How Iceberg is organized
+
+An Iceberg table is a stack of four layers, and each commit swaps the top pointer in a single atomic step:
+
+- **Catalog:** stores the location of the current metadata file for each table. Options include the REST catalog, AWS Glue, Hive Metastore, Apache Polaris, Unity Catalog, and Project Nessie.
+- **Metadata file:** a JSON file holding the schema, partition spec, sort order, properties, and the list of snapshots.
+- **Manifest list:** one per snapshot, listing the manifest files that make up that snapshot along with partition summaries.
+- **Manifest files:** Avro files that track individual data and delete files, with per-column statistics such as min and max values and null counts.
+
+Because query engines read these statistics before touching any data, Iceberg can skip whole files and manifests during planning, and it never needs to list directories in object storage. Readers always see a complete snapshot, and writers that collide simply retry their commit against the newer metadata.
+
+### How Hudi is organized
+
+Hudi keeps a `.hoodie` directory beside the data, and at its center sits the timeline: an ordered log of every action on the table, such as commits, delta commits, compactions, clustering runs, cleans, and rollbacks. Since Hudi 1.0, the timeline uses an LSM-style layout so that long histories stay cheap to read.
+
+Data is split into file groups, and each record key belongs to exactly one file group. A file group holds a series of file slices, where each slice is a base file (Parquet by default) plus, in Merge-on-Read tables, a set of log files carrying newer changes. An internal metadata table stores file listings, column statistics, bloom filters, and the record-level index, which lets writers find the file group for a key without scanning data.
+
+### Copy-on-Write vs Merge-on-Read
+
+![Apache Hudi Copy-on-Write and Merge-on-Read write and read paths](/img/blog/2026/18/hudi-copy-on-write-vs-merge-on-read.webp)
+
+In a Copy-on-Write table, an update rewrites the affected base file, so reads stay simple and fast at the cost of heavier writes. In a Merge-on-Read table, an update lands in a log file and a later compaction folds it into a new base file, so writes stay light while readers either merge on the fly (snapshot queries) or read only compacted data (read-optimized queries).
+
+Iceberg reaches a similar result through delete files rather than table types. In format v2, a merge-on-read write records position deletes or equality deletes next to the data, and format v3 replaces position delete files with compact deletion vectors stored in Puffin files. Compaction then rewrites data to drop the deleted rows. For a closer look at the three options, see [equality deletes vs positional deletes vs deletion vectors](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors).
+
+## Apache Iceberg vs Apache Hudi: Performance Comparison
+
+Neither format is faster across the board, and published benchmarks often contradict each other because they are tuned by vendors with a stake in the result. A more useful way to compare performance is to look at which operations each design makes cheap.
+
+### Upserts and CDC writes
+
+This is Hudi's home turf. When a batch of updates arrives, Hudi looks up each record key in its index, finds the file group that owns it, and writes only to that group. With a Merge-on-Read table, the write is an append to a log file, which keeps latency low even on very large tables.
+
+Iceberg handles upserts through `MERGE INTO` or equality deletes from streaming writers such as Flink. Without a key index, the engine has to scan candidate files to locate matching rows, which costs more on high-churn tables. Deletion vectors in format v3 and regular compaction narrow the gap, but workloads dominated by random updates still tend to favor Hudi.
+
+### Read and query performance
+
+Iceberg's manifest statistics and hidden partitioning let engines prune files before reading them, which pays off on large scans, interactive BI, and ad hoc analytics. Since nearly every major engine has a mature, optimized Iceberg reader, query speed often depends more on the engine than on the format.
+
+Hudi Copy-on-Write tables read at roughly the speed of plain Parquet. Merge-on-Read snapshot queries add the cost of merging log files at read time, so their speed depends heavily on how often compaction runs. Hudi's metadata table and secondary indexes help point lookups and selective filters.
+
+### Small files and maintenance
+
+Streaming writes in either format produce many small files, and query speed drops when they pile up. Hudi addresses this inside the write path with file sizing, clustering, and async compaction. Iceberg relies on maintenance procedures such as `rewrite_data_files` and `expire_snapshots`, which teams usually schedule through Spark or a managed service. OLake, for example, includes [compaction](/docs/fusion/getting-started/overview) and snapshot expiration for the Iceberg tables it writes.
+
+### Bottom line on performance
+
+For write-heavy tables with frequent updates and strict freshness targets, Hudi usually comes out ahead. For read-heavy analytics across several engines, Iceberg usually does. The most reliable answer still comes from testing your own data, update ratio, and query patterns on the engines you plan to use.
+
+## Advantages and Limitations of Apache Iceberg
+
+Iceberg's strengths come from its narrow scope, and so do most of its gaps.
+
+### Advantages
+
+- **Widest engine support:** Spark, Flink, Trino, Presto, Dremio, Snowflake, BigQuery, Athena, Redshift, DuckDB, StarRocks, and ClickHouse can all read Iceberg, and most can write it.
+- **Vendor neutrality:** the REST catalog standard means a table is not tied to one engine or cloud, which lowers the cost of switching later.
+- **Flexible schema and partition evolution:** columns and partition layouts can change without rewriting historical data.
+- **Reliable concurrency:** atomic snapshot commits give serializable isolation, and readers never see half-written data.
+- **Fast planning on huge tables:** manifest statistics let engines prune files without listing directories.
+- **Fast-moving spec:** format v3 brings deletion vectors, row lineage, default column values, and the variant type.
+
+### Limitations
+
+- **No built-in ingestion:** a separate tool or engine is needed to get data into tables.
+- **Heavier random updates:** with no key index, high-churn upserts cost more than they do in Hudi.
+- **Maintenance is your job:** compaction, snapshot expiration, and orphan file cleanup need scheduling unless a managed service or tool handles them.
+- **Uneven feature support:** v3 features and some delete types reach different engines at different times, so check compatibility before enabling them.
+
+## Advantages and Limitations of Apache Hudi
+
+Hudi trades some simplicity for a much richer toolbox on the write side.
+
+### Advantages
+
+- **Efficient upserts and deletes:** record keys and indexes route each change to the right file group, which keeps update costs proportional to the data that changed.
+- **Choice of table type:** Copy-on-Write and Merge-on-Read let each table favor read speed or write speed.
+- **First-class incremental processing:** incremental and CDC queries let downstream jobs read only new changes, cutting compute for multi-stage pipelines.
+- **Batteries included:** Hudi Streamer, async compaction, clustering, cleaning, and indexing come with the project.
+- **Concurrency built for streaming:** non-blocking concurrency control lets multiple writers and table services work on Merge-on-Read tables without blocking each other.
+- **New data types:** Hudi 1.2 adds `VECTOR`, `BLOB`, and `VARIANT` columns for AI and semi-structured workloads.
+
+### Limitations
+
+- **More settings to tune:** index type, table type, compaction schedules, and cleaning policies all affect performance, and defaults rarely fit every workload.
+- **Narrower ecosystem:** Spark and Flink support is deep, but write support in other engines and cloud warehouses lags behind Iceberg.
+- **Rigid partitioning:** partition paths are fixed at table creation, so changing the scheme usually means rewriting the table.
+- **Interoperability takes extra work:** exposing Hudi tables to Iceberg-only engines usually requires a translation layer such as Apache XTable (incubating).
+
+## When to Choose Apache Iceberg vs Apache Hudi
+
+The right choice depends less on feature lists and more on two questions: how often existing rows change, and how many engines need to touch the same tables.
+
+![Decision guide for choosing Apache Iceberg or Apache Hudi based on update frequency and number of engines](/img/blog/2026/18/iceberg-vs-hudi-when-to-choose.webp)
+
+### Choose Apache Iceberg when
+
+- Several engines or teams query the same data, for example Spark for ETL, Trino for BI, and Snowflake or BigQuery for reporting.
+- Avoiding lock-in to a single vendor or cloud is a priority.
+- Most data is appended, such as events, logs, and clickstreams, with occasional updates or deletes.
+- Schemas and partition layouts are expected to change as the business grows.
+- The team wants a simple table abstraction and prefers to pick ingestion and maintenance tools separately.
+
+### Choose Apache Hudi when
+
+- Tables receive a heavy, continuous stream of updates and deletes, such as CDC from busy OLTP databases.
+- Downstream pipelines benefit from reading only what changed since the last run.
+- Data must be queryable within minutes, and Merge-on-Read write speed matters more than raw scan speed.
+- The stack already centers on Spark or Flink, and the team is comfortable tuning indexes and table services.
+
+### A middle path
+
+The choice is not always permanent. Apache XTable can expose the same data as Hudi, Iceberg, and Delta Lake metadata, and many teams now land CDC data directly in Iceberg using purpose-built replication tools instead of running a Hudi pipeline. If database replication is the main workload, [OLake](/docs/) replicates sources such as PostgreSQL, MySQL, and MongoDB into Iceberg with full loads and CDC, and handles compaction and snapshot expiration on the resulting tables.
+
+## Conclusion
+
+Apache Iceberg and Apache Hudi solve the same core problem, turning files in object storage into reliable tables, but they come at it from opposite ends. Hudi is a write-optimized platform built for upserts, incremental pipelines, and near real-time freshness, and it brings its own ingestion and table services. Iceberg is a read-optimized, engine-neutral specification built for correctness, flexible evolution, and broad interoperability, and it lets teams choose the tools around it.
+
+For most new lakehouse projects that need many engines on shared data, Iceberg is the safer long-term bet, especially now that format v3 and deletion vectors have made row-level changes cheaper. Hudi remains a strong fit for update-heavy CDC tables where write latency matters most. Whichever format wins the evaluation, the best decision comes from a proof of concept on real data, real update rates, and the engines the team already runs.
+
+<BlogCTA />
