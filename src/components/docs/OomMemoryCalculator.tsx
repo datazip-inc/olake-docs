@@ -5,8 +5,6 @@ const GIB = 1024 ** 3;
 const BASE_KEY_BYTES = 250;
 const BUFFER = 1.3;
 
-const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
-
 /** Executor memory per compaction task, from the formula on the out-of-memory page. */
 export default function OomMemoryCalculator() {
   const [values, setValues] = useState({
@@ -45,46 +43,22 @@ export default function OomMemoryCalculator() {
     const neededGb = ((keysPerTask + n.deleteFileRows) * bytesPerKey * BUFFER) / GIB;
     const setGb = Math.max(1, Math.ceil(neededGb - 1e-9));
     const fits = neededGb <= n.memoryGb;
-    const finalGb = Math.max(n.memoryGb, setGb);
 
     output = (
-      <>
-        <div className={styles.out}>
-          <div>
-            Memory needed: <span className={styles.big}>{neededGb.toFixed(2)} GB</span>
-          </div>
-          <div className={fits ? styles.ok : styles.bad}>
-            {fits ? (
-              <>Your {n.memoryGb} GB executor is enough.</>
-            ) : (
-              <>
-                Too small: set <code>spark.executor.memory={setGb}g</code> (<a href="#fix-a">fix A</a>).
-              </>
-            )}
-          </div>
-          {finalGb <= 6 && (
-            <div>
-              At 6 GB or less, also raise the overhead:{' '}
-              <code>
-                {finalGb < 4 ? 'spark.executor.memoryOverhead=512m' : 'spark.executor.memoryOverheadFactor=0.15'}
-              </code>{' '}
-              (<a href="#fix-b">fix B</a>).
-            </div>
+      <div className={styles.out}>
+        <div>
+          Memory needed: <span className={styles.big}>{neededGb.toFixed(2)} GB</span>
+        </div>
+        <div className={fits ? styles.ok : styles.bad}>
+          {fits ? (
+            <>Your {n.memoryGb} GB executor is enough.</>
+          ) : (
+            <>
+              Too small: set <code>spark.executor.memory={setGb}g</code>.
+            </>
           )}
         </div>
-        <div className={styles.steps}>
-          <div>
-            rows_per_task = {fmt(n.targetMb)} × {fmt(n.rowsPerMb)} = <b>{fmt(rowsPerTask)}</b>
-          </div>
-          <div>
-            changed_keys_per_task = min({fmt(rowsPerTask)}, {fmt(n.changedKeys)}) = <b>{fmt(keysPerTask)}</b>
-          </div>
-          <div>
-            memory_needed = ({fmt(keysPerTask)} + {fmt(n.deleteFileRows)}) × ({BASE_KEY_BYTES} + {n.keyLength}) B ×{' '}
-            {BUFFER} = <b>{neededGb.toFixed(2)} GB</b>
-          </div>
-        </div>
-      </>
+      </div>
     );
   }
 
