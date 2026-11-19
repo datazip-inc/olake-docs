@@ -23,6 +23,11 @@ import S3Prereqs from './sources/s3/Prereqs.mdx'
 import S3Connect from './sources/s3/Connect.mdx'
 import Db2Prereqs from './sources/db2/Prereqs.mdx'
 import Db2Connect from './sources/db2/Connect.mdx'
+import PostgresDecimals from './sources/postgres/Decimals.mdx'
+import MysqlDecimals from './sources/mysql/Decimals.mdx'
+import OracleDecimals from './sources/oracle/Decimals.mdx'
+import MssqlDecimals from './sources/mssql/Decimals.mdx'
+import Db2Decimals from './sources/db2/Decimals.mdx'
 
 import HorizonSetup from './catalogs/horizon/Setup.mdx'
 import HorizonWriter from './catalogs/horizon/Writer.mdx'
@@ -80,6 +85,12 @@ export const PARTIALS = {
   'sources/s3/connect': S3Connect,
   'sources/db2/prereqs': Db2Prereqs,
   'sources/db2/connect': Db2Connect,
+  'sources/postgres/decimals': PostgresDecimals,
+  'sources/mysql/decimals': MysqlDecimals,
+  'sources/mariadb/decimals': MysqlDecimals,
+  'sources/oracle/decimals': OracleDecimals,
+  'sources/mssql/decimals': MssqlDecimals,
+  'sources/db2/decimals': Db2Decimals,
   'catalogs/horizon/setup': HorizonSetup,
   'catalogs/horizon/writer': HorizonWriter,
   'catalogs/glue/setup': GlueSetup,
