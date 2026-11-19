@@ -1,0 +1,218 @@
+---
+slug: data-streaming-architecture
+title: "Data Streaming Architecture: Components and Design"
+description: "Explore data streaming architecture, its key components, processing patterns, technologies, real-world use cases, and best practices for building real-time data pipelines."
+date: 2026-11-18
+authors: [anshika]
+tags: [kafka, real-time, cdc, iceberg, lakehouse, data-engineering, olake]
+image: /img/blog/cover/data-streaming-architecture-cover.webp
+---
+
+import BlogCTA from '@site/src/components/BlogCTA';
+
+![Data Streaming Architecture: Components and Design cover](/img/blog/cover/data-streaming-architecture-cover.webp)
+
+A data streaming architecture is the set of systems that capture events as they happen, move them through a durable log, process them in flight and deliver the results to the places that use them, all within seconds. It replaces the nightly batch job with a pipeline that never stops running.
+
+This guide covers how a streaming architecture works, the components every one of them needs, the common patterns such as Lambda and Kappa, the tools teams use in 2026 and a step-by-step way to build one. It ends with how streaming fits into a lakehouse built on Apache Iceberg, which is where most streaming data ends up for analytics.
+
+## What Is Data Streaming Architecture?
+
+Data streaming architecture is a way of designing data systems around continuous, unbounded streams of events instead of finite datasets that are loaded on a schedule. An event is a small, timestamped fact: an order was placed, a sensor reported a temperature, a row changed in PostgreSQL. A streaming architecture treats each of these as it arrives rather than waiting to collect a day's worth.
+
+The difference shows up in how fresh the data is. A batch pipeline that runs every night means a dashboard is up to 24 hours behind, while a streaming pipeline keeps it seconds behind. For fraud checks, inventory counts, live pricing and operational alerts, that gap decides whether the data is useful at all.
+
+Streaming architecture is not one product. It is a combination of a few building blocks, usually an event broker such as Apache Kafka, a stream processor such as Apache Flink, and one or more destinations such as a database, a search index or an Apache Iceberg table. The design work is in choosing those blocks and deciding how they guarantee correctness when something fails.
+
+## How Does Data Streaming Architecture Work?
+
+Every streaming architecture follows the same basic flow: produce, store, process and serve. Events are produced by sources, appended to a durable log, read and transformed by a processor, and written to the systems that answer questions or trigger actions.
+
+![Data streaming architecture flow: produce, store in a durable log, process and serve](/img/blog/2026/18/data-streaming-architecture-flow.webp)
+
+The log in the middle is what makes the design work. Producers write to it without knowing who will read, and consumers read at their own pace from their own position, called an offset. That decoupling means a slow dashboard cannot hold up a fraud check, and a new consumer can replay history from the start of the log to build its own view.
+
+Two ideas from stream processing explain most of the behavior you will see in production:
+
+- **Event time vs processing time:** event time is when something actually happened, and processing time is when the pipeline saw it. Mobile apps and flaky networks deliver events late, so correct results group events by event time and use watermarks to decide when a time window is complete enough to close.
+- **State and checkpoints:** counting orders per minute or joining two streams means the processor has to remember things between events. Engines like Flink store that state and take periodic checkpoints together with the source offsets, so after a crash they restart from a consistent point instead of losing or double-counting data.
+
+Put together, a streaming system is always running, always a few seconds behind reality, and always able to rewind to its last checkpoint.
+
+## Key Components of Data Streaming Architecture
+
+Most production designs have six components, even when one product covers more than one of them.
+
+![The six components of a data streaming architecture: sources, ingestion and CDC, event broker, stream processor, storage and serving, governance and operations](/img/blog/2026/18/data-streaming-architecture-components.webp)
+
+| Component | What it does | Common choices |
+| --- | --- | --- |
+| Sources | Generate events | Application services, IoT devices, clickstreams, database change logs |
+| Ingestion and CDC | Capture events and changes from sources | Kafka Connect, Debezium, OLake Go, cloud SDKs |
+| Event broker | Store events in an ordered, replayable log | Apache Kafka, Redpanda, Apache Pulsar, Amazon Kinesis Data Streams |
+| Stream processor | Filter, enrich, aggregate and join events in flight | Apache Flink, Spark Structured Streaming, Kafka Streams |
+| Storage and serving | Hold results for queries and applications | Apache Iceberg tables, OLAP databases, key-value stores, search indexes |
+| Governance and operations | Keep schemas, access and health under control | Schema registry, catalogs, monitoring, alerting |
+
+### Sources and ingestion
+
+Application events are usually sent straight to the broker by the service that creates them. Databases are different, because the data already lives in tables. Change data capture (CDC) reads the database's own change log, such as the PostgreSQL write-ahead log or the MySQL binlog, and turns every insert, update and delete into an event without adding load to application queries.
+
+### The event broker
+
+The broker is the backbone. It splits each topic into partitions, keeps events in order within a partition, replicates them across nodes and retains them for a set period so consumers can replay. Partitions are also the unit of parallelism: a topic with 12 partitions can be read by up to 12 consumers in one group at the same time.
+
+### Stream processing, storage and governance
+
+The processor turns raw events into something useful, such as a cleaned stream, a running total or an alert. Storage then depends on the question being asked: an Iceberg table for analytics across engines, a low-latency database for an application lookup, or a search index for logs. Finally, a schema registry stops one team's change to an event format from breaking every consumer downstream, which is one of the most common ways streaming pipelines break.
+
+## Types of Data Streaming Architecture
+
+Streaming architectures are usually grouped by how events reach consumers and how much processing happens along the way. Most real systems mix two or three of these.
+
+- **Event-driven architecture** connects services through events instead of direct calls. The order service publishes `OrderPlaced`, and the payment, shipping and email services each react on their own, so adding a new reaction means adding a consumer, not changing the order service.
+- **Stream processing architecture** puts a processing engine between the broker and the destination to compute results continuously, such as revenue per minute, a session's click path or a fraud score per transaction.
+- **CDC-based architecture** turns operational databases into streams. Every committed change is captured from the database log and replayed into analytics systems, caches or search indexes, which keeps them in sync with the source within seconds.
+- **Streaming ETL into a lakehouse** lands events and changes in open table formats such as Apache Iceberg on object storage. The same tables then serve dashboards, ad hoc SQL and machine learning, with any engine that reads Iceberg.
+- **Edge streaming** filters and aggregates data close to where it is produced, on gateways or devices, and sends only the summary upstream. It is common in manufacturing and connected vehicles, where raw sensor data would cost too much to move.
+
+## Data Streaming Architecture Patterns
+
+Patterns describe how the pieces are arranged. Two of them, Lambda and Kappa, shape most of the debate about streaming design.
+
+### Lambda architecture
+
+Lambda runs two pipelines side by side. A batch layer reprocesses all historical data on a schedule for accurate results, and a speed layer processes new events in real time for fresh but approximate results, and a serving layer merges the two. It works, but the same business logic has to be written and kept in sync in two systems, which is where most Lambda pain comes from.
+
+### Kappa architecture
+
+Kappa drops the batch layer and treats everything as a stream. History is kept in the log or in table storage, and reprocessing means replaying events through a new version of the streaming job. One code path is easier to maintain, so most new designs start from Kappa unless they have heavy historical recomputation that a stream processor handles poorly.
+
+![Lambda architecture with batch and speed layers compared with Kappa architecture with a single streaming pipeline](/img/blog/2026/18/lambda-vs-kappa-architecture.webp)
+
+| | Lambda | Kappa |
+| --- | --- | --- |
+| Pipelines | Batch plus speed layer | One streaming pipeline |
+| Code to maintain | Two versions of the logic | One version |
+| Reprocessing | Rerun the batch layer | Replay the log or table history |
+| Best fit | Heavy historical recomputation | Most event and CDC workloads |
+
+### Other patterns worth knowing
+
+- **Event sourcing** stores every change to an entity as an event and rebuilds current state by replaying them, which gives a full audit trail.
+- **CQRS** (command query responsibility segregation) writes through one model and reads through views that are updated from the event stream.
+- **Outbox pattern** writes an event to an outbox table in the same database transaction as the business change, and CDC publishes it, so the database and the stream never disagree.
+- **Medallion layers** (bronze, silver, gold) land raw events first, then cleaned and joined data, then business aggregates, often as Iceberg tables updated by streaming jobs.
+
+## Real-Time vs Batch Data Processing
+
+Batch processing works on a bounded dataset that already exists, such as yesterday's orders, and produces a result when the job finishes. Real-time processing works on an unbounded stream and keeps its results updated as each event arrives.
+
+| | Batch processing | Real-time (stream) processing |
+| --- | --- | --- |
+| Input | Bounded, collected over a period | Unbounded, arriving continuously |
+| Latency | Minutes to hours | Milliseconds to seconds |
+| Compute pattern | Scheduled bursts | Always on |
+| Correctness model | Recompute everything on each run | Event-time windows, watermarks, checkpoints |
+| Typical cost driver | Large clusters for short periods | Smaller clusters running all the time |
+| Good for | Monthly reports, model training, backfills | Fraud checks, live dashboards, alerts, CDC replication |
+
+The line between the two keeps getting thinner. Spark 4.1 added a real-time mode to Structured Streaming that targets sub-second latency, and micro-batching every few seconds is enough for many dashboards. A practical rule is to ask how old the data can be before a decision based on it goes wrong. If the answer is hours, batch is cheaper and simpler, and if it is seconds or minutes, stream it.
+
+## Popular Data Streaming Technologies
+
+The tools below cover the broker, processing and storage layers. Versions and features are current as of November 2026.
+
+| Tool | Layer | Where it fits |
+| --- | --- | --- |
+| Apache Kafka | Event broker | The default open-source log. Since version 4.0 it runs only in KRaft mode, without ZooKeeper, and share groups (Queues for Kafka) are production-ready in 4.2. |
+| Redpanda | Event broker | Kafka API compatible, written in C++, single binary with no JVM |
+| Apache Pulsar | Event broker | Separates serving and storage (Apache BookKeeper), with built-in multi-tenancy and geo-replication |
+| Amazon Kinesis, Google Pub/Sub, Azure Event Hubs | Managed broker | Cloud-native logs with no cluster to run, tied to one cloud |
+| Apache Flink | Stream processor | Record-at-a-time processing with large state, event time and exactly-once checkpoints; version 2.3 shipped in June 2026 |
+| Spark Structured Streaming | Stream processor | Micro-batch by default, with a real-time mode added in Spark 4.1 for low-latency stateless queries |
+| Kafka Streams | Stream processor | A Java library inside your application, no separate cluster |
+| RisingWave, Materialize | Streaming database | Incrementally maintained SQL views over streams |
+| Debezium, OLake Go | CDC | Capture database changes; Debezium writes to Kafka, OLake Go writes directly to Apache Iceberg |
+| Apache Iceberg | Table format | Open tables on object storage that streaming jobs write to and many engines read |
+
+Kafka-compatible brokers are interchangeable at the protocol level, so the broker choice is mostly about operations and cost. The processor choice matters more: Flink is the usual pick for complex stateful jobs, Spark suits teams that already run Spark for batch, and a streaming database suits teams that want results as SQL views without writing jobs. For a wider comparison, see [Confluent alternatives](/blog/confluent-alternatives) and [RisingWave alternatives](/blog/risingwave-alternatives).
+
+## Data Streaming Architecture Examples
+
+The same building blocks show up in very different businesses. These four examples show how the pieces are combined in practice.
+
+**Fraud detection for card payments.** Each authorization request is published to Kafka, and a Flink job joins it with the customer's recent transactions held in state, scores it and writes a decision back within the request's time budget. The raw events also land in Iceberg so analysts can retrain the model on weeks of history.
+
+**Inventory across an e-commerce catalog.** CDC captures every stock change from the order and warehouse databases. A streaming job keeps a per-product count up to date in a key-value store for the storefront, so the site stops selling items that are out of stock instead of finding out in the nightly reconciliation.
+
+**IoT monitoring in a factory.** Gateways on the shop floor aggregate sensor readings into one-second summaries and send them to a managed broker. A stream processor flags readings that drift outside a tolerance band and pages the on-call engineer, while the full history goes to object storage for root-cause analysis.
+
+**Database replication into a lakehouse.** An analytics team needs PostgreSQL and MySQL tables in its lakehouse within minutes of each change. Instead of nightly dumps, CDC streams inserts, updates and deletes into Iceberg tables that Trino, Spark and Snowflake can all query, which is the pattern described in the [architect's guide to CDC with Apache Iceberg](/blog/architect-guide-cdc-apache-iceberg).
+
+## How to Build a Data Streaming Architecture
+
+The steps below take a design from a requirement to a running pipeline. The example streams order events through Kafka into a per-minute revenue view with Flink SQL.
+
+1. **Define the latency and correctness you need.** Write down how fresh each output must be and whether a duplicate or a missed event is acceptable. A fraud check and a weekly report need very different guarantees, and this decision drives every choice after it.
+2. **Model events and register schemas.** Give every event a stable ID, an event timestamp and a versioned schema in a schema registry, using Avro or Protobuf for strict typing.
+3. **Pick a partition key and create topics.** Partition by the key that must stay in order, such as `order_id` or `customer_id`, and size partitions for the parallelism you expect to need.
+4. **Write the processing job with event-time semantics.** Declare a watermark so late events are handled on purpose, and turn on checkpoints for exactly-once results.
+5. **Choose sinks for each consumer.** Send analytical data to Iceberg tables and low-latency lookups to a database or cache, rather than forcing one store to do both.
+6. **Plan for backfills and replays.** Keep enough retention in the broker, or history in Iceberg, to rebuild a view after a bug fix.
+7. **Monitor lag, throughput and errors.** Consumer lag, the gap between the newest event and the last one processed, is the first number to alert on.
+
+Creating the topic for step 3:
+
+```bash
+kafka-topics.sh --create --topic orders \
+  --partitions 12 --replication-factor 3 \
+  --bootstrap-server kafka:9092
+```
+
+A Flink SQL job for step 4 that reads the topic and computes revenue per one-minute window:
+
+```sql
+CREATE TABLE orders (
+  order_id   BIGINT,
+  amount     DECIMAL(10, 2),
+  event_time TIMESTAMP(3),
+  WATERMARK FOR event_time AS event_time - INTERVAL '10' SECOND
+) WITH (
+  'connector' = 'kafka',
+  'topic' = 'orders',
+  'properties.bootstrap.servers' = 'kafka:9092',
+  'scan.startup.mode' = 'earliest-offset',
+  'format' = 'json'
+);
+
+SELECT window_start, window_end, SUM(amount) AS revenue
+FROM TABLE(
+  TUMBLE(TABLE orders, DESCRIPTOR(event_time), INTERVAL '1' MINUTE)
+)
+GROUP BY window_start, window_end;
+```
+
+The watermark tells Flink to wait 10 seconds for late orders before closing each minute, which trades a little latency for correct totals.
+
+## Data Streaming Architecture for Big Data
+
+At big data scale, the hard part stops being latency and becomes keeping huge volumes queryable and affordable over time. Brokers are built to hold days or weeks of events, not years, so long-term history moves to object storage, and open table formats such as Apache Iceberg have become the usual landing zone.
+
+Iceberg fits streaming for three reasons. Each commit is atomic, so readers never see a half-written batch. Snapshots let you query the table as of any earlier commit, which helps with audits and replays. And because the format is open, Spark, Flink, Trino, Snowflake and other engines can read the same tables without copying data.
+
+Streaming into Iceberg brings its own maintenance work, though:
+
+- **Small files:** frequent commits produce many small data files, which slow down query planning and scans until they are compacted.
+- **Delete files from CDC:** updates and deletes are written as delete files that readers have to merge, so they pile up on busy tables.
+- **Metadata growth:** every commit adds a snapshot, so old snapshots need to be expired on a schedule.
+
+This is the gap OLake was built for. [OLake Go](/docs/) replicates PostgreSQL, MySQL, MongoDB, Oracle, Kafka and other sources into Iceberg tables with a full load followed by CDC, and [OLake Fusion](/docs/fusion/getting-started/overview) handles the compaction and snapshot expiration that keep those tables fast. For a Kafka-specific walkthrough, see [Kafka as a source in OLake](/docs/connectors/kafka).
+
+## Conclusion
+
+A data streaming architecture comes down to a small set of decisions: how events are captured, which log stores them, which engine processes them and where the results live. Start from the freshness and correctness each consumer needs, choose Kappa unless heavy historical recomputation forces Lambda, and give every event a stable ID, a timestamp and a registered schema.
+
+For analytics, the destination is increasingly an open lakehouse rather than a single warehouse. Landing streams and CDC changes in Apache Iceberg keeps the data readable by every engine your teams use, as long as compaction and snapshot cleanup run alongside the pipeline. To try that pattern with your own databases, start with [OLake Go on GitHub](https://github.com/datazip-inc/olake-go).
+
+<BlogCTA />
