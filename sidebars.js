@@ -383,6 +383,13 @@ const fusionDocSidebar = {
     { type: 'doc', id: 'fusion/cleanup/configuration', label: 'Cleanup' },
     { type: 'doc', id: 'fusion/maintenance/runs-and-logs', label: 'Runs & Logs' },
     { type: 'doc', id: 'fusion/maintenance/metrics', label: 'Metrics' },
+    {
+      type: 'category',
+      label: 'Troubleshooting',
+      items: [
+        { type: 'doc', id: 'fusion/maintenance/troubleshooting/out-of-memory', label: 'Out of Memory' },
+      ],
+    },
 
     // CORE CONCEPTS
     sectionHeader("CORE CONCEPTS"),
