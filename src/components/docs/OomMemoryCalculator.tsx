@@ -45,14 +45,14 @@ export default function OomMemoryCalculator() {
     const fits = setGb <= n.memoryGb;
 
     output = (
-      <div className={styles.out}>
+      <div className={`${styles.out} ${fits ? styles.ok : styles.warn}`}>
         {fits ? (
           <>
-            A task needs <strong>{setGb} GB</strong>, so your {n.memoryGb} GB executor is enough.
+            Your {n.memoryGb} GB executor is enough: a task needs <strong>{setGb} GB</strong>.
           </>
         ) : (
           <>
-            A task needs <strong>{setGb} GB</strong>, more than your {n.memoryGb} GB executor. Set{' '}
+            Your {n.memoryGb} GB executor is too small: a task needs <strong>{setGb} GB</strong>. Set{' '}
             <code>spark.executor.memory={setGb}g</code>, as in <a href="#fix-a">Fix It: Raise the Executor Memory</a>.
           </>
         )}
