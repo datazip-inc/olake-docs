@@ -42,22 +42,20 @@ export default function OomMemoryCalculator() {
     const keysPerTask = Math.min(rowsPerTask, n.changedKeys);
     const neededGb = ((keysPerTask + n.deleteFileRows) * bytesPerKey * BUFFER) / GIB;
     const setGb = Math.max(1, Math.ceil(neededGb - 1e-9));
-    const fits = neededGb <= n.memoryGb;
+    const fits = setGb <= n.memoryGb;
 
     output = (
       <div className={styles.out}>
-        <div>
-          Memory needed: <span className={styles.big}>{neededGb.toFixed(2)} GB</span>
-        </div>
-        <div className={fits ? styles.ok : styles.bad}>
-          {fits ? (
-            <>Your {n.memoryGb} GB executor is enough.</>
-          ) : (
-            <>
-              Too small: set <code>spark.executor.memory={setGb}g</code>.
-            </>
-          )}
-        </div>
+        {fits ? (
+          <>
+            A task needs <strong>{setGb} GB</strong>, so your {n.memoryGb} GB executor is enough.
+          </>
+        ) : (
+          <>
+            A task needs <strong>{setGb} GB</strong>, more than your {n.memoryGb} GB executor. Set{' '}
+            <code>spark.executor.memory={setGb}g</code>, as in <a href="#fix-a">Fix It: Raise the Executor Memory</a>.
+          </>
+        )}
       </div>
     );
   }
