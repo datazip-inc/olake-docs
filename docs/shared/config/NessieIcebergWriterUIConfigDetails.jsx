@@ -207,7 +207,7 @@ export default function NessieIcebergWriterUIConfigDetails({ authType }) {
       </table>
 
       <Admonition type="note" title="Catalog Name Supported for v0.3.5 and above">
-        For the <strong>catalog name</strong>, OLake Go only supports lowercase letters and
+        For the <strong>catalog name</strong>, OLake Go only supports lowercase letters, numbers (<strong>v0.12.1 and above</strong>) and
         underscores. Spaces and special characters are not supported.
       </Admonition>
     </>
