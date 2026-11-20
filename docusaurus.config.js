@@ -505,6 +505,10 @@ const config = {
         redirects: [
           // /ai-lake was a client-side redirect page to /contact/; now a real redirect (not in the sitemap)
           { to: '/contact', from: '/ai-lake' },
+          // wal2json is not supported and its page was removed; the page still got search traffic for "wal2json",
+          // and the logical replication runbook covers output plugins. scripts/runbooks/check.mjs fails while the
+          // target is unlisted, so this redirect only ships together with that runbook.
+          { to: '/docs/runbooks/postgres/enable-logical-replication/', from: '/docs/connectors/postgres/wal2json_plugin' },
           // URLs that still get search traffic (Search Console) but had no redirect
           // Author pages removed for authors without posts
           { to: '/blog/authors', from: '/blog/authors/pavan' },

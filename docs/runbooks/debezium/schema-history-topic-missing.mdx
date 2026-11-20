@@ -1,0 +1,222 @@
+---
+title: "Debezium: the db history topic is missing"
+description: "Why Debezium fails with 'The db history topic is missing' or 'schema isn't known to this connector', and the recovery we ran on Debezium 1.9 and 3.7."
+sidebar_label: Schema history topic missing
+unlisted: true
+keywords:
+  - the db history topic is missing
+  - debezium schema history topic
+  - schema isn't known to this connector
+  - database.history.kafka.topic
+  - schema.history.internal.kafka.topic
+  - schema_only_recovery
+  - debezium snapshot.mode recovery
+runbook:
+  family: debezium
+  author: shubham
+  reproduced:
+    date: "2026-11-16"
+    versions:
+      - "Debezium 3.7.1.Final on Kafka Connect 4.3.1 with MySQL 8.4.13"
+      - "Debezium 1.9.7.Final on Kafka Connect 3.2.0 with MySQL 8.0.46"
+    lab: labs/runbooks/debezium/schema-history-topic-missing
+    summary: "The schema history topic was deleted under a running pipeline of two tables. Recovery mode resumed from the stored offset on both versions. On 3.7.1 it was also run after a column was added during the outage, where it failed, and after a table was added to the include list."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+A Debezium MySQL connector stops at start-up with `The db history topic is missing` when its schema history topic is gone but its offsets are not. The connector knows where it was in the binary log (binlog) and no longer knows what the tables looked like at that point.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** If no table changed structure since the connector last ran, set `snapshot.mode` to `recovery` and restart it. Before Debezium 2.6 the value is `schema_only_recovery`.
+
+The connector rebuilds the topic from the tables as they are now and continues from its stored offset, without reading the data again. If a table did change in between, recovery fails on the first older row, and you need a new snapshot instead.
+
+<TLDR title='Key takeaways'>
+
+- The offsets and the schema history live in two different Kafka topics. Losing the second one alone produces this error.
+- `snapshot.mode=recovery` (`schema_only_recovery` before 2.6) rebuilt the topic and resumed from the stored offset on Debezium 1.9.7 and 3.7.1, with no rows read twice.
+- Recovery reads today's table structure. After a schema change during the outage it failed in the run on this page, and the fix was a full new snapshot.
+
+</TLDR>
+
+## The error
+
+On Debezium 3.7.1 the task goes to `FAILED` and the connector stays `RUNNING`. The task trace starts with this:
+
+```text
+io.debezium.DebeziumException: The db history topic is missing. You may attempt to recover it by reconfiguring the connector to recovery.
+	at io.debezium.connector.common.BaseSourceTask.validateSchemaHistory(BaseSourceTask.java:143)
+	at io.debezium.connector.mysql.MySqlConnectorTask.start(MySqlConnectorTask.java:164)
+```
+
+The Kafka Connect log shows two lines just before it. The second is the generic Kafka Connect message for any task that dies.
+
+```text
+WARN   MySQL||lifecycle  Database schema history was not found but was expected   [io.debezium.connector.common.BaseSourceTask]
+ERROR  MySQL||lifecycle  WorkerSourceTask{id=inventory-connector-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+```
+
+On Debezium 1.9.7 the same failure names the old snapshot mode:
+
+```text
+io.debezium.DebeziumException: The db history topic is missing. You may attempt to recover it by reconfiguring the connector to SCHEMA_ONLY_RECOVERY
+```
+
+### The same failure across versions
+
+The message and the property names changed twice. Use the row for the version you run.
+
+| Debezium | Message ends with | History topic property | Recovery value of `snapshot.mode` |
+| --- | --- | --- | --- |
+| 0.9 to 1.9 | `... to SCHEMA_ONLY_RECOVERY` | `database.history.kafka.topic` | `schema_only_recovery` |
+| 2.0 to 2.5 | `... to SCHEMA_ONLY_RECOVERY` | `schema.history.internal.kafka.topic` | `schema_only_recovery` |
+| 2.6 and later | `... to recovery.` | `schema.history.internal.kafka.topic` | `recovery` |
+
+The 1.9.7 and 3.7.1 rows are from the runs on this page. The boundaries come from the [Debezium 2.0 release notes](https://debezium.io/releases/2.0/release-notes), which renamed `database.history.*` to `schema.history.internal.*`, and from the Debezium source at each release tag ([1.9.7](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-connector-mysql/src/main/java/io/debezium/connector/mysql/MySqlConnectorTask.java), [3.7.1](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-common/src/main/java/io/debezium/connector/common/BaseSourceTask.java)).
+
+Versions 1.2 to 3.0 also carry a second message, for a topic that exists but lacks records. It begins `The db history topic or its content is fully or partially missing.` The cause and the fixes below are the same.
+
+## Why it happens
+
+Kafka Connect stores the connector's position in its offsets topic. Debezium stores every table structure it has seen, as data definition language (DDL) statements, in a separate [schema history topic](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-schema-history-topic). At start-up the connector reads the whole history topic to learn how to decode rows from its stored position onward.
+
+In the run, the offsets were still there after the history topic was deleted:
+
+```json
+{
+  "offsets": [
+    {
+      "partition": { "server": "dbserver1" },
+      "offset": { "ts_sec": 1794844769, "file": "mysql-bin.000003", "pos": 198, "gtids": "caff6928-e1a4-11f1-a3ef-66f6faaced59:1-13" }
+    }
+  ]
+}
+```
+
+A position without a history is the whole problem. These are the usual ways to get there:
+
+- **The topic was deleted**, by hand, by a clean-up job, or when a Kafka cluster was rebuilt and only the offsets were kept.
+- **The topic lost records to retention.** When Debezium creates the topic itself it sets one partition, `cleanup.policy=delete`, `retention.ms=9223372036854775807` and `retention.bytes=-1`, which is what the run showed. A topic created ahead of time with broker defaults does not have those settings.
+- **The topic has more than one partition.** The Debezium documentation says: "Never partition the database schema history topic."
+- **The connector moved to a new name or a new cluster** with its offsets and without its history.
+
+## Confirm the diagnosis
+
+Check the task, the topic and the offsets. The last call needs Kafka Connect 3.5 or later.
+
+```bash
+curl -s localhost:8083/connectors/inventory-connector/status
+kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic schemahistory.inventory
+kafka-configs.sh --bootstrap-server kafka:9092 --entity-type topics --entity-name schemahistory.inventory --describe
+curl -s localhost:8083/connectors/inventory-connector/offsets
+```
+
+If the offsets are empty too, this is not your failure: a connector with no offsets and no history starts with a normal initial snapshot.
+
+## Fix 1: rebuild the history with recovery mode
+
+Use this when you are sure no captured table was altered between the connector's last position and now.
+
+1. Stop the connector. On Kafka Connect 3.5 or later use `PUT /connectors/<name>/stop`. On older versions delete the connector; its offsets stay in the offsets topic under the same name.
+2. Set `snapshot.mode` to `recovery`, or `schema_only_recovery` before Debezium 2.6.
+3. Start it again, with `PUT /connectors/<name>/resume` or by creating the connector under the same name.
+
+A `PUT` to `/config` replaces the whole configuration, so send every existing setting along with the changed one.
+
+```bash
+curl -X PUT localhost:8083/connectors/inventory-connector/stop
+curl -X PUT -H 'Content-Type: application/json' localhost:8083/connectors/inventory-connector/config \
+  --data '{ "...": "your existing settings", "snapshot.mode": "recovery" }'
+curl -X PUT localhost:8083/connectors/inventory-connector/resume
+```
+
+The log confirms what the connector does:
+
+```text
+INFO   MySQL||lifecycle  The db-history topic is missing but we are in recovery snapshot mode. Attempting to snapshot the current schema and then begin reading the redo log from the last recorded offset.   [io.debezium.connector.common.BaseSourceTask]
+```
+
+In the run, a row was inserted while the connector was down. After recovery the `customers` topic went from 4 events to 5, the new event was a normal insert (`op=c`, `snapshot=false`), and the history topic was back with 8 records. Nothing was read twice. Debezium 1.9.7 behaved the same way with `schema_only_recovery`.
+
+Afterwards, set `snapshot.mode` back to what it was. The Debezium documentation suggests this so the connector does not start a recovery again after a later restart.
+
+## When recovery mode is not safe
+
+Recovery reads the table structure as it is today. The [Debezium documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-snapshot-mode) warns: "Do not use this mode to perform a snapshot if schema changes were committed to the database after the last connector shutdown."
+
+The run shows why. While the connector was down, one row was inserted, a column was added, and a second row was inserted. Recovery rebuilt a five-column structure and then met the first row, which has four:
+
+```text
+org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped.
+Caused by: io.debezium.DebeziumException: Error processing binlog event
+Caused by: io.debezium.DebeziumException: Error processing row in customers, internal schema size 5, but row size 4 , restart connector with schema recovery mode.
+```
+
+The advice at the end of that message does not help here, because the connector is already in recovery mode. Older versions, and Flink CDC, which embeds Debezium, report the same mismatch as `Data row is smaller than a column index, internal schema representation is probably out of sync with real database schema` ([flink-cdc issue 732](https://github.com/apache/flink-cdc/issues/732)).
+
+### Fix 2: clear the offsets and take a new snapshot
+
+When the history cannot be trusted, give up the old position.
+
+1. Stop the connector.
+2. Delete its offsets with `DELETE /connectors/<name>/offsets`. This needs Kafka Connect 3.6 or later and a stopped connector. On older versions, register the connector under a new name, or remove the offsets as the [Debezium FAQ](https://debezium.io/documentation/faq/#how_to_remove_committed_offsets_for_a_connector) describes.
+3. Delete what is left of the history topic.
+4. Set `snapshot.mode` to `initial` and start the connector.
+
+```bash
+curl -X PUT localhost:8083/connectors/inventory-connector/stop
+curl -X DELETE localhost:8083/connectors/inventory-connector/offsets
+kafka-topics.sh --bootstrap-server kafka:9092 --delete --topic schemahistory.inventory
+curl -X PUT -H 'Content-Type: application/json' localhost:8083/connectors/inventory-connector/config \
+  --data '{ "...": "your existing settings", "snapshot.mode": "initial" }'
+curl -X PUT localhost:8083/connectors/inventory-connector/resume
+```
+
+Kafka Connect answered the delete with: "The Connect framework-managed offsets for this connector have been reset successfully." The connector then took a full snapshot.
+
+Expect every row again. In the run the `customers` topic went from 5 events to 12, because all 7 rows of the table were written once more as read events (`op=r`). Whatever consumes the topic has to treat a repeated key as an update, not as a new row.
+
+## Related: "schema isn't known to this connector"
+
+The same history topic causes a second error when a table is added to a running connector.
+
+```text
+org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped.
+Caused by: io.debezium.DebeziumException: Error processing binlog event
+Caused by: io.debezium.DebeziumException: Encountered change event for table inventory.orders whose schema isn't known to this connector
+```
+
+In the run, a connector captured one table with [`schema.history.internal.store.only.captured.tables.ddl`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-database-history-store-only-captured-tables-ddl) set to `true`. A second table was then added to `table.include.list`. The task failed on the first change to that table, because the history held no structure for it.
+
+The [documented procedure](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-capturing-data-from-tables-not-captured-by-the-initial-snapshot-no-schema-change) fixed it: stop the connector, delete the history topic, set `snapshot.mode` to `recovery` and `store.only.captured.tables.ddl` to `false`, keep the new table in the include list, and start again. The same limit applies as above: no schema change on that table in the meantime.
+
+Recovery does not copy the table's existing rows. After the fix, the new topic held 1 event, the insert that had failed, while the table held 5 rows. Run an [incremental snapshot](https://debezium.io/documentation/reference/stable/connectors/mysql.html#debezium-mysql-incremental-snapshots) for the table to load the rest.
+
+## Prevent it
+
+- Let Debezium create the history topic, or create it with the same settings: one partition, `cleanup.policy=delete`, `retention.ms=-1` and `retention.bytes=-1`.
+- Give each connector its own history topic, and keep it out of any job that deletes or expires topics by pattern.
+- Leave `store.only.captured.tables.ddl` at `false` if tables may be added later. The history is larger and adding a table is simpler.
+- When you move a connector to another Kafka cluster, move the history topic with the offsets, or plan a new snapshot.
+- Alert on a `FAILED` task. Kafka Connect does not restart it for you.
+
+:::note[How OLake Go handles this]
+
+OLake Go keeps no schema history topic and uses no Kafka. Its MySQL connector asks for `binlog_row_metadata=FULL`, which makes MySQL write column names into the binlog next to each change.
+
+It has a related failure of its own: [`Column Count Mismatch: Expected X, Got Y`](/docs/connectors/mysql/#3-column-count-mismatch-expected-x-got-y) when that setting is not `FULL` or a table changed after CDC started. It also runs change data capture (CDC) on a schedule and not as a continuous stream, and it needs the binlog to be retained between runs, as Debezium does.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Debezium MySQL connector: [schema history topic](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-schema-history-topic), [`snapshot.mode`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-snapshot-mode), [tables not captured by the initial snapshot](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-capturing-data-from-tables-not-captured-by-the-initial-snapshot-no-schema-change)
+- [Debezium 2.0 release notes](https://debezium.io/releases/2.0/release-notes), for the renamed properties
+- [Debezium FAQ](https://debezium.io/documentation/faq/#how_to_remove_committed_offsets_for_a_connector), for removing committed offsets on older Kafka Connect versions
+- [Kafka Connect REST API](https://kafka.apache.org/documentation/#connect_rest), for the stop, resume and offsets endpoints

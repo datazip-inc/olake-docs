@@ -1,0 +1,391 @@
+---
+title: "MySQL purge binary logs: retention and error 1236"
+description: "How long to keep MySQL binary logs for change data capture, how to purge them safely, and how to recover a replica or Debezium after error 1236."
+sidebar_label: Binlog retention and error 1236
+unlisted: true
+keywords:
+  - mysql purge binary logs
+  - binlog_expire_logs_seconds
+  - expire_logs_days
+  - mysql binlog retention
+  - got fatal error 1236 from master when reading data from binary log
+  - could not find first log file name in binary log index file
+  - cannot replicate because the source purged required binary logs
+  - debezium binlog no longer available on the server
+  - snapshot.mode when_needed
+  - show binary logs
+runbook:
+  family: mysql
+  author: shubham
+  reproduced:
+    date: "2026-11-16"
+    versions:
+      - "MySQL 8.4.13, 8.0.46 and 5.7.44, each as a source with one replica"
+      - "Debezium 3.7.1.Final on Kafka Connect 4.3.1 with MySQL 8.4.13"
+      - "Debezium 3.0.8.Final on Kafka Connect 3.9.0 with MySQL 8.4.13"
+      - "Debezium 1.9.7.Final on Kafka Connect 3.2.0 with MySQL 8.0.46"
+    lab: labs/runbooks/mysql/binlog-retention-error-1236
+    summary: "A replica and a Debezium connector were stopped while the binary log file they needed was purged or expired, with and without GTIDs. The replica was rebuilt from a dump and the connector took a new snapshot. A connected reader in the middle of an older file was not purged."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+MySQL removes old binary log (binlog) files by expiry or by `PURGE BINARY LOGS`, and it does not check whether a stopped reader still needs them. A replica that comes back afterwards stops with `Got fatal error 1236`. A Debezium connector stops with `The connector is trying to read binlog starting at ... but this is no longer available on the server`.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Keep binary logs for longer than the longest time any reader can be stopped, and purge by hand only up to the oldest file a reader still needs. The setting is `binlog_expire_logs_seconds` on MySQL 8.0 and 8.4, and `expire_logs_days` on 5.7.
+
+```sql
+SHOW BINARY LOGS;                                 -- what the server has
+SET GLOBAL binlog_expire_logs_seconds = 604800;   -- keep 7 days (MySQL 8.0 and 8.4)
+PURGE BINARY LOGS TO 'mysql-bin.000012';          -- removes every file before this one
+```
+
+Once a reader's position is purged, the server cannot give the missing changes back. Rebuild a replica from a new dump of the source, and let a Debezium connector take a new snapshot with `snapshot.mode=when_needed`.
+
+<TLDR title='Key takeaways'>
+
+- MySQL 5.7 keeps binary logs forever by default and 8.0 and 8.4 keep them 30 days. An expired file is removed at the next log flush or restart, not at the moment it expires.
+- `PURGE BINARY LOGS` skipped a file that a connected replica was still reading (warning 1867 in the run). Nothing protects a reader that is stopped.
+- A replica rebuilt from a dump had equal checksums on MySQL 5.7.44, 8.0.46 and 8.4.13, and `snapshot.mode=when_needed` recovered Debezium 1.9.7, 3.0.8 and 3.7.1.
+
+</TLDR>
+
+## The errors, by reader and version
+
+The same event, a purged position, is worded differently by every reader and several times per reader. Find your reader and version below.
+
+### A MySQL replica
+
+On MySQL 8.4.13 and 8.0.46, `SHOW REPLICA STATUS` shows this after the file was purged:
+
+```text
+           Replica_IO_Running: No
+          Replica_SQL_Running: Yes
+                Last_IO_Errno: 13114
+                Last_IO_Error: Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file'
+```
+
+The replica's error log has two lines for it. The source logs nothing in this case.
+
+```text
+[ERROR] [MY-010557] [Repl] Error reading packet from server for channel '': Could not find first log file name in binary log index file (server_errno=1236)
+[ERROR] [MY-013114] [Repl] Replica I/O for channel '': Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file', Error_code: MY-013114
+```
+
+With global transaction identifiers (GTIDs) and auto-positioning, the text in quotes names the missing transactions instead of a file. In this case the source logs it too, as warning `MY-011809`.
+
+```text
+Last_IO_Error: Got fatal error 1236 from source when reading data from binary log: 'Cannot replicate because the source purged required binary logs. Replicate the missing transactions from elsewhere, or provision a new replica from backup. Consider increasing the source's binary log expiration period. The GTID set sent by the replica is 'e10e193c-e1e2-11f1-94ca-a60260749f0c:1-17', and the missing transactions are 'e10e193c-e1e2-11f1-94ca-a60260749f0c:18-19''
+```
+
+On MySQL 5.7.44, `SHOW SLAVE STATUS` uses the older words and a different error number:
+
+```text
+                Last_IO_Errno: 1236
+                Last_IO_Error: Got fatal error 1236 from master when reading data from binary log: 'Could not find first log file name in binary log index file'
+```
+
+```text
+Last_IO_Error: Got fatal error 1236 from master when reading data from binary log: 'The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. Replicate the missing transactions from elsewhere, or provision a new slave from backup. Consider increasing the master's binary log expiration period. The GTID set sent by the slave is '73222c63-e1e3-11f1-a721-eeee9fc8c185:1-18', and the missing transactions are '73222c63-e1e3-11f1-a721-eeee9fc8c185:19-20'.'
+```
+
+| MySQL | `Last_IO_Errno` | Message starts with | Text in quotes with GTID auto-positioning |
+| --- | --- | --- | --- |
+| 5.7 | 1236 | `Got fatal error 1236 from master when reading data from binary log:` | `The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. ...` |
+| 8.0.12 to 8.0.32 | not run | `Got fatal error 1236 from master when reading data from binary log:` | `Cannot replicate because the master purged required binary logs. ...` |
+| 8.0.33 and later, 8.4 | 13114 | `Got fatal error 1236 from source when reading data from binary log:` | `Cannot replicate because the source purged required binary logs. ...` |
+
+The 5.7.44, 8.0.46 and 8.4.13 rows are from the runs on this page. The 8.0.12 to 8.0.32 row and the 8.0.33 boundary come from the message files in the MySQL source at each release tag ([5.7.44](https://github.com/mysql/mysql-server/blob/mysql-5.7.44/sql/share/errmsg-utf8.txt), [8.0.32](https://github.com/mysql/mysql-server/blob/mysql-8.0.32/share/messages_to_clients.txt), [8.0.33](https://github.com/mysql/mysql-server/blob/mysql-8.0.33/share/messages_to_clients.txt)). Without GTIDs the text in quotes was the same on all three versions run.
+
+Monitoring that waits for `Last_IO_Errno = 1236` misses this failure on 8.0.46 and 8.4.13. There the number is 13114, and 1236 appears only inside the message.
+
+Not every error 1236 is a retention problem. A replica pointed past the end of a file that still exists reported `'Client requested source to start replication from position > file size'` in the run (`master` in place of `source` on 5.7.44), and more retention does not fix that.
+
+### A Debezium MySQL connector
+
+Debezium checks its stored position against the server before it starts to stream. What it does when the check fails changed twice.
+
+| Debezium | What the task does | Message |
+| --- | --- | --- |
+| 1.9 to 2.5 | `FAILED` at start | `The connector is trying to read binlog starting at ... , but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed.` |
+| 2.6 to 3.1 | Logs a warning and starts to stream. MySQL then refuses the position | `The connector is trying to read redo log starting at ...` as a warning, then `Could not find first log file name in binary log index file Error code: 1236; SQLSTATE: HY000.` |
+| 3.2 and later | `FAILED` at start | `The connector is trying to read change stream starting at ... , but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.` |
+
+Debezium 1.9.7, 3.0.8 and 3.7.1 were run. The boundaries come from the Debezium source at each release tag ([2.5.4](https://github.com/debezium/debezium/blob/v2.5.4.Final/debezium-connector-mysql/src/main/java/io/debezium/connector/mysql/MySqlConnectorTask.java), [2.6.0](https://github.com/debezium/debezium/blob/v2.6.0.Final/debezium-core/src/main/java/io/debezium/connector/common/BaseSourceTask.java), [3.1.3](https://github.com/debezium/debezium/blob/v3.1.3.Final/debezium-core/src/main/java/io/debezium/connector/common/BaseSourceTask.java), [3.2.0](https://github.com/debezium/debezium/blob/v3.2.0.Final/debezium-core/src/main/java/io/debezium/connector/common/BaseSourceTask.java)).
+
+On Debezium 3.7.1 the task trace starts with this. The position object in the middle is shortened here.
+
+```text
+io.debezium.DebeziumException: The connector is trying to read change stream starting at BinlogOffsetContext{sourceInfoSchema=Schema{io.debezium.connector.mysql.Source:STRUCT}, sourceInfo=BinlogSourceInfo{currentGtid='null', currentBinlogFilename='mysql-bin.000003', currentBinlogPosition=158, ...}, but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+```
+
+On Debezium 1.9.7:
+
+```text
+io.debezium.DebeziumException: The connector is trying to read binlog starting at SourceInfo [currentGtid=null, currentBinlogFilename=mysql-bin.000003, currentBinlogPosition=157, currentRowNumber=0, serverId=0, sourceTime=null, threadId=-1, currentQuery=null, tableIds=[], databaseName=null], but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed.
+```
+
+Debezium 3.0.8 did not fail. The task stayed `RUNNING` in the Kafka Connect status and repeated these lines about every 15 seconds, so an alert on `FAILED` tasks never fires:
+
+```text
+WARN   The connector is trying to read redo log starting at BinlogOffsetContext{...}, but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed if you want to recover. If not the connector will streaming from the last available position in the log   [io.debezium.connector.common.BaseSourceTask]
+ERROR  Error during binlog processing. Last offset stored = null, binlog reader near position = mysql-bin.000003/158   [io.debezium.connector.binlog.BinlogStreamingChangeEventSource]
+io.debezium.DebeziumException: Could not find first log file name in binary log index file Error code: 1236; SQLSTATE: HY000.
+Caused by: com.github.shyiko.mysql.binlog.network.ServerException: Could not find first log file name in binary log index file
+WARN   Retry 1 of unlimited retries will be attempted   [io.debezium.pipeline.ErrorHandler]
+WARN   Going to restart connector after 10 sec. after a retriable exception   [io.debezium.connector.common.BaseSourceTask]
+```
+
+One log line just before the error tells you which case you are in. Without GTIDs it names the file, and with GTIDs it names the purge.
+
+```text
+Connector requires binlog file 'mysql-bin.000003', but server only has mysql-bin.000004, mysql-bin.000005
+Some of the GTIDs needed to replicate have been already purged
+```
+
+## Why it happens
+
+The binary log is a series of numbered files plus an index file. Every reader remembers where it stopped: a file name and a position, or a set of GTIDs. The server keeps no list of those readers.
+
+Files leave the server in two ways, and neither asks a stopped reader.
+
+**Expiry.** Each version has its own setting and default. The table shows what each version answered in the run.
+
+| MySQL | Retention setting | Default | The other setting |
+| --- | --- | --- | --- |
+| 5.7.44 | `expire_logs_days`, whole days | 0, which keeps every file | `binlog_expire_logs_seconds`: `ERROR 1193 Unknown system variable` |
+| 8.0.46 | `binlog_expire_logs_seconds` | 2592000 (30 days) | `expire_logs_days` still exists, is 0, and warns that it is deprecated |
+| 8.4.13 | `binlog_expire_logs_seconds` | 2592000 (30 days) | `expire_logs_days`: `ERROR 1193 Unknown system variable` |
+
+MySQL added `binlog_expire_logs_seconds` in [8.0.1](https://docs.oracle.com/cd/E17952_01/mysql-8.0-relnotes-en/news-8-0-1.html), deprecated `expire_logs_days` in [8.0.3](https://docs.oracle.com/cd/E17952_01/mysql-8.0-relnotes-en/news-8-0-3.html), made 30 days the default of the new variable in [8.0.11](https://docs.oracle.com/cd/E17952_01/mysql-8.0-relnotes-en/news-8-0-11.html) and removed the old variable in [8.4](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/mysql-nutshell.html#mysql-nutshell-removals). On 8.0.46 the two cannot both be set. With the seconds variable at its default, `SET GLOBAL expire_logs_days = 7` returned this:
+
+```text
+ERROR 3683 (HY000) at line 1: The option expire_logs_days and binlog_expire_logs_seconds cannot be used together. Please use binlog_expire_logs_seconds to set the expire time (expire_logs_days is deprecated)
+```
+
+Expiry is not a timer. In the run a file was back-dated by two days and the retention set to one day, and the file stayed listed until `FLUSH BINARY LOGS`. With a 5-second retention nothing was removed after 8 seconds, and the next flush removed every older file.
+
+That matches the [MySQL manual](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/replication-options-binary-log.html#sysvar_binlog_expire_logs_seconds): "Possible removals happen at startup and when the binary log is flushed."
+
+A full file counts as a flush. With `max_binlog_size` lowered to 4096 bytes, 40 inserts and no flush statement, the server started new files by itself and removed the back-dated file, on all three versions.
+
+**A manual purge.** `PURGE BINARY LOGS` removes files at once. It protects only a reader that is connected and still reading an older file, as the purge section below shows.
+
+**A reader that looks healthy.** A stored position can also fall behind while the reader runs. In the run a Debezium 3.7.1 connector captured one database while writes went to another. Its stored offset stayed on `mysql-bin.000005`, the server expired that file, and the next task restart failed with the same message.
+
+## Confirm the diagnosis
+
+Compare what the server still has with what the reader asks for.
+
+```sql
+SHOW BINARY LOGS;              -- the oldest file listed is the oldest position anyone can read
+SHOW REPLICA STATUS\G          -- SHOW SLAVE STATUS on 5.7: Relay_Source_Log_File, Last_IO_Error
+SELECT @@GLOBAL.gtid_purged;   -- with GTIDs: everything in this set is gone from the server
+```
+
+For Debezium, read the stored position and look for its `file` in the list. The endpoint is in the Kafka Connect documentation from [3.5](https://github.com/apache/kafka/blob/3.5.0/docs/connect.html).
+
+```bash
+curl -s localhost:8083/connectors/inventory-connector/offsets
+```
+
+```json
+{"offsets":[{"partition":{"server":"dbserver1"},"offset":{"ts_sec":1794850317,"file":"mysql-bin.000003","pos":158}}]}
+```
+
+If the file is still listed, or the text in quotes is not one of those above, retention is not your problem.
+
+## Fix 1: rebuild a MySQL replica from a dump
+
+The purged changes exist nowhere on the source, so the replica has to be loaded again. A dump taken with the position inside it lets replication continue from the exact point of the dump.
+
+Without GTIDs, the dump carries a `CHANGE REPLICATION SOURCE TO` statement with the file and position. The option is `--source-data` on 8.0.46 and 8.4.13 and `--master-data` on 5.7.44.
+
+```bash
+mysql -h replica -e "STOP REPLICA;"
+mysqldump -h source --databases inventory --single-transaction --source-data=1 | mysql -h replica
+mysql -h replica -e "START REPLICA;"
+```
+
+With GTIDs, the dump sets `gtid_purged` on the replica, which needs the replica's own GTID state cleared first. The statement is `RESET BINARY LOGS AND GTIDS` on 8.4.13 and `RESET MASTER` on 8.0.46 and 5.7.44.
+
+```bash
+mysql -h replica -e "STOP REPLICA; RESET BINARY LOGS AND GTIDS;"
+mysqldump -h source --databases inventory --single-transaction --set-gtid-purged=ON | mysql -h replica
+mysql -h replica -e "START REPLICA;"
+```
+
+In the run both threads returned to `Yes` on all three versions, in both modes. The source and the replica each held 8 customers, and `CHECKSUM TABLE` gave the same value on both servers for both tables.
+
+Skipping the reset fails at once. MySQL 8.0.46 and 8.4.13 answered `ERROR 3546 (HY000) at line 24: @@GLOBAL.GTID_PURGED cannot be changed: the added gtid set must not overlap with @@GLOBAL.GTID_EXECUTED`, and 5.7.44 answered `ERROR 1840 (HY000) at line 87: @@GLOBAL.GTID_PURGED can only be set when @@GLOBAL.GTID_EXECUTED is empty.`
+
+### Do not skip over the gap
+
+The common shortcut is to point the replica at the oldest file the source still has, or to tell it that it already has the purged GTIDs. Both make the error go away.
+
+```sql
+-- Unsafe without GTIDs
+CHANGE REPLICATION SOURCE TO SOURCE_LOG_FILE = 'mysql-bin.000019', SOURCE_LOG_POS = 4;
+-- Unsafe with GTIDs
+RESET BINARY LOGS AND GTIDS; SET GLOBAL gtid_purged = '<the gtid_purged of the source>';
+```
+
+In the run replication then reported both threads as `Yes` and 0 seconds behind, while the source had 7 customers and the replica 4. An order changed during the outage still had its old quantity on the replica.
+
+The damage showed later. The source updated one of the rows the replica never received, and the replica stopped:
+
+```text
+Last_SQL_Errno: 1032
+[ERROR] [MY-010584] [Repl] Replica SQL for channel '': Worker 1 failed executing transaction 'ANONYMOUS' at source log mysql-bin.000019, end_log_pos 531; Could not execute Update_rows event on table inventory.customers; Can't find record in 'customers', Error_code: 1032; handler error HA_ERR_KEY_NOT_FOUND; the event's source log mysql-bin.000019, end_log_pos 531, Error_code: MY-001032
+```
+
+## Fix 2: let Debezium take a new snapshot
+
+Set `snapshot.mode` to `when_needed` and restart the connector. The [Debezium documentation](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-snapshot-mode) says this mode takes a snapshot when "A previously recorded offset specifies a binlog position or GTID that is not available on the server."
+
+A `PUT` to `/config` replaces the whole configuration, so send every existing setting along with the changed one.
+
+```bash
+curl -X PUT -H 'Content-Type: application/json' localhost:8083/connectors/inventory-connector/config \
+  --data '{ "...": "your existing settings", "snapshot.mode": "when_needed" }'
+```
+
+The log confirms it on 3.0.8 and 3.7.1. Debezium 1.9.7 words it as `Forcing the snapshot execution as it is allowed by the configuration.`
+
+```text
+WARN   Last recorded offset is no longer available on the server.   [io.debezium.connector.common.BaseSourceTask]
+INFO   The last recorded offset is no longer available but we are in when_needed snapshot mode. Attempting to snapshot data to fill the gap.   [io.debezium.connector.common.BaseSourceTask]
+```
+
+In the run the outage had added 3 customers, changed 1 order and deleted 1 order. After the fix the `customers` topic went from 4 events to 11 and the `orders` topic from 4 to 7, on all three Debezium versions, and a new insert was then streamed as a normal event.
+
+Two things follow from those numbers.
+
+- **Every row arrives again.** All 7 customers and 3 orders were written once more as read events (`op=r`). Whatever consumes the topics has to treat a repeated key as an update.
+- **Deletes during the outage are lost.** The `orders` topic got no delete event for the order that was deleted. A consumer keeps that row until it is rebuilt or the row is removed by hand.
+
+### If you leave when_needed on
+
+The mode stays active after the fix. In the run the same outage was repeated with `when_needed` still set, and the task did not fail. The connector read all 11 customers again by itself, and the `customers` topic went from 12 events to 23.
+
+That is the trade. With `when_needed` a lost position costs a full reload and no alert. With `initial` it costs a failed task that someone has to fix.
+
+### The other way: clear the offsets
+
+You can also keep `snapshot.mode=initial` and clear the stored position. The endpoint that resets offsets is in the Kafka Connect documentation from [3.6](https://github.com/apache/kafka/blob/3.6.0/docs/connect.html).
+
+```bash
+curl -X PUT localhost:8083/connectors/inventory-connector/stop
+curl -X DELETE localhost:8083/connectors/inventory-connector/offsets
+kafka-topics.sh --bootstrap-server kafka:9092 --delete --topic schemahistory.inventory
+curl -X PUT localhost:8083/connectors/inventory-connector/resume
+```
+
+Kafka Connect 4.3.1 answered "The Connect framework-managed offsets for this connector have been reset successfully." The connector then took a snapshot with the same counts as above. The documentation of Kafka Connect [3.2.0](https://github.com/apache/kafka/blob/3.2.0/docs/connect.html), which the Debezium 1.9.7 image runs, lists neither endpoint.
+
+## Prevent it
+
+### How long to keep binary logs
+
+Keep them longer than the longest outage you want to survive without a reload: a weekend, a failed deploy, a paused pipeline. Then check that the disk holds that many days of files.
+
+```sql
+SET GLOBAL binlog_expire_logs_seconds = 604800;   -- MySQL 8.0 and 8.4: 7 days
+SET GLOBAL expire_logs_days = 7;                  -- MySQL 5.7
+```
+
+`SET GLOBAL` changes the running server. The [MySQL manual](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/set-variable.html) describes two ways to keep the value across restarts, `SET PERSIST` and the option file. Those were not run here.
+
+On MySQL 5.7 the default of 0 never removes a file, which protects readers and fills disks. Set a value there too, and size it the same way.
+
+`SHOW BINARY LOGS` gives the size of each file, and the file times on disk show how many hours the list covers. Retention goes by those file times: the back-dated file in the run was treated as two days old.
+
+### Purge binary logs safely
+
+The [MySQL manual](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/purge-binary-logs.html) gives the procedure: find the file each replica is reading, take the earliest of those, and "Purge all log files up to but not including the target file." Readers that are not replicas, such as CDC connectors, belong on that list too.
+
+```sql
+SHOW REPLICA STATUS\G                               -- on each replica: Relay_Source_Log_File
+SHOW BINARY LOGS;                                   -- on the source
+PURGE BINARY LOGS TO 'mysql-bin.000012';            -- the earliest file still needed
+PURGE BINARY LOGS BEFORE NOW() - INTERVAL 1 DAY;    -- or by age
+```
+
+In the run the replica was on `mysql-bin.000012`. `PURGE BINARY LOGS BEFORE NOW() - INTERVAL 1 DAY` removed the two files last written three days earlier, `PURGE BINARY LOGS TO 'mysql-bin.000012'` removed the rest, and the replica kept running.
+
+MySQL protects a reader only while it is connected. The replica was frozen in the middle of a 48 MB file, and a purge past that file was refused on all three versions:
+
+```text
+Warning | 1867 | file ./mysql-bin.000012 was not purged because it was being read by 1 thread(s), purged only 0 out of 2 files.
+```
+
+The same purge with the replica stopped removed the file without a warning. That is the case behind error 1236.
+
+Do not remove binlog files with `rm`. After a file was deleted by hand, `SHOW BINARY LOGS` still listed it with a size of 0.
+
+The manual says a later purge fails in that state. In the run it completed on all three versions with warning 1612, `Being purged log ./mysql-bin.000013 was not found`.
+
+### Keep a quiet reader's position moving
+
+For Debezium, set [`heartbeat.interval.ms`](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-heartbeat-interval-ms). Its default is 0, which sends no heartbeats.
+
+In the run, with `heartbeat.interval.ms=2000`, the same writes to the uncaptured database moved the stored offset to the newest file, `mysql-bin.000011`. The task restart that had failed before stayed `RUNNING` and took no snapshot.
+
+### Watch for it
+
+- Alert when a reader's file is close to the oldest file in `SHOW BINARY LOGS`, not only when the reader fails.
+- On MySQL 8.0.33 and later, match `Last_IO_Errno = 13114` as well as 1236.
+- On Debezium 2.6 to 3.1, alert on the log text. The task state stayed `RUNNING` in the 3.0.8 run.
+
+:::note[How OLake Go handles this]
+
+OLake Go reads the same binary log and has the same limit. Its MySQL connector saves the binlog position as state, and the next CDC sync looks for that position, so the server has to keep the log for at least the pause between two syncs.
+
+The connector's connection check includes an optional [`binlog_retention` check](/docs/connectors/mysql/#3-check-source-connection) with a recommended value of 7 days or more. Its description reads: "If a sync is paused longer than the retention window, the logs it needs are purged and a full resync is required."
+
+On Amazon RDS and Aurora the check reads the retention hours from `mysql.rds_configuration`, which needs a `SELECT` grant on that table ([RDS guide](/docs/connectors/mysql/setup/rds), [Aurora guide](/docs/connectors/mysql/setup/aurora)).
+
+:::
+
+## The same condition in other tools
+
+This section quotes each tool's own documentation, checked on 16 November 2026. None of it was run here.
+
+**AWS Database Migration Service (DMS).** The task log shows `[SOURCE_CAPTURE ]E: Error 1236 (Could not find first log file name in binary log index file) reading binlog [1020493]`. The [AWS Knowledge Center article](https://repost.aws/knowledge-center/dms-cdc-error-1236-msql) says: "To resolve the error, check the binary log retention period on the source MySQL database. If needed, then increase the retention period. Restart the AWS DMS task to run the full-load phase again."
+
+The [DMS guide for MySQL sources](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.MySQL.html) recommends `binlog_expire_logs_seconds` of "86400 seconds (1 day) or greater" on MySQL 8.0 and later.
+
+**Airbyte.** The MySQL source starts over instead of failing. Its [troubleshooting page](https://docs.airbyte.com/integrations/sources/mysql/mysql-troubleshooting) quotes the log line `Saved offset no longer present on the server, Airbyte is going to trigger a sync from scratch`, and recommends "a time period of 7 days" for `binlog_expire_logs_seconds`.
+
+**Flink CDC.** The [MySQL connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/mysql-cdc/) runs the Debezium embedded engine, and its error has the Debezium 1.9 wording. The [Flink CDC FAQ](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/faq/faq/) explains: "This error occurs because the binlog file being read by the job has been cleaned up on the MySQL server."
+
+The FAQ's fix is `set global expire_logs_days=7;`. In the run that statement returned `ERROR 3683` on MySQL 8.0.46 with default settings and `ERROR 1193` on 8.4.13, so use `binlog_expire_logs_seconds` there.
+
+## Amazon RDS and Aurora
+
+This section also comes from documentation, checked on 16 November 2026, and was not run. On these services a stored procedure sets retention, in hours:
+
+```sql
+CALL mysql.rds_set_configuration('binlog retention hours', 24);
+CALL mysql.rds_show_configuration;
+```
+
+**Amazon Relational Database Service (RDS) for MySQL.** The [RDS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-stored-proc-configuring.html) says: "The default value of binlog retention hours is NULL. For RDS for MySQL, NULL means binary logs aren't retained (0 hours)." The maximum is 168 hours (7 days).
+
+**Aurora MySQL.** The [Aurora documentation](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/mysql-stored-proc-configuring.html) says that NULL "means binary logs are cleaned up lazily", and that binary logs "might remain in the system for a certain period, which is usually not longer than a day." For version 2.11.0 and higher and for version 3 the maximum is 2160 hours (90 days).
+
+A CDC reader on RDS with the default therefore has no retention to rely on. Set the hours before the first sync.
+
+<R.HowWeReproduced />
+
+## References
+
+- MySQL 8.4 Reference Manual: [PURGE BINARY LOGS](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/purge-binary-logs.html), [SHOW BINARY LOGS](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/show-binary-logs.html), [`binlog_expire_logs_seconds`](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/replication-options-binary-log.html#sysvar_binlog_expire_logs_seconds), [SHOW REPLICA STATUS](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/show-replica-status.html), [mysqldump](https://docs.oracle.com/cd/E17952_01/mysql-8.4-en/mysqldump.html)
+- MySQL 8.0 and 5.7 Reference Manuals: [`expire_logs_days` in 8.0](https://docs.oracle.com/cd/E17952_01/mysql-8.0-en/replication-options-binary-log.html#sysvar_expire_logs_days), [`expire_logs_days` in 5.7](https://docs.oracle.com/cd/E17952_01/mysql-5.7-en/replication-options-binary-log.html#sysvar_expire_logs_days)
+- [MySQL 8.4.0 release notes](https://docs.oracle.com/cd/E17952_01/mysql-8.4-relnotes-en/news-8-4-0.html), for the removed statements such as `SHOW MASTER STATUS` and `PURGE MASTER LOGS`
+- Debezium MySQL connector 3.7: [`snapshot.mode`](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-snapshot-mode), [MySQL purges binlog files](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-purges-binlog-files-used-by-debezium), [`heartbeat.interval.ms`](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-heartbeat-interval-ms)
+- Questions this page answers: [Is it safe to delete mysql-bin files?](https://dba.stackexchange.com/questions/41050) and [MySQL error 1236 When using GTID](https://stackoverflow.com/questions/38390765)

@@ -1,0 +1,169 @@
+# ./run.sh neighbour    PostgreSQL 12.22    2026-11-16T18:17:44Z
+
+## Only quietdb has a slot. Only appdb is written to.
+SELECT * FROM pg_create_logical_replication_slot('quiet_slot', 'pgoutput');
+ slot_name  |    lsn     
+------------+------------
+ quiet_slot | 0/1DDC6D50
+(1 row)
+
+CALL write_wal(128);
+CALL
+CHECKPOINT;
+CHECKPOINT
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | f      |            | 0/1DDC6D18  | 0/1DDC6D50          | 129 MB
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+        10 | 160 MB
+(1 row)
+
+
+## A consumer that confirms only the changes it has read finds nothing to confirm.
+SELECT count(*) AS changes_read, (array_agg(lsn ORDER BY lsn DESC))[1] AS last_change_lsn FROM pg_logical_slot_peek_binary_changes('quiet_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'quiet_pub');
+ changes_read | last_change_lsn 
+--------------+-----------------
+            0 | 
+(1 row)
+
+(no change was read, so there is no position to confirm)
+CHECKPOINT;
+CHECKPOINT
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | f      |            | 0/1DDC6D18  | 0/1DDC6D50          | 129 MB
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+        10 | 160 MB
+(1 row)
+
+
+## One row changes in quietdb (a heartbeat). Now there is a position to confirm.
+UPDATE heartbeat SET ts = now() WHERE id = 1;
+UPDATE 1
+SELECT count(*) AS changes_read, (array_agg(lsn ORDER BY lsn DESC))[1] AS last_change_lsn FROM pg_logical_slot_peek_binary_changes('quiet_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'quiet_pub');
+ changes_read | last_change_lsn 
+--------------+-----------------
+            4 | 0/25E596E0
+(1 row)
+
+SELECT * FROM pg_replication_slot_advance('quiet_slot', '0/25E596E0');
+ slot_name  |  end_lsn   
+------------+------------
+ quiet_slot | 0/25E596E0
+(1 row)
+
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | f      |            | 0/230D8FE0  | 0/25E596E0          | 46 MB
+(1 row)
+
+CHECKPOINT;
+CHECKPOINT
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         6 | 96 MB
+(1 row)
+
+
+## A second heartbeat moves restart_lsn the rest of the way.
+UPDATE heartbeat SET ts = now() WHERE id = 1;
+UPDATE 1
+SELECT count(*) AS changes_read, (array_agg(lsn ORDER BY lsn DESC))[1] AS last_change_lsn FROM pg_logical_slot_peek_binary_changes('quiet_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'quiet_pub');
+ changes_read | last_change_lsn 
+--------------+-----------------
+            4 | 0/25E598F0
+(1 row)
+
+SELECT * FROM pg_replication_slot_advance('quiet_slot', '0/25E598F0');
+ slot_name  |  end_lsn   
+------------+------------
+ quiet_slot | 0/25E598F0
+(1 row)
+
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | f      |            | 0/25E59718  | 0/25E598F0          | 472 bytes
+(1 row)
+
+CHECKPOINT;
+CHECKPOINT
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         4 | 64 MB
+(1 row)
+
+
+## pg_recvlogical on the same slot, and no change in quietdb at all.
+$ pg_recvlogical -d quietdb --slot quiet_slot --start -o proto_version=1 -o publication_names=quiet_pub -f /dev/null -v  &
+CALL write_wal(96);
+CALL
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | t      |       3424 | 0/25E598F0  | 0/25E598F0          | 97 MB
+(1 row)
+
+
+## It confirms the position the server reports in its keepalive messages.
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | t      |       3424 | 0/25E598F0  | 0/2BD50DD0          | 97 MB
+(1 row)
+
+after checkpoint 1: restart_lsn 0/25E598F0, retained by the slot 99 MB, pg_wal 128 MB in 8 files
+after checkpoint 2: restart_lsn 0/2BF4AD60, retained by the slot 4051 kB, pg_wal 80 MB in 5 files
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name  | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal 
+------------+-----------+----------+--------+------------+-------------+---------------------+--------------
+ quiet_slot | logical   | quietdb  | t      |       3424 | 0/2BF4AD60  | 0/2C144E50          | 4052 kB
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         5 | 80 MB
+(1 row)
+
+--- consumer output
+pg_recvlogical: starting log streaming at 0/0 (slot quiet_slot)
+pg_recvlogical: streaming initiated
+pg_recvlogical: confirming write up to 0/0, flush to 0/0 (slot quiet_slot)
+pg_recvlogical: confirming write up to 0/2BD50DD0, flush to 0/2BD50DD0 (slot quiet_slot)
+pg_recvlogical: confirming write up to 0/2C144E50, flush to 0/2C144E50 (slot quiet_slot)
+---
+$ kill -TERM <pid of pg_recvlogical>
+SELECT pg_drop_replication_slot('quiet_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+

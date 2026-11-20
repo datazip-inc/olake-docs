@@ -1,0 +1,63 @@
+# Lab: a Spark session that cannot find Iceberg.
+# MinIO holds the data, the Iceberg REST catalog test fixture holds the table metadata, and a Spark
+# container runs one spark-submit per step. No host port is published.
+# Memory limits: 384m + 64m + 384m + 2g, under 3 GB in total.
+name: iceberg-spark-cannot-find-iceberg
+
+services:
+  minio:
+    image: olakego/minio:RELEASE.2025-04-03T14-56-28Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+      GOMEMLIMIT: 256MiB
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: creates the bucket, then exits.
+  mc:
+    image: olakego/mc:RELEASE.2025-04-03T17-07-56Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "mc alias set local http://minio:9000 admin password && mc mb -p local/warehouse"]
+    mem_limit: 64m
+
+  rest:
+    image: apache/iceberg-rest-fixture:1.10.1
+    depends_on:
+      mc:
+        condition: service_completed_successfully
+    environment:
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: us-east-1
+    mem_limit: 384m
+
+  # Idle container; run.sh starts each Spark session in it with docker compose exec.
+  spark:
+    image: ${SPARK_IMAGE:-apache/spark:3.5.6-scala2.12-java17-python3-ubuntu}
+    user: root
+    command: ["tail", "-f", "/dev/null"]
+    depends_on:
+      - rest
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: us-east-1
+    volumes:
+      - .:/lab:ro
+      - ivy:/ivy
+    mem_limit: 2g
+
+volumes:
+  ivy:

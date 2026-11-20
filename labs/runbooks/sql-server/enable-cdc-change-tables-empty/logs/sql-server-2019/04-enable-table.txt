@@ -1,0 +1,77 @@
+-- One capture instance per table. With no @capture_instance the name is <schema>_<table>.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'orders',
+  @role_name = NULL, @supports_net_changes = 1;
+SQLServerAgent is not currently running so it cannot be notified of this action.
+SQLServerAgent is not currently running so it cannot be notified of this action.
+SQLServerAgent is not currently running so it cannot be notified of this action.
+SQLServerAgent is not currently running so it cannot be notified of this action.
+
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'customers',
+  @role_name = NULL, @supports_net_changes = 1;
+
+-- A table with no primary key: net changes need a key.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'audit_notes',
+  @role_name = NULL, @supports_net_changes = 1;
+Msg 22939, Level 16, State 1, Server mssql, Procedure sys.sp_cdc_enable_table_internal, Line 229
+The parameter @supports_net_changes is set to 1, but the source table does not have a primary key defined and no alternate unique index has been specified.
+
+-- All changes do not.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'audit_notes',
+  @role_name = NULL, @supports_net_changes = 0;
+
+-- Verify: the tables, the capture instances, the change tables, the two jobs.
+SELECT s.name + N'.' + t.name AS table_name, t.is_tracked_by_cdc
+FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = N'dbo' AND t.is_ms_shipped = 0 ORDER BY t.name;
+table_name|is_tracked_by_cdc
+----------|-----------------
+dbo.audit_notes|1
+dbo.customers|1
+dbo.orders|1
+dbo.reader_position|0
+
+(4 rows affected)
+
+SELECT capture_instance,
+       OBJECT_SCHEMA_NAME(source_object_id) + N'.' + OBJECT_NAME(source_object_id) AS source_table,
+       supports_net_changes, start_lsn
+FROM cdc.change_tables ORDER BY capture_instance;
+capture_instance|source_table|supports_net_changes|start_lsn
+----------------|------------|--------------------|---------
+dbo_audit_notes|dbo.audit_notes|0|0x0000002900000C98004B
+dbo_customers|dbo.customers|1|0x00000029000004800043
+dbo_orders|dbo.orders|1|0x0000002800000B680047
+
+(3 rows affected)
+
+SELECT name AS change_table FROM sys.tables
+WHERE schema_id = SCHEMA_ID(N'cdc') AND name LIKE N'%[_]CT' ORDER BY name;
+change_table
+------------
+dbo_audit_notes_CT
+dbo_customers_CT
+dbo_orders_CT
+
+(3 rows affected)
+
+SELECT job_type, maxtrans, maxscans, continuous, pollinginterval, retention, threshold
+FROM msdb.dbo.cdc_jobs WHERE database_id = DB_ID() ORDER BY job_type;
+job_type|maxtrans|maxscans|continuous|pollinginterval|retention|threshold
+--------|--------|--------|----------|---------------|---------|---------
+capture|500|10|1|5|0|0
+cleanup|0|0|0|0|4320|5000
+
+(2 rows affected)
+
+SELECT name AS agent_job, enabled FROM msdb.dbo.sysjobs WHERE name LIKE N'cdc.cdclab%' ORDER BY name;
+agent_job|enabled
+---------|-------
+cdc.cdclab_capture|1
+cdc.cdclab_cleanup|1
+
+(2 rows affected)
+

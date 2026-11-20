@@ -1,0 +1,55 @@
+# ./run.sh disk-full    PostgreSQL 14.25    2026-11-16T18:42:07Z
+SELECT version();
+                                                          version                                                           
+----------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 14.25 (Debian 14.25-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+(1 row)
+
+
+## A 256 MB disk. 48 MB of it holds a file that has nothing to do with PostgreSQL.
+$ dd if=/dev/zero of=/disk/old-backup.tar bs=1M count=48; df -h /disk
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           256M  107M  150M  42% /disk
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/1779918
+(1 row)
+
+
+## Write 24 MB at a time until something gives.
+round 1: CALL write_wal(24); -> CALL 
+  disk used/free: 144M 113M   pg_wal: 48M
+round 2: CALL write_wal(24); -> CALL 
+  disk used/free: 165M 92M   pg_wal: 64M
+round 3: CALL write_wal(24); -> CALL 
+  disk used/free: 202M 55M   pg_wal: 96M
+round 4: CALL write_wal(24); -> CALL 
+  disk used/free: 223M 34M   pg_wal: 128M
+round 5: CALL write_wal(24); -> CALL 
+  disk used/free: 244M 13M   pg_wal: 144M
+round 6: CALL write_wal(24); -> PANIC:  could not write to file "pg_wal/xlogtemp.225": No space left on device CONTEXT:  SQL statement "INSERT INTO orders (customer_id, status, note)     SELECT g % 1000, 'new', repeat(md5(g::text), 8) FROM generate_series(1, 5000) g" 
+  disk used/free: 256M 4.0K   pg_wal: 144M
+--- server log
+2026-11-16 18:42:12.612 UTC [225] PANIC:  could not write to file "pg_wal/xlogtemp.225": No space left on device
+2026-11-16 18:42:12.613 UTC [8] LOG:  server process (PID 225) was terminated by signal 6: Aborted
+2026-11-16 18:42:12.613 UTC [8] LOG:  terminating any other active server processes
+2026-11-16 18:42:12.615 UTC [8] LOG:  all server processes terminated; reinitializing
+2026-11-16 18:42:12.624 UTC [226] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-11-16 18:42:12.625 UTC [226] LOG:  redo starts at 0/60A6100
+2026-11-16 18:42:12.631 UTC [226] FATAL:  could not extend file "base/16384/16424": No space left on device
+2026-11-16 18:42:12.631 UTC [226] HINT:  Check free disk space.
+2026-11-16 18:42:12.632 UTC [8] LOG:  startup process (PID 226) exited with exit code 1
+2026-11-16 18:42:12.632 UTC [8] LOG:  aborting startup due to startup process failure
+2026-11-16 18:42:12.633 UTC [8] LOG:  database system is shut down
+postgres exited with status 1; waiting for /tmp/start-postgres
+---
+
+## PostgreSQL is down and the disk is still full.
+$ pg_isready -h 127.0.0.1
+127.0.0.1:5432 - no response
+$ df -h /disk; du -sh /disk/pgdata/pg_wal /disk/old-backup.tar
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           256M  256M  4.0K 100% /disk
+144M	/disk/pgdata/pg_wal
+48M	/disk/old-backup.tar

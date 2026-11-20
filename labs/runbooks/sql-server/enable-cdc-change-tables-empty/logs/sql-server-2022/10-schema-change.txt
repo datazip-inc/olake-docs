@@ -1,0 +1,174 @@
+-- The capture instance and the columns it captures.
+SELECT ct.capture_instance, cc.column_name, cc.column_type
+FROM cdc.change_tables ct JOIN cdc.captured_columns cc ON cc.object_id = ct.object_id
+WHERE ct.source_object_id = OBJECT_ID(N'dbo.orders') ORDER BY ct.capture_instance, cc.column_ordinal;
+capture_instance|column_name|column_type
+----------------|-----------|-----------
+dbo_orders|id|int
+dbo_orders|customer_id|int
+dbo_orders|quantity|int
+dbo_orders|placed_at|datetime2
+
+(4 rows affected)
+
+-- A column is added to the source table, and a row is written with it.
+ALTER TABLE dbo.orders ADD note NVARCHAR(50) NULL;
+
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (1, 20, N'written before the new capture instance');
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:10';
+
+-- The change table did not get the column. The change is there, the note is not.
+SELECT ct.capture_instance, cc.column_name
+FROM cdc.change_tables ct JOIN cdc.captured_columns cc ON cc.object_id = ct.object_id
+WHERE ct.source_object_id = OBJECT_ID(N'dbo.orders') ORDER BY ct.capture_instance, cc.column_ordinal;
+capture_instance|column_name
+----------------|-----------
+dbo_orders|id
+dbo_orders|customer_id
+dbo_orders|quantity
+dbo_orders|placed_at
+
+(4 rows affected)
+
+SELECT TOP (1) * FROM cdc.dbo_orders_CT ORDER BY __$start_lsn DESC;
+__$start_lsn|__$end_lsn|__$seqval|__$operation|__$update_mask|id|customer_id|quantity|placed_at|__$command_id
+------------|----------|---------|------------|--------------|--|-----------|--------|---------|-------------
+0x0000002C00000E400004|NULL|0x0000002C00000E400003|2|0x0F|1012|1|20|2026-11-16 18:06:59|1
+
+(1 rows affected)
+
+-- SQL Server recorded the DDL.
+SELECT OBJECT_NAME(source_object_id) AS source_table, required_column_update, ddl_command, ddl_time
+FROM cdc.ddl_history;
+source_table|required_column_update|ddl_command|ddl_time
+------------|----------------------|-----------|--------
+orders|0|ALTER TABLE dbo.orders ADD note NVARCHAR(50) NULL|2026-11-16 18:06:00.000
+
+(1 rows affected)
+
+-- A second capture instance picks up the table as it is now.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'orders',
+  @role_name = NULL, @supports_net_changes = 1,
+  @capture_instance = N'dbo_orders_v2';
+Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.
+
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (2, 21, N'written after the new capture instance');
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:10';
+
+SELECT capture_instance, start_lsn FROM cdc.change_tables
+WHERE source_object_id = OBJECT_ID(N'dbo.orders') ORDER BY capture_instance;
+capture_instance|start_lsn
+----------------|---------
+dbo_orders|0x0000002C00000CB80003
+dbo_orders_v2|0x0000002C00000E700063
+
+(2 rows affected)
+
+-- The old instance: both rows, no note. The new instance: only the row written after it existed.
+SELECT __$operation, id, quantity FROM cdc.dbo_orders_CT WHERE id IN (SELECT id FROM dbo.orders WHERE note IS NOT NULL);
+SELECT __$operation, id, quantity, note FROM cdc.dbo_orders_v2_CT;
+__$operation|id|quantity
+------------|--|--------
+2|1012|20
+2|1013|21
+
+(2 rows affected)
+__$operation|id|quantity|note
+------------|--|--------|----
+2|1013|21|written after the new capture instance
+
+(1 rows affected)
+
+-- The source table has both notes.
+SELECT id, quantity, note FROM dbo.orders WHERE note IS NOT NULL;
+id|quantity|note
+--|--------|----
+1012|20|written before the new capture instance
+1013|21|written after the new capture instance
+
+(2 rows affected)
+
+-- A table can have two capture instances, not three.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'orders',
+  @role_name = NULL, @capture_instance = N'dbo_orders_v3';
+Msg 22962, Level 16, State 1, Server mssql, Procedure sys.sp_cdc_enable_table_internal, Line 189
+Two capture instances already exist for source table 'dbo.orders'. A table can have at most two capture instances. If the current tracking options are not appropriate, disable change tracking for the obsolete instance by using sys.sp_cdc_disable_table and retry the operation.
+
+-- Once every reader has moved to the new instance, drop the old one.
+EXEC sys.sp_cdc_disable_table
+  @source_schema = N'dbo', @source_name = N'orders', @capture_instance = N'dbo_orders';
+
+SELECT capture_instance FROM cdc.change_tables WHERE source_object_id = OBJECT_ID(N'dbo.orders');
+capture_instance
+----------------
+dbo_orders_v2
+
+(1 rows affected)
+
+-- Other changes to the source table: a dropped column and a changed type.
+ALTER TABLE dbo.orders DROP COLUMN note;
+
+ALTER TABLE dbo.orders ALTER COLUMN quantity BIGINT NOT NULL;
+
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (3, 22);
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:10';
+
+SELECT cc.column_name, cc.column_type
+FROM cdc.change_tables ct JOIN cdc.captured_columns cc ON cc.object_id = ct.object_id
+WHERE ct.capture_instance = N'dbo_orders_v2' ORDER BY cc.column_ordinal;
+column_name|column_type
+-----------|-----------
+id|int
+customer_id|int
+quantity|bigint
+placed_at|datetime2
+note|nvarchar
+
+(5 rows affected)
+
+SELECT c.name AS change_table_column, TYPE_NAME(c.user_type_id) AS type_name
+FROM sys.columns c WHERE c.object_id = OBJECT_ID(N'cdc.dbo_orders_v2_CT') AND c.name NOT LIKE N'[_][_]$%' ORDER BY c.column_id;
+change_table_column|type_name
+-------------------|---------
+id|int
+customer_id|int
+quantity|bigint
+placed_at|datetime2
+note|nvarchar
+
+(5 rows affected)
+
+SELECT TOP (1) __$operation, id, quantity, note FROM cdc.dbo_orders_v2_CT ORDER BY __$start_lsn DESC;
+__$operation|id|quantity|note
+------------|--|--------|----
+2|1014|22|NULL
+
+(1 rows affected)
+
+SELECT OBJECT_NAME(source_object_id) AS source_table, required_column_update, ddl_command
+FROM cdc.ddl_history ORDER BY ddl_time;
+source_table|required_column_update|ddl_command
+------------|----------------------|-----------
+orders|0|ALTER TABLE dbo.orders DROP COLUMN note
+orders|1|ALTER TABLE dbo.orders ALTER COLUMN quantity BIGINT NOT NULL
+
+(2 rows affected)
+
+SELECT COUNT(*) AS cdc_errors FROM sys.dm_cdc_errors;
+cdc_errors
+----------
+0
+
+(1 rows affected)
+

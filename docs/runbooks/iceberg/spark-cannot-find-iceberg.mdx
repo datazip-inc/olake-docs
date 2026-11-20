@@ -1,0 +1,328 @@
+---
+title: "Spark cannot find Iceberg: catalog plugin class errors"
+description: "Fix Cannot find catalog plugin class, Failed to find data source: iceberg and MERGE or CALL errors, run on Spark 3.3, 3.5 and 4.0 with Iceberg 1.4 and 1.12."
+sidebar_label: Spark cannot find Iceberg
+unlisted: true
+keywords:
+  - cannot find catalog plugin class for catalog
+  - org.apache.iceberg.spark.SparkCatalog
+  - failed to find data source iceberg
+  - DATA_SOURCE_NOT_FOUND iceberg
+  - iceberg is not a valid Spark SQL Data Source
+  - MERGE INTO TABLE is not supported temporarily
+  - IcebergSparkSessionExtensions
+  - iceberg-spark-runtime
+  - SparkSessionCatalog
+  - Delegated SessionCatalog is missing
+  - CATALOG_NOT_FOUND
+runbook:
+  family: iceberg
+  author: shubham
+  reproduced:
+    date: "2026-11-17"
+    versions:
+      - "Spark 3.5.6 (Scala 2.12, Java 17) with Iceberg 1.12.0"
+      - "Spark 3.3.3 (Scala 2.12, Java 11) with Iceberg 1.4.3"
+      - "Spark 4.0.5 (Scala 2.13, Java 17) with Iceberg 1.12.0"
+      - "Iceberg REST catalog fixture 1.10.1 and MinIO RELEASE.2025-04-03T14-56-28Z"
+    lab: labs/runbooks/iceberg/spark-cannot-find-iceberg
+    summary: "On each Spark line a session was started without the runtime jar, with jars built for another Spark or Scala version, without the SQL extensions, with a catalog name or class that does not exist, and with Iceberg tables in spark_catalog. The working spark-submit options and spark-defaults.conf were then run on all three."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+A Spark session that cannot see Iceberg starts normally and fails at the first statement that needs Iceberg. With no runtime jar, a query on an Iceberg catalog stops with `Cannot find catalog plugin class for catalog 'demo': org.apache.iceberg.spark.SparkCatalog`, and `spark.read.format("iceberg")` stops with `Failed to find data source: iceberg`.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Add the runtime jar built for your Spark minor version and Scala version, named `iceberg-spark-runtime-<spark minor>_<scala version>`, and define a catalog with `spark.sql.catalog.<name>` and its `type`. On Spark 3, also set `spark.sql.extensions` to `org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions`.
+
+Then use the catalog name you configured, as `<name>.<namespace>.<table>`. The error says which of these is missing: a plugin class or data source error means no jar, `NoSuchMethodError` or `NoClassDefFoundError` means the wrong jar, and a namespace error means a catalog name the session does not have.
+
+<TLDR title='Key takeaways'>
+
+- Spark needs three things to see Iceberg: the runtime jar, a catalog, and the SQL extensions. Each error on this page points at one of them.
+- A jar built for the wrong Spark minor version can start cleanly and fail later. On Spark 3.5.6 the Spark 3.4 jar created, read and deleted rows, and failed only at `MERGE`, `UPDATE` and `CALL`.
+- What needs the extensions depends on the Spark version. Without them, Spark 3.3.3 refused `MERGE` and `UPDATE`, Spark 3.5.6 refused only `CALL`, and Spark 4.0.5 ran all four.
+
+</TLDR>
+
+## The errors
+
+### No runtime jar
+
+On Spark 3.5.6, with the catalog `demo` configured and no jar, the first query on it failed:
+
+```text
+org.apache.spark.SparkException: Cannot find catalog plugin class for catalog 'demo': org.apache.iceberg.spark.SparkCatalog.
+Caused by: java.lang.ClassNotFoundException: org.apache.iceberg.spark.SparkCatalog
+```
+
+A DataFrame read with `format("iceberg")`, or a table created `USING iceberg`, names the data source instead:
+
+```text
+org.apache.spark.SparkClassNotFoundException: [DATA_SOURCE_NOT_FOUND] Failed to find the data source: iceberg. Please find packages at `https://spark.apache.org/third-party-projects.html`.
+Caused by: java.lang.ClassNotFoundException: iceberg.DefaultSource
+```
+
+On Spark 3.3.3 the same read printed the older wording, over three lines:
+
+```text
+java.lang.ClassNotFoundException:
+Failed to find data source: iceberg. Please find packages at
+https://spark.apache.org/third-party-projects.html
+```
+
+The session itself started on all three versions. A missing extensions class is only a warning in the Spark log, and the session goes on without it:
+
+```text
+WARN org.apache.spark.sql.SparkSession: Cannot use org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions to configure session extensions.
+java.lang.ClassNotFoundException: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+```
+
+### A jar built for another Spark or Scala version
+
+These fail with Java linkage errors that do not mention Iceberg's version at all. On Spark 3.5.6 (Scala 2.12) with `iceberg-spark-runtime-3.5_2.13`, every SQL statement failed, because the extensions parser handles each one:
+
+```text
+java.lang.NoClassDefFoundError: scala/collection/SeqOps
+	at org.apache.spark.sql.catalyst.analysis.RewriteViewCommands.apply(RewriteViewCommands.scala:50)
+Caused by: java.lang.ClassNotFoundException: scala.collection.SeqOps
+```
+
+On Spark 3.5.6 with the Spark 3.4 jar, `iceberg-spark-runtime-3.4_2.12:1.11.0`, the table was created, written, read and deleted from. `MERGE` and `UPDATE` failed with the first error below and `CALL` with the second:
+
+```text
+java.lang.NoSuchMethodError: 'boolean org.apache.spark.sql.types.DataType$.canWrite(org.apache.spark.sql.types.DataType, org.apache.spark.sql.types.DataType, boolean, scala.Function2, java.lang.String, scala.Enumeration$Value, scala.Function1)'
+java.lang.NoSuchMethodError: 'scala.collection.Seq org.apache.spark.sql.types.StructType.toAttributes()'
+```
+
+On Spark 4.0.5, the Spark 3.5 jar for Scala 2.13 failed at every statement with the first error below, and the Spark 4.1 jar with the second:
+
+```text
+java.lang.NoClassDefFoundError: Could not initialize class org.apache.spark.sql.catalyst.analysis.RewriteUpdateTableForRowLineage$
+Caused by: java.lang.ExceptionInInitializerError: Exception java.lang.AbstractMethodError: Receiver class org.apache.spark.sql.catalyst.analysis.RewriteUpdateTableForRowLineage$ does not define or inherit an implementation of the resolved method ...
+
+java.lang.NoSuchMethodError: 'void org.apache.spark.sql.catalyst.parser.ParserInterface.$init$(org.apache.spark.sql.catalyst.parser.ParserInterface)'
+```
+
+With the Spark 3.5 jar on Spark 4.0.5, `CALL` also printed `Could not deserialize ATN with version 3 (expected 4).` On Spark 3.3.3 the Spark 3.5 jar failed at once with `java.lang.IncompatibleClassChangeError: class org.apache.spark.sql.catalyst.plans.logical.OrderAwareCoalesce can not implement org.apache.spark.sql.catalyst.plans.logical.OrderPreservingUnaryNode, because it is not an interface`, then with `java.lang.NoClassDefFoundError: org/apache/spark/sql/connector/catalog/SupportsDeleteV2`.
+
+### No SQL extensions
+
+On Spark 3.3.3 with the jar and the catalog but no `spark.sql.extensions`, `MERGE` and `UPDATE` failed in the planner:
+
+```text
+java.lang.UnsupportedOperationException: MERGE INTO TABLE is not supported temporarily.
+java.lang.UnsupportedOperationException: UPDATE TABLE is not supported temporarily.
+```
+
+`DELETE` ran. `CALL` failed in the parser, and on Spark 3.5.6 it was the only one of the four that failed:
+
+```text
+[PARSE_SYNTAX_ERROR] Syntax error at or near 'CALL'.(line 1, pos 0)
+
+== SQL ==
+CALL demo.system.rewrite_data_files(table => 'db.events')
+^^^
+```
+
+Spark 3.3.3 printed the same without the error class in brackets: `Syntax error at or near 'CALL'(line 1, pos 0)`. On Spark 4.0.5, `MERGE`, `UPDATE`, `DELETE` and `CALL` all ran without the extensions.
+
+### A catalog name the session does not have
+
+With `demo` configured and the query written as `dmeo.db.events`, Spark 3.5.6 answered:
+
+```text
+[REQUIRES_SINGLE_PART_NAMESPACE] spark_catalog requires a single-part namespace, but got `dmeo`.`db`.
+```
+
+`USE dmeo` gave ``[SCHEMA_NOT_FOUND] The schema `dmeo` cannot be found.``, and a procedure call on that name gave `Cannot use catalog spark_catalog: not a ProcedureCatalog`. A misspelled class, `spark.sql.catalog.demo=org.apache.iceberg.spark.SparkCatlog`, produced the same message as a missing jar, with the misspelled name in it.
+
+The same misspelling in `spark.sql.defaultCatalog=dmeo` broke every two-part table name. Spark 3.3.3 and 3.5.6 printed the first message below, and Spark 4.0.5 the second:
+
+```text
+org.apache.spark.sql.connector.catalog.CatalogNotFoundException: Catalog 'dmeo' plugin class not found: spark.sql.catalog.dmeo is not defined
+org.apache.spark.sql.connector.catalog.CatalogNotFoundException: [CATALOG_NOT_FOUND] The catalog `dmeo` not found. Consider to set the SQL config "spark.sql.catalog.dmeo" to a catalog plugin. SQLSTATE: 42P08
+```
+
+### Iceberg tables in spark_catalog
+
+Without `SparkSessionCatalog`, `CREATE TABLE default.t_session (id bigint) USING iceberg` succeeded on Spark 3.3.3 and 3.5.6, because the jar was there. Writing to the table and reading it then failed on both:
+
+```text
+org.apache.spark.sql.AnalysisException: iceberg is not a valid Spark SQL Data Source.
+```
+
+With `SparkSessionCatalog` configured under a name other than `spark_catalog`, every statement that fell through to Spark's own catalog failed on all three versions:
+
+```text
+java.lang.NullPointerException: Delegated SessionCatalog is missing. Please make sure your are replacing Spark's default catalog, named 'spark_catalog'.
+```
+
+### The same failures across versions
+
+| What is wrong | Spark 3.3.3, Iceberg 1.4.3 | Spark 3.5.6, Iceberg 1.12.0 | Spark 4.0.5, Iceberg 1.12.0 |
+| --- | --- | --- | --- |
+| No jar, query on the catalog | `Cannot find catalog plugin class for catalog 'demo': org.apache.iceberg.spark.SparkCatalog` | Same, with a period at the end | Same as 3.5.6 |
+| No jar, `format("iceberg")` or `USING iceberg` | `Failed to find data source: iceberg. Please find packages at ...` | `[DATA_SOURCE_NOT_FOUND] Failed to find the data source: iceberg. Please find packages at ...` | `[DATA_SOURCE_NOT_FOUND] Failed to find the data source: iceberg. Make sure the provider name is correct and the package is properly registered and compatible with your Spark version. SQLSTATE: 42K02` |
+| No extensions, `MERGE` or `UPDATE` | `MERGE INTO TABLE is not supported temporarily.` | Ran | Ran |
+| No extensions, `CALL` | `Syntax error at or near 'CALL'` | `[PARSE_SYNTAX_ERROR] Syntax error at or near 'CALL'.` | Ran |
+| Unknown catalog name | `spark_catalog requires a single-part namespace, but got [dmeo, db]` | `[REQUIRES_SINGLE_PART_NAMESPACE] spark_catalog requires a single-part namespace, but got ...` | Same as 3.5.6, ending with `SQLSTATE: 42K05` |
+| `CALL` on an unknown catalog name | `Cannot use catalog spark_catalog: not a ProcedureCatalog` | Same | `Catalog spark_catalog does not support procedures.` |
+| Misspelled `spark.sql.defaultCatalog` | `Catalog 'dmeo' plugin class not found: spark.sql.catalog.dmeo is not defined` | Same | `[CATALOG_NOT_FOUND] The catalog ... not found. Consider to set the SQL config ... to a catalog plugin.` |
+| `USING iceberg` in the built-in catalog | Created; reads and writes fail with `iceberg is not a valid Spark SQL Data Source.` | Same | `CREATE` fails with `Cannot open table: path is not set` |
+
+The three columns are from the runs on this page. Outside them, the Spark source at each release tag shows where the wording changed. The plugin class message is a plain string at [3.3.3](https://github.com/apache/spark/blob/v3.3.3/sql/catalyst/src/main/scala/org/apache/spark/sql/errors/QueryExecutionErrors.scala) and the legacy error class `_LEGACY_ERROR_TEMP_2215` from [3.4.4](https://github.com/apache/spark/blob/v3.4.4/core/src/main/resources/error/error-classes.json) to [4.1.0](https://github.com/apache/spark/blob/v4.1.0/common/utils/src/main/resources/error/error-conditions.json).
+
+`DATA_SOURCE_NOT_FOUND` replaced the older wording in [3.4.0](https://github.com/apache/spark/blob/v3.4.0/core/src/main/resources/error/error-classes.json), and its second sentence changed in [4.0.0](https://github.com/apache/spark/blob/v4.0.0/common/utils/src/main/resources/error/error-conditions.json). The message `<ddl> is not supported temporarily.` is `_LEGACY_ERROR_TEMP_2096` from 3.4.4 to 4.0.0 and is gone from the 4.1.0 file, and `CATALOG_NOT_FOUND` is absent at 3.5.6 and present from 4.0.0. Spark 3.4 and 4.1 were not run here.
+
+## Why it happens
+
+Spark loads Iceberg in three separate places, and each can be missing on its own. The runtime jar holds the classes, `spark.sql.catalog.<name>` tells Spark which class to load as the catalog called `<name>`, and `spark.sql.extensions` adds Iceberg's parser and planner rules to the session.
+
+Spark builds a catalog only when a statement first uses its name, so a broken catalog setting does not stop the session from starting. In the run on Spark 3.5.6, `SHOW CATALOGS` listed only `spark_catalog` before the first query and `spark_catalog` and `demo` after it.
+
+A name that is not a configured catalog is not an error by itself either. Spark reads `dmeo.db.events` as the namespace `dmeo.db` in its built-in catalog, which allows one level of namespace, hence `requires a single-part namespace`.
+
+The runtime jar is built for one Spark minor version and one Scala version, because it uses Spark internals that change between minor versions. The [Iceberg multi-engine support page](https://iceberg.apache.org/multi-engine-support/) gives the naming: "For example, to use Iceberg with Spark 3.5 and AWS integrations, iceberg-spark-runtime-3.5_2.12 and AWS SDK dependencies are needed for the Spark installation."
+
+## Confirm the diagnosis
+
+Check the versions first, then what the session loaded. `spark-submit --version` prints the Spark and Scala versions, which pick the jar:
+
+```text
+   /___/ .__/\_,_/_/ /_/\_\   version 3.5.6
+Using Scala version 2.12.18, OpenJDK 64-Bit Server VM, 17.0.15
+```
+
+From inside a PySpark session, these calls show the Iceberg build, the jars, the parser and where `SparkCatalog` came from. They are the calls the lab makes:
+
+```python
+jvm = spark._jvm
+print(f"Iceberg build: {jvm.org.apache.iceberg.IcebergBuild.fullVersion()}")
+print(f"spark.jars = {spark.sparkContext.getConf().get('spark.jars', '<not set>')}")
+print(f"SQL parser: {spark._jsparkSession.sessionState().sqlParser().getClass().getName()}")
+loader = jvm.java.lang.Thread.currentThread().getContextClassLoader()
+c = jvm.java.lang.Class.forName("org.apache.iceberg.spark.SparkCatalog", False, loader)
+print(f"SparkCatalog loaded from: {c.getProtectionDomain().getCodeSource().getLocation().toString()}")
+```
+
+In the working run on Spark 3.5.6 they printed:
+
+```text
+Iceberg build: Apache Iceberg 1.12.0 (commit 212aa894e919ff9fdf89160da4aadcbe6858ac01)
+spark.jars = file:///ivy/jars/org.apache.iceberg_iceberg-spark-runtime-3.5_2.12-1.12.0.jar,file:///ivy/jars/org.apache.iceberg_iceberg-aws-bundle-1.12.0.jar
+SQL parser: org.apache.spark.sql.catalyst.parser.extensions.IcebergSparkSqlExtensionsParser
+SparkCatalog loaded from: file:/ivy/jars/org.apache.iceberg_iceberg-spark-runtime-3.5_2.12-1.12.0.jar
+```
+
+Without the extensions, the parser line read `org.apache.spark.sql.execution.SparkSqlParser`. With `--packages`, the driver log also shows what Ivy resolved, for example `found org.apache.iceberg#iceberg-spark-runtime-3.5_2.12;1.12.0 in central`.
+
+One warning is not the cause. On Spark 3.3.3 with Iceberg 1.4.3, the working session printed `ANTLR Tool version 4.9.3 used for code generation does not match the current runtime version 4.8` and then ran every statement. On Spark 4.0.5 the same warning, with `4.13.1` at the end, came with the Spark 3.5 jar, which did fail.
+
+## Fix 1: put the runtime jar on the class path
+
+On Spark 3.5.6 this configuration ran `CREATE TABLE`, `INSERT`, `MERGE`, `UPDATE`, `DELETE`, `CALL` and a DataFrame read. The AWS bundle provides `S3FileIO` for the object store.
+
+```bash
+spark-submit \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0,org.apache.iceberg:iceberg-aws-bundle:1.12.0 \
+  --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.demo=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.demo.type=rest \
+  --conf spark.sql.catalog.demo.uri=http://rest:8181 \
+  --conf spark.sql.catalog.demo.io-impl=org.apache.iceberg.aws.s3.S3FileIO \
+  --conf spark.sql.catalog.demo.s3.endpoint=http://minio:9000 \
+  --conf spark.sql.catalog.demo.s3.path-style-access=true \
+  job.py
+```
+
+The same settings in `spark-defaults.conf`, read from `$SPARK_CONF_DIR`, gave the same result with no options on the command line:
+
+```properties
+spark.jars.packages                          org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0,org.apache.iceberg:iceberg-aws-bundle:1.12.0
+spark.sql.extensions                         org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+spark.sql.catalog.demo                       org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.demo.type                  rest
+spark.sql.catalog.demo.uri                   http://rest:8181
+spark.sql.catalog.demo.io-impl               org.apache.iceberg.aws.s3.S3FileIO
+spark.sql.catalog.demo.s3.endpoint           http://minio:9000
+spark.sql.catalog.demo.s3.path-style-access  true
+```
+
+For the other two lines only the first line changes: `iceberg-spark-runtime-3.3_2.12:1.4.3` with `iceberg-aws-bundle:1.4.3` on Spark 3.3.3, and `iceberg-spark-runtime-4.0_2.13:1.12.0` with `iceberg-aws-bundle:1.12.0` on Spark 4.0.5. Both ran the same statements. The AWS credentials came from `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION` in the environment.
+
+## Fix 2: match the jar to Spark and Scala
+
+Read the Spark minor version and the Scala version from `spark-submit --version`, and take the runtime jar with both in its name. Then pick an Iceberg release that still ships that jar. The [multi-engine support page](https://iceberg.apache.org/multi-engine-support/) lists the range:
+
+| Spark | First Iceberg release | Last Iceberg release | Runtime jars |
+| --- | --- | --- | --- |
+| 3.3 | 0.14.0 | 1.8.1 | `iceberg-spark-runtime-3.3_2.12`, `iceberg-spark-runtime-3.3_2.13` |
+| 3.4 | 1.3.0 | 1.11.0 | `iceberg-spark-runtime-3.4_2.12`, `iceberg-spark-runtime-3.4_2.13` |
+| 3.5 | 1.4.0 | 1.12.0 | `iceberg-spark-runtime-3.5_2.12`, `iceberg-spark-runtime-3.5_2.13` |
+| 4.0 | 1.10.0 | 1.12.0 | `iceberg-spark-runtime-4.0_2.13` |
+| 4.1 | 1.11.0 | 1.12.0 | `iceberg-spark-runtime-4.1_2.13` |
+
+The Java version matters too, and it was not tested here. The [Iceberg release notes](https://iceberg.apache.org/releases/) list "Build for Java 11 (#10849) - Removal of Java 8" under 1.7.0 and "Drop support for Java 11 (#14400)" under 1.11.0. A Spark image on Java 11 therefore needs Iceberg 1.10 or older.
+
+## Fix 3: add the SQL extensions
+
+Set `spark.sql.extensions` to `org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions` on every Spark version, and check the spelling. With `IcebergSparkSessionExtension`, one letter short, all three versions logged the warning above and ran exactly as without extensions.
+
+The Iceberg documentation states where Spark 4 differs: "For Spark 3.x, stored procedures are only available when using Iceberg SQL extensions in Spark. For Spark 4.0, stored procedures are supported natively without requiring the Iceberg SQL extensions. However, note that they are case-sensitive in Spark 4.0." ([Spark procedures](https://iceberg.apache.org/docs/latest/spark-procedures/)).
+
+The [Spark writes page](https://iceberg.apache.org/docs/latest/spark-writes/) still marks `MERGE INTO` and `UPDATE` with "Requires Iceberg Spark extensions". Spark 3.5.6 ran both without them in the run, so do not read a working `MERGE` as proof that the extensions are loaded. The same `UPDATE TABLE is not supported temporarily.` was reported on Spark 3.5 with Iceberg 1.5 in [iceberg#9960](https://github.com/apache/iceberg/issues/9960), a setup this lab did not reproduce.
+
+## Fix 4: use the catalog name you configured
+
+Each `spark.sql.catalog.<name>` defines one catalog, and a three-part table name must start with that exact name; otherwise Spark looks in `spark_catalog`, as the errors above show. Compare the name in the failing statement with `spark.sql.catalog.*` in the session, and run `SHOW CATALOGS` after the first query, because it only lists catalogs that have been loaded.
+
+Three settings fail in ways that look unrelated. A misspelled class name gives the missing-jar message with your spelling in it, so read the class name in the message before adding jars. A misspelled `spark.sql.defaultCatalog` fails every table name without a catalog, with `plugin class not found` or, on Spark 4, `CATALOG_NOT_FOUND`.
+
+A catalog with a `uri` but no `type` was built as a Hive catalog on all three versions. It tried to talk the Hive Metastore protocol to the REST endpoint and failed with `java.lang.RuntimeException: Failed to get table info from metastore db.events`, caused by `org.apache.thrift.transport.TTransportException`. The fix was `spark.sql.catalog.demo.type=rest`.
+
+## Fix 5: choose between SparkSessionCatalog and a separate catalog
+
+A separate catalog, `spark.sql.catalog.demo=org.apache.iceberg.spark.SparkCatalog`, keeps Iceberg tables out of Spark's built-in catalog. Do not create Iceberg tables in `spark_catalog` without replacing it: on Spark 3.3.3 and 3.5.6 the table was created and then could not be read.
+
+Replace `spark_catalog` only when Iceberg and non-Iceberg tables must share one namespace. The [Iceberg documentation](https://iceberg.apache.org/docs/latest/spark-configuration/) puts it this way: "SparkSessionCatalog is useful when you want spark_catalog to work with both Iceberg and non-Iceberg tables in the same metastore." The configuration that ran on all three versions:
+
+```properties
+spark.sql.catalog.spark_catalog                       org.apache.iceberg.spark.SparkSessionCatalog
+spark.sql.catalog.spark_catalog.type                  rest
+spark.sql.catalog.spark_catalog.uri                   http://rest:8181
+spark.sql.catalog.spark_catalog.io-impl               org.apache.iceberg.aws.s3.S3FileIO
+spark.sql.catalog.spark_catalog.s3.endpoint           http://minio:9000
+spark.sql.catalog.spark_catalog.s3.path-style-access  true
+```
+
+With it, `db.events` from the REST catalog was readable as a two-part name, an Iceberg table and a Parquet table were both created in `db`, and `CALL spark_catalog.system.rewrite_data_files(...)` ran. `SHOW TABLES IN db` listed only the Parquet table. The Iceberg tables were in the REST catalog and did not appear in that listing.
+
+The class only works under the name `spark_catalog`. Registered as `demo`, it read an existing Iceberg table, and failed with `Delegated SessionCatalog is missing` on a table that did not exist, on `SHOW TABLES` and on a Parquet table.
+
+## Prevent it
+
+- Derive the runtime jar from `spark-submit --version` in the image or job definition, and change it in the same change as any Spark upgrade.
+- Pin the jar version in `spark-defaults.conf` or the job, not in individual notebooks.
+- Set the extensions on every Spark version. A working `MERGE` does not show that they are loaded; the parser class does.
+- Log `IcebergBuild.fullVersion()` and the parser class at the start of each job, so a mismatch shows up in the first line of the log.
+- Use one catalog name across jobs and write table names in three parts.
+
+:::note[How OLake handles this]
+
+OLake Go's Iceberg writer runs as a Java process with a version requirement of its own: it needs Java 17 or later. On an older Java it stops with `java.lang.UnsupportedClassVersionError: io/debezium/server/iceberg/OlakeRpcServer has been compiled by a more recent version of the Java Runtime (class file version 61.0), this version of the Java Runtime only recognizes class file versions up to 55.0`, as the [Iceberg writer troubleshooting page](/docs/writers/iceberg/troubleshooting-local/) shows.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Iceberg: [Spark configuration](https://iceberg.apache.org/docs/latest/spark-configuration/), [Spark procedures](https://iceberg.apache.org/docs/latest/spark-procedures/), [Spark writes](https://iceberg.apache.org/docs/latest/spark-writes/), [multi-engine support](https://iceberg.apache.org/multi-engine-support/), [release notes](https://iceberg.apache.org/releases/)
+- Apache Spark: [configuration 3.5.6](https://spark.apache.org/docs/3.5.6/configuration.html), for `spark.jars.packages` and `spark.sql.extensions`; error definitions at [3.3.3](https://github.com/apache/spark/blob/v3.3.3/sql/catalyst/src/main/scala/org/apache/spark/sql/errors/QueryExecutionErrors.scala), [3.4.4](https://github.com/apache/spark/blob/v3.4.4/core/src/main/resources/error/error-classes.json), [3.5.6](https://github.com/apache/spark/blob/v3.5.6/common/utils/src/main/resources/error/error-classes.json), [4.0.0](https://github.com/apache/spark/blob/v4.0.0/common/utils/src/main/resources/error/error-conditions.json) and [4.1.0](https://github.com/apache/spark/blob/v4.1.0/common/utils/src/main/resources/error/error-conditions.json)
+- GitHub issues: [iceberg#1756](https://github.com/apache/iceberg/issues/1756), `iceberg is not a valid Spark SQL Data Source`; [iceberg#9960](https://github.com/apache/iceberg/issues/9960), `UPDATE TABLE is not supported temporarily.`; [iceberg#13358](https://github.com/apache/iceberg/issues/13358), the runtime jar for Spark 4.0
+- Stack Overflow, the most viewed questions on these errors: [72255648](https://stackoverflow.com/questions/72255648), [77563084](https://stackoverflow.com/questions/77563084)

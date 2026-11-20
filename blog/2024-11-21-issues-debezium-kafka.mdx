@@ -1,9 +1,9 @@
 ---
 slug: issues-debezium-kafka
-title: "Debezium Kafka Issues: 13 CDC Problems & Alternative"
-description: "Explore common Debezium and Kafka CDC challenges including setup complexity, overhead, schema changes, and why OLake Go is a faster, simpler alternative."
+title: "Debezium Issues and Fixes: Kafka Connect CDC Errors, 0.9 to 3.x"
+description: "Debezium and Kafka Connect CDC problems explained, from the change event producer error to slots, binlogs, TOAST and snapshots, with fixes for 0.9 to 3.x."
 image: /img/blog/cover/issues-debezium-kafka-cover.webp
-authors: [priyansh]
+authors: [shubham]
 tags: [debezium, alternatives]
 ---
 
@@ -11,489 +11,609 @@ tags: [debezium, alternatives]
 
 ![Debezium + Kafka architecture: MySQL/MongoDB/Postgres CDC to Kafka, routed to sinks, with setup cost and de-duplication warning](/img/blog/cover/issues-debezium-kafka-cover.webp)
 
-Also read - [Problems with Debezium and How we (OLake, Open-Source) solve it](/blog/debezium-vs-olake)
+Debezium is an open source change data capture (CDC) project: its connectors read a database's transaction log and turn each committed row change into an event. The [Debezium architecture page](https://debezium.io/documentation/reference/3.7/architecture.html) describes the usual deployment in one line: "Most commonly, you deploy Debezium by means of Apache Kafka Connect." This page lists the problems that setup runs into, with the exact messages each one prints from Debezium 0.9 to 3.7, and a fix that works on Debezium itself.
 
-Change Data Capture (CDC) is essential for modern data architectures that require real-time data replication and synchronization across systems. Debezium (a Java utility based on the Qurkus framework), coupled with Apache Kafka, has become a popular open-source solution for implementing CDC.
+Where a runbook on this site reproduces a problem in a lab, the section gives the short version and links to the runbook for the full fix. The runbooks quote what their labs captured, with the versions and the date of each run.
 
-However, while this combination offers powerful capabilities, it also comes with significant drawbacks that can impact your organization's efficiency and resources.
+**Disclosure.** [OLake Go](/docs/) is an open source alternative to Debezium for loading database changes into Apache Iceberg, and its Iceberg writer began as a fork of [debezium-server-iceberg](https://github.com/memiiso/debezium-server-iceberg), the community Iceberg sink for Debezium Server ([writer source](https://github.com/datazip-inc/olake-go/blob/master/destination/iceberg/olake-iceberg-java-writer/README.md)). None of the fixes on this page needs OLake Go. OLake is not affiliated with the Commonhaus Foundation, which holds the Debezium marks ([trademark policy](https://www.commonhaus.org/policies/trademark-policy/)).
 
-In this article, we'll delve into the technical challenges of using Debezium and Kafka for CDC, provide concrete examples, and explore why companies adopt this approach despite its limitations.
+<TLDR title='Key takeaways'>
 
-## 1. Complex Setup and Maintenance
+- `An exception occurred in the change event producer. This connector will be stopped.` is a wrapper. The cause is the last `Caused by:` line in the failed task's `trace`, which the Kafka Connect status call returns.
+- Several limits in older guides have moved: Kafka 4.0 runs without ZooKeeper, Debezium 3.3 added exactly-once delivery on Kafka Connect 3.3 or later, and Debezium 3.5 can split one table across snapshot threads.
+- The data losses reproduced in the labs behind this page came from a purged binary log, an invalidated replication slot and `errors.tolerance=all` without a dead letter queue. When Kafka itself is down, the Debezium documentation says the connector pauses and resumes where it left off.
 
-**Technical Challenge**
+</TLDR>
 
-Setting up Debezium with Kafka is not a plug-and-play process. It requires:
+## Debezium, Kafka Connect and Debezium Server {/* #debezium-kafka-connect-and-debezium-server */}
 
-* **Installation and Configuration of Multiple Components**: You need to set up Kafka brokers, Kafka Connect, Zookeeper ([fairly heavy](https://www.quora.com/What-are-some-drawbacks-of-Apache-ZooKeeper)), and Debezium connectors.
-    
-* **Expertise in Distributed Systems**: Understanding the intricacies of Kafka's partitioning, replication, and retention policies is essential to make it highly available.
-    
-* **Managing Compatibility**: Making sure that all components (written in Java) are compatible in terms of versions (version incompatibility is a nightmare) and configurations.
-    
-* Understanding concepts like partitioning, replication, leader election, and fault tolerance. Knowing how databases handle transaction logs or binlogs, which Debezium relies on.
-    
-* **Custom Transformations**: Implementing **Single Message Transforms** (SMTs) may require writing custom Java classes and deploying them to the Kafka Connect cluster. Transforms in Debezium only apply to individual messages as they are sent to the topic.
-    
-* For more advanced transformations, such as streaming joins, splitting messages, or processing the entire dataset, an additional system like Flink is required.
-    
+Kafka Connect is the framework, and Debezium supplies source connectors that run inside it. The architecture page calls Kafka Connect "a framework and runtime" for source connectors "such as Debezium that send records into Kafka" and for sink connectors "that propagate records from Kafka topics to other systems". Debezium and Kafka Connect are therefore not alternatives to each other: a Debezium connector is a Kafka Connect plug-in.
 
-**Example**
+Debezium also runs without Kafka Connect. [Debezium Server](https://debezium.io/documentation/reference/3.7/operations/debezium-server.html) is a standalone application whose documentation says it "runs on the Quarkus framework", and it sends events to targets such as Amazon Kinesis, Google Cloud Pub/Sub or Apache Pulsar. The Debezium Engine embeds the same connectors as a library inside a Java application ([architecture](https://debezium.io/documentation/reference/3.7/architecture.html)).
 
-Imagine you want to capture changes from a MongoDB database and stream them into Kafka:
+The layers matter when you read an error, because Kafka Connect, Debezium and the database each print their own messages:
 
-1. **Set Up Kafka Cluster**: Install and configure a Kafka cluster with at least three brokers for fault tolerance.
-    
-2. **Configure Zookeeper**: Kafka relies on Zookeeper for cluster coordination, requiring its own setup and maintenance.
-    
-3. **Deploy Kafka Connect**: Install Kafka Connect to run Debezium connectors.
-    
-4. **Configure Debezium Connector**: Setting up Debezium to capture changes from MongoDB requires you to write a detailed JSON configuration file. You need to specify connector classes, database connection details, and Kafka topics. If you’re dealing with multiple databases, each requires its own configuration file and specific topic configurations.
-    
-5. **Sink Connector for Data Lake**: Moving data from Kafka into a data lake involves setting up a sink connector.  
-    You need to manually configure the sink connector to read from the Kafka topics and define where data will be stored in the lake (e.g., S3, HDFS, or Azure Blob Storage).  
-    Additionally, you must specify the data format (like Avro or Parquet) and tune batch and flush settings to control data flow.
-    
+| Printed by | Example | Explained in |
+| --- | --- | --- |
+| Kafka Connect | `Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted` | [Task failed, will not recover](/docs/runbooks/kafka-connect/task-failed-will-not-recover/) |
+| Kafka Connect | `Failed to find any class that implements Connector and which name matches ...` | [Connector class not found](/docs/runbooks/kafka-connect/connector-class-not-found/) |
+| Debezium | `An exception occurred in the change event producer. This connector will be stopped.` | [The decoder below](#change-event-producer) |
+| Debezium | `The db history topic is missing.` | [Section 13](#schema-history-topic) |
+| The database, through Debezium | `logical decoding requires wal_level >= logical` | [Section 17](#logical-replication) |
 
-**Debezium Connector Configuration Example:**
+## Decode "An exception occurred in the change event producer" {/* #change-event-producer */}
+
+Debezium wraps many different failures in one line:
+
+```text
+org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped.
+```
+
+It names no cause. Debezium reads the database log on its own thread, the change event producer, and passes events to Kafka Connect through a queue. When that thread fails, Debezium logs `Producer failure` and the next call from Kafka Connect gets this exception with the real error attached ([`ErrorHandler`](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-common/src/main/java/io/debezium/pipeline/ErrorHandler.java) and [`ChangeEventQueue`](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-common/src/main/java/io/debezium/connector/base/ChangeEventQueue.java) at 3.7.1).
+
+In the worker log the failure arrives as a short sequence. These lines are from Debezium 3.7.1 on Kafka Connect 4.3.1, in the lab behind the [schema history runbook](/docs/runbooks/debezium/schema-history-topic-missing/), with the timestamps removed and the stored offset shortened:
+
+```text
+ERROR  MySQL||binlog  Error during binlog processing. Last offset stored = {...}, binlog reader near position = mysql-bin.000003/686   [io.debezium.connector.binlog.BinlogStreamingChangeEventSource]
+ERROR  MySQL||binlog  Producer failure   [io.debezium.pipeline.ErrorHandler]
+ERROR  MySQL||lifecycle  WorkerSourceTask{id=inventory-connector-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+```
+
+The last line is Kafka Connect's own wrapper, so a Debezium failure is wrapped twice.
+
+### Read the cause from the task status {/* #read-the-cause */}
+
+The connector keeps reporting `RUNNING` and its task goes to `FAILED`. The task's `trace` field holds the whole chain of exceptions, and this command prints it without the stack frames:
+
+```bash
+curl -s localhost:8083/connectors/<name>/status | jq -r '.tasks[].trace // empty' | grep -vE '^[[:space:]]+(at |\.\.\. )'
+```
+
+For the run above it printed:
+
+```text
+org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped.
+Caused by: io.debezium.DebeziumException: Error processing binlog event
+Caused by: io.debezium.DebeziumException: Error processing row in customers, internal schema size 5, but row size 4 , restart connector with schema recovery mode.
+```
+
+Read it from the bottom. The last `Caused by:` line is the cause: the connector's stored table structure had five columns and the binlog row had four, because a column was added while the connector was down ([section 13](#schema-history-topic)).
+
+Failures at start-up skip the wrapper. When the same lab deleted the schema history topic, the trace began directly with `io.debezium.DebeziumException: The db history topic is missing.`, because the task failed while it was starting.
+
+### The same line from Debezium 0.9 to 3.7 {/* #versions */}
+
+| Debezium | What changes | Source |
+| --- | --- | --- |
+| 0.9 and 0.10 | The word is misspelled: `An exception ocurred in the change event producer. This connector will be stopped.` | `ChangeEventQueue.java` at [0.9.5](https://github.com/debezium/debezium/blob/v0.9.5.Final/debezium-core/src/main/java/io/debezium/connector/base/ChangeEventQueue.java) and [0.10.0](https://github.com/debezium/debezium/blob/v0.10.0.Final/debezium-core/src/main/java/io/debezium/connector/base/ChangeEventQueue.java) |
+| 1.0 | Spelled `occurred` | `ChangeEventQueue.java` at [1.0.0](https://github.com/debezium/debezium/blob/v1.0.0.Final/debezium-core/src/main/java/io/debezium/connector/base/ChangeEventQueue.java) |
+| 1.1 and later | Errors that Debezium treats as retriable raise `org.apache.kafka.connect.errors.RetriableException: An exception occurred in the change event producer. This connector will be restarted.` instead | `ErrorHandler.java` at [1.1.0](https://github.com/debezium/debezium/blob/v1.1.0.Final/debezium-core/src/main/java/io/debezium/pipeline/ErrorHandler.java) and [3.7.1](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-common/src/main/java/io/debezium/pipeline/ErrorHandler.java) |
+| 2.0 and later | "Most Debezium connectors now restart by default when an exception related to communication (SqlException, IOException) is thrown" | [2.0 release notes](https://debezium.io/releases/2.0/release-notes) (DBZ-5244) |
+| 2.2 (SQL Server) and 2.3.1 (every connector) | `errors.max.retries` caps those restarts. The default, `-1`, means no limit, and `0` turns them off | `SqlServerConnectorConfig.java` at [2.2.0](https://github.com/debezium/debezium/blob/v2.2.0.Final/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerConnectorConfig.java), `CommonConnectorConfig.java` at [2.3.1](https://github.com/debezium/debezium/blob/v2.3.1.Final/debezium-core/src/main/java/io/debezium/config/CommonConnectorConfig.java) |
+
+The embedded Debezium Engine had its own `errors.max.retries` from 2.0 ([`EmbeddedEngine.java` at 2.0.0](https://github.com/debezium/debezium/blob/v2.0.0.Final/debezium-embedded/src/main/java/io/debezium/embedded/EmbeddedEngine.java)).
+
+### When the connector restarts itself {/* #retriable */}
+
+A retriable error does not fail the task. In the lab behind the [binlog runbook](/docs/runbooks/mysql/binlog-retention-error-1236/), Debezium 3.0.8 on Kafka Connect 3.9.0 lost its binlog position, kept the task `RUNNING` and repeated these lines about every 15 seconds:
+
+```text
+WARN   MySQL|dbserver1|binlog  Retry 1 of unlimited retries will be attempted   [io.debezium.pipeline.ErrorHandler]
+WARN   ||  Going to restart connector after 10 sec. after a retriable exception   [io.debezium.connector.common.BaseSourceTask]
+```
+
+Kafka Connect logs the exception as `failed to poll records from SourceTask. Will retry operation.` ([`AbstractWorkerSourceTask.java` at 4.3.1](https://github.com/apache/kafka/blob/4.3.1/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTask.java)), so an alert on `FAILED` tasks never fires. When `errors.max.retries` runs out, Debezium logs `The maximum number of <n> retries has been attempted` and raises the `... This connector will be stopped.` version ([`ErrorHandler.java` at 3.7.1](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-common/src/main/java/io/debezium/pipeline/ErrorHandler.java)).
+
+### Where the cause sends you {/* #where-the-cause-sends-you */}
+
+Match the last `Caused by:` line, or the first line of a trace without the wrapper, against this table. All but the data definition language (DDL) parser message were captured in a runbook lab; that one is from the Debezium source.
+
+| The line contains | What it means | Go to |
+| --- | --- | --- |
+| `The db history topic is missing` | The schema history topic is gone and the offsets are not | [Section 13](#schema-history-topic) |
+| `whose schema isn't known to this connector` | A table was added that the schema history does not describe | [Section 13](#schema-history-topic) |
+| `internal schema size 5, but row size 4` (the numbers vary) | A table changed while the connector was stopped | [Section 13](#schema-history-topic) |
+| `DDL statement couldn't be parsed` | The DDL parser could not read a statement | [Section 4](#ddl-parse-error) |
+| `but this is no longer available on the server` | The binary log position was purged | [Section 16](#binlog-1236) |
+| `Could not find first log file name in binary log index file` | The same, retried by Debezium 2.6 to 3.1 | [Section 16](#binlog-1236) |
+| `logical decoding requires wal_level >= logical` | PostgreSQL is not set up for logical decoding | [Section 17](#logical-replication) |
+| `replication slot "<name>" is active for PID <n>` | Another connection holds the slot | [Section 15](#replication-slot) |
+| `can no longer get changes from replication slot` | The slot was invalidated | [Section 15](#replication-slot) |
+| `Tolerance exceeded in error handler` | A sink's converter or transformation rejected a record | [Task failed runbook](/docs/runbooks/kafka-connect/task-failed-will-not-recover/) |
+| No exception, task `RUNNING`, no events | One of five configuration causes | [Section 14](#running-captures-nothing) |
+
+## 1. Complex setup and maintenance {/* #setup */}
+
+A Debezium pipeline on Kafka has four moving parts: Kafka brokers, Kafka Connect workers, the Debezium plug-ins installed on those workers, and sink connectors that take the events further. Each has its own configuration, versions and failure modes.
+
+### Kafka no longer needs ZooKeeper
+
+ZooKeeper is not part of a current Kafka cluster. Kafka 3.5 marked it deprecated ([3.5.0 announcement](https://kafka.apache.org/blog/2023/06/15/apache-kafka-3.5.0-release-announcement/)), and the [4.0.0 announcement](https://kafka.apache.org/blog/2025/03/18/apache-kafka-4.0.0-release-announcement/) calls 4.0 "the first major release to operate entirely without Apache ZooKeeper".
+
+Kafka now runs in KRaft (Kafka Raft) mode, in which a few servers act as controllers and hold the cluster metadata. The [operations guide](https://kafka.apache.org/43/operations/kraft/#controllers) says "A Kafka admin will typically select 3 or 5 servers for this role" and that combined mode, where one server is both broker and controller, "is not recommended in critical deployment environments". The Debezium labs behind the runbooks on this page ran one Kafka 4.3.1 server in KRaft mode, as broker and controller at once.
+
+### Versions that work together
+
+Debezium publishes what each release series is tested against. For 3.7 the [release page](https://debezium.io/releases/3.7/) lists Java "17+ for connectors" and Kafka Connect "3.1 and later". A plug-in built for a newer Java fails quietly: in a lab, a Kafka Connect 3.2.0 worker on Java 11 did not load the Debezium 3.7.1 PostgreSQL plug-in and logged no warning ([connector class not found, cause 6](/docs/runbooks/kafka-connect/connector-class-not-found/#cause-6-the-plug-in-needs-a-newer-java)).
+
+### Failed to find any class that implements Connector
+
+When a worker has not loaded a plug-in, creating the connector fails with `Failed to find any class that implements Connector and which name matches io.debezium.connector.postgresql.PostgresConnector, available connectors are: ...`. Ask the worker what it loaded with `curl -s localhost:8083/connector-plugins`: if the class is missing, the jars are not where `plugin.path` looks, or the worker was not restarted after the install. The [runbook](/docs/runbooks/kafka-connect/connector-class-not-found/) reproduces seven causes on Kafka Connect 3.2.0 and 4.3.1, starting with `plugin.path` pointing at the folder of jars instead of its parent.
+
+### A connector configuration for Debezium 2.4 and later
+
+Configurations copied from posts written for Debezium 1.x use property names that later versions removed. This MongoDB example uses the names in the 3.7 documentation, where `mongodb.connection.string` "replaces the mongodb.hosts property that was available in previous versions of the MongoDB connector" ([MongoDB connector](https://debezium.io/documentation/reference/3.7/connectors/mongodb.html#mongodb-property-mongodb-connection-string)). It was written from that documentation and was not run in a lab.
 
 ```json
 {
   "name": "mongodb-connector",
   "config": {
     "connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
-    "mongodb.hosts": "rs0/localhost:27017",
+    "mongodb.connection.string": "mongodb://localhost:27017/?replicaSet=rs0",
     "mongodb.user": "debezium",
     "mongodb.password": "dbz",
-    "mongodb.name": "dbserver1",
+    "topic.prefix": "dbserver1",
     "database.include.list": "mydb",
     "collection.include.list": "mydb.my_collection"
   }
 }
 ```
 
-This process requires a deep understanding of each component and how they interact, making the setup time-consuming and error-prone.
+These renames break configurations written for older versions:
 
-Or, let’s say if you want to set up a CDC pipeline from PostgreSQL to a system like Elasticsearch, you’ll need to connect and configure a lot of different tools.
+| Old name | New name | Version |
+| --- | --- | --- |
+| `mongodb.hosts` | `mongodb.connection.string` | New name from 2.0, old name removed in 2.4 |
+| `mongodb.name` | `topic.prefix` | 2.0 |
+| `database.server.name` | `topic.prefix` | 2.0 |
+| `database.history.kafka.topic` | `schema.history.internal.kafka.topic` | 2.0 |
+| `table.whitelist`, `database.whitelist` and their siblings | `table.include.list` and its siblings | 1.3, old names removed in 2.0 |
+| `snapshot.mode=schema_only` (MySQL) or `never` (PostgreSQL) | `snapshot.mode=no_data` | 2.6, old values removed in 3.3 |
+| `snapshot.mode=schema_only_recovery` | `snapshot.mode=recovery` | 2.6 |
+| `toasted.value.placeholder` | `unavailable.value.placeholder` | Old name deprecated in 1.9, removed in 2.0 |
 
-You will need a connector (Debezium PostgreSQL Connector), Instaclustr’s Managed Kafka Connect (or use the unmanaged one), and OpenDistro Elasticsearch service. While it’s definitely possible, it’s not simple—it takes time and effort to get everything working together. So, if you’re planning something similar, be ready for the complexity involved in setting up and managing all these connections.
+Sources: Debezium source at the tags for `CommonConnectorConfig.java` [1.9.7](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-core/src/main/java/io/debezium/config/CommonConnectorConfig.java) and [2.0.0](https://github.com/debezium/debezium/blob/v2.0.0.Final/debezium-core/src/main/java/io/debezium/config/CommonConnectorConfig.java), `MongoDbConnectorConfig.java` [2.3.0](https://github.com/debezium/debezium/blob/v2.3.0.Final/debezium-connector-mongodb/src/main/java/io/debezium/connector/mongodb/MongoDbConnectorConfig.java) and [2.4.0](https://github.com/debezium/debezium/blob/v2.4.0.Final/debezium-connector-mongodb/src/main/java/io/debezium/connector/mongodb/MongoDbConnectorConfig.java), and `PostgresConnectorConfig.java` [1.9.7](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorConfig.java); the [2.0 release notes](https://debezium.io/releases/2.0/release-notes); and the version tables in the [schema history](/docs/runbooks/debezium/schema-history-topic-missing/#the-same-failure-across-versions) and [captures nothing](/docs/runbooks/debezium/connector-running-captures-nothing/#names-and-messages-by-debezium-version) runbooks.
 
-## 2. High Operational Overhead
+For a full walk-through, see [MongoDB CDC with Debezium and Kafka](/blog/mongodb-cdc-using-debezium-and-kafka/).
 
-Running and maintaining a Kafka cluster demands continuous monitoring and tuning:
+### Single message transforms are plug-ins too
 
-* **Resource Allocation**: Kafka brokers require significant CPU, memory, and disk I/O resources.
-    
-* **Scaling Infrastructure**: As data volume grows, you might need to add more brokers (Downtime involved) and manage data distribution. Also need to scale consumers.
-    
-* **Monitoring and Alerts**: Implementing monitoring tools (*like Prometheus, Loki and Grafana*) to track cluster health and performance + snapshot metrics and streaming metrics, schema history metrics that Debezium emits. Running these tools is again resource intensive + engineering effort of setting them up.
-    
-* **Handling Failures**: You need to manually develop strategies for broker failures, network issues, and data loss prevention.
-    
+Kafka Connect transformations change records on their way through, and the [Kafka documentation](https://kafka.apache.org/43/kafka-connect/user-guide/#transformations) describes them as "lightweight message-at-a-time modifications". A custom single message transform (SMT) is a Java class, and a worker finds it the same way it finds a connector, so it has to be on `plugin.path` on every worker ([runbook](/docs/runbooks/kafka-connect/connector-class-not-found/#a-converter-that-is-not-installed)). What one record at a time cannot do is in [section 8](#transformations).
 
-**Quantifying Resource Consumption**
+:::note[How OLake Go handles this]
 
-* **Memory Usage**: Each Kafka broker can consume between **4 GB to 32 GB** of RAM, depending on workload.
-    
-* **Disk Throughput**: High disk I/O is needed; SSDs are recommended for low latency.
-    
-* **CPU Usage**: High throughput scenarios can consume significant CPU resources per broker.
-    
+OLake Go runs each source as its own Docker image, such as `olakego/source-mysql` in the [MySQL connector's check command](/docs/connectors/mysql/#3-check-source-connection), not as a plug-in on a Kafka Connect worker. The PostgreSQL connector page adds that it "can be used within the OLake UI or run locally via Docker for open-source workflows" ([PostgreSQL connector](/docs/connectors/postgres/)).
 
-## 3. Slow Snapshot
+:::
 
-One challenge with using Debezium is that its initial snapshot can be quite slow, especially with large datasets. This is because Debezium processes the snapshot **sequentially without parallelism**.
+## 2. High operational overhead {/* #operations */}
 
-To speed things up, a common approach is to use a faster tool like an EMR cluster with Apache Spark to create a snapshot of the data and store it in a separate backfill table.
+A running pipeline means watching the database, Kafka and Kafka Connect. On top of the metrics that Kafka and Kafka Connect expose, the Debezium MySQL connector provides "three types of metrics", for snapshots, streaming and schema history, over Java Management Extensions (JMX) ([monitoring](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-monitoring)).
 
-While this approach temporarily results in data existing in two locations with some overlap, you **explicitly** need to merge them into a single table or view to unify the data and ensure consistency.
+Two streaming metrics show where lag builds up. `MilliSecondsBehindSource` is the time between a change's timestamp in the database and the connector processing it, and `QueueRemainingCapacity` is the free room in the queue between the connector and Kafka Connect ([streaming metrics](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-streaming-metrics)).
 
-## 4. Challenges with Complex Schema Evolutions
+Alert on the task state, not on the connector state. In every run behind the [task failure runbook](/docs/runbooks/kafka-connect/task-failed-will-not-recover/), the connector kept reporting `RUNNING` over a `FAILED` task, and Kafka Connect did not restart the task on its own. The restart calls, which differ by Kafka Connect version, are in [that runbook](/docs/runbooks/kafka-connect/task-failed-will-not-recover/#fix-1-restart-when-the-cause-is-gone).
 
-Debezium doesn't seamlessly handle complex schema changes such as:
+Adding brokers does not move data by itself. The [operations guide](https://kafka.apache.org/43/operations/basic-kafka-operations/#expanding-your-cluster) says new servers "will not automatically be assigned any data partitions", so existing partitions stay where they are until you move them with `bin/kafka-reassign-partitions.sh`.
 
-* **Altering Primary Keys**
-    
-* **Changing Column Data Types**
-    
-* **Renaming Tables or Columns**
-    
-* **DROP table**
-    
+## 3. Slow initial snapshot {/* #snapshot */}
 
-Primary key updates (add, remove, rename) can cause brief periods of desynchronization between the actual database primary key and the metadata Debezium uses. During these moments, data change events might have an inconsistent structure, which can result in data integrity issues.
+By default the initial snapshot reads one table at a time with one thread: `snapshot.max.threads` defaults to `1` ([MySQL](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-snapshot-max-threads), [PostgreSQL](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-snapshot-max-threads)). If it is interrupted, the [MySQL documentation](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-snapshots) says "the process restarts after the connector restarts", so a long snapshot that fails near the end starts over.
 
-To prevent this, you need to make primary key changes when the system is in read-only mode, process all events, stop Debezium, make the changes, then **restart** Debezium.
+How far one snapshot can be split depends on the version. The setting has existed since 1.4 ([`CommonConnectorConfig.java` at 1.4.0](https://github.com/debezium/debezium/blob/v1.4.0.Final/debezium-core/src/main/java/io/debezium/config/CommonConnectorConfig.java)), and up to 3.4 each thread reads a whole table, so several tables run at once and one large table still runs alone. From 3.5 a value above `1` also splits each table "into chunks based on primary key ranges"; the 3.7 documentation calls this "an incubating feature", and tables without a primary key or with snapshot select overrides "fall back to single-threaded snapshotting" ([MySQL](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-snapshot-max-threads); [`CommonConnectorConfig.java` at 3.5.0](https://github.com/debezium/debezium/blob/v3.5.0.Final/debezium-connector-common/src/main/java/io/debezium/config/CommonConnectorConfig.java)).
 
-These changes can cause Debezium to fail or require manual intervention.
+Incremental snapshots, added in 1.6 (DBZ-3473 in the [1.6 release notes](https://debezium.io/releases/1.6/release-notes)), read a table in chunks of `incremental.snapshot.chunk.size` rows, 1024 by default, while streaming goes on. The MySQL documentation says "neither operation blocks the other", and an interrupted incremental snapshot "begins at the point where it stopped, rather than recapturing the table from the beginning" ([incremental snapshots](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#debezium-mysql-incremental-snapshots)). You start one with a signal, which is also how a table added to a running connector gets its existing rows.
 
-If any DDL (Data Definition Language) changes, like table structure updates, adding a new column, are made in MySQL (like `ON DELETE CASCADE` ) or Postgres, Debezium won’t notify downstream consumers, so they won’t be aware of these changes automatically. You can read more about it [here](https://groups.google.com/g/debezium/c/B0S6F_VHCHo/m/kyYsxM4fBgAJ?pli=1)
+Locks are a separate question from speed. The MySQL connector's default, `snapshot.locking.mode=minimal`, holds the global read lock "for only the initial phase of the snapshot during which it reads the database schemas and other metadata", while `extended` "Blocks all write operations for the duration of the snapshot" ([MySQL](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-snapshot-locking-mode)). The PostgreSQL connector's default in 3.7 is `none`, under which "The connector avoids locks entirely" ([PostgreSQL](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-snapshot-locking-mode)).
 
-Azure Mysql you will sometimes see DDL statements such as : "`FLUSH FIREWALL_RULES`" which are unparseable by Debezium. [Source](https://stackoverflow.com/questions/46663900/java-debezium-cannot-parse-ddl-create-proc-statements-mysql-connector)
+One way around a long snapshot is to copy the history with a separate bulk job, for example in Apache Spark, and let Debezium stream only new changes with `snapshot.mode=no_data` (`schema_only` or `never` before 2.6). The bulk copy and the stream then overlap, and the two have to be merged by key into one table.
 
-### Added a new column to source db
+:::note[How OLake Go handles this]
 
-Let’s say you added a new column in your source db and backfilled it with some default values, that's a DDL event, this change won't be reflected in your destination DB.
+OLake Go's PostgreSQL connector "offers features like parallel chunking, checkpointing, and automatic resume for failed full loads" ([PostgreSQL connector](/docs/connectors/postgres/)). Its [MySQL](/docs/connectors/mysql/), [MongoDB](/docs/connectors/mongodb/) and [SQL Server](/docs/connectors/mssql/) pages describe the same.
 
-1. **No Event for Existing Rows**:
-    
-    * When you add a column with a default value in PostgreSQL (say), the database does not generate change events for existing rows in the *Write-Ahead Log* (`WAL`). This means Debezium, which relies on WAL for capturing change data, does not pick up the addition of the default values for pre-existing rows.
-        
-    * Only new inserts or updates to the table generate events that include the new column, as these actions trigger WAL entries for the rows involved​.  
-        .
-        
-2. **Schema Evolution is Event-Driven**:
-    
-    * Debezium captures schema changes and propagates them to Kafka when data change events (insert, update, or delete) occur. Without any such event for pre-existing rows, the schema change doesn’t get propagated to the sink connector​.
-        
+:::
 
-### How Will the New Column Be Reflected in the Destination?
+## 4. Schema changes and DDL {/* #schema-changes */}
 
-The new column will appear in the destination database when:
+How a schema change reaches the change stream depends on the database. The MySQL connector reads DDL statements from the binary log and keeps them in its schema history topic. The PostgreSQL connector cannot, because "Logical decoding does not support DDL changes" and so "the connector is unable to report DDL change events back to consumers" ([PostgreSQL limitations](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-limitations)).
 
-* A new row is inserted into the source table.
-    
-* An existing row is updated or deleted in the source table.
-    
+### DDL statement couldn't be parsed {/* #ddl-parse-error */}
 
-These actions will generate WAL entries that Debezium captures, including the new schema metadata.
+When the MySQL connector meets a statement its parser cannot read, the task stops with:
 
-This will be done by Debezium automatically, you might face issues with the sink connectors.
-
-* If you use a schema registry, ensure it is updated with the new schema version to avoid conflicts during serialization/deserialization.
-    
-* As long as the sink system (destination database) supports schema evolution and can accommodate the new column, no errors should occur.
-    
-
-It’s working looking at debezium’s [maintainers comment on this thread](https://groups.google.com/g/debezium/c/B0S6F_VHCHo/m/kyYsxM4fBgAJ?pli=1)  
-*“For Postgres, we don't support schema history and so all that gets captured are your typical data change events, i.e.* `insert / update / delete`*.”*
-
-Moreover, Debezium expects to have Primary Key of Source to `NOT` be of  `STRING` type as they need to be stably ordered for incremental snapshot to happen. [Why?](https://debezium.io/documentation/reference/stable/connectors/mongodb.html#debezium-mongodb-incremental-snapshots)
-
-### Configuration Considerations:
-
-Debezium provides a snapshot.mode configuration for schema, but options like initial, schema_only, or never may not address complex schema changes without manual steps.
-
-If there’s a possibility of **schema changes** during the snapshot, you cannot use `snapshot.locking.mode`. This setting controls how the connector locks tables (to read the schema) while taking a schema snapshot.
-
-Debezium's PostgreSQL connector poses challenges for consumers during schema evolution, as event structures can change over time. This requires consumers to frequently update their schema interpretations, increasing overhead.
-
-To solve this, Debezium includes schema information or references a schema `ID` in each event, keeping events self-contained and simplifying interpretation.
-
-In scenarios where JSON messages with schemas are enabled, larger Kafka records are produced, particularly when schema changes are rare. To address this, some configurations disable message schemas by setting `key.converter.schemas.enabled` and `value.converter.schemas.enabled` to false.
-
-This approach reduces payload size, saving on network bandwidth and serialization/deserialization costs. However, it introduces the need to manage and maintain schemas externally in a schema registry (such as Confluent's), adding complexity.
-
-### Incremental Snapshot Limitations:
-
-The kafka connector **doesn’t** support schema changes during an incremental snapshot. If a schema change occurs between signaling and starting the snapshot, it could disrupt the snapshot process, leading to partial or inaccurate data capture.
-
-**One of the ways of Mitigation** is by using database.autosave set to “conservative” helps manage this risk by handling schema changes carefully, again, requiring manual intervention.
-
-**Info:** The default chunk size for incremental snapshots is `1024` rows according to Debezium and user on reddit mentioned they did some testing and found [incremental snapshots pretty slow](https://www.reddit.com/r/RedditEng/comments/qkfx7a/comment/hkcjtvp/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button).
-
-## 5. Limited Exactly-Once Delivery Guarantees & Hot Standby of cluster failovers
-
-Debezium claims to provide **at-least-once** delivery, meaning duplicates can occur (and they do de-duplication steps in a snapshot window frame to resolve collisions between events that have the same primary key.).
-
-However, in case of failures, connector restarts or DB connection drops, the same event can be delivered more than once.
-
-Ensuring **exactly-once** processing requires additional work:
-
-* **Implementing Idempotent Consumers**: Design consumers that can handle duplicate messages gracefully.
-    
-* **Using Transactional Messaging**: Kafka supports transactions, but configuring this with Debezium adds complexity.
-    
-
-**Example**
-
-If a network glitch causes a message to be resent OR streaming update and incremental snapshot change or read the data at the same time / near same time, a possible collisions between late-arriving `READ` events and streamed events that modify the same collection row:
-
-* **Duplicate Event**: The consumer receives the same change event twice.
-    
-* **Data Integrity Issue**: Without handling duplicates, this could result in incorrect data states in the target system.
-    
-* **Possible solution**: Implement deduplication logic based on unique identifiers, increasing development effort.
-    
-
-Talking about PostgreSQL, replication slots are only available on primary servers. If the primary server fails, Debezium must be reconfigured to work with the new primary, and the replication slot must be carefully managed to avoid data loss.
-
-Moreover, if either Debezium or the MySQL (let’s say) replica (used as the CDC source) goes down, the CDC stream halts entirely.
-
-Another way to handle duplicate events is requiring additional logic to handle **idempotency** (*a function or operation that produces the same result when performed multiple times*) at the consumer side or something like a deduplicator service (*again, a lot of manual engineering team effort + code + testing it out + $$* ) between the stream that takes care of NOT sending any duplicate data to destination.
-
-Read more about it [here](https://medium.com/blablacar/streaming-data-out-of-the-monolith-building-a-highly-reliable-cdc-stack-d71599131acb).
-
-![Deduplication pipeline: Kafka messages processed by deduplicators using a key-value store to filter duplicates](/img/blog/2024/11/issues-debezium-kafka-1.webp)
-
-Although Debezium relies on the Kafka Connect framework for high availability, it does not support **hot** standby instances—a backup instance that can immediately take over without interruptions.
-
-When a connector shuts down, it takes time for a new instance to start, which may be acceptable for some use cases but can be problematic for scenarios requiring uninterrupted data capture.
-
-You can mitigate this to some extent by using managed services like AWS RDS and GCP CloudSQL, as they handle replication slots during failovers, minimizing the setup complexity. However, verification of the replication slot and data consistency after failover remains essential.
-
-## 6. Ingestion into Target Systems Requires Custom Development
-
-Debezium streams data into Kafka topics, but moving that data into target systems (like data warehouses or data lakes) out of scope of the Debezium project. You need to utilize **Sink Connectors** provided by Kafka Connect or third-party vendors.
-
-* **Custom Consumers Needed**: You need to configure Kafka consumers that can read from topics and write to target systems.
-    
-* **Schema Management**: Mapping database schemas to target schemas requires additional development on your part.
-    
-
-**Examples**:
-
-* **Snowflake Connector for Kafka**: Provided by Snowflake, this connector streams data from Kafka topics directly into Snowflake tables.
-    
-* **Redshift Connector**: Available through Confluent or third-party vendors, this connector allows data to flow from Kafka into Amazon Redshift.
-    
-* **Apache Iceberg**: While there isn't a native Debezium connector for Iceberg, you can use existing Kafka Connect Sink frameworks or develop custom connectors to write data into Iceberg tables.
-    
-
-**Example Scenario:** In order to write Debezium data into an Apache Iceberg lakehouse, you need to:
-
-1. **Develop a Kafka Consumer**: Write an application that reads from Kafka topics and writes data to Iceberg tables.
-    
-2. **Handle Schema Evolution**: Implement logic to map Debezium's change event structure to Iceberg's schema (or other lakehouse format), including handling schema changes.
-    
-3. **Maintain the Pipeline**: Monitor and update the consumer application as schemas evolve and data volumes grow. A tool like OLake Go is needed in such scenarios.
-    
-
-## 7. Kafka Dependency and Resource Consumption
-
-Relying on Kafka introduces several challenges:
-
-* **Infrastructure Complexity**: Managing Kafka clusters and Zookeeper ensembles is complex.
-    
-* **High Resource Consumption**: Kafka and Zookeeper require significant resources to operate efficiently.
-    
-* **Cost Implications**: Infrastructure costs can be substantial.
-    
-
-### Quantifying Resource Needs
-
-* **Kafka Brokers**:
-    
-    * **Memory**: 6-12 GB RAM per broker.
-        
-    * **CPU**: Multi-core processors for handling high throughput.
-        
-    * **Disk Space**: Depends on data retention policies; could be terabytes of storage.
-        
-* **Zookeeper Nodes**:
-    
-    * **Memory**: 4 GB RAM per node.
-        
-    * **CPU**: Less intensive but still requires reliable hardware.
-        
-    * **Cluster Size**: Minimum of 3 nodes for high availability.
-        
-
-**Cost Example on AWS:**
-
-* **Kafka Cluster (3 brokers)**:
-    
-    * Instance Type: `m5.2xlarge` (8 vCPU, 32 GB RAM).
-        
-    * Cost: Approximately **$350 per month per instance**.
-        
-    * Total: **$1,050 per month**. Estimate.
-        
-* **Zookeeper Ensemble (3 nodes)**: (*if not using Debezium v3*)
-    
-    * Instance Type: `m5.large` (2 vCPU, 8 GB RAM).
-        
-    * Cost: Approximately **$88 per month per instance**.
-        
-    * Total: **$264 per month**.
-        
-* **Total Infrastructure Cost**: Around **$1,314 per month (estimate, depends on use)**, not including storage costs and data transfer fees.
-    
-
-## 8. Limited Transformation Capabilities
-
-Debezium's transformation abilities are limited to simple, stateless transformations:
-
-* **Single Message Transforms (SMTs)**: Applied to individual messages; cannot perform operations that require state or context.
-    
-* **Complex Transformations Require Additional Tools**: For aggregations, joins, or stateful computations, you need to integrate Kafka Streams, Apache Flink, or Apache Spark separately.
-    
-
-**Example**
-
-* **Use Case**: You want to `JOIN` change events from two tables to create a denormalized dataset.
-    
-* **Limitation**: Debezium cannot perform this join out-of-the-box, not something Debezium does but you might require from a single solution.
-    
-* **Solution**: Develop a Kafka Streams application, which adds complexity and requires additional resources.
-    
-
-## 9. Handling Data Loss scenarios:
-
-Another challenge with Debezium is ensuring zero data loss, particularly when dealing with large tables. When using Debezium CDC, performance, availability, and potential data loss become major concerns.
-
-If any component in the system—such as Kafka brokers, connectors, or databases—fails, achieving absolute data integrity and zero data loss is not guaranteed. This is especially true when there are high write volumes or complex database structures.
-
-For instance, if Kafka experiences an outage or there are network issues, some change events might be lost, leading to inconsistencies in the data.
-
-The burden of ensuring that data loss doesn’t happen falls entirely on the development team. This means setting up robust monitoring, retry mechanisms, and possibly custom recovery processes to handle failures.
-
-You also need to tune the system to balance performance and reliability, which involves careful configuration of Debezium, Kafka, and the underlying database to handle failures gracefully.
-
-The bottom line is that maintaining data integrity with Debezium requires a lot of effort from developers. Ensuring zero data loss involves complex configurations, ongoing monitoring, and a solid understanding of the entire data pipeline—making it a challenging task when working with large datasets or critical systems.
-
-## 10. Scalability Challenges with Debezium Connectors
-
-Debezium has many connectors for different databases, but they can sometimes struggle to handle large amounts of data. For example, when using PostgreSQL with the **wal2json** [plugin](https://github.com/eulerto/wal2json) to turn database logs into JSON, you might run into an `OutOfMemoryError` when committing large transactions that require more memory for their serialized form than the available Java heap space.
-
-Also, taking a snapshot of large tables while new data is coming in can make the tables unavailable for a long time. This is especially a problem with big datasets
-
-## 11. Handling Source Data types
-
-While Debezium covers a range of PostgreSQL types, the handling is often simplified. Complex, custom, and structured data types are generally reduced to basic types like `STRING` or `BYTES`.
-
-This approach may limit data fidelity and the ability to perform direct operations on these data types without additional transformation or processing.
-
-* **Handling of Custom and Complex Types**:
-    
-    * **Custom Types**: We referred to the Debezium docs to see how they map postgres data types. The [table does not show](https://debezium.io/documentation/reference/connectors/postgresql.html#postgresql-basic-types) direct support for custom types created by users in PostgreSQL (such as user-defined types or custom structures).
-        
-    * **Structured Data**: Only a few structured types like POINT are supported natively as `STRUCT`, while most range types and complex structures default to a simple `STRING` representation. This limits fine-grained handling and direct manipulation of complex types, as they must first be parsed or processed outside Debezium.
-        
-* **Range and Enum Types**:
-    
-    * Debezium represents PostgreSQL’s range types (like `INT4RANGE`, `INT8RANGE`, `NUMRANGE`) as strings, which means that the connector doesn’t directly support operations on ranges. Similarly, `ENUM` values are also treated as `STRING`, limiting type specificity.
-        
-* **Temporal and Interval Handling**:
-    
-    * **Limited Options**: Although `INTERVAL` can be mapped to an integer (microseconds) or a formatted string, this handling lacks granularity. PostgreSQL’s rich interval functions are not fully leveraged, as Debezium simply provides a raw numeric or string format.
-        
-
-## 12. Handling TOAST values of Postgres
-
-*[fixed in v2.5], might be good time to upgrade if you face this issue.
-
-TOAST (The Oversized-Attribute Storage Technique) in PostgreSQL stores large column values outside the main table row. Normally, it's transparent to users, but when using **Debezium**, unchanged TOAST column values (e.g., large `TEXT` fields) are not sent in change events unless part of the table's replica identity.
-
-Instead, Debezium uses a placeholder, like `__debezium_unavailable_value`
-
-### Example
-
-Given a table with name and email as `CHAR` and biography as  `TEXT` type, which can exceed page size (*of 8kb*) and we update the email of a user, this is what streamed to the kafka event:
-
-```json
-{ "before": null, "after": { "id": 1004, "first_name": "Dana", "last_name": "Kretchmar", "email": "annek@noanswer.org", "biography": "__debezium_unavailable_value" } }
+```text
+io.debezium.text.ParsingException: DDL statement couldn't be parsed. Please open a Jira issue with the statement '...'
 ```
 
-One way to handle this is to set the Postgres table's **replica identity** to `FULL`. This includes all column values (even unchanged ones) in change events, so there will be redundancies or add some custom `TRIGGERS`. Both of which will make you sit for hours to write, test and configure.
+From Debezium 3.5 the second sentence reads `Please open a GitHub issue at https://github.com/debezium/dbz/issues with the statement '...'` ([`ParsingErrorListener.java` at 3.4.0](https://github.com/debezium/debezium/blob/v3.4.0.Final/debezium-ddl-parser/src/main/java/io/debezium/antlr/ParsingErrorListener.java) and [3.5.0](https://github.com/debezium/debezium/blob/v3.5.0.Final/debezium-ddl-parser/src/main/java/io/debezium/antlr/ParsingErrorListener.java)). On Azure Database for MySQL 5.7 the connector stopped this way on `FLUSH FIREWALL_RULES`: [DBZ-3925](https://redhat.atlassian.net/browse/DBZ-3925) was reported on 1.6.1.Final in August 2021 and fixed in 2.4.0.Alpha1. A [2017 Stack Overflow question](https://stackoverflow.com/questions/46663900) shows the same failure on DDL for stored procedures.
 
-## 13. Miscellaneous Debezium Drawbacks
+The setting that skips such statements is `schema.history.internal.skip.unparseable.ddl`, called `database.history.skip.unparseable.ddl` before 2.0, and it defaults to `false`. Its description warns that "If skipping is enabled then Debezium can miss metadata changes" ([`SchemaHistory.java` at 3.7.1](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-common/src/main/java/io/debezium/relational/history/SchemaHistory.java); [MySQL property](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-database-history-skip-unparseable-ddl)), so use it to get past one known statement and then set it back.
 
-1. **Connector Task Limitation**:
-    
+### Primary key changes
 
-Each Debezium connector instance is limited to a single task (tasks.max: 1). While it’s possible to run multiple connectors, this restriction prevents parallelism within a single connector, slowing down data processing. This limitation is particularly noticeable in high-volume environments, where data ingestion could be slower than the rate of change, resulting in a backlog of change events.
+Changing a primary key has two effects. An `UPDATE` that changes a key value arrives as two events: "the connector sends a DELETE event record for the old key and a CREATE event record for the new (updated) key" ([PostgreSQL primary key updates](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-primary-key-updates)). Changing the key definition itself opens a short window on PostgreSQL, because the connector takes the key columns from Java Database Connectivity (JDBC) metadata and not from the change stream.
 
-2. **Lack of Active Directory Authentication Support**:
-    
+The documentation describes the window: "there is a tiny period of time when the primary key information from JDBC is not synchronized with the change event that the logical decoding plug-in generates". Its procedure for a key change ([streaming changes](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-streaming-changes)) is:
 
-Currently, Debezium does not support Active Directory (AD) authentication. Many enterprise environments use AD for managing access and permissions. Without support for AD, administrators may need to configure separate access management, which complicates setup and reduces integration with other enterprise systems.
+1. Put the database or an application into a read-only mode.
+2. Let Debezium process all remaining events.
+3. Stop Debezium.
+4. Update the primary key definition in the relevant table.
+5. Put the database or the application into read/write mode.
+6. Restart Debezium.
 
-3. **Event Overflow Risks**:
-    
+### A new column with a default value
 
-Rapid creation of millions of data modification (DML) events can overwhelm Debezium’s event-processing pipeline (*postgres connector is 7k/events per second max*). When this happens, events can accumulate faster than they are processed, leading to potential data loss or delayed data sync.
+Adding a column on PostgreSQL writes no row changes. The [ALTER TABLE notes](https://www.postgresql.org/docs/current/sql-altertable.html#SQL-ALTERTABLE-NOTES) explain that with a non-volatile default, "the default value is evaluated at the time of the statement and the result stored in the table's metadata", so existing rows are not touched and Debezium has nothing to send. The new column shows up in the change stream with the next insert, update or delete on that table, and a backfill written as `UPDATE` statements arrives as ordinary updates.
 
-While backlogging can be addressed using partitioning, this requires setting up multiple connectors for the same table and then reassembling the data later. If the load is uneven between tables, smaller tables might experience delays, as they have to wait for larger operations to complete processing first.
+On the Debezium mailing list in June 2021, the answer to this question was: "for Postgres, we don't support schema history and so all that gets captured are your typical data change events, i.e. insert / update / delete" ([thread](https://groups.google.com/g/debezium/c/B0S6F_VHCHo)). PostgreSQL's own [restrictions page](https://www.postgresql.org/docs/current/logical-replication-restrictions.html) says the same of logical replication: "The database schema and DDL commands are not replicated."
 
-This scenario often occurs when high-volume operations like bulk inserts, updates, or deletes are performed, and the connector cannot keep up, creating an overflow situation in Kafka or other destinations.
+Whether a sink accepts the new field depends on its own schema evolution settings. For Iceberg tables, the errors that Spark, PyIceberg and Trino print are in [Iceberg schema evolution errors](/docs/runbooks/iceberg/schema-evolution-errors/).
 
-**4. Table name restrictions:**
+### JSON events and schemas.enable
 
-If your database name is `TEST` and the name of the table is in format for `“ABC.TABLE2”`, you must escape the table name in double quotes like `"TEST."ABC.TABLE2""`.
+With Kafka's JSON (JavaScript Object Notation) converter, every event carries its schema next to its payload. The Debezium frequently asked questions (FAQ) page says each event must be "completely self-describing" and that "events represented in JSON are indeed verbose and large" ([FAQ](https://debezium.io/documentation/faq/#why-are-events-so-large)).
 
-**5. Delay Processing in extreme cases:**
+The converter settings are `key.converter.schemas.enable` and `value.converter.schemas.enable`, without a final `d`, and `schemas.enable` defaults to `true` ([`JsonConverterConfig.java` at 4.3.1](https://github.com/apache/kafka/blob/4.3.1/connect/json/src/main/java/org/apache/kafka/connect/json/JsonConverterConfig.java)). Setting them to `false` drops the schema from each event, so a consumer needs it from elsewhere. The FAQ's suggestion is a schema registry, where "actual change events only contain the id of the corresponding schema in the registry".
 
-Debezium exhibits an odd behavior when monitoring multiple tables with unbalanced loads. If one table receives a batch of changes before the others, the connector processes all changes from that table before moving on to others, potentially causing delays (e.g., *up to 10 minutes in one observed case*). While this may not affect well-balanced workloads, it could impact timely processing for spiky or batch-heavy loads on specific tables. [Source](https://instaclustr.medium.com/change-data-capture-cdc-with-kafka-connect-and-the-debezium-postgresql-source-connector-13a48eabfcb2#:~:text=One%20limitation%20of%20the%20Debezium,one%20change%20event%20per%20transaction.):
+A sink that expects schemas and reads events written without them stops with this message, which is the same at the Kafka [0.10.2.2](https://github.com/apache/kafka/blob/0.10.2.2/connect/json/src/main/java/org/apache/kafka/connect/json/JsonConverter.java) and [4.3.1](https://github.com/apache/kafka/blob/4.3.1/connect/json/src/main/java/org/apache/kafka/connect/json/JsonConverter.java) tags:
 
-Here’s what a reddit user [had to say](https://www.reddit.com/r/dataengineering/comments/12bxvsz/debezium/):
+```text
+JsonConverter with schemas.enable requires "schema" and "payload" fields and may not contain additional fields. If you are trying to deserialize plain JSON data, set schemas.enable=false in your converter configuration.
+```
 
-![Kafka messages flow to deduplicator modules using a KV store to remove duplicates before outputting to Kafka again](/img/blog/2024/11/issues-debezium-kafka-2.webp)
+### Schema changes during an incremental snapshot
 
-## RedHat Debezium Issue Tracker Highlights:
+The PostgreSQL documentation is direct: "The Debezium connector for PostgreSQL does not support schema changes while an incremental snapshot is running." For a change made after the signal and before the snapshot starts, it says to set the pass-through option `database.autosave` to `conservative` ([PostgreSQL incremental snapshots](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-incremental-snapshots)).
 
-* `DBZ-7857`: Challenges with Debezium not capturing columns created by unique keys using the HASH function in MariaDB schemas.
-    
-* `DBZ-5761`: Difficulties in whitelisting additional MySQL tables in schema_only mode.
-    
-* `DBZ-7560`: Problems related to Debezium's handling of certain data types or schema changes.
-    
-* `DBZ-5169`: Issues concerning Debezium's performance under specific configurations.
-    
-* `DBZ-3829`: Complications arising from Debezium's integration with other data processing tools.
-    
-* `DBZ-2208`: Errors encountered during Debezium's snapshot process.
-    
-* `DBZ-3046`: Challenges with Debezium's handling of large transactions.
-    
-* `DBZ-560`: Problems related to Debezium's connector configurations.
-    
-* `DBZ-5189`: Issues with Debezium's handling of specific database events.
-    
+The MySQL connector has `incremental.snapshot.allow.schema.changes`, default `false`, which re-reads the current chunk when it detects a schema change; the documentation adds that "Changes to a primary key are not supported" ([MySQL](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-incremental-snapshot-allow-schema-changes)). The MongoDB documentation sets a condition on keys, "Incremental snapshots require that the primary key for each table is stably ordered", and advises a key type other than String ([MongoDB](https://debezium.io/documentation/reference/3.7/connectors/mongodb.html#debezium-mongodb-incremental-snapshots)).
 
-You can read more about them [here](https://issues.redhat.com/projects/DBZ/issues/DBZ-5189?filter=allopenissues). Being such a vast and complex project, you cannot be sure how long would it take if you had your production setup moved to Debezium just to later find a bug with the project or it does not handle specific use cases.
+### Snapshot mode names
 
-Some users on the internet mentioned issues with Debezium (or due to its complexity, they were unable to set it up the correct way):
+`snapshot.mode` values were renamed in 2.6 and the old ones removed in 3.3: `schema_only` and `never` became `no_data`, and `schema_only_recovery` became `recovery`. Debezium 3.7.1 rejects the old names with `The 'snapshot.mode' value is invalid: Value must be one of ...`, and 1.9.7 rejects the new ones the same way ([runbook](/docs/runbooks/debezium/connector-running-captures-nothing/#the-old-value-on-a-new-version)).
 
-![Forum comment: Debezium 1.8 + Kafka 2.7 setup worked for years, now frequent failures with no changes, seeking help](/img/blog/2024/11/issues-debezium-kafka-3.webp)
+:::note[How OLake Go handles this]
 
-[Link](https://forum.confluent.io/t/troubleshooting-debezium-connector-intermittent-failures/11300)
+Instead of a schema history topic, OLake Go's MySQL connector recommends `binlog_row_metadata=FULL` "so the binlog carries column metadata. Otherwise OLake reads it from information_schema, which can mis-map columns if a table is altered while a sync is catching up" ([MySQL connector](/docs/connectors/mysql/#3-check-source-connection)). A table changed after CDC started, or incomplete binlog metadata, gives [`Column Count Mismatch: Expected X, Got Y`](/docs/connectors/mysql/#3-column-count-mismatch-expected-x-got-y).
 
-Another user on reddit said “When a large number of updates occur, Debezium is unable to keep up with the throughput, resulting in untimely downstream data.” [Source](https://www.reddit.com/r/dataengineering/comments/1fv186f/is_there_an_alternative_to_debezium_kafka/)
+:::
+
+## 5. At-least-once delivery, exactly-once and failover {/* #delivery */}
+
+Debezium's default guarantee is at least once. Its [exactly-once page](https://debezium.io/documentation/reference/3.7/configuration/eos.html) says: "This means that no changes are missed; however, in some cases, a record may be delivered more than once." The [FAQ](https://debezium.io/documentation/faq/#what_happens_when_debezium_stops_or_crashes) explains one case: after a worker crash, the restarted connectors "will begin recording events from the database starting at the position/offset last recorded by the connector before it crashed", and consumers see some events twice.
+
+### Exactly-once delivery from Debezium 3.3
+
+Exactly-once delivery arrived in Debezium 3.3 (DBZ-9177 in the [3.3 release notes](https://debezium.io/releases/3.3/release-notes)) for the MariaDB, MongoDB, MySQL, Oracle, PostgreSQL and SQL Server connectors, and only on Kafka Connect. It needs Kafka Connect 3.3.0 or later in distributed mode, `exactly.once.source.support=enabled` on every worker and `exactly.once.support=required` on the connector ([exactly-once page](https://debezium.io/documentation/reference/3.7/configuration/eos.html)).
+
+It covers what Kafka Connect writes to Kafka, so consumers have to read with `isolation.level=read_committed`; the default, `read_uncommitted`, "will return all messages, even transactional messages which have been aborted" ([consumer configs](https://kafka.apache.org/43/configuration/consumer-configs/#consumerconfigs_isolation.level)). Debezium's page also notes that "it remains unclear whether the implementation is fully correct or if there are edge cases where exactly-once semantics might be violated".
+
+A new snapshot is a different matter. After the binlog runbook's `when_needed` recovery, every row arrived again as a read event, so consumers still have to treat a repeated key as an update ([runbook](/docs/runbooks/mysql/binlog-retention-error-1236/#fix-2-let-debezium-take-a-new-snapshot)).
+
+Incremental snapshots handle their own overlap with the stream: the watermarking strategy exists "to deduplicate events that might be captured by an incremental snapshot and then recaptured after streaming resumes" ([`incremental.snapshot.watermarking.strategy`](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-incremental-snapshot-watermarking-strategy)).
+
+### When the database fails over
+
+PostgreSQL 17 added "the failover of logical slots" ([17.0 release notes](https://www.postgresql.org/docs/release/17.0/)), and Debezium's PostgreSQL connector creates such slots with `slot.failover=true` from 3.0.5 ([`PostgresConnectorConfig.java` at 3.0.4](https://github.com/debezium/debezium/blob/v3.0.4.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorConfig.java) and [3.0.5](https://github.com/debezium/debezium/blob/v3.0.5.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorConfig.java)). The Debezium documentation says these slots "enable Debezium to continue reading changes from a new primary server after a failover event, without losing events", and they also need `synchronized_standby_slots` set on the primary ([failover slots](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#enabling-postgresql-failover-slots)).
+
+On PostgreSQL 16 and earlier the connector does not create a failover slot, and whether a slot survives a failover depends on the platform. Azure Database for PostgreSQL, for one, says that on those versions with high availability "logical replication slots aren't preserved during failover events", and points to the PG Failover Slots extension ([Azure limitations](https://learn.microsoft.com/en-us/azure/postgresql/configure-maintain/concepts-logical#limitations)).
+
+### When a Kafka Connect worker fails
+
+When a worker leaves the group, Kafka Connect waits up to `scheduled.rebalance.max.delay.ms`, 5 minutes by default, before it reassigns that worker's connectors and tasks, which "remain unassigned" in the meantime ([Kafka Connect configs](https://kafka.apache.org/43/configuration/kafka-connect-configs/#connectconfigs_scheduled.rebalance.max.delay.ms)). After a crash, the restarted connectors resume from the last recorded offset, which is the duplicate case quoted above.
+
+## 6. Getting changes into a lake or warehouse {/* #sinks */}
+
+Debezium's source connectors stop at Kafka topics, and a sink connector or a consumer takes the events further. Depending on the sink, the [architecture page](https://debezium.io/documentation/reference/3.7/architecture.html) says "you might need to configure the Debezium new record state extraction transformation", which reduces each change event to the row's new state.
+
+Three ready-made routes now exist. Debezium has shipped a JDBC sink connector since 2.2 (DBZ-3647 in the [2.2 release notes](https://debezium.io/releases/2.2/release-notes)), and Debezium Server lists an Apache Iceberg sink that "is a community-maintained, open-source project" kept in a [separate repository](https://github.com/memiiso/debezium-server-iceberg) ([Debezium Server](https://debezium.io/documentation/reference/3.7/operations/debezium-server.html#debezium-server-apache-iceberg-sink-configuration)). Apache Iceberg has shipped its own Kafka Connect sink since [1.5.0](https://iceberg.apache.org/releases/#150-release), with an experimental `DebeziumTransform` for Debezium events ([Iceberg Kafka Connect](https://iceberg.apache.org/docs/latest/kafka-connect/)).
+
+The Iceberg sink's documented features include table creation, schema evolution and exactly-once delivery, but not updates in place. Its tracker says the first version left out the delta writer needed "for features like change data capture and upsert mode", and that issue has been open since August 2024 ([apache/iceberg#10842](https://github.com/apache/iceberg/issues/10842), checked Nov 2026). Until it lands, a current-state table needs a merge job after the sink.
+
+Iceberg-side failures are in the [Iceberg runbooks](/docs/runbooks/iceberg/): schema evolution errors, compaction that rewrites nothing, and Spark sessions that cannot find Iceberg.
+
+:::note[How OLake Go handles this]
+
+OLake Go replicates "from MySQL, PostgreSQL, Oracle, and MongoDB into an Apache Iceberg based data lake" ([use cases](/docs/core/use-cases/)) with its own writer, the one named in the disclosure at the top of this page. A job writes to the Iceberg or Parquet destination set in its [destination configuration](/docs/core/configs/writer/).
+
+:::
+
+## 7. Kafka dependency and resource consumption {/* #kafka-cost */}
+
+Running Debezium on Kafka Connect means running Kafka: brokers, KRaft controllers, Kafka Connect workers and storage for each topic's retention. [Debezium Server and the Debezium Engine](#debezium-kafka-connect-and-debezium-server) avoid that when the events can go somewhere other than Kafka.
+
+Kafka's own guidance sizes brokers by workload, not by a fixed figure. The [hardware page](https://kafka.apache.org/43/operations/hardware-and-os/) suggests estimating memory as `write_throughput*30` to buffer 30 seconds of writes and says "In general disk throughput is the performance bottleneck, and more disks is better", and the [Java page](https://kafka.apache.org/43/operations/java-version/) shows `-Xmx6g -Xms6g` among "Typical arguments for running Kafka".
+
+As an illustration, three brokers on `m5.2xlarge` and three KRaft controllers on `m5.large`, at on-demand Linux prices in US East (N. Virginia), cost:
+
+| Role | Instance | Price per hour | Three instances for a 730-hour month |
+| --- | --- | --- | --- |
+| Broker | `m5.2xlarge` | $0.384 | $840.96 |
+| Controller | `m5.large` | $0.096 | $210.24 |
+| Total | | | $1,051.20 |
+
+Sources: [Amazon Elastic Compute Cloud (EC2) on-demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/) (checked Nov 2026).
+
+Storage, data transfer and the Kafka Connect workers come on top, and the instance types are an example, not a sizing recommendation. Combined mode would drop the three controllers, and the Kafka documentation does not recommend it for critical deployments ([KRaft](https://kafka.apache.org/43/operations/kraft/#controllers)).
+
+## 8. Limited transformation capabilities {/* #transformations */}
+
+Kafka Connect transformations work on one record at a time, which is what "message-at-a-time" means in the [Kafka documentation](https://kafka.apache.org/43/kafka-connect/user-guide/#transformations). Debezium adds its own, such as the new record state extraction that flattens events, and Kafka includes others, such as `Cast` and `RegexRouter`.
+
+A join, an aggregation or anything else that needs state across records is outside what a single message transform can do, so it runs downstream in Kafka Streams, Apache Flink or Apache Spark. Joining change events from two tables into one denormalized table is one example.
+
+## 9. Data loss scenarios {/* #data-loss */}
+
+A Kafka outage pauses the pipeline instead of dropping events. The PostgreSQL connector documentation says that while the brokers are unavailable, "the connector tasks pause until a connection can be re-established, at which point the connectors resume exactly where they left off" ([Kafka becomes unavailable](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-kafka-becomes-unavailable)).
+
+The losses reproduced in the labs behind the runbooks came from other places:
+
+- **A purged binary log.** A MySQL connector was stopped while its binlog file expired, and `snapshot.mode=when_needed` took a new snapshot; the order deleted during the outage never produced a delete event ([binlog runbook](/docs/runbooks/mysql/binlog-retention-error-1236/#fix-2-let-debezium-take-a-new-snapshot)).
+- **An invalidated replication slot.** With `max_slot_wal_keep_size` set, PostgreSQL removed write-ahead log (WAL) that the slot still needed, and every reader of the slot then needed a new snapshot ([slot runbook](/docs/runbooks/postgres/replication-slot-filling-disk/#what-an-invalidated-slot-costs)).
+- **SQL Server clean-up.** A reader whose saved position fell below the change table's minimum log sequence number (LSN) after the clean-up job ran lost a change for good ([SQL Server runbook](/docs/runbooks/sql-server/enable-cdc-change-tables-empty/#the-range-moves-when-clean-up-runs)).
+- **`errors.tolerance=all` on its own.** A sink with that setting and no dead letter queue skipped a bad record that was then gone, with no line in the worker log ([task failure runbook](/docs/runbooks/kafka-connect/task-failed-will-not-recover/#do-not-tolerate-without-a-trace)).
+
+Each of these is visible on the source side before it happens: the WAL each slot retains, the oldest binlog file against the connector's position, and the size of the dead letter queue. The runbooks give the query or command for each.
+
+## 10. Scalability, backpressure and performance settings {/* #performance */}
+
+Debezium reads the log into a queue, and Kafka Connect takes events from it in batches. When the queue is full the connector stops reading, which the documentation describes as backpressure "in cases where the connector ingests messages faster than it can write them to Kafka, or when Kafka becomes unavailable" ([`max.queue.size`](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-max-queue-size)). The backlog then waits in the database log, which on PostgreSQL means WAL held by the replication slot ([section 15](#replication-slot)).
+
+These settings size that path. The defaults are from the 3.7 PostgreSQL connector documentation:
+
+| Setting | Default | What it controls |
+| --- | --- | --- |
+| `max.batch.size` | 2048 | Events in each batch the connector processes |
+| `max.queue.size` | 8192 | Events the queue holds; keep it larger than `max.batch.size` |
+| `max.queue.size.in.bytes` | 0, no byte limit | The queue's size in bytes |
+| `poll.interval.ms` | 500 | Wait for new events in each poll, capped at 5000 |
+| `snapshot.fetch.size` | 10240 | Rows per batch while a snapshot reads a table |
+| `incremental.snapshot.chunk.size` | 1024 | Rows per incremental snapshot chunk |
+| `snapshot.max.threads` | 1 | Snapshot threads, see [section 3](#snapshot) |
+
+Sources: [Debezium PostgreSQL connector properties](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-max-batch-size) (checked Nov 2026).
+
+Read the metrics from [section 2](#operations) before changing them. A `QueueRemainingCapacity` near zero suggests the Kafka side is the slower one, while a growing `MilliSecondsBehindSource` with room in the queue suggests the connector is not reading the database log fast enough.
+
+On Debezium 1.x with PostgreSQL, the [`wal2json`](https://github.com/eulerto/wal2json) plug-in was an option. Debezium 2.0 removed it, and the [2.0 release notes](https://debezium.io/releases/2.0/release-notes) say "pgoutput decoding plug-in is recommended as the replacement". The `plugin.name` default is still `decoderbufs` in 3.7 ([`plugin.name`](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-plugin-name)).
+
+## 11. Source data types on PostgreSQL {/* #data-types */}
+
+The PostgreSQL connector maps several types to plain strings, so the consumer has to parse them. These mappings are from the [3.7 type tables](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-basic-types):
+
+| PostgreSQL type | Debezium schema | What arrives |
+| --- | --- | --- |
+| `INT4RANGE`, `INT8RANGE`, `NUMRANGE`, `TSRANGE`, `TSTZRANGE`, `DATERANGE` | `STRING` | The range as text |
+| `ENUM` | `STRING`, named `io.debezium.data.Enum` | The value as text; the schema's `allowed` parameter lists the allowed values |
+| `INTERVAL` | `INT64` (`io.debezium.time.MicroDuration`) by default | "The approximate number of microseconds", or a string such as `P1Y2M3DT4H5M6.78S` with `interval.handling.mode=string` |
+| `POINT` | `STRUCT` (`io.debezium.data.geometry.Point`) | Two `FLOAT64` fields, `x` and `y` |
+| Domain types | The type they are based on | Built "based on the full type hierarchy" ([domain types](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-domain-types)) |
+| A type the connector does not know | Nothing | Left out with a warning, unless `include.unknown.datatypes=true` ([property](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-include-unknown-datatypes)) |
+
+## 12. TOAST columns and `__debezium_unavailable_value` {/* #toast */}
+
+PostgreSQL stores large values out of line with The Oversized-Attribute Storage Technique (TOAST). The [Debezium documentation](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-toasted-values) states the consequence: "Values that were stored by using the TOAST mechanism and that have not been changed are not included in the message", unless they are part of the table's replica identity.
+
+Debezium puts a placeholder in their place. With the default replica identity, an update to a user's email leaves a large `TEXT` column such as `biography` unchanged, and the `after` part of the event looks like this:
+
+```json
+{ "after": { "id": 1004, "first_name": "Dana", "last_name": "Kretchmar", "email": "annek@noanswer.org", "biography": "__debezium_unavailable_value" } }
+```
+
+The value comes from `unavailable.value.placeholder`, default `__debezium_unavailable_value` ([property](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-unavailable-value-placeholder)). Before 2.0 it was `toasted.value.placeholder`, with the same default; 1.9 marks that name deprecated and 2.0 removed it ([`PostgresConnectorConfig.java` at 1.2.0](https://github.com/debezium/debezium/blob/v1.2.0.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorConfig.java) and [1.9.7](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorConfig.java)).
+
+The placeholder stands for what PostgreSQL itself sends. In the [logical replication lab](/docs/runbooks/postgres/enable-logical-replication/#6-give-every-table-a-replica-identity), an update that did not touch a 32,000-character column arrived from the `test_decoding` plug-in as `body[text]:unchanged-toast-datum`, on all eight PostgreSQL versions run.
+
+There are three ways out, each with a cost:
+
+- `ALTER TABLE ... REPLICA IDENTITY FULL` makes PostgreSQL log the whole old row on every update and delete. The PostgreSQL manual says "replica identity FULL should only be used as a fallback if no other solution is possible" ([publication](https://www.postgresql.org/docs/current/logical-replication-publication.html)).
+- From Debezium 2.5, the [reselect columns post processor](https://debezium.io/documentation/reference/3.7/post-processors/reselect-columns.html) queries the source again for columns that carry the placeholder and "fetches their current state" ([class added at 2.5.0](https://github.com/debezium/debezium/blob/v2.5.0.Final/debezium-core/src/main/java/io/debezium/processors/reselect/ReselectColumnsPostProcessor.java)). If the row changed again since, that is a newer value than the change being processed, which is why the connector does not read it by default: the PostgreSQL connector documentation says doing so "would potentially lead to race conditions".
+- The consumer can keep the column's previous value whenever the placeholder arrives, which works once it has seen the row.
+
+:::note[How OLake Go handles this]
+
+OLake Go has the same limit. When an update leaves a TOAST column unchanged, "OLake Go writes `__olake_unavailable_value__` for that column"; its **Preserve TOAST Values** option, which can only be set when the source is created, reads the previous value from the Iceberg destination instead ([PostgreSQL connector](/docs/connectors/postgres/#toast-columns-preserve)).
+
+:::
+
+## 13. The db history topic is missing {/* #schema-history-topic */}
+
+A Debezium MySQL connector stops at start-up with this message when its schema history topic is gone and its offsets are not:
+
+```text
+io.debezium.DebeziumException: The db history topic is missing. You may attempt to recover it by reconfiguring the connector to recovery.
+```
+
+Before 2.6 the sentence ends `... to SCHEMA_ONLY_RECOVERY`, and the topic property is `database.history.kafka.topic` before 2.0 and `schema.history.internal.kafka.topic` after. Versions 1.2 to 3.0 also have `The db history topic or its content is fully or partially missing.` for a topic that exists but lacks records ([runbook](/docs/runbooks/debezium/schema-history-topic-missing/)).
+
+If no table changed structure since the connector last ran, `snapshot.mode=recovery` (`schema_only_recovery` before 2.6) rebuilt the topic in the lab and resumed from the stored offset on Debezium 1.9.7 and 3.7.1, with no rows read twice. After a column was added during the outage, recovery failed with the `internal schema size 5, but row size 4` error from the [decoder](#read-the-cause), and the fix was a new snapshot with the offsets cleared.
+
+The same topic causes `Encountered change event for table inventory.orders whose schema isn't known to this connector` when a table is added to a connector that stores only the captured tables' DDL. The runbook has the documented fix and the topic settings that prevent both errors: one partition and no retention limit.
+
+## 14. Connector is RUNNING but captures nothing {/* #running-captures-nothing */}
+
+A connector and its task can both report `RUNNING` while no events arrive. A [Confluent forum thread from August 2024](https://forum.confluent.io/t/troubleshooting-debezium-connector-intermittent-failures/11300) describes it on Debezium 2.5.0 with Aurora MySQL, and a second user reported the same symptoms on Debezium 1.8 with Kafka 2.7 in November 2024.
+
+The thread's restart call, `POST /connectors/<name>/restart` with no parameters, restarts the connector and leaves its tasks alone. In a lab on Kafka Connect 3.2.0 and 4.3.1 it answered with HTTP (Hypertext Transfer Protocol) status 204 and the task was not started again, while `POST /connectors/<name>/tasks/<id>/restart` restarts a task on every version ([runbook](/docs/runbooks/kafka-connect/task-failed-will-not-recover/#fix-1-restart-when-the-cause-is-gone)).
+
+The [captures nothing runbook](/docs/runbooks/debezium/connector-running-captures-nothing/) reproduces five causes on MySQL and PostgreSQL, each with the command that proves it:
+
+- an include list that matches no table, logged at start-up as `After applying the include/exclude list filters, no changes will be captured. Please check your configuration!`;
+- a snapshot mode that reads no existing rows, `no_data` (`schema_only` or `never` before 2.6);
+- topics that are never created, with `UNKNOWN_TOPIC_OR_PARTITION` warnings in the log;
+- a PostgreSQL publication that lacks the table, which logs nothing;
+- a connector with no task, such as the MySQL connector with `tasks.max=2`, which logged `java.lang.IllegalArgumentException: Only a single connector task may be started`.
+
+Correcting the configuration does not replay what was skipped. On MySQL, the rows from before the fix arrived only after the offsets were removed and a new snapshot ran. Old filter names such as `table.whitelist` were ignored without a log line by Debezium 3.7.1, so the connector captured every table.
+
+## 15. PostgreSQL replication slot is filling the disk {/* #replication-slot */}
+
+A logical replication slot keeps all WAL after its `restart_lsn` until its consumer confirms, whether or not anything is connected. In the [runbook's lab](/docs/runbooks/postgres/replication-slot-filling-disk/), a slot that nobody read held 257 MB while `max_wal_size` was 64 MB, and on a 256 MB disk PostgreSQL 18.7 stopped with `PANIC:  could not write to file "pg_wal/xlogtemp.334": No space left on device`.
+
+Find the slot that holds the space, then get its consumer reading again or drop the slot:
+
+```sql
+SELECT slot_name, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+```
+
+A slot in use cannot be dropped and answers `ERROR:  replication slot "cdc_slot" is active for PID 3314`. Stop the consumer first, then run `SELECT pg_drop_replication_slot('cdc_slot');`.
+
+For Debezium, the PostgreSQL documentation describes a quiet captured database next to a busy one: "As WAL is shared by all databases, the amount used tends to grow until an event is emitted by the database for which Debezium is capturing changes" ([WAL disk space consumption](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-wal-disk-space)). The fix is a heartbeat: `heartbeat.interval.ms`, which defaults to `0`, with `heartbeat.action.query` writing to a table in the connector's publication. Debezium 3.4 added `lsn.flush.mode` ([3.4 release notes](https://debezium.io/releases/3.4/release-notes)), whose `connector_and_driver` value is meant "to prevent WAL growth on low-activity databases where monitored tables have infrequent changes" ([`lsn.flush.mode`](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-lsn-flush-mode)).
+
+`max_slot_wal_keep_size` (PostgreSQL 13 and later) caps what a slot may hold, at the price of the slot. Once it is invalidated, a streaming reader gets `cannot read from logical replication slot "cdc_slot"` on 13 to 15, `can no longer get changes from replication slot "cdc_slot"` on 16 and 17, or `can no longer access replication slot "cdc_slot"` on 18, and has to start over from a new snapshot.
+
+:::note[How OLake Go handles this]
+
+OLake Go reads the same kind of slot, so it has the same limit. Its PostgreSQL connector uses a `pgoutput` slot that "retains WAL segments until read", and its documentation warns against sharing one slot or publication between jobs ([PostgreSQL connector](/docs/connectors/postgres/#configuration)).
+
+:::
+
+## 16. MySQL binlog purged: error 1236 {/* #binlog-1236 */}
+
+MySQL removes binary log files when they expire or on `PURGE BINARY LOGS`, without checking whether a stopped reader still needs them. A Debezium connector whose position is gone reports it differently by version ([runbook](/docs/runbooks/mysql/binlog-retention-error-1236/)):
+
+| Debezium | What the task does and says |
+| --- | --- |
+| 1.9 to 2.5 | `FAILED` at start: `The connector is trying to read binlog starting at ..., but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed.` |
+| 2.6 to 3.1 | Stays `RUNNING` and retries: `Could not find first log file name in binary log index file Error code: 1236; SQLSTATE: HY000.` |
+| 3.2 and later | `FAILED` at start: `The connector is trying to read change stream starting at ..., but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.` |
+
+A MySQL replica in the same position reports `Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file'` on 8.0.33 and later, `from master` on older versions, and its `Last_IO_Errno` was 13114 on 8.0.46 and 8.4.13.
+
+The fix that worked on Debezium 1.9.7, 3.0.8 and 3.7.1 was `snapshot.mode=when_needed`: every row arrived again, and a delete made during the outage was lost. To prevent it, keep binary logs longer than the longest stop you plan for, with `binlog_expire_logs_seconds` on MySQL 8.0 and 8.4 (default 2592000, which is 30 days) or `expire_logs_days` on 5.7, and set `heartbeat.interval.ms` so a quiet connector's stored position keeps moving.
+
+:::note[How OLake Go handles this]
+
+OLake Go reads the same binary log and has the same limit. Its connection check includes an optional `binlog_retention` test with a recommended value of 7 days or more, and explains: "If a sync is paused longer than the retention window, the logs it needs are purged and a full resync is required" ([MySQL connector](/docs/connectors/mysql/#3-check-source-connection)).
+
+:::
+
+## 17. PostgreSQL logical replication prerequisites {/* #logical-replication */}
+
+Debezium's PostgreSQL connector reads through logical decoding, and each missing prerequisite has its own error. The [runbook](/docs/runbooks/postgres/enable-logical-replication/) captured them on PostgreSQL 12 to 18 and the 19 release candidate:
+
+| Missing | Message |
+| --- | --- |
+| `wal_level = logical` | `logical decoding requires wal_level >= logical` (12 to 16), `logical decoding requires "wal_level" >= "logical"` (17, 18). Changing it needs a restart |
+| The `REPLICATION` attribute | `must be superuser or replication role to use replication slots` (12 to 15), `permission denied to use replication slots` (16 and later) |
+| A free slot | `all replication slots are in use` |
+| The publication | `publication "cdc_publication" does not exist` (12 to 17); 18 logs `skipped loading publication "cdc_publication"` instead |
+| A replica identity | `cannot update table "events_nopk" because it does not have a replica identity and publishes updates`, raised in the application and not in Debezium |
+
+The output plug-in is the one Debezium users meet by default: `plugin.name` defaults to `decoderbufs`, a separate package, while `pgoutput` ships with PostgreSQL 10 and later and needed nothing installed in the lab. On the minor releases of 13 August 2026 and later, a third-party plug-in also has to be listed in `output_plugin_libraries`, or the server answers `library "wal2json" may not be used as an output plugin` ([runbook, step 5](/docs/runbooks/postgres/enable-logical-replication/#5-choose-an-output-plugin)).
+
+## 18. SQL Server change tables stay empty {/* #sql-server-cdc */}
+
+Debezium's SQL Server connector reads the change tables that SQL Server's capture job fills, and that job runs under SQL Server Agent. With the Agent stopped, `sys.sp_cdc_enable_db` and `sys.sp_cdc_enable_table` still succeed, and the only hint is `SQLServerAgent is not currently running so it cannot be notified of this action.` ([runbook](/docs/runbooks/sql-server/enable-cdc-change-tables-empty/)).
+
+Debezium logs `No maximum LSN recorded in the database; SQL Server Agent is not running` from 2.0, and `No maximum LSN recorded in the database; please ensure that the SQL Server Agent is running` in 1.9. A new column needs a second capture instance, and a table can have two at most.
+
+Connections use Secure Sockets Layer (SSL) encryption by default: "By default, JDBC connections to Microsoft SQL Server use SSL encryption". Setting `driver.encrypt` to `false` turns that off for a server without SSL ([encrypting connections](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html#_encrypting_connections)).
+
+## 19. Miscellaneous {/* #misc */}
+
+### One task per connector
+
+The MySQL and PostgreSQL connectors run a single task. The [MySQL documentation](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-tasks-max) says "Because the MySQL connector always uses a single task, changing the default value has no effect", yet in a lab `tasks.max=2` left the MySQL connector with no task at all ([runbook](/docs/runbooks/debezium/connector-running-captures-nothing/#tasksmax-above-1-on-the-mysql-connector)). The SQL Server connector is the exception: with several databases in `database.names`, `tasks.max` can go up to their number ([SQL Server](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html#sqlserver-property-tasks-max)).
+
+### Active Directory and Microsoft Entra sign-in
+
+The SQL Server connector documents directory sign-in through the Microsoft JDBC driver. `driver.authentication` takes values such as `ActiveDirectoryManagedIdentity`, with the note "Use this property to configure Microsoft Entra authentication when connecting to Azure SQL Database", and Kerberos is set up through pass-through properties ([`driver.authentication`](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html#sqlserver-property-driver-authentication)).
+
+### Table names with dots in snapshot signals
+
+In an incremental snapshot signal, a table name that contains a dot, a space or another non-alphanumeric character has to be quoted. The MySQL documentation's example for a table `My.Table` in the `db1` database is `"db1.\"My.Table\""` ([triggering an incremental snapshot](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-triggering-an-incremental-snapshot)).
+
+### Unbalanced load across tables
+
+PostgreSQL hands committed transactions to the connector one at a time: "Concurrent transactions are decoded in commit order" ([output plug-in callbacks](https://www.postgresql.org/docs/current/logicaldecoding-output-plugin.html#LOGICALDECODING-OUTPUT-PLUGIN-CALLBACKS)). A large transaction on one table therefore delays changes to every table committed after it. Splitting tables across connectors gives each connector its own order, since "each connector requires a unique replication slot and publication" ([multiple connectors](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-deploying-multiple-connectors)).
+
+## Debezium tracker issues cited on this page {/* #tracker */}
+
+| Issue | Title in the tracker | Reported in | Fixed in |
+| --- | --- | --- | --- |
+| [DBZ-3473](https://redhat.atlassian.net/browse/DBZ-3473) | Incremental snapshotting | | 1.6.0.Alpha1 |
+| [DBZ-3647](https://redhat.atlassian.net/browse/DBZ-3647) | Debezium JDBC Sink Connector | | 2.2.0.Beta1 |
+| [DBZ-3925](https://redhat.atlassian.net/browse/DBZ-3925) | Mysql connector fails to parse statement FLUSH FIREWALL_RULES | 1.6.1.Final, 2.3.0.Final | 2.4.0.Alpha1 |
+| [DBZ-4156](https://redhat.atlassian.net/browse/DBZ-4156) | Remove wal2json support | | 2.0.0.Alpha1 |
+| [DBZ-5244](https://redhat.atlassian.net/browse/DBZ-5244) | Reverse the logic of handling retriable errors - retry by default | | 2.0.0.Beta2 |
+| [DBZ-6573](https://redhat.atlassian.net/browse/DBZ-6573) | Refactor errors.max.retries to common connector framework | | 2.3.1.Final, 2.4.0.Alpha1 |
+| [DBZ-9177](https://redhat.atlassian.net/browse/DBZ-9177) | Add EOS support into main Debezium connectors | 3.2.0.Beta2 | 3.3.0.Alpha1 |
+
+Sources: the Debezium issue tracker (checked Nov 2026). From Debezium 3.5, the DDL parser's own message points to the GitHub tracker at [debezium/dbz](https://github.com/debezium/dbz/issues), which is the place to search for errors on recent versions.
+
+## How Debezium compares with other tools {/* #comparison */}
+
+<details>
+<summary>Debezium on Kafka Connect, Debezium Server and OLake Go side by side</summary>
+
+| | Debezium on Kafka Connect | Debezium Server | OLake Go |
+| --- | --- | --- | --- |
+| Where changes go | Kafka topics, then a sink connector or a consumer | Amazon Kinesis, Google Cloud Pub/Sub, Apache Pulsar and other targets, including the community Iceberg sink | Iceberg tables or Parquet files |
+| What you run | Kafka brokers and KRaft controllers, plus Kafka Connect workers | A standalone application on Quarkus | One Docker image per source, or the OLake UI |
+| Where the position is kept | The Kafka Connect offsets topic, plus a schema history topic for MySQL | Offset and schema history storage configured in Debezium Server | State saved during each sync, which the next sync resumes from |
+
+Sources: [Debezium architecture](https://debezium.io/documentation/reference/3.7/architecture.html), [Debezium Server](https://debezium.io/documentation/reference/3.7/operations/debezium-server.html), the [schema history runbook](/docs/runbooks/debezium/schema-history-topic-missing/), OLake Go's [destination configuration](/docs/core/configs/writer/), [MySQL connector troubleshooting](/docs/connectors/mysql/#troubleshooting) and [PostgreSQL connector](/docs/connectors/postgres/) (checked Nov 2026).
+
+Debezium on Kafka Connect fits when several applications read the same change events from Kafka topics, which OLake Go does not produce: its destinations are Iceberg and Parquet. OLake Go fits when the target is an Iceberg table and Kafka is not otherwise needed.
+
+For wider comparisons, see [Top 5 Debezium Alternatives of 2026](/blog/debezium-alternatives/) and [OLake Go vs Debezium + Kafka](/blog/debezium-vs-olake/).
+
+</details>
 
 ## FAQs
 
 <Faq showHeading={false} data={[
   {
-    question: "Q1. What makes setting up Debezium with Kafka so complex compared to other CDC tools?",
+    question: 'Q1. What does "An exception occurred in the change event producer" mean in Debezium?',
     answer: <div>
-      <p>Debezium with Kafka requires installing and configuring multiple interdependent components: Kafka brokers, ZooKeeper (deprecated since Kafka 3.5 and fully removed in Kafka 4.0; KRaft is now the only supported metadata mode), Kafka Connect workers, Debezium source connectors, and sink connectors. Each component needs version-compatible configuration, separate scaling strategies, and monitoring.</p>
-      <p>Implementing custom transformations requires writing Java classes (Java 17 or later) and deploying them to the Kafka Connect classpath. This complexity demands deep expertise in distributed systems before a single CDC event is captured.</p>
+      <p>It is a wrapper. Debezium reads the database log on its own thread, and when that thread fails, Kafka Connect receives this exception with the real error attached. Read the failed task's <code>trace</code> from the status call, for example <code>curl -s localhost:8083/connectors/my-connector/status</code>, and look at the last <code>Caused by:</code> line.</p>
+      <p>Debezium 0.9 and 0.10 spell the line <code>ocurred</code>. From 1.1, errors that Debezium treats as retriable end with <code>This connector will be restarted.</code> instead, and <code>errors.max.retries</code> caps those retries on every connector from 2.3.1 (from 2.2 on SQL Server). In a lab on Debezium 3.0.8 the task stayed <code>RUNNING</code> while it retried, so an alert on failed tasks did not fire.</p>
     </div>
   },
   {
-    question: "Q2. How does Debezium handle schema changes in source databases?",
+    question: "Q2. What makes setting up Debezium with Kafka so complex compared to other CDC tools?",
     answer: <div>
-      <p>Debezium handles simple schema changes automatically: it tracks schema history in a dedicated Kafka topic and embeds schema information in each event, keeping events self-contained. However, complex schema changes require careful configuration and often manual intervention:</p>
-      <ul>
-        <li><strong>Column type changes</strong> can cause compatibility issues between Debezium's captured schema and the target system's schema, often requiring custom Single Message Transforms (SMTs)</li>
-        <li><strong>Primary key changes</strong> (add, remove, rename) can cause brief periods of desynchronization. The recommended approach is to make primary key changes when the system is in read-only mode, allow all events to be processed, stop Debezium, apply the changes, then restart</li>
-        <li><strong>Connector configuration updates</strong> may be required after schema changes, and in some cases connectors must be paused and restarted</li>
-      </ul>
+      <p>A Debezium pipeline on Kafka has four parts to install, version and monitor: Kafka brokers, Kafka Connect workers, the Debezium plug-ins on those workers, and sink connectors. Current Kafka runs in KRaft mode without ZooKeeper, which Kafka 3.5 deprecated and Kafka 4.0 removed.</p>
+      <p>Debezium 3.7 is tested with Java 17 or later for connectors and Kafka Connect 3.1 or later. Each plug-in, including a custom single message transform, has to sit in its own folder under <code>plugin.path</code> on every worker, or Kafka Connect answers <code>Failed to find any class that implements Connector</code>.</p>
     </div>
   },
   {
-    question: "Q3. What are the performance limitations of Debezium plus Kafka for large table snapshots?",
+    question: "Q3. How does Debezium handle schema changes in source databases?",
     answer: <div>
-      <p>Debezium's initial snapshotting is single-threaded by default for some connectors, but <code>snapshot.max.threads</code> can be configured to enable parallel snapshotting. Additionally, Debezium's <strong>incremental snapshot mode</strong> (available since version 1.6) allows snapshotting to run concurrently with CDC streaming without blocking ongoing change capture, and is resumable after connector restarts.</p>
-      <p>During snapshotting in some configurations (such as MySQL), the source table may be locked or unavailable for writes for the duration of the snapshot lock. For very large tables this window can be significant.</p>
-      <p>Additionally, very large Kafka topics from high-volume CDC streams can become expensive to manage in terms of storage retention and consumer lag monitoring.</p>
+      <p>It depends on the database. The MySQL connector reads DDL from the binary log and keeps it in a schema history topic, and losing that topic gives <code>The db history topic is missing</code>. The PostgreSQL connector gets no DDL from logical decoding, so a new column appears with the next insert, update or delete on the table.</p>
+      <p>A change to a primary key definition on PostgreSQL has a documented procedure: put the database or application into read-only mode, let Debezium process all remaining events, stop Debezium, change the key, return to read/write mode and restart Debezium. On SQL Server a new column needs a second capture instance, and a MySQL statement the parser cannot read stops the connector with <code>DDL statement couldn't be parsed</code>.</p>
     </div>
   },
   {
-    question: "Q4. Why might a data team choose an alternative to Debezium plus Kafka for CDC?",
+    question: "Q4. What are the performance limitations of Debezium plus Kafka for large table snapshots?",
     answer: <div>
-      <p>Teams choose alternatives when the operational overhead outweighs the benefits: maintaining Kafka infrastructure, managing connector versions, debugging complex SMT transformations, and handling schema drift all require dedicated engineering effort.</p>
-      <p>Organizations wanting a simpler, lower-maintenance CDC solution that handles the full pipeline from source to data lakehouse without Kafka expertise or infrastructure often migrate to purpose-built tools like OLake Go. For scenarios where a full Kafka cluster is not warranted, Debezium Server is also available as a lightweight standalone alternative.</p>
+      <p>By default the initial snapshot uses one thread, because <code>snapshot.max.threads</code> defaults to 1, and an interrupted initial snapshot starts over. Up to Debezium 3.4 a higher value reads several tables at once, one table per thread; from 3.5 it also splits each table with a primary key into chunks, a feature the documentation calls incubating.</p>
+      <p>Incremental snapshots, available since 1.6, read tables in chunks of 1024 rows by default while streaming continues, and resume where they stopped. On MySQL the default <code>snapshot.locking.mode=minimal</code> holds the global read lock only while it reads schemas, while <code>extended</code> blocks writes for the whole snapshot; the PostgreSQL connector takes no locks by default.</p>
     </div>
   },
   {
     question: "Q5. How does Debezium handle data deduplication when consumers restart or fail?",
     answer: <div>
-      <p>Debezium uses <strong>Kafka Connect's internal offset storage</strong> to track its position in the source database log (oplog position or LSN), not Kafka consumer group offsets, which are managed by downstream sink connectors or application consumers.</p>
-      <p>After a failure, the connector resumes from the last committed offset position in the source log.</p>
-      <p><strong>Exactly-once semantics:</strong> As of Debezium 3.3, exactly-once delivery is natively supported for all core connectors (MariaDB, MongoDB, MySQL, Oracle, PostgreSQL, and SQL Server), built on top of Kafka's transaction support. This means events are delivered and written to a Kafka topic exactly once without duplicates, and manual configuration of idempotent producers and transactional consumers is no longer required for supported versions.</p>
-      <p>For deployments on older Debezium versions, at-least-once delivery is the default, meaning duplicate events can appear downstream and require deduplication logic in the sink or transformation layer.</p>
+      <p>Debezium records its position in the Kafka Connect offsets, not in consumer group offsets, and after a crash it resumes from the last recorded position, so consumers can see some events twice. Its default guarantee is at least once.</p>
+      <p>Exactly-once delivery is available from Debezium 3.3 for the MariaDB, MongoDB, MySQL, Oracle, PostgreSQL and SQL Server connectors on Kafka Connect 3.3 or later in distributed mode, with <code>exactly.once.source.support=enabled</code> on the workers and <code>exactly.once.support=required</code> on the connector. Consumers must read with <code>isolation.level=read_committed</code>, and a new snapshot still sends every row again, so consumers should treat a repeated key as an update.</p>
+    </div>
+  },
+  {
+    question: "Q6. What is __debezium_unavailable_value?",
+    answer: <div>
+      <p>It is the placeholder the PostgreSQL connector writes for a large TOAST column that an update did not change, because PostgreSQL does not send that value unless it is part of the replica identity. It comes from <code>unavailable.value.placeholder</code>, called <code>toasted.value.placeholder</code> before 2.0.</p>
+      <p>The fixes are <code>REPLICA IDENTITY FULL</code> on the table, which the PostgreSQL manual calls a fallback, the reselect columns post processor from Debezium 2.5, which reads the current value from the source, or keeping the previous value in the consumer.</p>
+    </div>
+  },
+  {
+    question: "Q7. Why might a data team choose an alternative to Debezium plus Kafka for CDC?",
+    answer: <div>
+      <p>An alternative makes sense when running Kafka and Kafka Connect is more than the pipeline needs, for example when the changes go to a single destination. Debezium itself offers two ways without Kafka: Debezium Server, which sends events to systems such as Amazon Kinesis, Google Cloud Pub/Sub or Apache Pulsar, and the Debezium Engine, which runs inside a Java application.</p>
+      <p>For loading changes into Apache Iceberg, OLake Go, which is built by the team that publishes this page, replicates database changes into Iceberg tables with its own writer. The <a href={"/blog/debezium-alternatives/"}>Debezium alternatives</a> post compares more options.</p>
     </div>
   },
 ]} />
