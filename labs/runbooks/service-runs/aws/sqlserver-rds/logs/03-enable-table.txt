@@ -1,0 +1,70 @@
+=== 2026-11-23 09:17:15 UTC 02-enable-table.sql (database master, login rbadmin)
+-- One capture instance per table. With no @capture_instance the name is <schema>_<table>.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'orders',
+  @role_name = NULL, @supports_net_changes = 1;
+Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.
+Job 'cdc.cdclab_capture' started successfully.
+Job 'cdc.cdclab_cleanup' started successfully.
+
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'customers',
+  @role_name = NULL, @supports_net_changes = 1;
+Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.
+
+-- A table with no primary key: net changes need a key (the runbook's Msg 22939).
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'audit_notes',
+  @role_name = NULL, @supports_net_changes = 1;
+Msg 22939, Level 16, State 1, Server <host>, Procedure sys.sp_cdc_enable_table_internal, Line 266
+The parameter @supports_net_changes is set to 1, but the source table does not have a primary key defined and no alternate unique index has been specified.
+
+-- All changes do not.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'audit_notes',
+  @role_name = NULL, @supports_net_changes = 0;
+
+SELECT s.name + N'.' + t.name AS table_name, t.is_tracked_by_cdc
+FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = N'dbo' AND t.is_ms_shipped = 0 ORDER BY t.name;
+table_name|is_tracked_by_cdc
+----------|-----------------
+dbo.audit_notes|1
+dbo.customers|1
+dbo.orders|1
+dbo.reader_position|0
+
+(4 rows affected)
+
+SELECT capture_instance,
+       OBJECT_SCHEMA_NAME(source_object_id) + N'.' + OBJECT_NAME(source_object_id) AS source_table,
+       supports_net_changes, start_lsn
+FROM cdc.change_tables ORDER BY capture_instance;
+capture_instance|source_table|supports_net_changes|start_lsn
+----------------|------------|--------------------|---------
+dbo_audit_notes|dbo.audit_notes|0|0x0000002800000EB90047
+dbo_customers|dbo.customers|1|0x000000280000047E0046
+dbo_orders|dbo.orders|1|0x0000002700000B730046
+
+(3 rows affected)
+
+-- The job defaults, against the table in the runbook.
+EXEC sys.sp_cdc_help_jobs;
+job_id|job_type|job_name|maxtrans|maxscans|continuous|pollinginterval|retention|threshold
+------|--------|--------|--------|--------|----------|---------------|---------|---------
+186B8F1F-ECE2-4464-AC68-93271E185B73|capture|cdc.cdclab_capture|500|10|1|5|0|0
+FE16E402-B7C4-4EF5-9C6C-E2B879355526|cleanup|cdc.cdclab_cleanup|0|0|0|0|4320|5000
+
+SELECT job_type, maxtrans, maxscans, continuous, pollinginterval, retention, threshold
+FROM msdb.dbo.cdc_jobs WHERE database_id = DB_ID() ORDER BY job_type;
+Msg 229, Level 14, State 5, Server <host>, Line 1
+The SELECT permission was denied on the object 'cdc_jobs', database 'msdb', schema 'dbo'.
+
+SELECT name AS agent_job, enabled FROM msdb.dbo.sysjobs WHERE name LIKE N'cdc.cdclab%' ORDER BY name;
+agent_job|enabled
+---------|-------
+cdc.cdclab_capture|1
+cdc.cdclab_cleanup|1
+
+(2 rows affected)
+

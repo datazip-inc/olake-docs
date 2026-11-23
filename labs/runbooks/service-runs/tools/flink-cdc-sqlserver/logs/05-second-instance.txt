@@ -1,0 +1,46 @@
+
+## a second capture instance, which has the new column
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'orders', @role_name = NULL, @capture_instance = N'dbo_orders_v2';
+Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.
+
+SELECT capture_instance, start_lsn, create_date FROM cdc.change_tables ORDER BY create_date;
+capture_instance|start_lsn|create_date
+----------------|---------|-----------
+dbo_orders|0x0000002A00000B900047|2026-11-23 09:58:21.897
+dbo_orders_v2|0x0000002B00000B400049|2026-11-23 09:59:43.690
+
+SELECT ct.capture_instance, cc.column_name FROM cdc.captured_columns cc JOIN cdc.change_tables ct ON ct.object_id = cc.object_id ORDER BY ct.capture_instance, cc.column_ordinal;
+capture_instance|column_name
+----------------|-----------
+dbo_orders|id
+dbo_orders|customer_id
+dbo_orders|quantity
+dbo_orders|placed_at
+dbo_orders_v2|id
+dbo_orders_v2|customer_id
+dbo_orders_v2|quantity
+dbo_orders_v2|placed_at
+dbo_orders_v2|note
+
+
+## one insert with a value in the new column, job 2 still running
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (1, 9, N'fourth note');
+
+job2> +I[9, 1, 9, 2026-11-23T09:59:55, fourth note]
+
+## a second insert one minute later
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (2, 10, N'fifth note');
+
+job2> +I[10, 2, 10, 2026-11-23T10:00:59, fifth note]
+state: RUNNING, restarts 0
+
+## log lines of the TaskManager about the capture instances
+   1 INFO  io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource [] - Schema will be changed for Capture instance "dbo_orders_v2" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_v2_CT, startLsn=0000002b:00000b40:0049, changeTableObjectId=1397580017, stopLsn=NULL]
+   1 INFO  io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource [] - Multiple capture instances present for the same table: Capture instance "dbo_orders" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_CT, startLsn=0000002a:00000b90:0047, changeTableObjectId=1301579675, stopLsn=0000002b:00000b40:0049] and Capture instance "dbo_orders_v2" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_v2_CT, startLsn=0000002b:00000b40:0049, changeTableObjectId=1397580017, stopLsn=NULL]
+   1 INFO  io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource [] - Migrating schema to Capture instance "dbo_orders_v2" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_v2_CT, startLsn=0000002b:00000b40:0049, changeTableObjectId=1397580017, stopLsn=NULL]
+SELECT __$operation AS op, id, quantity, note FROM cdc.dbo_orders_v2_CT ORDER BY __$start_lsn, __$seqval, __$operation;
+op|id|quantity|note
+--|--|--------|----
+2|9|9|fourth note
+2|10|10|fifth note
+

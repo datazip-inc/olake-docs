@@ -1,0 +1,69 @@
+# ./run.sh disk-capped    PostgreSQL 19rc2    2026-11-16T18:54:28Z
+
+## The same disk and the same writes, with a cap on what a slot may hold.
+SHOW max_slot_wal_keep_size;
+ max_slot_wal_keep_size 
+------------------------
+ -1
+(1 row)
+
+ALTER SYSTEM SET max_slot_wal_keep_size = '64MB';
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/0C0073D8
+(1 row)
+
+$ df -h /disk
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           256M  112M  144M  44% /disk
+
+## Eight rounds of 24 MB: more than the free space on the disk.
+round 1: CALL write_wal(24); -> CALL 
+  disk used/free: 114M 143M   pg_wal: 64M
+round 2: CALL write_wal(24); -> CALL 
+  disk used/free: 103M 154M   pg_wal: 64M
+round 3: CALL write_wal(24); -> CALL 
+  disk used/free: 124M 133M   pg_wal: 80M
+round 4: CALL write_wal(24); -> CALL 
+  disk used/free: 113M 144M   pg_wal: 64M
+round 5: CALL write_wal(24); -> CALL 
+  disk used/free: 118M 139M   pg_wal: 64M
+round 6: CALL write_wal(24); -> CALL 
+  disk used/free: 106M 151M   pg_wal: 64M
+round 7: CALL write_wal(24); -> CALL 
+  disk used/free: 111M 146M   pg_wal: 64M
+round 8: CALL write_wal(24); -> CALL 
+  disk used/free: 116M 141M   pg_wal: 64M
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | f      |            |             | 0/0C0073D8          |              | lost       |               | wal_removed
+(1 row)
+
+--- server log
+2026-11-16 18:54:31.919 UTC [562] LOG:  invalidating obsolete replication slot "cdc_slot"
+2026-11-16 18:54:31.919 UTC [562] DETAIL:  The slot's restart_lsn 0/0C0073A0 exceeds the limit by 16747616 bytes.
+2026-11-16 18:54:31.919 UTC [562] HINT:  You might need to increase "max_slot_wal_keep_size".
+---
+$ pg_isready -h 127.0.0.1
+127.0.0.1:5432 - accepting connections
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  can no longer access replication slot "cdc_slot"
+DETAIL:  This replication slot has been invalidated due to "wal_removed".
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+

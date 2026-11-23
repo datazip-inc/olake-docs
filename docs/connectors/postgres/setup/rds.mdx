@@ -1,7 +1,7 @@
 ---
-title: "OLake PostgreSQL RDS Setup | CDC with wal2json Plugin Guide"
+title: "OLake PostgreSQL RDS Setup | CDC with pgoutput Plugin Guide"
 seo_title: "AWS RDS PostgreSQL CDC Setup for OLake"
-description: Set up OLake CDC on AWS RDS PostgreSQL using wal2json. Enable logical replication, create replication slots, and troubleshoot common RDS CDC issues.
+description: Set up OLake CDC on AWS RDS PostgreSQL using pgoutput. Enable logical replication, create replication slots, and troubleshoot common RDS CDC issues.
 sidebar_label: 2. AWS RDS Postgres
 sidebar_position: 2
 ---
@@ -15,7 +15,6 @@ This guide walks you through setting up Change Data Capture (CDC) for Amazon RDS
 - An Amazon RDS for PostgreSQL instance (PostgreSQL 10+).
 - A custom **DB parameter group** for this instance (the default parameter group cannot be modified).
 - The RDS master user or another user with the `rds_superuser` and `rds_replication` roles.
-- Automated backups enabled (backup retention > 0) – this is needed for long-term WAL retention on RDS 
 
 **Steps:**
 
@@ -30,12 +29,13 @@ In the AWS RDS console, go to `Parameter Groups` and create a new parameter grou
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
 | `rds.logical_replication` | `1` | Enables logical replication (required for pgoutput) |
-| `wal_level` | `logical` | Usually set automatically by above |
-| `max_replication_slots` | `≥5` | Number of concurrent CDC connections |
-| `max_wal_senders` | `≥7` | Should exceed replication slots |
+| `max_replication_slots` | `≥5` | Number of concurrent CDC connections. The RDS default is 20 |
+| `max_wal_senders` | `≥7` | Should exceed replication slots. The RDS default is 20 on PostgreSQL 13 to 15 and 35 on 16 to 18 |
 | `wal_sender_timeout` | `0` | Prevents snapshot timeouts |
 
 Save the parameter group changes.
+
+`wal_level` is not a parameter of the group. RDS sets it to `logical` when `rds.logical_replication` is `1`.
 
 ![postgres-rds-pg-2](/img/docs/cdc/postgres/postgres-rds-pg-2.webp)
 
@@ -224,7 +224,7 @@ FROM pg_logical_slot_peek_binary_changes(
 
 ✅ **Success**: Returns binary change records from pgoutput
 
-❌ **Permission denied**: Check user has REPLICATION role
+❌ **Permission denied**: Check that the user has the `rds_replication` role
 
 ❌ **Publication not found**: Verify publication exists and contains tables
 
@@ -248,11 +248,11 @@ FROM pg_logical_slot_peek_binary_changes(
 - **Access Issues:** If the OLake reports `ERROR: permission denied for relation/sequence ...` or *"permission denied for schema"* during snapshot or streaming, the replication user might lack SELECT privileges on those tables/schemas. Logical decoding itself does not check table ACLs for emitting changes. Grant the necessary privileges or use the master user for the initial snapshot. Also, ensure the user has the `rds_replication` role to use the slot.
 
 - **Slot or Plugin Errors:** 
-  - If creating a slot yields `ERROR: permission denied to create replication slot`, use the master user or a user with `rds_superuser` role to create it.
-  - If you see `ERROR: logical decoding requires wal_level "logical"`, it means wal_level is not logical – double-check the parameter group (maybe the DB is still running with the old param group).
-  - If the error is about `pgoutput` not found, ensure PostgreSQL is version 10+ and `rds.logical_replication` is enabled.
+  - If creating a slot yields `ERROR: permission denied to use replication slots` (the wording of PostgreSQL 17), with a detail line that names the `rds_replication` role, grant `rds_replication` to the user or use the master user.
+  - If you see `ERROR: logical decoding requires "wal_level" >= "logical"` (PostgreSQL 16 and earlier print it without the quotes), it means wal_level is not logical – double-check the parameter group (maybe the DB is still running with the old param group).
+  - If you see `ERROR: replication slots can only be used if "max_replication_slots" > 0`, automated backups are off and `rds.logical_replication` is not `1`. Setting `rds.logical_replication = 1` and rebooting is enough: backups do not have to be on.
 
-- **WAL buildup / Disk-Full:** Similar to Aurora, an inactive logical slot on RDS will prevent WAL files from being purged. Monitor the **WAL storage** on RDS (CloudWatch metric "TransactionLogsDiskUsage"). If your CDC connector falls behind or is stopped for a while, the disk usage can grow. In extreme cases, you might get RDS events complaining that “The transaction logs have consumed XX% of storage”. To fix, either restart the CDC process to consume the backlog or drop the slot if you no longer need it. For example:
+- **WAL buildup / Disk-Full:** Similar to Aurora, an inactive logical slot on RDS will prevent WAL files from being purged. Monitor the **WAL storage** on RDS (CloudWatch metric "TransactionLogsDiskUsage"). If your CDC connector falls behind or is stopped for a while, the disk usage can grow. Do not rely on an RDS event to warn you: when a test instance filled its volume this way, RDS wrote no event and still reported the status `available` while connections were refused. Alert on the CloudWatch metric "FreeStorageSpace" as well. To fix, either restart the CDC process to consume the backlog or drop the slot if you no longer need it. For example:
   ```sql
   SELECT pg_drop_replication_slot('cdc_slot');
   ```

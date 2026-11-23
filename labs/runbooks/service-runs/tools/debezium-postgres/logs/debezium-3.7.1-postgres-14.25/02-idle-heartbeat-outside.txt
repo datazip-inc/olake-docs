@@ -1,0 +1,92 @@
+
+## defaults: no heartbeat
+  plugin.name=pgoutput, publication.autocreate.mode=disabled, database.dbname=quietdb, topic.prefix=quiet, slot.name=dbz_quiet, publication.name=quiet_pub, table.include.list=public.customers
+$ PUT /connectors/quiet/config  ->  HTTP 201
+08:19:02  quiet: connector=RUNNING tasks=[RUNNING]
+08:19:07  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 96 bytes, sender streaming (flush_lsn , reply 08:19:01), pg_wal 16 MB
+$ CALL write_wal(128, false);   -- in appdb
+60 s with no change in quietdb, one line every 20 s:
+08:19:08  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 129 MB, sender streaming (flush_lsn , reply 08:19:01), pg_wal 144 MB
+08:19:29  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 129 MB, sender streaming (flush_lsn , reply 08:19:21), pg_wal 144 MB
+08:19:49  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 129 MB, sender streaming (flush_lsn , reply 08:19:41), pg_wal 144 MB
+08:20:09  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 129 MB, sender streaming (flush_lsn , reply 08:20:01), pg_wal 144 MB
+three more checkpoints, 12 s apart, each after 1.6 MB written to appdb:
+08:20:10  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 131 MB, sender streaming (flush_lsn , reply 08:20:01), pg_wal 160 MB
+08:20:23  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 133 MB, sender streaming (flush_lsn , reply 08:20:21), pg_wal 160 MB
+08:20:35  active t, confirmed_flush_lsn 0/1984808, restart_lsn 0/19847D0, retained 135 MB, sender streaming (flush_lsn , reply 08:20:31), pg_wal 160 MB
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------
+ dbz_quiet | logical   | quietdb  | t      |        213 | 0/19847D0   | 0/1984808           | 135 MB       | extended   | 
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+        10 | 160 MB
+(1 row)
+
+SELECT id, to_char(ts AT TIME ZONE 'UTC', 'HH24:MI:SS') AS heartbeat_written_utc, to_char(now() AT TIME ZONE 'UTC', 'HH24:MI:SS') AS now_utc FROM heartbeat;
+ id | heartbeat_written_utc | now_utc  
+----+-----------------------+----------
+  1 | 08:18:40              | 08:20:48
+(1 row)
+
+08:20:49  topic quiet.public.customers holds 2 events
+08:20:50  topic __debezium-heartbeat.quiet does not exist
+08:20:50  GET /connectors/quiet/offsets: {"offsets":[{"partition":{"server":"quiet"},"offset":{"last_snapshot_record":true,"lsn":26757128,"txId":748,"ts_usec":1795421941202327,"snapshot":"INITIAL","snapshot_completed":true}}]}
+--- Kafka Connect log
+2026-11-23T08:19:00,904 INFO   ||  Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:19:01,104 INFO   ||lifecycle  Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:19:01,106 INFO   Postgres||lifecycle  Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+---
+
+## heartbeat.interval.ms and heartbeat.action.query, the heartbeat table not in the publication
+  plugin.name=pgoutput, publication.autocreate.mode=disabled, database.dbname=quietdb, topic.prefix=quiet, slot.name=dbz_quiet, publication.name=quiet_pub, table.include.list=public.customers, heartbeat.interval.ms=5000, heartbeat.action.query=UPDATE public.heartbeat SET ts = now() WHERE id = 1
+$ PUT /connectors/quiet/config  ->  HTTP 201
+08:20:59  quiet: connector=RUNNING tasks=[RUNNING]
+08:21:04  active t, confirmed_flush_lsn 0/A20FDC8, restart_lsn 0/A20FD90, retained 480 bytes, sender streaming (flush_lsn , reply 08:20:58), pg_wal 64 MB
+$ CALL write_wal(128, false);   -- in appdb
+60 s with no change in quietdb, one line every 20 s:
+08:21:05  active t, confirmed_flush_lsn 0/A20FDC8, restart_lsn 0/A20FD90, retained 129 MB, sender streaming (flush_lsn , reply 08:20:58), pg_wal 144 MB
+08:21:25  active t, confirmed_flush_lsn 0/122A7910, restart_lsn 0/E15D140, retained 65 MB, sender streaming (flush_lsn 0/122A7910, reply 08:21:18), pg_wal 144 MB
+08:21:46  active t, confirmed_flush_lsn 0/122A7B68, restart_lsn 0/122A7AA8, retained 600 bytes, sender streaming (flush_lsn 0/122A7B68, reply 08:21:38), pg_wal 144 MB
+08:22:06  active t, confirmed_flush_lsn 0/122A7DC0, restart_lsn 0/122A7D00, retained 600 bytes, sender streaming (flush_lsn 0/122A7DC0, reply 08:21:58), pg_wal 144 MB
+three more checkpoints, 12 s apart, each after 1.6 MB written to appdb:
+08:22:07  active t, confirmed_flush_lsn 0/122A7DC0, restart_lsn 0/122A7D00, retained 2028 kB, sender streaming (flush_lsn 0/122A7DC0, reply 08:21:58), pg_wal 64 MB
+08:22:19  active t, confirmed_flush_lsn 0/124A2F40, restart_lsn 0/124A2B30, retained 2034 kB, sender streaming (flush_lsn 0/124A2F40, reply 08:22:18), pg_wal 64 MB
+08:22:32  active t, confirmed_flush_lsn 0/1269F6B8, restart_lsn 0/1269F250, retained 2032 kB, sender streaming (flush_lsn 0/1269F6B8, reply 08:22:28), pg_wal 64 MB
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------
+ dbz_quiet | logical   | quietdb  | t      |        879 | 0/1269F740  | 0/1269F800          | 2032 kB      | reserved   | 
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         4 | 64 MB
+(1 row)
+
+SELECT id, to_char(ts AT TIME ZONE 'UTC', 'HH24:MI:SS') AS heartbeat_written_utc, to_char(now() AT TIME ZONE 'UTC', 'HH24:MI:SS') AS now_utc FROM heartbeat;
+ id | heartbeat_written_utc | now_utc  
+----+-----------------------+----------
+  1 | 08:22:41              | 08:22:44
+(1 row)
+
+08:22:46  topic quiet.public.customers holds 2 events
+08:22:47  topic __debezium-heartbeat.quiet holds 22 events
+08:22:47  GET /connectors/quiet/offsets: {"offsets":[{"partition":{"server":"quiet"},"offset":{"lsn_proc":308934656,"messageType":"COMMIT","lsn_commit":308934656,"lsn":308934656,"txId":918,"ts_usec":1795422150793466}}]}
+--- Kafka Connect log
+2026-11-23T08:20:57,839 INFO   ||  Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:20:57,917 INFO   ||lifecycle  Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+   heartbeat.action.query = UPDATE public.heartbeat SET ts = now() WHERE id = 1
+2026-11-23T08:20:57,919 INFO   Postgres||lifecycle  Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+---
+exit 0

@@ -1,0 +1,66 @@
+
+## the slot is moved past the saved position: 2 rows are written, then pg_replication_slot_advance
+INSERT INTO orders (customer_id, status) VALUES (8, 'new'), (9, 'new');
+INSERT 0 2
+SELECT pg_replication_slot_advance('airbyte_slot', pg_current_wal_lsn());
+ pg_replication_slot_advance 
+-----------------------------
+ (airbyte_slot,0/14603178)
+(1 row)
+
+SELECT slot_name, database, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots WHERE slot_name = 'airbyte_slot';
+  slot_name   | database | active | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+--------------+----------+--------+-------------+---------------------+--------------+------------+---------------+---------------------
+ airbyte_slot | appdb    | f      | 0/14602FF0  | 0/14603178          | 392 bytes    | reserved   |               | 
+(1 row)
+
+
+## a sync with the state saved before the slot was moved
+state handed to the connector: [{"global": {"shared_state": {"state": {"[\"appdb\",{\"server\":\"appdb\"}]": "{\"lsn_proc\":341848008,\"lsn_commit\":341848008,\"lsn\":341848008,\"txId\":962,\"ts_usec\":1795426191330126}"}}, "stream_states": [{"stream_descriptor": {"name": "orders", "namespace": "public"}, "stream_state": {"cursors": {}, "state_type": "ctid_based", "stream_name": "", "stream_namespace": "", "version": 3}}]}, "sourceStats": {"recordCount": 6.0}, "type": "GLOBAL"}]
+started 2026-11-23 09:30:04 UTC
+$ docker run --rm --network rbt-abt-pg_default airbyte/source-postgres:3.8.12 read --config /work/config-app.json --catalog /work/catalog-app.json --state /work/state7.json
+exit code 1 after 2 s; messages by type: {"LOG": 43, "TEXT": 17, "TRACE": 2}
+records per stream: none
+--- connector log lines (warnings, errors, and lines about the saved position)
+INFO DefaultDispatcher-worker-1#global-round-1-create-partitions i.a.i.s.p.c.PostgresSourceDebeziumOperations(generateColdStartOffset-JhqZ4pE):179 Initial Debezium state constructed: {["appdb",{"server":"appdb"}]={"transaction_id":null,"lsn":341848440,"lsn_proc":341848440,"lsn_commit":341848440,"txId":964,"ts_usec":1795426205820107}}
+WARN DefaultDispatcher-worker-1#global i.a.c.r.RootReader$FeedExceptionHandler(handleException):152 canceled feed 'global' due to thrown exception io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14603178}, source LSN: LSN{0/14602FC8}.
+ERROR main i.a.c.AirbyteConnectorRunnable(run):38 Failed class io.airbyte.cdk.read.ReadOperation operation execution. io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14603178}, source LSN: LSN{0/14602FC8}.
+OUT io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14603178}, source LSN: LSN{0/14602FC8}.
+OUT 	at io.airbyte.integrations.source.postgres.cdc.ReplicationSlotManager.validate(ReplicationSlotManager.kt:99)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.validate-rZbDqnk(PostgresSourceDebeziumOperations.kt:214)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.startup-rZbDqnk(PostgresSourceDebeziumOperations.kt:147)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreatorDebeziumOperations.runStartup-rZbDqnk(CdcPartitionsCreatorDebeziumOperations.kt:24)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreator.run(CdcPartitionsCreator.kt:110)
+OUT 	at io.airbyte.cdk.read.FeedReader.createPartitionsWithResources(FeedReader.kt:198)
+OUT 	at io.airbyte.cdk.read.FeedReader.access$createPartitionsWithResources(FeedReader.kt:36)
+OUT 	at io.airbyte.cdk.read.FeedReader$createPartitions$3.invokeSuspend(FeedReader.kt:132)
+OUT 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+OUT 	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+OUT 	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+OUT 	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+TRACE STREAM_STATUS orders STARTED
+TRACE ERROR failure_type=config_error
+  message: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14603178}, source LSN: LSN{0/14602FC8}.
+  internal_message: io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14603178}, source LSN: LSN{0/14602FC8}.
+--- state messages: 0
+complete output: logs/raw/08-ahead.jsonl.gz
+ended 2026-11-23 09:30:06 UTC
+--- the slot while the sync ran
+09:30:04  active|pid|restart_lsn|confirmed_flush_lsn = f|-|0/14602FF0|0/14603178
+---
+SELECT slot_name, database, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots WHERE slot_name = 'airbyte_slot';
+  slot_name   | database | active | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+--------------+----------+--------+-------------+---------------------+--------------+------------+---------------+---------------------
+ airbyte_slot | appdb    | f      | 0/14602FF0  | 0/14603178          | 432 bytes    | reserved   |               | 
+(1 row)
+

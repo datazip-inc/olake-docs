@@ -1,0 +1,61 @@
+# A logical slot with no consumer on a 20 GB instance
+# 2026-11-23 09:02:57 UTC, instance rbtest-pgfull, postgres 18.6 db.t4g.micro 20 gp3 (GiB, type), storage autoscaling off
+
+SELECT version();
+                                                   version                                                    
+--------------------------------------------------------------------------------------------------------------
+ PostgreSQL 18.6 on aarch64-unknown-linux-gnu, compiled by aarch64-unknown-linux-gnu-gcc (GCC) 12.4.0, 64-bit
+(1 row)
+
+SELECT name, setting, unit FROM pg_settings WHERE name IN ('rds.logical_replication','wal_level','max_wal_size','max_slot_wal_keep_size','idle_replication_slot_timeout','max_replication_slots','wal_sender_timeout') ORDER BY name;
+             name              | setting | unit 
+-------------------------------+---------+------
+ idle_replication_slot_timeout | 0       | s
+ max_replication_slots         | 20      | 
+ max_slot_wal_keep_size        | -1      | MB
+ max_wal_size                  | 2048    | MB
+ rds.logical_replication       | on      | 
+ wal_level                     | logical | 
+ wal_sender_timeout            | 30000   | ms
+(7 rows)
+
+CREATE TABLE orders (id bigserial PRIMARY KEY, customer_id int NOT NULL, status text NOT NULL, note text, updated_at timestamptz NOT NULL DEFAULT now()) WITH (autovacuum_enabled = off);
+CREATE PROCEDURE write_wal(target_mb int) LANGUAGE plpgsql AS $$
+DECLARE
+  start_lsn pg_lsn := pg_current_wal_lsn();
+BEGIN
+  WHILE pg_wal_lsn_diff(pg_current_wal_lsn(), start_lsn) < target_mb::numeric * 1024 * 1024 LOOP
+    INSERT INTO orders (customer_id, status, note)
+    SELECT g % 1000, 'new', repeat(md5(g::text), 8) FROM generate_series(1, 5000) g;
+    COMMIT;
+    IF (SELECT count(*) FROM orders) >= 50000 THEN
+      TRUNCATE orders;
+      COMMIT;
+    END IF;
+  END LOOP;
+END $$;
+CREATE PUBLICATION cdc_pub FOR TABLE orders;
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/10013030
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         4 | 256 MB
+(1 row)
+
+SELECT pg_size_pretty(pg_database_size('appdb')) AS appdb_size;
+ appdb_size 
+------------
+ 8102 kB
+(1 row)
+
+
+# backups: 0 days of automated backups
+# FreeStorageSpace (CloudWatch, minimum per minute)
+  2026-11-23T09:00:00+00:00  19518 MB
+  2026-11-23T09:01:00+00:00  19518 MB
+  2026-11-23T09:02:00+00:00  19454 MB

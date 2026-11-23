@@ -1,0 +1,162 @@
+# ./run.sh publication    PostgreSQL 13.23    2026-11-16T17:53:11Z
+
+## The capture role tries to create the publication itself.
+CREATE PUBLICATION cdc_pub FOR TABLE orders;    -- as cdc_user
+ERROR:  permission denied for database appdb
+GRANT CREATE ON DATABASE appdb TO cdc_user;
+GRANT
+CREATE PUBLICATION cdc_pub FOR ALL TABLES;    -- as cdc_user
+ERROR:  must be superuser to create FOR ALL TABLES publication
+CREATE PUBLICATION cdc_pub FOR TABLE orders;    -- as cdc_user
+ERROR:  must be owner of table orders
+REVOKE CREATE ON DATABASE appdb FROM cdc_user;
+REVOKE
+
+## An administrator creates it, and checks it.
+CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
+CREATE PUBLICATION
+SELECT pubname, puballtables, pubinsert, pubupdate, pubdelete, pubtruncate FROM pg_publication;
+ pubname | puballtables | pubinsert | pubupdate | pubdelete | pubtruncate 
+---------+--------------+-----------+-----------+-----------+-------------
+ cdc_pub | f            | t         | t         | t         | t
+(1 row)
+
+SELECT pubname, schemaname, tablename FROM pg_publication_tables WHERE pubname = 'cdc_pub' ORDER BY tablename;
+ pubname | schemaname | tablename 
+---------+------------+-----------
+ cdc_pub | public     | documents
+ cdc_pub | public     | orders
+(2 rows)
+
+
+## Syntax that depends on the version
+CREATE PUBLICATION schema_pub FOR TABLES IN SCHEMA public;
+ERROR:  syntax error at or near "TABLES"
+LINE 1: CREATE PUBLICATION schema_pub FOR TABLES IN SCHEMA public;
+                                          ^
+DROP PUBLICATION IF EXISTS schema_pub;
+NOTICE:  publication "schema_pub" does not exist, skipping
+DROP PUBLICATION
+CREATE PUBLICATION root_pub FOR TABLE orders WITH (publish_via_partition_root = true);
+CREATE PUBLICATION
+DROP PUBLICATION IF EXISTS root_pub;
+DROP PUBLICATION
+
+## A slot, one change, and a consumer that asks for a publication name that does not exist
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/161D638
+(1 row)
+
+INSERT INTO orders (customer_id, status) VALUES (10, 'new');
+INSERT 0 1
+SELECT count(*) FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_publication');
+ERROR:  publication "cdc_publication" does not exist
+CONTEXT:  slot "cdc_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161D6A0
+SELECT count(*) FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ count 
+-------
+     4
+(1 row)
+
+--- server log
+2026-11-16 17:53:13.023 UTC [339] ERROR:  permission denied for database appdb
+2026-11-16 17:53:13.250 UTC [355] ERROR:  must be superuser to create FOR ALL TABLES publication
+2026-11-16 17:53:13.355 UTC [363] ERROR:  must be owner of table orders
+2026-11-16 17:53:13.952 UTC [403] ERROR:  syntax error at or near "TABLES" at character 35
+2026-11-16 17:53:14.663 UTC [458] ERROR:  publication "cdc_publication" does not exist
+2026-11-16 17:53:14.663 UTC [458] CONTEXT:  slot "cdc_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161D6A0
+---
+
+## Over the replication protocol the consumer connects without an error. It fails at the first change.
+SELECT * FROM pg_create_logical_replication_slot('typo_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ typo_slot | 0/161D8F8
+(1 row)
+
+$ pg_recvlogical -d appdb --slot typo_slot --start -o proto_version=1 -o publication_names=cdc_publication -f /dev/null --no-loop &
+SELECT slot_name, plugin, slot_type, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | slot_type | database | active 
+-----------+----------+-----------+----------+--------
+ cdc_slot  | pgoutput | logical   | appdb    | f
+ typo_slot | pgoutput | logical   | appdb    | t
+(2 rows)
+
+INSERT INTO orders (customer_id, status) VALUES (11, 'new');
+INSERT 0 1
+--- consumer output
+pg_recvlogical: error: unexpected termination of replication stream: ERROR:  publication "cdc_publication" does not exist
+CONTEXT:  slot "typo_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161D8F8
+pg_recvlogical: error: disconnected
+---
+SELECT slot_name, plugin, slot_type, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | slot_type | database | active 
+-----------+----------+-----------+----------+--------
+ cdc_slot  | pgoutput | logical   | appdb    | f
+ typo_slot | pgoutput | logical   | appdb    | f
+(2 rows)
+
+
+## A slot that is older than its publication
+SELECT * FROM pg_create_logical_replication_slot('early_slot', 'pgoutput');
+ slot_name  |    lsn    
+------------+-----------
+ early_slot | 0/161DA28
+(1 row)
+
+INSERT INTO orders (customer_id, status) VALUES (12, 'new');
+INSERT 0 1
+CREATE PUBLICATION late_pub FOR TABLE orders;
+CREATE PUBLICATION
+SELECT pubname FROM pg_publication ORDER BY pubname;
+ pubname  
+----------
+ cdc_pub
+ late_pub
+(2 rows)
+
+SELECT count(*) FROM pg_logical_slot_peek_binary_changes('early_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'late_pub');
+ERROR:  publication "late_pub" does not exist
+CONTEXT:  slot "early_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161DA28
+INSERT INTO orders (customer_id, status) VALUES (13, 'new');
+INSERT 0 1
+SELECT count(*) FROM pg_logical_slot_peek_binary_changes('early_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'late_pub');
+ERROR:  publication "late_pub" does not exist
+CONTEXT:  slot "early_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161DA28
+--- server log
+2026-11-16 17:53:18.357 UTC [482] ERROR:  publication "cdc_publication" does not exist
+2026-11-16 17:53:18.357 UTC [482] CONTEXT:  slot "typo_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161D8F8
+2026-11-16 17:53:22.230 UTC [575] ERROR:  publication "late_pub" does not exist
+2026-11-16 17:53:22.230 UTC [575] CONTEXT:  slot "early_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161DA28
+2026-11-16 17:53:22.527 UTC [591] ERROR:  publication "late_pub" does not exist
+2026-11-16 17:53:22.527 UTC [591] CONTEXT:  slot "early_slot", output plugin "pgoutput", in the change callback, associated LSN 0/161DA28
+---
+
+## Fix: the publication first, then the slot.
+SELECT pg_drop_replication_slot('early_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('early_slot', 'pgoutput');
+ slot_name  |    lsn    
+------------+-----------
+ early_slot | 0/161E128
+(1 row)
+
+INSERT INTO orders (customer_id, status) VALUES (14, 'new');
+INSERT 0 1
+SELECT lsn, xid, chr(get_byte(data, 0)) AS message FROM pg_logical_slot_peek_binary_changes('early_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'late_pub');
+    lsn    | xid | message 
+-----------+-----+---------
+ 0/161E128 | 511 | B
+ 0/161E128 | 511 | R
+ 0/161E128 | 511 | I
+ 0/161E1E8 | 511 | C
+(4 rows)
+
+DROP PUBLICATION late_pub;
+DROP PUBLICATION

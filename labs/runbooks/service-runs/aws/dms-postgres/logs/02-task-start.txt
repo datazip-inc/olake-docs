@@ -1,0 +1,64 @@
+# A DMS task, full load and ongoing replication, on appdb (tables orders and notes)
+# 2026-11-23 09:05:48 UTC, DMS rbtest-dms dms.t3.small engine 3.6.1, source rbtest-pg (PostgreSQL 17.11), target rbtest-apg (Aurora PostgreSQL 17.11)
+
+# before the task exists
+ slot_name | plugin | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size 
+-----------+--------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------
+(0 rows)
+
+rbtest-p-appdb	full-load-and-cdc	creating
+$ aws dms start-replication-task --replication-task-arn ... --start-replication-task-type start-replication
+starting
+2026-11-23 09:07:18 UTC  task: running None None
+
+# the slot DMS created, and its connection
+                           slot_name                            |    plugin     | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size 
+----------------------------------------------------------------+---------------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------
+ x45rd6uednefxke3_00016415_02f6a4d8_e2b6_46f9_9847_832f36cfcc78 | test_decoding | appdb    | t      |       1939 | 0/1017E4E8  | 0/14001310          | 63 MB        | reserved   | 
+(1 row)
+
+                           slot_name                            | pid  | application_name |   state   |  sent_lsn  | flush_lsn  | reply_time 
+----------------------------------------------------------------+------+------------------+-----------+------------+------------+------------
+ x45rd6uednefxke3_00016415_02f6a4d8_e2b6_46f9_9847_832f36cfcc78 | 1939 |                  | streaming | 0/14004E90 | 0/14001310 | 09:07:59
+(1 row)
+
+# what DMS added to the source database
+SELECT n.nspname AS schema, c.relname AS name, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname LIKE 'awsdms%' ORDER BY 1, 2;
+ schema |            name            | relkind 
+--------+----------------------------+---------
+ public | awsdms_ddl_audit           | r
+ public | awsdms_ddl_audit_c_key_seq | S
+ public | awsdms_ddl_audit_pkey      | i
+(3 rows)
+
+SELECT evtname, evtevent, evtenabled FROM pg_event_trigger;
+       evtname        |    evtevent     | evtenabled 
+----------------------+-----------------+------------
+ awsdms_intercept_ddl | ddl_command_end | O
+(1 row)
+
+SELECT pubname FROM pg_publication;
+ pubname 
+---------
+(0 rows)
+
+# a change arrives at the target
+INSERT INTO orders (customer_id, status) VALUES (5, 'after start') RETURNING id;
+ id 
+----
+  5
+(1 row)
+
+SELECT id, customer_id, status FROM public.orders ORDER BY id;
+ id | customer_id |   status    
+----+-------------+-------------
+  1 |           1 | new
+  2 |           2 | new
+  3 |           3 | new
+  4 |           4 | new
+  5 |           5 | after start
+(5 rows)
+
+# table statistics
+public	notes	0	0	0	0	Table completed
+public	orders	4	1	0	0	Table completed

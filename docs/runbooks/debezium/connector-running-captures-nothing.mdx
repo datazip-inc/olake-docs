@@ -1,0 +1,536 @@
+---
+title: "Debezium connector is RUNNING but captures nothing"
+description: "A Debezium connector reports RUNNING and no change events arrive. Five causes on MySQL and PostgreSQL, the command that proves each one, and the fix we ran."
+sidebar_label: Running but captures nothing
+keywords:
+  - debezium connector running but no data
+  - debezium no changes will be captured
+  - After applying the include/exclude list filters
+  - table.include.list
+  - table.whitelist
+  - snapshot.mode no_data
+  - topic.creation.enable
+  - UNKNOWN_TOPIC_OR_PARTITION
+  - debezium publication missing table
+  - kafka connect connector running no tasks
+runbook:
+  family: debezium
+  author: shubham
+  reviewer: nayan
+  reproduced:
+    date: "2026-11-16"
+    versions:
+      - "Debezium 3.7.1.Final on Kafka Connect 4.3.1 with MySQL 8.4.13 and PostgreSQL 16.15"
+      - "Debezium 1.9.7.Final on Kafka Connect 3.2.0 with MySQL 8.0.46 and PostgreSQL 13.23"
+    lab: labs/runbooks/debezium/connector-running-captures-nothing
+    summary: "Five mistakes were made on purpose against a broker with topic auto-creation off: a table filter in the wrong format, a snapshot mode that reads no rows, no topic creation settings, a publication without the table, and tasks.max above 1. Each left the connector RUNNING while changes went missing, and a fix for each was run on both versions. A sixth run, two workers that advertise localhost, was made on 3.7.1 only."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+A Debezium connector and its task both report `RUNNING`, the log shows no exception, and the Kafka topics stay empty or are never created. This page lists the causes we reproduced on MySQL and PostgreSQL, the command that proves each one, and the fix we ran.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Search the Kafka Connect log for `no changes will be captured`. If the line is there, a value in `table.include.list` does not match the full table name: `database.table` on MySQL and `schema.table` on PostgreSQL.
+
+If the line is not there, four more checks remain, each one command under [Confirm the diagnosis](#confirm-the-diagnosis):
+
+- **The snapshot mode:** it may read no existing rows.
+- **The topics:** they may never have been created.
+- **The PostgreSQL publication:** it may not contain the table.
+- **The task list:** the connector may have no task at all.
+
+<TLDR title='Key takeaways'>
+
+- `RUNNING` is not a count of events. Five different mistakes left a connector `RUNNING` with nothing captured on **Debezium 1.9.7** and on **Debezium 3.7.1**.
+- A filter that matches no table is logged as a warning at start-up and nowhere else: `After applying the include/exclude list filters, no changes will be captured. Please check your configuration!`
+- Correcting the configuration does not replay what was skipped. On MySQL the 4 rows that were in the table before the fix arrived only after the connector's offsets were removed and it took a new snapshot.
+
+</TLDR>
+
+## What you see
+
+The status call answers `RUNNING` for the connector and for its task. This is **Kafka Connect 4.3.1**; **Kafka Connect 3.2.0** gives the same states without the `version` fields.
+
+```json
+{
+  "name": "my-filter",
+  "connector": { "state": "RUNNING", "worker_id": "172.31.0.5:8083", "version": "3.7.1.Final" },
+  "tasks": [{ "id": 0, "state": "RUNNING", "worker_id": "172.31.0.5:8083", "version": "3.7.1.Final" }],
+  "type": "source"
+}
+```
+
+The worker log holds one of these lines, or none of them. Each line points at one issue:
+
+| Issue | What the worker log shows |
+| --- | --- |
+| 1. The include list matches no table | `no changes will be captured` |
+| 2. A snapshot mode that reads no existing rows | `Skipping snapshotting of data` |
+| 3. The topics are never created | `UNKNOWN_TOPIC_OR_PARTITION` |
+| 4. The PostgreSQL publication does not contain the table | No log line at all |
+| 5. RUNNING with no task | `Failed to reconfigure connector's tasks` |
+
+The full lines, from **Debezium 3.7.1 on Kafka Connect 4.3.1**, in the same order:
+
+```text
+WARN   MySQL||snapshot  After applying the include/exclude list filters, no changes will be captured. Please check your configuration!   [io.debezium.relational.RelationalDatabaseSchema]
+INFO   MySQL||snapshot  Snapshot step 7 - Skipping snapshotting of data   [io.debezium.relational.RelationalSnapshotChangeEventSource]
+WARN   ||  [Producer clientId=connector-producer-my-topics-0] The metadata response from the cluster reported a recoverable issue with correlation id 35 : {myt=UNKNOWN_TOPIC_OR_PARTITION}   [org.apache.kafka.clients.NetworkClient]
+ERROR  ||  [Worker clientId=connect-172.31.0.5:8083, groupId=lab-connect] Failed to reconfigure connector's tasks (my-notask), retrying after backoff.   [org.apache.kafka.connect.runtime.distributed.DistributedHerder]
+```
+
+### Names and messages by Debezium version
+
+The filter properties were renamed once and the snapshot modes once. Use the row for the version you run.
+
+| Debezium | Warning when the filters match no table | Filter properties | Snapshot mode that reads no rows |
+| --- | --- | --- | --- |
+| 1.2 and earlier | `After applying blacklist/whitelist filters there are no tables to monitor, please check your configuration` | `database.whitelist`, `schema.whitelist`, `table.whitelist`, `column.whitelist` | MySQL `schema_only`, PostgreSQL `never` |
+| 1.3 to 1.9 | `After applying the include/exclude list filters, no changes will be captured. Please check your configuration!` | `database.include.list`, `schema.include.list`, `table.include.list`, `column.include.list`. The old names still work | MySQL `schema_only`, PostgreSQL `never` |
+| 2.0 to 2.5 | Same as 1.3 | The `*.include.list` names only | MySQL `schema_only`, PostgreSQL `never` |
+| 2.6 to 3.2 | Same as 1.3 | The `*.include.list` names only | `no_data`. The old values are deprecated and still present |
+| 3.3 and later | Same as 1.3 | The `*.include.list` names only | `no_data` only |
+
+The 1.9.7 and 3.7.1 rows are from the runs on this page. The other boundaries come from the Debezium release notes for [1.3](https://debezium.io/releases/1.3/release-notes) (the rename), [2.0](https://debezium.io/releases/2.0/release-notes) ("All deprecated configuration options were removed") and [3.3](https://debezium.io/releases/3.3/release-notes) ("Deprecated names of snapshot modes were removed"), and from the source at the [1.2.5](https://github.com/debezium/debezium/blob/v1.2.5.Final/debezium-core/src/main/java/io/debezium/relational/RelationalDatabaseSchema.java), [1.3.1](https://github.com/debezium/debezium/blob/v1.3.1.Final/debezium-core/src/main/java/io/debezium/schema/DatabaseSchema.java), [2.6.2](https://github.com/debezium/debezium/blob/v2.6.2.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorConfig.java) and [3.2.7](https://github.com/debezium/debezium/blob/v3.2.7.Final/debezium-connector-binlog/src/main/java/io/debezium/connector/binlog/BinlogConnectorConfig.java) tags.
+
+The old filter names, such as `table.whitelist` and `column.whitelist`, behave differently on each side of 2.0:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The connector filtered as asked and logged a warning for each old name:
+
+```text
+WARN   ||  Using configuration property "table.whitelist" is deprecated and will be removed in future versions. Please use "table.include.list" instead.   [io.debezium.config.Configuration]
+```
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+The old names were ignored without a log line, and the connector captured every table with every column.
+
+</TabItem>
+</Tabs>
+
+So after an upgrade across 2.0, a connector with old names captures more, not less.
+
+### Names and messages by Kafka Connect version
+
+| Kafka Connect | Missing-topic warning | Topic creation by Kafka Connect | Stop a connector and reset its offsets |
+| --- | --- | --- | --- |
+| Before 2.6 | `Error while fetching metadata with correlation id N : {topic=UNKNOWN_TOPIC_OR_PARTITION}` | Not available | Delete the connector and register it under a new name |
+| 2.6 to 3.4 | Same as before 2.6 | `topic.creation.enable` on the worker, `topic.creation.default.*` on the connector | Delete the connector and register it under a new name |
+| 3.5 | Same as before 2.6 | Same as 2.6 | `PUT /connectors/<name>/stop`. Offsets can be read, not changed |
+| 3.6 to 3.8 | Same as before 2.6 | Same as 2.6 | `PUT /connectors/<name>/stop`, then `DELETE /connectors/<name>/offsets` |
+| 3.9 and later | `The metadata response from the cluster reported a recoverable issue with correlation id N : {topic=UNKNOWN_TOPIC_OR_PARTITION}` | Same as 2.6 | Same as 3.6 |
+
+The 3.2.0 and 4.3.1 rows are from the runs. The other boundaries come from the Kafka Improvement Proposal [KIP-158](https://cwiki.apache.org/confluence/display/KAFKA/KIP-158%3A+Kafka+Connect+should+allow+source+connectors+to+set+topic-specific+settings+for+new+topics), which is marked "Released: AK 2.6.0", and from the Kafka source at the [3.4.1](https://github.com/apache/kafka/blob/3.4.1/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java), [3.5.0](https://github.com/apache/kafka/blob/3.5.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java), [3.6.0](https://github.com/apache/kafka/blob/3.6.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java), [3.8.0](https://github.com/apache/kafka/blob/3.8.0/clients/src/main/java/org/apache/kafka/clients/NetworkClient.java) and [3.9.0](https://github.com/apache/kafka/blob/3.9.0/clients/src/main/java/org/apache/kafka/clients/NetworkClient.java) tags.
+
+## Why RUNNING does not mean captured
+
+None of the issues on this page throws an exception inside the task, so nothing moves the state to `FAILED`. The connector is connected to the database and is reading its log. What it reads is:
+
+| Issue | What happens to the changes |
+| --- | --- |
+| 1. The include list matches no table | Filtered out |
+| 2. A snapshot mode that reads no existing rows | Never requested |
+| 3. The topics are never created | Cannot be written to a topic |
+| 4. The PostgreSQL publication does not contain the table | Never sent by the database |
+
+Issue 5 is the exception: the connector has no task at all, and the status shows `RUNNING` with an empty task list.
+
+:::note[Versions on this page]
+The runs used **Debezium 3.7.1** on **Kafka Connect 4.3.1** with MySQL 8.4.13 and PostgreSQL 16.15, and **Debezium 1.9.7** on **Kafka Connect 3.2.0** with MySQL 8.0.46 and PostgreSQL 13.23. Each database has an `inventory` database with the tables `customers` and `orders`, 4 rows each; on PostgreSQL they are in the `public` schema. The Kafka broker runs with `auto.create.topics.enable=false`. Unless an issue says otherwise, both versions gave the same result.
+:::
+
+## Issue 1: The include list matches no table
+
+**What the name must look like.** The [MySQL connector documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-table-include-list) says of `table.include.list`: "Each identifier is of the form databaseName.tableName." The [PostgreSQL one](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-table-include-list) says: "Each identifier is of the form schemaName.tableName."
+
+The MySQL page adds that the expression "is matched against the entire name string of the table; it does not match substrings that might be present in a table name."
+
+**What was tried.** The table is `customers`: in the `inventory` database on MySQL, and in the `public` schema of the `inventory` database on PostgreSQL. The result was the same on 1.9.7 and 3.7.1:
+
+| Database | `table.include.list` | Captured | Why |
+| --- | --- | --- | --- |
+| MySQL | `customers` | No | No database name |
+| MySQL | `inventory.cust*` | No | A regular expression, not a wildcard: `t*` means any number of `t` |
+| MySQL | `INVENTORY.CUSTOMERS` | Yes | The match ignores case |
+| MySQL | `inventory.customers` | Yes | |
+| PostgreSQL | `inventory.customers` | No | `inventory` is the database, the schema is `public` |
+| PostgreSQL | `customers` | No | No schema name |
+| PostgreSQL | `inventory.public.customers` | No | Three parts where two are expected |
+| PostgreSQL | `PUBLIC.CUSTOMERS` | Yes | The match ignores case |
+| PostgreSQL | `public.customers` | Yes | |
+
+Wrong case is not a cause. Debezium compiles these lists with a case-insensitive flag ([source](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-util/src/main/java/io/debezium/function/Predicates.java)), and the upper-case values captured the table in the runs.
+
+**What a "No" row did.** The connector and its task stayed `RUNNING`, and the warning was logged:
+
+- **MySQL:** twice, once in the snapshot phase and once in the streaming phase. The schema change topic still received 8 records, so a topic named after the prefix exists and the table topics do not.
+- **PostgreSQL:** once.
+
+One PostgreSQL setting turns the silence into a failure. With `publication.autocreate.mode=filtered`, the same wrong list failed the task on both versions:
+
+```text
+org.apache.kafka.connect.errors.ConnectException: Unable to create filtered publication pgg_pub for
+Caused by: io.debezium.DebeziumException: No table filters found for filtered publication pgg_pub
+```
+
+**Fix:** send the whole configuration again with the corrected value. The warning did not come back on either database.
+
+```bash
+curl -X PUT -H 'Content-Type: application/json' localhost:8083/connectors/<name>/config \
+  --data '{ "...": "your existing settings", "table.include.list": "inventory.customers" }'
+```
+
+What arrives after the fix depends on whether the connector stored an offset (its read position) while it captured nothing:
+
+<Tabs groupId="database">
+<TabItem value="mysql" label="MySQL" default>
+
+**MySQL had an offset.** It had written schema change records, so a position was stored. The corrected connector found it and took no snapshot. It read the binary log (binlog) from the stored position: the 1 row inserted while the filter was wrong arrived, and the 4 rows from before did not.
+
+The log line, by version:
+
+- **Debezium 3.7.1:** `A previous offset indicating a completed snapshot has been found.`
+- **Debezium 1.9.7:** `A previous offset indicating a completed snapshot has been found. Neither schema nor data will be snapshotted.`
+
+</TabItem>
+<TabItem value="postgresql" label="PostgreSQL">
+
+**PostgreSQL had none.** The connector had written nothing. After the fix it took a normal initial snapshot on both versions: all 5 rows arrived as read events (`op=r`).
+
+</TabItem>
+</Tabs>
+
+You can see which case you are in before you fix anything, on **Kafka Connect 4.3.1**. `GET /connectors/<name>/offsets` showed the stored binlog position for the MySQL connector and returned `{"offsets":[]}` for the PostgreSQL connector. The **Debezium 3.7.1** log of the PostgreSQL connector also repeated `No previous offsets found` every 10 seconds, which is the offset flush interval of the lab. On **Kafka Connect 3.2.0** the offsets call answered `HTTP 404 Not Found`.
+
+**Read the rows that were skipped (MySQL).** The 4 old rows need a new snapshot. On Kafka Connect 3.6 or later, stop the connector, delete its offsets and its schema history topic, and resume:
+
+```bash
+curl -X PUT localhost:8083/connectors/<name>/stop
+curl -X DELETE localhost:8083/connectors/<name>/offsets
+kafka-topics.sh --bootstrap-server kafka:9092 --delete --topic <schema history topic>
+curl -X PUT localhost:8083/connectors/<name>/resume
+```
+
+In the run the table topic went from 2 events to 8: the 6 rows of the table were read as `op=r`. On **Kafka Connect 3.2.0**, which has neither endpoint, we deleted the connector and its history topic and registered the same configuration under a new name, with the same result.
+
+The 2 rows that had already arrived were read again, so whatever consumes the topic sees them a second time. An [incremental snapshot](https://debezium.io/documentation/reference/stable/connectors/mysql.html#debezium-mysql-incremental-snapshots) is the documented way to read a table without resetting the connector; it was not run in this lab.
+
+### A column filter in the wrong format
+
+`column.include.list` has the same trap one level down. With `column.include.list=id,email` and a correct table list, the connector wrote one event per row on both versions, and every event was empty:
+
+```json
+{ "before": null, "after": {}, "op": "r" }
+```
+
+The key was intact (`{"id": 6}`). The MySQL documentation gives the form: "Fully-qualified names for columns are of the form databaseName.tableName.columnName."
+
+**Fix:** write the column list in that form. As `inventory\.customers\.(id|email)`, the same list produced events with the two columns.
+
+## Issue 2: A snapshot mode that reads no existing rows
+
+With `snapshot.mode=no_data` the connector reads the table structure and starts streaming. It never selects the rows that are already in the table. Before Debezium 2.6 the value is `schema_only` on MySQL and `never` on PostgreSQL.
+
+In the run the table held 4 rows, and after start-up no table topic existed. One insert later the topic held 1 event, an insert (`op=c`).
+
+The log says what happened, in different words per connector:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+```text
+INFO   MySQL|mys|snapshot  According to the connector configuration only schema will be snapshotted   [io.debezium.connector.mysql.MySqlSnapshotChangeEventSource]
+INFO   MySQL|mys|snapshot  Snapshot step 7 - Skipping snapshotting of data   [io.debezium.relational.RelationalSnapshotChangeEventSource]
+INFO   Postgres|pgs|snapshot  According to the connector configuration no snapshot will be executed   [io.debezium.connector.postgresql.PostgresSnapshotChangeEventSource]
+```
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+```text
+INFO   MySQL||snapshot  According to the connector configuration only schema will be snapshot.   [io.debezium.relational.RelationalSnapshotChangeEventSource]
+INFO   MySQL||snapshot  Snapshot step 7 - Skipping snapshotting of data   [io.debezium.relational.RelationalSnapshotChangeEventSource]
+INFO   Postgres||snapshot  According to the connector configuration no snapshot will be executed   [io.debezium.connector.postgresql.PostgresSnapshotChangeEventSource]
+```
+
+</TabItem>
+</Tabs>
+
+**Changing the mode alone does nothing.** Setting `snapshot.mode` to `initial` on the same connector took no snapshot, on either database or version. The connector found its offset and skipped the snapshot. The line to look for differs:
+
+| Version | Connector | Log line |
+| --- | --- | --- |
+| 3.7.1 | MySQL and PostgreSQL | `A previous offset indicating a completed snapshot has been found.` |
+| 1.9.7 | MySQL | `A previous offset indicating a completed snapshot has been found. Neither schema nor data will be snapshotted.` |
+| 1.9.7 | PostgreSQL | `Previous snapshot has completed successfully, streaming logical changes from last known position` |
+
+**Fix:** set `snapshot.mode` to `initial`, then remove the offset with the same stop, delete offsets and resume sequence as in Issue 1. PostgreSQL has no schema history topic to delete. On both databases the topic went from 1 event to 6: the 5 rows were read as `op=r`.
+
+On **Kafka Connect 3.2.0** we registered the configuration under a new connector name, with the same result. On PostgreSQL the new connector also got a new `slot.name`, and the old replication slot was dropped afterwards so that it stops holding write-ahead log (WAL) on the server.
+
+### The old value on a new version, and the reverse
+
+Each version refused the other's value when the configuration was validated:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+`no_data` was refused. The MySQL connector answered:
+
+```text
+Value must be one of never, initial_only, when_needed, initial, schema_only, schema_only_recovery
+```
+
+The PostgreSQL connector answered `Value must be one of always, exported, never, initial_only, initial, custom`.
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+The MySQL connector refused `schema_only`:
+
+```text
+The 'snapshot.mode' value is invalid: Value must be one of always, initial_only, configuration_based, when_needed, initial, custom, no_data, recovery
+```
+
+The PostgreSQL connector answered the same way for `never`, without `recovery` in the list.
+
+</TabItem>
+</Tabs>
+
+The 3.7 documentation still lists `schema_only` as "Deprecated, see no_data."
+
+## Issue 3: The topics are never created
+
+A change topic can be created in two ways:
+
+- **By the broker,** when `auto.create.topics.enable` is `true`.
+- **By Kafka Connect,** when the connector carries `topic.creation.default.*` settings. The [Debezium documentation](https://debezium.io/documentation/reference/stable/configuration/topic-auto-create-config.html) says: "Kafka Connect automatic topic creation requires the replication.factor and partitions properties to be set for at least the default topic creation group."
+
+The lab broker runs with `auto.create.topics.enable=false`. A connector without the two settings stayed `RUNNING`, with a `RUNNING` task. The producer inside the task kept logging a warning for the first topic it needed:
+
+<Tabs groupId="kafka-connect-version">
+<TabItem value="3.2.0" label="Kafka Connect 3.2.0" default>
+
+733 of these lines in 75 seconds:
+
+```text
+WARN   ||  [Producer clientId=connector-producer-my-topics-0] Error while fetching metadata with correlation id 734 : {myt=UNKNOWN_TOPIC_OR_PARTITION}   [org.apache.kafka.clients.NetworkClient]
+```
+
+</TabItem>
+<TabItem value="4.3.1" label="Kafka Connect 4.3.1">
+
+33 of these lines in 30 seconds:
+
+```text
+WARN   ||  [Producer clientId=connector-producer-my-topics-0] The metadata response from the cluster reported a recoverable issue with correlation id 35 : {myt=UNKNOWN_TOPIC_OR_PARTITION}   [org.apache.kafka.clients.NetworkClient]
+```
+
+</TabItem>
+</Tabs>
+
+No topic of the connector's prefix existed, the schema history topic did, and the task never failed.
+
+**Fix 1: let Kafka Connect create the topics.** Add the two required settings to the connector. Use the replication factor your cluster can satisfy; the lab has one broker.
+
+```json
+{
+  "topic.creation.default.replication.factor": "1",
+  "topic.creation.default.partitions": "1"
+}
+```
+
+The task restarted, Kafka Connect logged `Created topic (name=myt.inventory.customers, numPartitions=1, replicationFactor=1, ...)`, and the snapshot arrived on both versions: 7 events for one table and 5 for the other.
+
+This needs `topic.creation.enable` to be `true` on the worker, which is the default. With the worker set to `false`, a connector that carried both settings logged the same warning and wrote nothing, on both versions. No log line said the settings were being ignored.
+
+**Fix 2: create the topics yourself.** Use this on a cluster where you may not change the connector or the worker. The connector does not need a restart.
+
+```bash
+kafka-topics.sh --bootstrap-server kafka:9092 --create --topic pgt.public.customers --partitions 1 --replication-factor 1
+```
+
+In the PostgreSQL run both table topics filled after they were created, with 6 and 5 events, on both versions. Turning `auto.create.topics.enable` on at the broker is the third way; the lab did not run it.
+
+## Issue 4: The PostgreSQL publication does not contain the table
+
+With the `pgoutput` plug-in, PostgreSQL sends only the changes of tables that are in the connector's publication. The [Debezium documentation](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-publication-name) says: "If the publication already exists, either for all tables or configured with a subset of tables, Debezium uses the publication as it is defined."
+
+**What was run.** A publication for `public.orders` alone existed before the connector was registered with `table.include.list=public.customers,public.orders`. The snapshot read both tables, because a snapshot does not go through the publication. After one insert into each table, the `orders` topic had the new event and the `customers` topic did not.
+
+The `pg_publication_tables` query returned one table, and this is its whole output:
+
+```text
+pgp_pub|public|orders
+```
+
+The connector logged nothing about it, on either version.
+
+**Fix 1: add the table to the publication.**
+
+```sql
+ALTER PUBLICATION pgp_pub ADD TABLE public.customers;
+```
+
+The next insert into `customers` arrived without a connector restart, on both versions. The row inserted before the statement never did: the table held 8 rows and the topic held 7 events.
+
+**Fix 2: let Debezium maintain the publication,** with `publication.autocreate.mode=filtered`. Only the newer version did this:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The existing publication was left as it was, with `orders` only. The topic held the 8 snapshot events, and the next `customers` insert did not arrive.
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+At start-up the connector changed the existing publication to match its include list:
+
+```text
+INFO   Postgres||postgres-connector-task  Publication 'pgq_pub' has to be updated. Tables to add: [public.customers], Tables to remove: []   [io.debezium.connector.postgresql.connection.PostgresReplicationConnection]
+INFO   Postgres||postgres-connector-task  Updating Publication with statement 'ALTER PUBLICATION pgq_pub SET TABLE "public"."customers", "public"."orders";'   [io.debezium.connector.postgresql.connection.PostgresReplicationConnection]
+```
+
+Both tables were in the publication afterwards. The topic held the 8 snapshot events and the next `customers` insert, 9 in all.
+
+</TabItem>
+</Tabs>
+
+The release notes list the change, "Postgres existing publication is not updated with the new table" (DBZ-3921), under [1.9.8.Final](https://debezium.io/releases/1.9/release-notes) and [2.0.0.Alpha2](https://debezium.io/releases/2.0/release-notes).
+
+## Issue 5: RUNNING with no task
+
+Here the status shows a `RUNNING` connector and an empty task list. The two causes below gave this status.
+
+```json
+{
+  "name": "my-notask",
+  "connector": { "state": "RUNNING", "worker_id": "172.31.0.5:8083", "version": "3.7.1.Final" },
+  "tasks": [],
+  "type": "source"
+}
+```
+
+### tasks.max above 1 on the MySQL connector
+
+The documentation for [`tasks.max`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-tasks-max) says that "changing the default value has no effect". In the run, `tasks.max=2` left the MySQL connector without a task on both versions, and the worker repeated these two lines:
+
+<Tabs groupId="kafka-connect-version">
+<TabItem value="3.2.0" label="Kafka Connect 3.2.0" default>
+
+```text
+ERROR  ||  [Worker clientId=connect-1, groupId=lab-connect] Failed to reconfigure connector's tasks (my-notask), retrying after backoff:   [org.apache.kafka.connect.runtime.distributed.DistributedHerder]
+java.lang.IllegalArgumentException: Only a single connector task may be started
+```
+
+</TabItem>
+<TabItem value="4.3.1" label="Kafka Connect 4.3.1">
+
+```text
+ERROR  ||  [Worker clientId=connect-172.31.0.5:8083, groupId=lab-connect] Failed to reconfigure connector's tasks (my-notask), retrying after backoff.   [org.apache.kafka.connect.runtime.distributed.DistributedHerder]
+java.lang.IllegalArgumentException: Only a single connector task may be started
+```
+
+</TabItem>
+</Tabs>
+
+The exception comes from the connector itself ([source](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-binlog/src/main/java/io/debezium/connector/binlog/BinlogConnector.java)). The PostgreSQL connector with `tasks.max=2` started one task and worked.
+
+**Fix:** set `tasks.max` back to `1`. The connector got its task, and the snapshot arrived.
+
+### Two workers that advertise the same address
+
+This run was made on **Debezium 3.7.1** only. Two workers in one group both advertised `localhost` as their REST address, which is what a container does when its advertised host name is left at a local value. A connector that landed on the worker that was not the group leader got no task:
+
+```text
+ERROR  ||  [Worker clientId=connect-localhost:8083, groupId=lab-connect-pair] Request to leader to reconfigure connector tasks failed   [org.apache.kafka.connect.runtime.distributed.DistributedHerder]
+org.apache.kafka.connect.runtime.rest.errors.ConnectRestException: Internal request missing required signature
+ERROR  ||  [Worker clientId=connect-localhost:8083, groupId=lab-connect-pair] Failed to reconfigure connector's tasks (pg-second), retrying after backoff.   [org.apache.kafka.connect.runtime.distributed.DistributedHerder]
+```
+
+The status gives it away before the log does: every `worker_id` reads `localhost:8083`.
+
+**Fix:** give each worker an address the other one resolves, through `rest.advertised.host.name` in the worker file or `ADVERTISED_HOST_NAME` on the Debezium image. After both workers restarted, the task appeared and the snapshot arrived.
+
+## Confirm the diagnosis
+
+Run the checks in this order. The first one that shows the bad sign is your cause.
+
+**1. The table filter (Issue 1).** Search the worker log, then compare the list with the names the database uses.
+
+```bash
+docker logs <connect-container> 2>&1 | grep 'no changes will be captured'
+curl -s localhost:8083/connectors/<name>/config | jq 'with_entries(select(.key | test("include|exclude|whitelist|blacklist")))'
+```
+
+```sql
+-- MySQL: the form table.include.list expects
+SELECT CONCAT(table_schema, '.', table_name) FROM information_schema.tables WHERE table_schema = 'inventory';
+-- PostgreSQL: the form table.include.list expects
+SELECT schemaname || '.' || tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema');
+```
+
+**2. The snapshot mode and the stored offset (Issue 2).** The first call prints `null` when the mode is not set, which means the default, `initial`. The second call needs Kafka Connect 3.5 or later; on 3.2.0 it answered `HTTP 404 Not Found`.
+
+```bash
+curl -s localhost:8083/connectors/<name>/config | jq -r '."snapshot.mode"'
+curl -s localhost:8083/connectors/<name>/offsets
+```
+
+**3. The topics (Issue 3).** List what exists for the connector's prefix, read the broker setting, and search the worker log.
+
+```bash
+kafka-topics.sh --bootstrap-server kafka:9092 --list | grep '^<prefix>'
+kafka-configs.sh --bootstrap-server kafka:9092 --describe --entity-type brokers --entity-name 1 --all | grep auto.create.topics.enable
+docker logs <connect-container> 2>&1 | grep -c UNKNOWN_TOPIC_OR_PARTITION
+```
+
+**4. The publication, on PostgreSQL (Issue 4).** The name is `dbz_publication` unless `publication.name` says otherwise.
+
+```sql
+SELECT pubname, puballtables FROM pg_publication;
+SELECT pubname, schemaname, tablename FROM pg_publication_tables WHERE pubname = 'dbz_publication';
+```
+
+**5. The task list (Issue 5).** An empty `tasks` array with a `RUNNING` connector is the sign.
+
+```bash
+curl -s localhost:8083/connectors/<name>/status
+docker logs <connect-container> 2>&1 | grep "Failed to reconfigure connector's tasks"
+```
+
+## Prevent it
+
+- After registering a connector, check the topics and not only the state. A snapshot of a non-empty table should put events on its topic within minutes.
+- Alert on the three log lines: `no changes will be captured`, `UNKNOWN_TOPIC_OR_PARTITION` and `Failed to reconfigure connector's tasks`.
+- Write `table.include.list` as full names with escaped dots, for example `inventory\.customers`, and keep one list per connector in version control.
+- Put `topic.creation.default.replication.factor` and `topic.creation.default.partitions` in every source connector. They work whether or not the broker creates topics.
+- On PostgreSQL, decide who owns the publication. Either create it for the exact tables and check `pg_publication_tables` after every change to the include list, or use `publication.autocreate.mode=filtered` on Debezium 2.0 or later.
+- Leave `tasks.max` at `1` for the MySQL and PostgreSQL connectors.
+
+:::note[How OLake Go handles this]
+
+OLake Go does not run on Kafka Connect, so Issues 3 and 5 have no counterpart in it. Tables are chosen as named streams, in a file that its `discover` step writes first ([streams configuration](/docs/core/configs/streams-migration/)).
+
+Issue 4 applies to it in the same way. Its PostgreSQL connector reads through a publication that you create, and the [connector documentation](/docs/connectors/postgres/#configuration) requires that it "include all tables for CDC capture", where CDC is change data capture. Its connection test checks that the publication exists and includes the required tables.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Debezium MySQL connector: [`table.include.list`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-table-include-list), [`snapshot.mode`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-snapshot-mode), [`tasks.max`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-tasks-max)
+- Debezium PostgreSQL connector: [`table.include.list`](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-table-include-list), [`publication.name`](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-publication-name), [`publication.autocreate.mode`](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-publication-autocreate-mode), [`snapshot.mode`](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-snapshot-mode)
+- Debezium: [customising automatic topic creation](https://debezium.io/documentation/reference/stable/configuration/topic-auto-create-config.html)
+- Debezium release notes: [1.3](https://debezium.io/releases/1.3/release-notes), [1.9](https://debezium.io/releases/1.9/release-notes), [2.0](https://debezium.io/releases/2.0/release-notes), [3.3](https://debezium.io/releases/3.3/release-notes)
+- Apache Kafka 4.3: [`topic.creation.enable`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#connectconfigs_topic.creation.enable), [`auto.create.topics.enable`](https://kafka.apache.org/43/configuration/broker-configs/#brokerconfigs_auto.create.topics.enable), [Kafka Connect REST API](https://kafka.apache.org/43/kafka-connect/user-guide/#rest-api)
+- Stack Overflow, the most viewed questions on this symptom: [70006222](https://stackoverflow.com/questions/70006222), [59754337](https://stackoverflow.com/questions/59754337), [66250234](https://stackoverflow.com/questions/66250234)
