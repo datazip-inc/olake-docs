@@ -94,6 +94,18 @@ export interface RunbookFrontMatter {
     lab: string
     /** One line on what the run did and showed. */
     summary?: string
+    /**
+     * Runs on managed services and with other tools, which need more than the lab's Compose file.
+     * They have their own date, and their folders are under labs/runbooks/service-runs.
+     */
+    services?: {
+      /** ISO date of these runs. */
+      date: string
+      /** Services and tools with their exact versions. */
+      versions: string[]
+      /** Folders of the runs, relative to the repository root. */
+      labs: string[]
+    }
   }
 }
 

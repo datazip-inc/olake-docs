@@ -1,0 +1,114 @@
+
+## a cap of 64 MB on the slot, then one row, 160 MB of writes and a checkpoint while no sync runs
+ALTER SYSTEM SET max_slot_wal_keep_size = '64MB';
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+INSERT INTO orders (customer_id, status) VALUES (6, 'new');
+INSERT 0 1
+CALL write_wal(160);
+CALL
+CHECKPOINT;
+CHECKPOINT
+SELECT slot_name, database, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots WHERE slot_name = 'airbyte_slot';
+  slot_name   | database | active | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+--------------+----------+--------+-------------+---------------------+--------------+------------+---------------+---------------------
+ airbyte_slot | appdb    | f      |             | 0/A24F870           |              | lost       |               | wal_removed
+(1 row)
+
+--- server log
+2026-11-23 09:29:38.673 UTC [83] LOG:  invalidating obsolete replication slot "airbyte_slot"
+2026-11-23 09:29:38.673 UTC [83] DETAIL:  The slot's restart_lsn 0/A24F580 exceeds the limit by 31132288 bytes.
+---
+
+## a sync with the last good state
+state handed to the connector: [{"global": {"shared_state": {"state": {"[\"appdb\",{\"server\":\"appdb\"}]": "{\"lsn_proc\":170195056,\"messageType\":\"COMMIT\",\"lsn_commit\":170195056,\"lsn\":170195056,\"txId\":859,\"ts_usec\":1795426022070076}"}}, "stream_states": [{"stream_descriptor": {"name": "orders", "namespace": "public"}, "stream_state": {"cursors": {}, "state_type": "ctid_based", "stream_name": "", "stream_namespace": "", "version": 3}}]}, "sourceStats": {"recordCount": 0.0}, "type": "GLOBAL"}]
+started 2026-11-23 09:29:39 UTC
+$ docker run --rm --network rbt-abt-pg_default airbyte/source-postgres:3.8.12 read --config /work/config-app.json --catalog /work/catalog-app.json --state /work/state5.json
+exit code 1 after 2 s; messages by type: {"LOG": 40, "TEXT": 17, "TRACE": 2}
+records per stream: none
+--- connector log lines (warnings, errors, and lines about the saved position)
+INFO DefaultDispatcher-worker-2#global-round-1-create-partitions i.a.i.s.p.c.PostgresSourceDebeziumOperations(generateColdStartOffset-JhqZ4pE):179 Initial Debezium state constructed: {["appdb",{"server":"appdb"}]={"transaction_id":null,"lsn":341840832,"lsn_proc":341840832,"lsn_commit":341840832,"txId":958,"ts_usec":1795426181459703}}
+WARN DefaultDispatcher-worker-2#global i.a.c.r.RootReader$FeedExceptionHandler(handleException):152 canceled feed 'global' due to thrown exception io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+ERROR main i.a.c.AirbyteConnectorRunnable(run):38 Failed class io.airbyte.cdk.read.ReadOperation operation execution. io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+OUT io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+OUT 	at io.airbyte.integrations.source.postgres.cdc.ReplicationSlotManager.validate(ReplicationSlotManager.kt:91)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.validate-rZbDqnk(PostgresSourceDebeziumOperations.kt:214)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.startup-rZbDqnk(PostgresSourceDebeziumOperations.kt:147)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreatorDebeziumOperations.runStartup-rZbDqnk(CdcPartitionsCreatorDebeziumOperations.kt:24)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreator.run(CdcPartitionsCreator.kt:110)
+OUT 	at io.airbyte.cdk.read.FeedReader.createPartitionsWithResources(FeedReader.kt:198)
+OUT 	at io.airbyte.cdk.read.FeedReader.access$createPartitionsWithResources(FeedReader.kt:36)
+OUT 	at io.airbyte.cdk.read.FeedReader$createPartitions$3.invokeSuspend(FeedReader.kt:132)
+OUT 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+OUT 	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+OUT 	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+OUT 	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+TRACE STREAM_STATUS orders STARTED
+TRACE ERROR failure_type=config_error
+  message: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+  internal_message: io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+--- state messages: 0
+complete output: logs/raw/06-lost.jsonl.gz
+ended 2026-11-23 09:29:41 UTC
+--- the slot while the sync ran
+09:29:39  active|pid|restart_lsn|confirmed_flush_lsn = f|-||0/A24F870
+---
+
+## the same sync without any state, as after a reset of the connection
+no state is handed to the connector
+started 2026-11-23 09:29:41 UTC
+$ docker run --rm --network rbt-abt-pg_default airbyte/source-postgres:3.8.12 read --config /work/config-app.json --catalog /work/catalog-app.json
+exit code 1 after 2 s; messages by type: {"LOG": 44, "TEXT": 17, "TRACE": 2}
+records per stream: none
+--- connector log lines (warnings, errors, and lines about the saved position)
+INFO DefaultDispatcher-worker-2#global-round-1-create-partitions i.a.i.s.p.c.PostgresSourceDebeziumOperations(generateColdStartOffset-JhqZ4pE):179 Initial Debezium state constructed: {["appdb",{"server":"appdb"}]={"transaction_id":null,"lsn":341846872,"lsn_proc":341846872,"lsn_commit":341846872,"txId":959,"ts_usec":1795426183981041}}
+WARN DefaultDispatcher-worker-2#global i.a.c.r.RootReader$FeedExceptionHandler(handleException):152 canceled feed 'global' due to thrown exception io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+ERROR main i.a.c.AirbyteConnectorRunnable(run):38 Failed class io.airbyte.cdk.read.ReadOperation operation execution. io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+OUT io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+OUT 	at io.airbyte.integrations.source.postgres.cdc.ReplicationSlotManager.validate(ReplicationSlotManager.kt:91)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.validate-rZbDqnk(PostgresSourceDebeziumOperations.kt:214)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.startup-rZbDqnk(PostgresSourceDebeziumOperations.kt:147)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreatorDebeziumOperations.runStartup-rZbDqnk(CdcPartitionsCreatorDebeziumOperations.kt:24)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreator.run(CdcPartitionsCreator.kt:110)
+OUT 	at io.airbyte.cdk.read.FeedReader.createPartitionsWithResources(FeedReader.kt:198)
+OUT 	at io.airbyte.cdk.read.FeedReader.access$createPartitionsWithResources(FeedReader.kt:36)
+OUT 	at io.airbyte.cdk.read.FeedReader$createPartitions$3.invokeSuspend(FeedReader.kt:132)
+OUT 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+OUT 	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+OUT 	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+OUT 	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+TRACE STREAM_STATUS orders STARTED
+TRACE ERROR failure_type=config_error
+  message: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+  internal_message: io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+--- state messages: 0
+complete output: logs/raw/06-lost-nostate.jsonl.gz
+ended 2026-11-23 09:29:44 UTC
+--- the slot while the sync ran
+09:29:42  active|pid|restart_lsn|confirmed_flush_lsn = f|-||0/A24F870
+---
+SELECT slot_name, database, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots WHERE slot_name = 'airbyte_slot';
+  slot_name   | database | active | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+--------------+----------+--------+-------------+---------------------+--------------+------------+---------------+---------------------
+ airbyte_slot | appdb    | f      |             | 0/A24F870           |              | lost       |               | wal_removed
+(1 row)
+

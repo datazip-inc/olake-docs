@@ -1,0 +1,25 @@
+-- The same on another capture instance without waiting: clean-up by hand, up to a low watermark.
+INSERT INTO dbo.audit_notes (note) VALUES (N'first'), (N'second');
+GO
+WAITFOR DELAY '00:00:40';
+GO
+DECLARE @pos BINARY(10) = (SELECT MIN(__$start_lsn) FROM cdc.dbo_audit_notes_CT);
+SELECT COUNT(*) AS rows_in_change_table, @pos AS reader_saved_position, sys.fn_cdc_get_min_lsn(N'dbo_audit_notes') AS min_lsn FROM cdc.dbo_audit_notes_CT;
+MERGE dbo.reader_position AS p USING (SELECT N'notes' AS reader) AS s ON p.reader = s.reader
+WHEN MATCHED THEN UPDATE SET last_lsn = @pos, saved_at = SYSUTCDATETIME()
+WHEN NOT MATCHED THEN INSERT (reader, last_lsn) VALUES (N'notes', @pos);
+GO
+INSERT INTO dbo.audit_notes (note) VALUES (N'third');
+GO
+WAITFOR DELAY '00:00:40';
+GO
+DECLARE @lwm BINARY(10) = (SELECT MAX(__$start_lsn) FROM cdc.dbo_audit_notes_CT);
+EXEC sys.sp_cdc_cleanup_change_table @capture_instance = N'dbo_audit_notes', @low_water_mark = @lwm, @threshold = 5000;
+GO
+SELECT COUNT(*) AS rows_in_change_table, sys.fn_cdc_get_min_lsn(N'dbo_audit_notes') AS min_lsn FROM cdc.dbo_audit_notes_CT;
+GO
+DECLARE @saved BINARY(10) = (SELECT last_lsn FROM dbo.reader_position WHERE reader = N'notes');
+DECLARE @from BINARY(10) = sys.fn_cdc_increment_lsn(@saved), @to BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT @from AS from_lsn, sys.fn_cdc_get_min_lsn(N'dbo_audit_notes') AS min_lsn;
+SELECT COUNT(*) FROM cdc.fn_cdc_get_all_changes_dbo_audit_notes(@from, @to, N'all');
+GO

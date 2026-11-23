@@ -1,0 +1,90 @@
+=== 2026-11-23 09:18:06 UTC 04-stop-capture.sql (database master, login rbadmin)
+-- The Agent cannot be stopped by the master user, but the capture job can. This is the nearest
+-- thing to "the Agent is not running" that RDS allows.
+EXEC sys.sp_cdc_stop_job @job_type = N'capture';
+Job 'cdc.cdclab_capture' stopped successfully.
+
+SELECT COUNT(*) AS rows_in_change_table_before FROM cdc.dbo_orders_CT;
+rows_in_change_table_before
+---------------------------
+5
+
+(1 rows affected)
+
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (3, 7), (4, 8);
+
+(2 rows affected)
+
+WAITFOR DELAY '00:00:15';
+
+SELECT COUNT(*) AS rows_in_change_table_15s_later FROM cdc.dbo_orders_CT;
+SELECT sys.fn_cdc_get_max_lsn() AS max_lsn;
+rows_in_change_table_15s_later
+------------------------------
+5
+
+(1 rows affected)
+max_lsn
+-------
+0x00000029000008E00005
+
+(1 rows affected)
+
+SELECT j.name AS agent_job, a.start_execution_date, a.stop_execution_date
+FROM msdb.dbo.sysjobs j LEFT JOIN msdb.dbo.sysjobactivity a ON a.job_id = j.job_id
+WHERE j.name LIKE N'cdc.cdclab_capture%' ORDER BY a.start_execution_date DESC;
+agent_job|start_execution_date|stop_execution_date
+---------|--------------------|-------------------
+cdc.cdclab_capture|2026-11-23 09:17:24.000|2026-11-23 09:18:07.000
+
+(1 rows affected)
+
+CHECKPOINT;
+
+SELECT name, log_reuse_wait_desc FROM sys.databases WHERE name = N'cdclab';
+name|log_reuse_wait_desc
+----|-------------------
+cdclab|NOTHING
+
+(1 rows affected)
+
+SELECT COUNT(*) AS cdc_errors FROM sys.dm_cdc_errors;
+cdc_errors
+----------
+0
+
+(1 rows affected)
+
+-- One scan by hand, as on a self-hosted server.
+EXEC sys.sp_cdc_scan @maxtrans = 500, @maxscans = 10, @continuous = 0;
+
+SELECT COUNT(*) AS rows_in_change_table_after_manual_scan FROM cdc.dbo_orders_CT;
+rows_in_change_table_after_manual_scan
+--------------------------------------
+7
+
+(1 rows affected)
+
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (1, 9);
+
+(1 rows affected)
+
+EXEC sys.sp_cdc_start_job @job_type = N'capture';
+Job 'cdc.cdclab_capture' started successfully.
+
+WAITFOR DELAY '00:00:12';
+
+SELECT COUNT(*) AS rows_in_change_table_after_start FROM cdc.dbo_orders_CT;
+rows_in_change_table_after_start
+--------------------------------
+8
+
+(1 rows affected)
+
+SELECT name, log_reuse_wait_desc FROM sys.databases WHERE name = N'cdclab';
+name|log_reuse_wait_desc
+----|-------------------
+cdclab|NOTHING
+
+(1 rows affected)
+

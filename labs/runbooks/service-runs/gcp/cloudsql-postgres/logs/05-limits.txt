@@ -1,0 +1,72 @@
+# max_replication_slots and max_wal_senders
+# 2026-11-23 10:29:24 UTC, instance rbtest-pg, POSTGRES_17 POSTGRES_17_11 db-f1-micro ENTERPRISE asia-south1
+
+SELECT name, setting FROM pg_settings WHERE name IN ('max_replication_slots','max_wal_senders') ORDER BY name;
+         name          | setting 
+-----------------------+---------
+ max_replication_slots | 10
+ max_wal_senders       | 10
+(2 rows)
+
+# create slots until the server refuses (max_replication_slots = 10)
+slot  1: lim_1 
+slot  2: lim_2 
+slot  3: lim_3 
+slot  4: lim_4 
+slot  5: lim_5 
+slot  6: lim_6 
+slot  7: lim_7 
+slot  8: lim_8 
+slot  9: lim_9 
+slot 10: lim_10 
+slot 11: ERROR:  all replication slots are in use HINT:  Free one or increase "max_replication_slots". 
+
+# one streaming connection per slot, then one more connection (max_wal_senders = 10)
+SELECT count(*) AS wal_senders FROM pg_stat_replication;
+ wal_senders 
+-------------
+          10
+(1 row)
+
+SELECT count(*) FILTER (WHERE active) AS active_slots, count(*) AS slots FROM pg_replication_slots;
+ active_slots | slots 
+--------------+-------
+           10 |    10
+(1 row)
+
+psql "dbname=appdb user=postgres replication=database" -c "IDENTIFY_SYSTEM;"
+psql: error: connection to server at "<instance-ip>", port 5432 failed: FATAL:  number of requested standby connections exceeds "max_wal_senders" (currently 10)
+# the receivers that did not get a connection say:
+
+# free one slot and ask again
+SELECT pg_drop_replication_slot('lim_1');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+SELECT slot_name FROM pg_create_logical_replication_slot('lim_again', 'pgoutput');
+ slot_name 
+-----------
+ lim_again
+(1 row)
+
+
+# raise both limits with flags
+$ gcloud sql instances patch rbtest-pg --database-flags=cloudsql.logical_decoding=on,max_replication_slots=100000,max_wal_senders=100000
+The following message will be used for the patch API method.
+{"name": "rbtest-pg", "project": "<project>", "settings": {"databaseFlags": [{"name": "cloudsql.logical_decoding", "value": "on"}, {"name": "max_replication_slots", "value": "100000"}, {"name": "max_wal_senders", "value": "100000"}]}}
+ERROR: (gcloud.sql.instances.patch) HTTPError 400: Value requested is not valid. Failed to set max_replication_slots: 100000 is not between 10 and 8192.
+$ gcloud sql instances patch rbtest-pg --database-flags=cloudsql.logical_decoding=on,max_replication_slots=12,max_wal_senders=12
+The following message will be used for the patch API method.
+{"name": "rbtest-pg", "project": "<project>", "settings": {"databaseFlags": [{"name": "cloudsql.logical_decoding", "value": "on"}, {"name": "max_replication_slots", "value": "12"}, {"name": "max_wal_senders", "value": "12"}]}}
+ERROR: (gcloud.sql.instances.patch) HTTPError 400: Value requested is not valid. Failed to set max_replication_slots: 12 is greater than 10. For Instances in db-f1-micro with 1024MB RAM, max_replication_slots cannot exceed 10.
+2026-11-23 10:30:03 UTC  state RUNNABLE again after 2 s
+SELECT name, setting FROM pg_settings WHERE name IN ('max_replication_slots','max_wal_senders','wal_level') ORDER BY name;
+         name          | setting 
+-----------------------+---------
+ max_replication_slots | 10
+ max_wal_senders       | 10
+ wal_level             | logical
+(3 rows)
+

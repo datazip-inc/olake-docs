@@ -8,6 +8,8 @@
  * A runbook is published only when a failure was reproduced and a second person has read it:
  *   - the `runbook:` front matter names a family, an author from the people registry, the date and
  *     versions of the run, and a lab folder that exists with its script, read-me and logs;
+ *   - if the page also names runs on managed services or with other tools (`reproduced.services`),
+ *     those have a date, versions and folders under labs/runbooks/service-runs that exist;
  *   - the page stays `unlisted: true` until `runbook.reviewer` names a second person;
  *   - the page follows the writing rules the integration pages use (no em dashes or curly quotes,
  *     title and description lengths).
@@ -91,6 +93,23 @@ for (const file of fs.existsSync(DIR) ? walk(DIR) : []) {
     }
     const logs = path.join(lab, 'logs')
     if (!fs.existsSync(logs) || !walk(logs, []).length && !fs.readdirSync(logs).length) err(file, 'lab has no captured logs')
+  }
+  // Runs on managed services and with other tools: an optional block with its own date and folders.
+  const svc = run.services
+  if (svc) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(svc.date || ''))) err(file, 'reproduced.services.date must be an ISO date')
+    if (!Array.isArray(svc.versions) || !svc.versions.length) err(file, 'reproduced.services.versions must list what was run')
+    if (!Array.isArray(svc.labs) || !svc.labs.length) err(file, 'reproduced.services.labs must list the folders of the runs')
+    for (const dir of Array.isArray(svc.labs) ? svc.labs : []) {
+      const d = path.join(ROOT, dir)
+      if (!dir.startsWith('labs/runbooks/service-runs/') || !fs.existsSync(d)) {
+        err(file, `service-run folder "${dir}" does not exist under labs/runbooks/service-runs`)
+        continue
+      }
+      if (!fs.existsSync(path.join(d, 'README.md'))) err(file, `service-run folder "${dir}" has no README.md`)
+      const l = path.join(d, 'logs')
+      if (!fs.existsSync(l) || !fs.readdirSync(l).length) err(file, `service-run folder "${dir}" has no captured logs`)
+    }
   }
 
   for (const tag of ['<R.Disclosure', '<R.Byline', '<R.HowWeReproduced']) {

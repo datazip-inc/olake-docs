@@ -17,4 +17,8 @@ Rules for a lab:
 - Keep the fix for the tool the page is about. A lab never "fixes" a failure by switching tools.
 - When a page changes, run the lab again and update `runbook.reproduced` in the page front matter. The date changes only when the lab is run.
 
-`node scripts/runbooks/check.mjs` checks that every runbook page points to a lab that exists.
+## Runs on managed services and with other tools
+
+Some runbooks also say what a managed database service or another tool does in the same situation. Those statements are backed by the runs under [`service-runs/`](service-runs/README.md): Amazon RDS, Aurora and DMS, Google Cloud SQL, Azure, and Debezium, Airbyte and Flink CDC. The cloud runs need an account, so they have a set-up script and a teardown script where the other labs have a Compose file. A page that uses them names the folders in `runbook.reproduced.services` in its front matter, with the date of those runs.
+
+`node scripts/runbooks/check.mjs` checks that every runbook page points to a lab that exists, and that the service-run folders it names exist.

@@ -28,6 +28,19 @@ export default function HowWeReproduced() {
           The lab is in the docs repository at <a href={`${REPO}${r.lab}`}>{r.lab}</a>: one Docker Compose file, one
           script, and the logs this page quotes.
         </li>
+        {r.services ? (
+          <li>
+            The managed services and the other tools were run on <strong>{r.services.date}</strong> with{' '}
+            {r.services.versions.join(', ')}. Those runs are in{' '}
+            {r.services.labs.map((lab, i) => (
+              <React.Fragment key={lab}>
+                {i > 0 ? ', ' : ''}
+                <a href={`${REPO}${lab}`}>{lab.split('/').slice(-2).join('/')}</a>
+              </React.Fragment>
+            ))}
+            .
+          </li>
+        ) : null}
         {reviewer ? <li>Reviewed by {reviewer.name}.</li> : null}
       </ul>
     </aside>
