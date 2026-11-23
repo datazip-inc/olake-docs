@@ -35,20 +35,13 @@ You ran `sys.sp_cdc_enable_db` and `sys.sp_cdc_enable_table`, both returned with
 
 <R.Disclosure />
 
-**The short answer.** Change data capture (CDC) needs three things: the database enabled by a member of `sysadmin`, each table enabled by a member of `db_owner`, and SQL Server Agent running. The Agent is disabled by default on Linux and in containers, and both procedures succeed without it.
+**The short answer.** Change data capture (CDC) needs three things, and the change table stays empty without the third:
 
-```sql
-USE cdclab;
-EXEC sys.sp_cdc_enable_db;
-EXEC sys.sp_cdc_enable_table
-  @source_schema = N'dbo', @source_name = N'orders',
-  @role_name = NULL, @supports_net_changes = 1;
+- **The database** enabled with `sys.sp_cdc_enable_db` by a member of `sysadmin`.
+- **Each table** enabled with `sys.sp_cdc_enable_table` by a member of `db_owner`.
+- **SQL Server Agent running.** It is disabled by default on Linux and in containers, and both procedures succeed without it.
 
--- SQL Server Agent must be Running, or cdc.dbo_orders_CT stays empty
-SELECT servicename, status_desc, startup_type_desc FROM sys.dm_server_services;
-```
-
-Changes made while the Agent is stopped are not lost. They stay in the transaction log, and the capture job reads them once it runs.
+Changes made while the Agent is stopped are not lost. They stay in the transaction log, and the capture job reads them once it runs. The set-up is under [Enable CDC step by step](#enable-cdc-step-by-step), and the Agent check under [Confirm the diagnosis](#confirm-the-diagnosis).
 
 <TLDR title='Key takeaways'>
 
@@ -58,7 +51,18 @@ Changes made while the Agent is stopped are not lost. They stay in the transacti
 
 </TLDR>
 
-## The messages, by version
+## What you see
+
+Either the enable calls succeed and the change table stays empty, or a call fails with a message number. Each points at one issue:
+
+| Issue | What you see |
+| --- | --- |
+| [1. Enabling CDC fails](#issue-1-enabling-cdc-fails) | Msg 22901, 22902, 22904, 22906, 22830 or 22939 from `sys.sp_cdc_enable_db` or `sys.sp_cdc_enable_table` |
+| [2. The change table stays empty](#issue-2-the-change-table-stays-empty) | No error, only `SQLServerAgent is not currently running so it cannot be notified of this action.`, and 0 rows in the change table |
+| [3. Msg 313 when reading changes](#issue-3-msg-313-when-reading-changes) | `An insufficient number of arguments were supplied for the procedure or function cdc.fn_cdc_get_all_changes_ ...` |
+| [4. A new column is not captured](#issue-4-a-new-column-is-not-captured) | No error. The column is missing from the change table, and a third capture instance gives Msg 22962 |
+
+### The same messages on 2022 and 2019
 
 SQL Server 2022 (16.0.4305.5) and SQL Server 2019 (15.0.4510.2) gave the same text for every message below. Only the procedure line number in the message header differs, for example `Procedure sys.sp_cdc_enable_db_internal, Line 281` on 2022 and `Line 258` on 2019.
 
@@ -100,29 +104,9 @@ Three other things give the same symptom.
 - **The rows are older than CDC.** Only changes made after the table was enabled are captured. The 4 orders that existed before never appeared in the change table.
 - **You are reading the wrong capture instance.** A table can have two, each with its own change table.
 
-## Confirm the diagnosis
-
-Run these in the database. The comments show what the run returned with the Agent off.
-
-```sql
-SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;    -- 0
-SELECT sys.fn_cdc_get_max_lsn() AS max_lsn;                        -- NULL
-SELECT COUNT(*) AS log_scan_sessions FROM sys.dm_cdc_log_scan_sessions;   -- 0
-SELECT COUNT(*) AS cdc_errors FROM sys.dm_cdc_errors;              -- 0
-SELECT servicename, status_desc, startup_type_desc FROM sys.dm_server_services;
-SELECT COUNT(*) AS agent_sessions FROM sys.dm_exec_sessions WHERE program_name LIKE N'SQLAgent%';   -- 0
-```
-
-```text
-servicename|status_desc|startup_type_desc
-SQL Server Agent (MSSQLSERVER)|Stopped|Automatic
-```
-
-On SQL Server 2019 the same view listed a second row, `SQL Server (MSSQLSERVER)|Stopped|Disabled`, so read the Agent row. With the Agent running the run showed `Running` and 4 Agent sessions.
-
-The jobs existed and had never run: `start_execution_date` was NULL for both in `msdb.dbo.sysjobactivity`. `sys.dm_cdc_errors` was empty too, because nothing had failed.
-
-The transaction log tells the same story. After a `CHECKPOINT`, `log_reuse_wait_desc` in `sys.databases` was `REPLICATION`, which means the log cannot be reused past changes that capture has not read. It went back to `NOTHING` once the Agent ran.
+:::note[Versions on this page]
+The runs used **SQL Server 2022 (RTM-CU27-GDR) 16.0.4305.5** and **SQL Server 2019 (RTM-CU32-GDR) 15.0.4510.2**, Developer Edition on Linux, in containers. Both gave the same result in every step. Output with no version named is from **SQL Server 2022**. The managed services and other tools were not run: that section quotes their documentation.
+:::
 
 ## Enable CDC step by step
 
@@ -160,7 +144,7 @@ EXEC sys.sp_cdc_help_jobs;
 
 **4. Check that the Agent is running**, with the query from the short answer.
 
-**5. Change a row and look.** With the Agent running, an insert was in the change table within 10 seconds in the run. The capture job polls every 5 seconds by default.
+**5. Change a row and look.** With the Agent running, an insert was in the change table within 10 seconds in the run. The capture job polls every 5 seconds by default. These were the first five rows of the change table:
 
 ```text
 __$start_lsn|__$operation|id|customer_id|quantity
@@ -175,7 +159,7 @@ Those five rows are two inserts (operation 2), one update as its before and afte
 
 To turn CDC off, `sys.sp_cdc_disable_table` removes one capture instance and `sys.sp_cdc_disable_db` removes everything. After the second call the run showed `is_cdc_enabled` 0, no `cdc` schema and no CDC jobs.
 
-## Fix: errors when enabling
+## Issue 1: Enabling CDC fails
 
 Each fix below was run on both versions, and the enable call succeeded afterwards.
 
@@ -204,9 +188,9 @@ EXEC sys.sp_cdc_enable_db;
 ENABLE TRIGGER lab_audit_ddl ON DATABASE;
 ```
 
-## Fix: change tables stay empty
+## Issue 2: The change table stays empty
 
-Start SQL Server Agent. In a container, set `MSSQL_AGENT_ENABLED=true` and create the container again over the same data volume, which is what the lab did:
+Both enable calls succeeded, and the change table has no rows. Start SQL Server Agent. In a container, set `MSSQL_AGENT_ENABLED=true` and create the container again over the same data volume, which is what the lab did:
 
 ```yaml
 environment:
@@ -217,6 +201,14 @@ environment:
 On a Linux host installed from packages, Microsoft's [Agent set-up page](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup-sql-agent?view=sql-server-ver16) gives `sudo /opt/mssql/bin/mssql-conf set sqlagent.enabled true` followed by a restart of the service. That path was not run here.
 
 In the run, 4 rows were changed while the Agent was off, and one more later. After the Agent started, the capture job's `start_execution_date` was set, the row that had been waiting was captured, and a new insert arrived within 10 seconds. Nothing had to be enabled again.
+
+| After | Rows in `cdc.dbo_orders_CT` |
+| --- | --- |
+| 4 changes with the Agent stopped | 0, and `sys.fn_cdc_get_max_lsn()` is NULL |
+| One manual `sys.sp_cdc_scan` (see below) | 5: two inserts, an update as two rows, and a delete |
+| One more insert, the Agent still stopped | 5 |
+| The Agent started | 6: the waiting insert is captured |
+| A new insert | 7, within 10 seconds |
 
 If the Agent is running and the table is still empty, the capture job may be stopped:
 
@@ -234,7 +226,7 @@ EXEC sys.sp_cdc_scan @maxtrans = 500, @maxscans = 10, @continuous = 0;
 
 In the run it wrote the 5 waiting change rows with the Agent off. It is a test, not a set-up: the next insert stayed uncaptured until the Agent ran.
 
-## Fix: Msg 313 and the LSN range
+## Issue 3: Msg 313 when reading changes
 
 `cdc.fn_cdc_get_all_changes_<capture_instance>` takes a low and a high LSN. Both must lie between the minimum LSN of the capture instance and the maximum LSN of the database:
 
@@ -265,6 +257,12 @@ A reader that saves its position and comes back later can find that position bel
 
 The change table went from 11 rows to 3, and the minimum LSN moved to `0x0000002C00000CB80003`. The reader's next call started at `0x0000002C00000C500005`, below the new minimum, and failed with Msg 313. The first of the two changes was gone from the change table for good.
 
+| | Before clean-up | After clean-up |
+| --- | --- | --- |
+| Rows in `cdc.dbo_orders_CT` | 11 | 3 |
+| Minimum LSN of `dbo_orders` | `0x0000002A00000C380047` | `0x0000002C00000CB80003` |
+| The reader's next start, `0x0000002C00000C500005` | Inside the range | Below the minimum: Msg 313 |
+
 Check before every call, and treat a position below the minimum as lost history:
 
 ```sql
@@ -283,7 +281,7 @@ ELSE
 
 The recovery in the run was to read the 10 rows of the source table again and save the current maximum LSN as the new position. The next change was then read normally.
 
-## Fix: a schema change needs a new capture instance
+## Issue 4: A new column is not captured
 
 A change table has a fixed set of columns. In the run a column named `note` was added to `dbo.orders` and a row was written with it. The change table still had its 4 original columns, and the change row carried no note.
 
@@ -303,11 +301,43 @@ EXEC sys.sp_cdc_disable_table
   @source_schema = N'dbo', @source_name = N'orders', @capture_instance = N'dbo_orders';
 ```
 
-Three results from the run are worth planning for.
+What each change to `dbo.orders` did to the change tables in the run:
+
+| Change | Change table afterwards | Rows written afterwards |
+| --- | --- | --- |
+| `ADD note NVARCHAR(50)` | `dbo_orders_CT` keeps its 4 columns | Captured without `note` |
+| A second capture instance, `dbo_orders_v2` | `dbo_orders_v2_CT` has `note` | Captured with `note`, from the instance's own start |
+| `DROP COLUMN note` | `dbo_orders_v2_CT` keeps `note` | `note` is NULL |
+| `ALTER COLUMN quantity BIGINT NOT NULL` | `quantity` becomes `bigint` in `dbo_orders_v2_CT` | Captured as `bigint` |
+
+Two results from the run are worth planning for.
 
 - **There is a gap.** The row written after the `ALTER TABLE` and before the new instance is in the old change table without its note, and not in the new one. Its note value reached no change table.
 - **Two is the limit.** A third instance failed with Msg 22962, so drop the old one before the next schema change.
-- **Other changes behave differently.** After `DROP COLUMN note`, the change table kept the column and new rows had NULL in it. After `ALTER COLUMN quantity BIGINT`, the change table column became `bigint` by itself.
+
+## Confirm the diagnosis
+
+Run these in the database. The comments show what the run returned with the Agent off.
+
+```sql
+SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;    -- 0
+SELECT sys.fn_cdc_get_max_lsn() AS max_lsn;                        -- NULL
+SELECT COUNT(*) AS log_scan_sessions FROM sys.dm_cdc_log_scan_sessions;   -- 0
+SELECT COUNT(*) AS cdc_errors FROM sys.dm_cdc_errors;              -- 0
+SELECT servicename, status_desc, startup_type_desc FROM sys.dm_server_services;
+SELECT COUNT(*) AS agent_sessions FROM sys.dm_exec_sessions WHERE program_name LIKE N'SQLAgent%';   -- 0
+```
+
+```text
+servicename|status_desc|startup_type_desc
+SQL Server Agent (MSSQLSERVER)|Stopped|Automatic
+```
+
+On SQL Server 2019 the same view listed a second row, `SQL Server (MSSQLSERVER)|Stopped|Disabled`, so read the Agent row. With the Agent running the run showed `Running` and 4 Agent sessions.
+
+The jobs existed and had never run: `start_execution_date` was NULL for both in `msdb.dbo.sysjobactivity`. `sys.dm_cdc_errors` was empty too, because nothing had failed.
+
+The transaction log tells the same story. After a `CHECKPOINT`, `log_reuse_wait_desc` in `sys.databases` was `REPLICATION`, which means the log cannot be reused past changes that capture has not read. It went back to `NOTHING` once the Agent ran.
 
 ## Prevent it
 
@@ -339,16 +369,6 @@ In the run, with a 1-minute retention, the newest captured change was committed 
 - Read `sys.dm_cdc_errors`, and do not rely on it alone. It was empty in the run even while the change table stayed empty.
 - Create the new capture instance in the same change window as the schema change, to keep the gap short.
 
-:::note[How OLake Go handles this]
-
-OLake Go reads the same change tables, so it has the same limits. Its [SQL Server connector](/docs/connectors/mssql/#cdc-prerequisites) needs CDC enabled on the database and on each table, and its connection check looks for the capture job.
-
-The connector's documentation says that change tables keep 3 days by default, and that if events expire before they are processed "a **full backfill** is required to restore consistency". It supports SQL Server 2017 or higher.
-
-For schema changes it [switches to a second capture instance](/docs/connectors/mssql/#4-handling-ddl-alterations-to-source-tables) once one exists. With **Manage Capture Instance** turned on it creates that instance itself, which needs `db_owner` for its user.
-
-:::
-
 ## Managed services and other tools
 
 This section quotes documentation, checked on 16 November 2026. None of it was run here.
@@ -366,6 +386,16 @@ For a new column the same page describes the gap seen in the run. With an [onlin
 **Airbyte.** The [SQL Server source page](https://docs.airbyte.com/integrations/sources/mssql) says: "Airbyte recommends retaining at least 7 days of CDC data." For a new column, its [troubleshooting page](https://docs.airbyte.com/integrations/sources/mssql/mssql-troubleshooting) recommends disabling and enabling CDC on the table again, which replaces the capture instance where the steps above run two side by side.
 
 **Flink CDC.** The [SQL Server connector page](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/sqlserver-cdc/) lists the same prerequisite: "The SQL Server Agent is running."
+
+:::note[How OLake Go handles this]
+
+OLake Go reads the same change tables, so it has the same limits. Its [SQL Server connector](/docs/connectors/mssql/#cdc-prerequisites) needs CDC enabled on the database and on each table, and its connection check looks for the capture job.
+
+The connector's documentation says that change tables keep 3 days by default, and that if events expire before they are processed "a **full backfill** is required to restore consistency". It supports SQL Server 2017 or higher.
+
+For schema changes it [switches to a second capture instance](/docs/connectors/mssql/#4-handling-ddl-alterations-to-source-tables) once one exists. With **Manage Capture Instance** turned on it creates that instance itself, which needs `db_owner` for its user.
+
+:::
 
 <R.HowWeReproduced />
 
