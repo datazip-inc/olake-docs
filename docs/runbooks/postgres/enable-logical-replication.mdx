@@ -104,6 +104,33 @@ The sixth is about the rows. For an update or a delete, PostgreSQL has to tell t
 The runs used **PostgreSQL 12.22, 13.23, 14.25, 15.19, 16.15, 17.12 and 18.7**, and **PostgreSQL 19rc2**, a release candidate, each on a self-hosted server. Output with no version named is from **18.7**. Two boundaries come from PostgreSQL itself and not from the runs. The setting `output_plugin_libraries` arrived in the minor releases of 13 August 2026: [18.6](https://www.postgresql.org/docs/release/18.6/), [17.11](https://www.postgresql.org/docs/release/17.11/), [16.15](https://www.postgresql.org/docs/release/16.15/), [15.19](https://www.postgresql.org/docs/release/15.19/) and [14.24](https://www.postgresql.org/docs/release/14.24/). The warning about a skipped publication is in the [source of 18.0](https://github.com/postgres/postgres/blob/REL_18_0/src/backend/replication/pgoutput/pgoutput.c) and is not in the 17 branch. The managed services were run separately on 23 November 2026, each on PostgreSQL 17.11.
 :::
 
+## Confirm the diagnosis
+
+On a self-hosted server, the six in order:
+
+```sql
+ALTER SYSTEM SET wal_level = logical;
+-- restart PostgreSQL, then:
+CREATE ROLE cdc_user LOGIN PASSWORD 'change-me';
+ALTER ROLE cdc_user REPLICATION;
+GRANT USAGE ON SCHEMA public TO cdc_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+```
+
+Every published table that receives updates or deletes also needs a primary key or another replica identity, as in [Issue 6](#issue-6-a-table-has-no-replica-identity).
+
+With the six in place, the capture role created its own slot, three statements changed a row, and the role read them back as ten `pgoutput` messages: `B`, `R`, `I`, `C` for the insert, then `B`, `U`, `C` and `B`, `D`, `C`.
+
+```sql
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+SELECT lsn, xid, chr(get_byte(data, 0)) AS message
+FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+```
+
+`peek` reads without consuming, so the tool still gets these changes. If the slot was only a test, drop it with `SELECT pg_drop_replication_slot('cdc_slot');`. A slot that is left behind keeps WAL until the disk is full.
+
 ## Issue 1: wal_level is not logical
 
 A new server has `wal_level = replica`. A request for a logical slot fails, from SQL and over the replication protocol alike:
@@ -402,33 +429,6 @@ What each identity left the table and the consumer with on 18.7, read with the `
 | `DEFAULT`, no primary key | Refused for every session | Nothing | Nothing | Nothing |
 | `DEFAULT`, with a primary key | Allowed | The new row | The key | `unchanged-toast-datum` |
 | `FULL` | Allowed | The old row and the new row | The whole old row | The full value in the old row, `unchanged-toast-datum` in the new row |
-
-## Confirm the diagnosis
-
-On a self-hosted server, the six in order:
-
-```sql
-ALTER SYSTEM SET wal_level = logical;
--- restart PostgreSQL, then:
-CREATE ROLE cdc_user LOGIN PASSWORD 'change-me';
-ALTER ROLE cdc_user REPLICATION;
-GRANT USAGE ON SCHEMA public TO cdc_user;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
-CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
-SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
-```
-
-Every published table that receives updates or deletes also needs a primary key or another replica identity, as in [Issue 6](#issue-6-a-table-has-no-replica-identity).
-
-With the six in place, the capture role created its own slot, three statements changed a row, and the role read them back as ten `pgoutput` messages: `B`, `R`, `I`, `C` for the insert, then `B`, `U`, `C` and `B`, `D`, `C`.
-
-```sql
-SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
-SELECT lsn, xid, chr(get_byte(data, 0)) AS message
-FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
-```
-
-`peek` reads without consuming, so the tool still gets these changes. If the slot was only a test, drop it with `SELECT pg_drop_replication_slot('cdc_slot');`. A slot that is left behind keeps WAL until the disk is full.
 
 ## Managed services
 
