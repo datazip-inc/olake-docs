@@ -94,6 +94,14 @@ Page: `docs/runbooks/sql-server/enable-cdc-change-tables-empty.mdx`.
 |  | Debezium | Events lack the column until the second capture instance exists. It appears 4 s after, with no restart | `tools/debezium-sqlserver` |
 |  | Flink CDC | NULL until the second capture instance exists. The connector switches to it by itself | `tools/flink-cdc-sqlserver` |
 
+## Checks of the setup guides
+
+While the instances were up, the statements of the OLake setup guides for the same services were run on them as well:
+
+- PostgreSQL on RDS, Aurora, Cloud SQL and Azure: the `publication` and `plugins` steps of `aws/postgres-rds`, `aws/postgres-aurora`, `gcp/cloudsql-postgres` and `azure/postgres-flexible-server`, and the `timeout` step of the three that have one.
+- MySQL on RDS and Aurora: `aws/mysql-setup-guides`.
+- SQL Server on RDS: the steps `06-olake-docs-user.sql`, `07-as-olake-user.sql` and `09-role-name.sql` of `aws/sqlserver-rds`.
+
 ## Running them again
 
 The `tools/` folders need only Docker, like the other labs. Each `run.sh` lists its steps.
