@@ -54,20 +54,16 @@ This page sets the six up in order on a self-hosted server and shows the error e
 
 <R.Disclosure />
 
-**The short answer.** On a self-hosted server, set `wal_level` to `logical` and restart. Then create a role with the `REPLICATION` attribute, a publication for the tables, and a slot that uses the built-in `pgoutput` plugin.
+**The short answer.** Logical decoding needs six things on the server, and each error on this page points at one of them:
 
-```sql
-ALTER SYSTEM SET wal_level = logical;
--- restart PostgreSQL, then:
-CREATE ROLE cdc_user LOGIN PASSWORD 'change-me';
-ALTER ROLE cdc_user REPLICATION;
-GRANT USAGE ON SCHEMA public TO cdc_user;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
-CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
-SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
-```
+- **`wal_level = logical`:** set it and restart the server. PostgreSQL 19rc2 also created a logical slot with `wal_level = replica`.
+- **A free slot and WAL sender:** `max_replication_slots` and `max_wal_senders`, 10 each by default.
+- **A role with the `REPLICATION` attribute,** and `SELECT` on the tables it copies.
+- **A publication** for the tables, created by an administrator.
+- **An output plugin:** the built-in `pgoutput` needs nothing installed.
+- **A replica identity,** usually a primary key, on every published table that receives updates or deletes.
 
-Every published table that receives updates or deletes also needs a primary key or another replica identity. On a managed service the first line is a setting of the service, and the rest is the same SQL.
+On a managed service the first one is a setting of the service, and the rest is the same SQL. The whole set-up, in order, is under [Confirm the diagnosis](#confirm-the-diagnosis).
 
 <TLDR title='Key takeaways'>
 
@@ -77,47 +73,64 @@ Every published table that receives updates or deletes also needs a primary key 
 
 </TLDR>
 
-## The errors, by prerequisite and version
+## What you see
 
-Every message below was captured in the lab. The last column gives the versions that printed it.
+Each missing prerequisite gives its own message, and each message points at one issue. Every message below was captured in the lab, and the last column gives the versions that printed it.
 
-| Missing | Message | Printed by |
+| Issue | Message | Printed by |
 | --- | --- | --- |
-| `wal_level = logical` | `ERROR:  logical decoding requires wal_level >= logical` | 12.22, 13.23, 14.25, 15.19, 16.15 |
+| [1. wal_level is not logical](#issue-1-wal_level-is-not-logical) | `ERROR:  logical decoding requires wal_level >= logical` | 12.22, 13.23, 14.25, 15.19, 16.15 |
 | | `ERROR:  logical decoding requires "wal_level" >= "logical"` | 17.12, 18.7 |
 | | No error: the slot is created with `wal_level = replica` | 19rc2 |
-| A free slot | `ERROR:  all replication slots are in use` | all eight |
-| A free sender | `FATAL:  number of requested standby connections exceeds max_wal_senders (currently 2)` | 12.22 to 16.15. From 17.12 the setting name is in double quotes |
-| The `REPLICATION` attribute | `ERROR:  must be superuser or replication role to use replication slots` | 12.22, 13.23, 14.25, 15.19 |
+| [2. No free slot or WAL sender](#issue-2-no-free-slot-or-wal-sender) | `ERROR:  all replication slots are in use` | all eight |
+| | `FATAL:  number of requested standby connections exceeds max_wal_senders (currently 2)` | 12.22 to 16.15. From 17.12 the setting name is in double quotes |
+| [3. The role cannot replicate](#issue-3-the-role-cannot-replicate) | `ERROR:  must be superuser or replication role to use replication slots` | 12.22, 13.23, 14.25, 15.19 |
 | | `ERROR:  permission denied to use replication slots` | 16.15, 17.12, 18.7, 19rc2 |
 | | `FATAL:  must be superuser or replication role to start walsender` | 12.22, 13.23, 14.25, 15.19 |
 | | `FATAL:  permission denied to start WAL sender` | 16.15, 17.12, 18.7, 19rc2 |
-| The publication | `ERROR:  publication "cdc_publication" does not exist` | 12.22 to 17.12 |
+| [4. The publication is missing or misnamed](#issue-4-the-publication-is-missing-or-misnamed) | `ERROR:  publication "cdc_publication" does not exist` | 12.22 to 17.12 |
 | | `WARNING:  skipped loading publication "cdc_publication"` | 18.7, 19rc2 |
-| The output plugin | `ERROR:  could not access file "wal2json": No such file or directory` | 12.22, 13.23. On later versions only once the plugin is allowed |
+| [5. The output plugin is not installed or allowed](#issue-5-the-output-plugin-is-not-installed-or-allowed) | `ERROR:  could not access file "wal2json": No such file or directory` | 12.22, 13.23. On later versions only once the plugin is allowed |
 | | `ERROR:  library "wal2json" may not be used as an output plugin` | 14.25, 15.19, 16.15, 17.12, 18.7, 19rc2 |
-| A replica identity | `ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates` | all eight |
+| [6. A table has no replica identity](#issue-6-a-table-has-no-replica-identity) | `ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates` | all eight |
 
-Two boundaries come from PostgreSQL itself and not from the runs. The setting `output_plugin_libraries` arrived in the minor releases of 13 August 2026: [18.6](https://www.postgresql.org/docs/release/18.6/), [17.11](https://www.postgresql.org/docs/release/17.11/), [16.15](https://www.postgresql.org/docs/release/16.15/), [15.19](https://www.postgresql.org/docs/release/15.19/) and [14.24](https://www.postgresql.org/docs/release/14.24/). The warning about a skipped publication is in the [source of 18.0](https://github.com/postgres/postgres/blob/REL_18_0/src/backend/replication/pgoutput/pgoutput.c) and is not in the 17 branch.
-
-## Why there are six
+## Why six prerequisites
 
 Logical decoding turns the write-ahead log (WAL) back into row changes. The WAL has to carry enough detail (`wal_level`), and the server needs room for a slot that remembers how far the reader got and for a process that sends the changes (the two limits). A role has to be allowed to do this, a publication has to say which tables are sent, and an output plugin has to choose the format.
 
 The sixth is about the rows. For an update or a delete, PostgreSQL has to tell the reader which row changed, and it does that with the table's replica identity. The PostgreSQL manual puts it this way: "A published table must have a replica identity configured in order to be able to replicate UPDATE and DELETE operations" ([Replica Identity](https://www.postgresql.org/docs/current/logical-replication-publication.html)).
 
-## Self-hosted PostgreSQL
+:::note[Versions on this page]
+The runs used **PostgreSQL 12.22, 13.23, 14.25, 15.19, 16.15, 17.12 and 18.7**, and **PostgreSQL 19rc2**, a release candidate, each on a self-hosted server. Output with no version named is from **18.7**. Two boundaries come from PostgreSQL itself and not from the runs. The setting `output_plugin_libraries` arrived in the minor releases of 13 August 2026: [18.6](https://www.postgresql.org/docs/release/18.6/), [17.11](https://www.postgresql.org/docs/release/17.11/), [16.15](https://www.postgresql.org/docs/release/16.15/), [15.19](https://www.postgresql.org/docs/release/15.19/) and [14.24](https://www.postgresql.org/docs/release/14.24/). The warning about a skipped publication is in the [source of 18.0](https://github.com/postgres/postgres/blob/REL_18_0/src/backend/replication/pgoutput/pgoutput.c) and is not in the 17 branch. The managed services were run separately on 23 November 2026, each on PostgreSQL 17.11.
+:::
 
-Everything in this section was run on each of the eight versions. The outputs shown are from 18.7 unless a version is named.
-
-### 1. Set wal_level to logical
+## Issue 1: wal_level is not logical
 
 A new server has `wal_level = replica`. A request for a logical slot fails, from SQL and over the replication protocol alike:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-16" label="PostgreSQL 12.22 to 16.15" default>
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ERROR:  logical decoding requires wal_level >= logical
+```
+
+</TabItem>
+<TabItem value="17-18" label="PostgreSQL 17.12 and 18.7">
 
 ```text
 SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
 ERROR:  logical decoding requires "wal_level" >= "logical"
 ```
+
+</TabItem>
+<TabItem value="19" label="PostgreSQL 19rc2">
+
+No error. The slot is created with `wal_level = replica`, as described under **PostgreSQL 19** below.
+
+</TabItem>
+</Tabs>
 
 Changing the setting and reloading is not enough. The value on disk changes, the running server keeps the old one, and `pg_settings` says so:
 
@@ -138,7 +151,7 @@ A publication can be created before the restart. PostgreSQL 13.23 to 18.7 answer
 
 The [19 release notes](https://www.postgresql.org/docs/19/release-19.html) say: "Logical replication can now be enabled without a server restart when wal_level is set to replica." With `wal_level = minimal` the request answered `ERROR:  replication slots can only be used if "wal_level" >= "replica"`.
 
-### 2. Leave room for a slot and a sender
+## Issue 2: No free slot or WAL sender
 
 Each consumer holds one replication slot, and one WAL sender process while it is connected. Both limits were 10 by default on every version in the run, and both can only change with a restart. With the limits lowered to 2, the third slot and the third connection were refused:
 
@@ -162,9 +175,24 @@ In the run, dropping one unused slot let the refused request through at once. A 
 
 To raise the limits, set `max_replication_slots` and `max_wal_senders` and restart. The manual's sizing rule is: "max_wal_senders should be set to at least the same as max_replication_slots, plus the number of physical replicas that are connected at the same time" ([Configuration Settings](https://www.postgresql.org/docs/current/logical-replication-config.html)).
 
-### 3. Create a role that may replicate
+## Issue 3: The role cannot replicate
 
-A role needs the `REPLICATION` attribute to use a slot and to open a replication connection. Without it, PostgreSQL 16.15 and later answered:
+A role needs the `REPLICATION` attribute to use a slot and to open a replication connection. Without it, both are refused, and the wording changed in PostgreSQL 16:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-15" label="PostgreSQL 12.22 to 15.19" default>
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
+ERROR:  must be superuser or replication role to use replication slots
+```
+
+```text
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  must be superuser or replication role to start walsender
+```
+
+</TabItem>
+<TabItem value="16+" label="PostgreSQL 16.15 to 19rc2">
 
 ```text
 SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
@@ -177,7 +205,10 @@ psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" 
 DETAIL:  Only roles with the REPLICATION attribute may start a WAL sender process.
 ```
 
-PostgreSQL 12.22 to 15.19 worded the same two refusals as `must be superuser or replication role to use replication slots` and `must be superuser or replication role to start walsender`. The fix and the check are the same everywhere:
+</TabItem>
+</Tabs>
+
+The fix and the check are the same everywhere:
 
 ```sql
 ALTER ROLE cdc_user REPLICATION;
@@ -194,7 +225,7 @@ The run showed both sides. From another address, the logical connection was acce
 psql: error: connection to server at "172.28.0.2", port 5432 failed: FATAL:  no pg_hba.conf entry for replication connection from host "172.28.0.2", user "cdc_user", no encryption
 ```
 
-### 4. Create a publication
+## Issue 4: The publication is missing or misnamed
 
 A publication names the tables whose changes are sent. The capture role usually cannot create it. In the run it was refused three times, in this order: without the `CREATE` privilege on the database, for `FOR ALL TABLES`, and for a table it does not own.
 
@@ -216,18 +247,26 @@ SELECT pubname, schemaname, tablename FROM pg_publication_tables WHERE pubname =
 
 Two clauses depend on the version. `FOR TABLES IN SCHEMA` answered `syntax error at or near "TABLES"` on 12.22, 13.23 and 14.25 and worked from 15.19. `publish_via_partition_root` answered `unrecognized publication parameter` on 12.22 and worked from 13.23.
 
-#### publication "x" does not exist
+### publication "x" does not exist
 
 This error does not come from `CREATE PUBLICATION`. It comes from the output plugin, when a consumer names a publication that the plugin cannot find, and it appears at the first change, not when the consumer connects.
 
-In the run, a consumer started with a misspelled publication name. The slot showed `active = t` and nothing was wrong until one row was inserted:
+In the run, a consumer started with a misspelled publication name. The slot showed `active = t` and nothing was wrong until one row was inserted. Then:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-17" label="PostgreSQL 12.22 to 17.12" default>
+
+The consumer stopped with an error. This is 17.12:
 
 ```text
 pg_recvlogical: error: unexpected termination of replication stream: ERROR:  publication "cdc_publication" does not exist
 CONTEXT:  slot "typo_slot", output plugin "pgoutput", in the change callback, associated LSN 0/19659E0
 ```
 
-That is PostgreSQL 17.12, and 12.22 to 16.15 did the same. PostgreSQL 18.7 and 19rc2 did not raise an error. The consumer stayed connected, received nothing, and the server logged a warning:
+</TabItem>
+<TabItem value="18+" label="PostgreSQL 18.7 and 19rc2">
+
+The consumer stayed connected and received nothing. The only sign was a warning in the server log:
 
 ```text
 WARNING:  skipped loading publication "cdc_publication"
@@ -235,30 +274,40 @@ DETAIL:  The publication does not exist at this point in the WAL.
 HINT:  Create the publication if it does not exist.
 ```
 
+</TabItem>
+</Tabs>
+
 On 18 and later, a wrong publication name therefore looks like a table with no changes. The warning in the server log is the only sign.
 
 The same message appears when the name is right and the slot is older than the publication. The plugin looks the publication up as of the change it is decoding, and a change made before `CREATE PUBLICATION` finds none. On 12.22 to 17.12 that slot failed on every read, even after later changes, and `pg_publication` listed the publication the whole time.
 
 The fix that worked was to drop the slot and create it again after the publication. The new slot then delivered the next insert as four `pgoutput` messages: begin, relation, insert, commit. On 18.7 the old slot skipped the early change with the warning and delivered the later one.
 
-### 5. Choose an output plugin
+## Issue 5: The output plugin is not installed or allowed
 
 `pgoutput` and `test_decoding` ship with PostgreSQL. On all eight versions a slot for either was created on a stock server. `wal2json` and `decoderbufs` are separate projects, and a stock server has neither.
 
-What the server answers depends on its minor release. PostgreSQL 12.22 and 13.23 looked for the file:
+What the server answers depends on its minor release. 12.22 and 13.23 looked for the file, and the later versions refused before looking:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-13" label="PostgreSQL 12.22 and 13.23" default>
 
 ```text
 SELECT * FROM pg_create_logical_replication_slot('s_wal2json', 'wal2json');
 ERROR:  could not access file "wal2json": No such file or directory
 ```
 
-PostgreSQL 14.25, 15.19, 16.15, 17.12, 18.7 and 19rc2 refused before looking:
+</TabItem>
+<TabItem value="14+" label="PostgreSQL 14.25 to 19rc2">
 
 ```text
 SELECT * FROM pg_create_logical_replication_slot('s_wal2json', 'wal2json');
 ERROR:  library "wal2json" may not be used as an output plugin
 HINT:  If it is safe for all REPLICATION users to use this library as an output plugin, add it to "output_plugin_libraries" and reload the server configuration.
 ```
+
+</TabItem>
+</Tabs>
 
 The second answer is new. The release notes of 13 August 2026 introduce `output_plugin_libraries` and state: "By default, only the output plugins shipped as part of PostgreSQL (pgoutput and test_decoding) are included in output_plugin_libraries. Installations that rely on other output plugins must add them after updating the server" ([release 18.6](https://www.postgresql.org/docs/release/18.6/)).
 
@@ -295,9 +344,9 @@ ERROR:  could not load library "/usr/lib/postgresql/16/lib/test_decoding.so": /u
 
 After a restart the servers reported 15.20 and 16.16, and both slots were created.
 
-Debezium users meet this section by default. The Debezium connector's `plugin.name` property defaults to `decoderbufs`, and its documentation lists the supported values as `decoderbufs` and `pgoutput` ([Debezium connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-plugin-name), checked Nov 2026). Setting it to `pgoutput` removes the need to install or allow anything.
+Debezium users meet this issue by default. The Debezium connector's `plugin.name` property defaults to `decoderbufs`, and its documentation lists the supported values as `decoderbufs` and `pgoutput` ([Debezium connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-plugin-name), checked Nov 2026). Setting it to `pgoutput` removes the need to install or allow anything.
 
-### 6. Give every table a replica identity
+## Issue 6: A table has no replica identity
 
 Adding a table without a primary key to a publication is accepted without a message. From that moment, inserts work and every `UPDATE` and `DELETE` on the table fails, for every session and not only for the CDC tool:
 
@@ -346,7 +395,30 @@ Large values behave the same way. PostgreSQL stores a big column value out of li
  table public.documents: UPDATE: id[bigint]:1 title[text]:'second title' body[text]:unchanged-toast-datum
 ```
 
-### 7. Create the slot and read one change
+What each identity left the table and the consumer with on 18.7, read with the `test_decoding` plugin:
+
+| Replica identity | `UPDATE` and `DELETE` on the table | An `UPDATE` sends | A `DELETE` sends | A large column the `UPDATE` did not touch |
+| --- | --- | --- | --- | --- |
+| `DEFAULT`, no primary key | Refused for every session | Nothing | Nothing | Nothing |
+| `DEFAULT`, with a primary key | Allowed | The new row | The key | `unchanged-toast-datum` |
+| `FULL` | Allowed | The old row and the new row | The whole old row | The full value in the old row, `unchanged-toast-datum` in the new row |
+
+## Confirm the diagnosis
+
+On a self-hosted server, the six in order:
+
+```sql
+ALTER SYSTEM SET wal_level = logical;
+-- restart PostgreSQL, then:
+CREATE ROLE cdc_user LOGIN PASSWORD 'change-me';
+ALTER ROLE cdc_user REPLICATION;
+GRANT USAGE ON SCHEMA public TO cdc_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+```
+
+Every published table that receives updates or deletes also needs a primary key or another replica identity, as in [Issue 6](#issue-6-a-table-has-no-replica-identity).
 
 With the six in place, the capture role created its own slot, three statements changed a row, and the role read them back as ten `pgoutput` messages: `B`, `R`, `I`, `C` for the insert, then `B`, `U`, `C` and `B`, `D`, `C`.
 
@@ -357,6 +429,14 @@ FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version'
 ```
 
 `peek` reads without consuming, so the tool still gets these changes. If the slot was only a test, drop it with `SELECT pg_drop_replication_slot('cdc_slot');`. A slot that is left behind keeps WAL until the disk is full.
+
+## Prevent it
+
+- Create the publication before the slot. A slot that is older than its publication failed on every read on PostgreSQL 12.22 to 17.12.
+- On PostgreSQL 18 and later, search the server log for `skipped loading publication` after any change to a publication name. The consumer does not report it.
+- Make `output_plugin_libraries` part of any minor upgrade to 14.24, 15.19, 16.15, 17.11, 18.6 or later, and add every third-party output plugin you use. The manual's query for finding them is `SELECT DISTINCT plugin FROM pg_replication_slots WHERE plugin IS NOT NULL;` ([Replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html)).
+- Give a table its primary key before it joins a publication, not after the first failed `UPDATE`.
+- Give each consumer its own slot, and drop the slot when the consumer is retired.
 
 ## Managed services
 
@@ -471,7 +551,7 @@ See also the [Azure set-up guide](/docs/connectors/postgres/setup/azure/).
 
 ### Output plugins on the four services
 
-Each service sets `output_plugin_libraries` itself, so [step 5](#5-choose-an-output-plugin) looks different there. On all four, slots for `pgoutput`, `test_decoding` and `wal2json` were created with nothing to install or allow.
+Each service sets `output_plugin_libraries` itself, so [Issue 5](#issue-5-the-output-plugin-is-not-installed-or-allowed) looks different there. On all four, slots for `pgoutput`, `test_decoding` and `wal2json` were created with nothing to install or allow.
 
 | Service, PostgreSQL 17.11 | `SHOW output_plugin_libraries` | A slot for `decoderbufs` |
 | --- | --- | --- |
@@ -480,14 +560,6 @@ Each service sets `output_plugin_libraries` itself, so [step 5](#5-choose-an-out
 | Azure flexible server | `pgoutput, test_decoding, pglogical, pglogical_output, wal2json, pg_squeeze` | `ERROR:  library "decoderbufs" may not be used as an output plugin` |
 
 Cloud SQL and Azure gave no way to change the list. Cloud SQL answered `The requested flag is either misspelled or unsupported by Cloud SQL.`, and Azure has no server parameter of that name. Debezium's default `plugin.name` is `decoderbufs`, which RDS, Aurora and Azure refused, so set `plugin.name=pgoutput` there.
-
-## Keep it working
-
-- Create the publication before the slot. A slot that is older than its publication failed on every read on PostgreSQL 12.22 to 17.12.
-- On PostgreSQL 18 and later, search the server log for `skipped loading publication` after any change to a publication name. The consumer does not report it.
-- Make `output_plugin_libraries` part of any minor upgrade to 14.24, 15.19, 16.15, 17.11, 18.6 or later, and add every third-party output plugin you use. The manual's query for finding them is `SELECT DISTINCT plugin FROM pg_replication_slots WHERE plugin IS NOT NULL;` ([Replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html)).
-- Give a table its primary key before it joins a publication, not after the first failed `UPDATE`.
-- Give each consumer its own slot, and drop the slot when the consumer is retired.
 
 :::note[How OLake Go handles this]
 
