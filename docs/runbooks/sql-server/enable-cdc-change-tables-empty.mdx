@@ -57,7 +57,18 @@ You ran `sys.sp_cdc_enable_db` and `sys.sp_cdc_enable_table`, both returned with
 - **Each table** enabled with `sys.sp_cdc_enable_table` by a member of `db_owner`.
 - **SQL Server Agent running.** It is disabled by default on Linux and in containers, and both procedures succeed without it.
 
-Changes made while the Agent is stopped are not lost. They stay in the transaction log, and the capture job reads them once it runs. The set-up is under [Enable CDC step by step](#enable-cdc-step-by-step), and the Agent check under [Confirm the diagnosis](#confirm-the-diagnosis).
+Changes made while the Agent is stopped are not lost. They stay in the transaction log, and the capture job reads them once it runs.
+
+```sql
+USE cdclab;
+EXEC sys.sp_cdc_enable_db;
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'orders',
+  @role_name = NULL, @supports_net_changes = 1;
+
+-- SQL Server Agent must be Running, or cdc.dbo_orders_CT stays empty
+SELECT servicename, status_desc, startup_type_desc FROM sys.dm_server_services;
+```
 
 <TLDR title='Key takeaways'>
 
@@ -76,7 +87,7 @@ Either the enable calls succeed and the change table stays empty, or a call fail
 | [1. Enabling CDC fails](#issue-1-enabling-cdc-fails) | Msg 22901, 22902, 22904, 22906, 22830 or 22939 from `sys.sp_cdc_enable_db` or `sys.sp_cdc_enable_table` |
 | [2. The change table stays empty](#issue-2-the-change-table-stays-empty) | No error, only `SQLServerAgent is not currently running so it cannot be notified of this action.`, and 0 rows in the change table |
 | [3. Msg 313 when reading changes](#issue-3-msg-313-when-reading-changes) | `An insufficient number of arguments were supplied for the procedure or function cdc.fn_cdc_get_all_changes_ ...` |
-| [4. A new column is not captured](#issue-4-a-new-column-is-not-captured) | No error. The column is missing from the change table, and a third capture instance gives Msg 22962 |
+| [4. Schema evolution needs a new capture instance](#issue-4-schema-evolution-needs-a-new-capture-instance) | No error. The column is missing from the change table, and a third capture instance gives Msg 22962 |
 
 ### The same messages on 2022 and 2019
 
@@ -176,6 +187,30 @@ __$start_lsn|__$operation|id|customer_id|quantity
 Those five rows are two inserts (operation 2), one update as its before and after image (3 and 4), and one delete (1).
 
 To turn CDC off, `sys.sp_cdc_disable_table` removes one capture instance and `sys.sp_cdc_disable_db` removes everything. After the second call the run showed `is_cdc_enabled` 0, no `cdc` schema and no CDC jobs.
+
+## Confirm the diagnosis
+
+Run these in the database. The comments show what the run returned with the Agent off.
+
+```sql
+SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;    -- 0
+SELECT sys.fn_cdc_get_max_lsn() AS max_lsn;                        -- NULL
+SELECT COUNT(*) AS log_scan_sessions FROM sys.dm_cdc_log_scan_sessions;   -- 0
+SELECT COUNT(*) AS cdc_errors FROM sys.dm_cdc_errors;              -- 0
+SELECT servicename, status_desc, startup_type_desc FROM sys.dm_server_services;
+SELECT COUNT(*) AS agent_sessions FROM sys.dm_exec_sessions WHERE program_name LIKE N'SQLAgent%';   -- 0
+```
+
+```text
+servicename|status_desc|startup_type_desc
+SQL Server Agent (MSSQLSERVER)|Stopped|Automatic
+```
+
+On SQL Server 2019 the same view listed a second row, `SQL Server (MSSQLSERVER)|Stopped|Disabled`, so read the Agent row. With the Agent running the run showed `Running` and 4 Agent sessions.
+
+The jobs existed and had never run: `start_execution_date` was NULL for both in `msdb.dbo.sysjobactivity`. `sys.dm_cdc_errors` was empty too, because nothing had failed.
+
+The transaction log tells the same story. After a `CHECKPOINT`, `log_reuse_wait_desc` in `sys.databases` was `REPLICATION`, which means the log cannot be reused past changes that capture has not read. It went back to `NOTHING` once the Agent ran.
 
 ## Issue 1: Enabling CDC fails
 
@@ -301,7 +336,7 @@ ELSE
 
 The recovery in the run was to read the 10 rows of the source table again and save the current maximum LSN as the new position. The next change was then read normally.
 
-## Issue 4: A new column is not captured
+## Issue 4: Schema evolution needs a new capture instance
 
 A change table has a fixed set of columns. In the run a column named `note` was added to `dbo.orders` and a row was written with it. The change table still had its 4 original columns, and the change row carried no note.
 
@@ -330,35 +365,12 @@ What each change to `dbo.orders` did to the change tables in the run:
 | `DROP COLUMN note` | `dbo_orders_v2_CT` keeps `note` | `note` is NULL |
 | `ALTER COLUMN quantity BIGINT NOT NULL` | `quantity` becomes `bigint` in `dbo_orders_v2_CT` | Captured as `bigint` |
 
-Two results from the run are worth planning for.
+Four results from the run are worth planning for.
 
 - **There is a gap.** The row written after the `ALTER TABLE` and before the new instance is in the old change table without its note, and not in the new one. Its note value reached no change table.
 - **An update of the new column alone leaves no trace.** In the runs of 23 November 2026, an `UPDATE` that set only `note` before the second instance existed put no row in the old change table. A reader gets no event for it, and no error.
 - **Two is the limit.** A third instance failed with Msg 22962, so drop the old one before the next schema change.
-
-## Confirm the diagnosis
-
-Run these in the database. The comments show what the run returned with the Agent off.
-
-```sql
-SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;    -- 0
-SELECT sys.fn_cdc_get_max_lsn() AS max_lsn;                        -- NULL
-SELECT COUNT(*) AS log_scan_sessions FROM sys.dm_cdc_log_scan_sessions;   -- 0
-SELECT COUNT(*) AS cdc_errors FROM sys.dm_cdc_errors;              -- 0
-SELECT servicename, status_desc, startup_type_desc FROM sys.dm_server_services;
-SELECT COUNT(*) AS agent_sessions FROM sys.dm_exec_sessions WHERE program_name LIKE N'SQLAgent%';   -- 0
-```
-
-```text
-servicename|status_desc|startup_type_desc
-SQL Server Agent (MSSQLSERVER)|Stopped|Automatic
-```
-
-On SQL Server 2019 the same view listed a second row, `SQL Server (MSSQLSERVER)|Stopped|Disabled`, so read the Agent row. With the Agent running the run showed `Running` and 4 Agent sessions.
-
-The jobs existed and had never run: `start_execution_date` was NULL for both in `msdb.dbo.sysjobactivity`. `sys.dm_cdc_errors` was empty too, because nothing had failed.
-
-The transaction log tells the same story. After a `CHECKPOINT`, `log_reuse_wait_desc` in `sys.databases` was `REPLICATION`, which means the log cannot be reused past changes that capture has not read. It went back to `NOTHING` once the Agent ran.
+- **Other changes behave differently.** After `DROP COLUMN note`, the change table kept the column and new rows had NULL in it. After `ALTER COLUMN quantity BIGINT`, the change table column became `bigint` by itself.
 
 Tools differ in what they do with the second instance. Debezium and Flink CDC switched to it by themselves, AWS Database Migration Service (DMS) did not need it, and Airbyte's documented fix cost it its saved position. The details are under [Managed services and other tools](#managed-services-and-other-tools).
 

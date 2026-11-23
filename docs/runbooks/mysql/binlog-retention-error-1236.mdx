@@ -57,6 +57,12 @@ MySQL removes old binary log (binlog) files by expiry or by `PURGE BINARY LOGS`,
 
 Then keep binary logs for longer than the longest time any reader can be stopped, with `binlog_expire_logs_seconds` on MySQL 8.0 and 8.4 and `expire_logs_days` on 5.7, and purge by hand only up to the oldest file a reader still needs.
 
+```sql
+SHOW BINARY LOGS;                                 -- what the server has
+SET GLOBAL binlog_expire_logs_seconds = 604800;   -- keep 7 days (MySQL 8.0 and 8.4)
+PURGE BINARY LOGS TO 'mysql-bin.000012';          -- removes every file before this one
+```
+
 Amazon Relational Database Service (RDS) and Aurora refuse the two statements above that change anything. Retention is set there in hours, with a stored procedure: see [Amazon RDS and Aurora](#amazon-rds-and-aurora).
 
 <TLDR title='Key takeaways'>
@@ -193,11 +199,11 @@ Some of the GTIDs needed to replicate have been already purged
 
 Debezium 1.9.7 writes the first one as `but MySQL only has` in place of `but server only has`.
 
-## How binary logs leave the server
+## Why a stopped reader loses its position
+
+Binary log files leave the server, and neither way they leave asks a stopped reader.
 
 The binary log is a series of numbered files plus an index file. Every reader remembers where it stopped: a file name and a position, or a set of GTIDs. The server keeps no list of those readers.
-
-Files leave the server in two ways, and neither asks a stopped reader.
 
 **Expiry.** Each version has its own setting and default. The table shows what each version answered in the run.
 
@@ -230,6 +236,28 @@ A full file counts as a flush. With `max_binlog_size` lowered to 4096 bytes, 40 
 :::note[Versions on this page]
 The runs used **MySQL 5.7.44, 8.0.46 and 8.4.13**, each as a source with one replica, with and without GTIDs. Debezium ran as **Debezium 1.9.7 on Kafka Connect 3.2.0 with MySQL 8.0.46**, **Debezium 3.0.8 on Kafka Connect 3.9.0** and **Debezium 3.7.1 on Kafka Connect 4.3.1**, both with MySQL 8.4.13. Rows for versions that were not run, MySQL 8.0.12 to 8.0.32 and the Debezium boundaries at 2.6 and 3.2, come from the MySQL and Debezium source at each release tag, linked under each table.
 :::
+
+## Confirm the diagnosis
+
+Compare what the server still has with what the reader asks for.
+
+```sql
+SHOW BINARY LOGS;              -- the oldest file listed is the oldest position anyone can read
+SHOW REPLICA STATUS\G          -- Relay_Source_Log_File, Last_IO_Error (5.7: SHOW SLAVE STATUS, Relay_Master_Log_File)
+SELECT @@GLOBAL.gtid_purged;   -- with GTIDs: everything in this set is gone from the server
+```
+
+For Debezium, read the stored position and look for its `file` in the list. The endpoint is in the Kafka Connect documentation from [3.5](https://github.com/apache/kafka/blob/3.5.0/docs/connect.html).
+
+```bash
+curl -s localhost:8083/connectors/inventory-connector/offsets
+```
+
+```json
+{"offsets":[{"partition":{"server":"dbserver1"},"offset":{"ts_sec":1794850317,"file":"mysql-bin.000003","pos":158}}]}
+```
+
+If the file is still listed, or the text in quotes is not one of those above, retention is not your problem.
 
 ## Issue 1: A replica's position was purged
 
@@ -381,28 +409,6 @@ A stored position can also fall behind while the reader runs. In the run a Debez
 The fix is a heartbeat. For Debezium, set [`heartbeat.interval.ms`](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-heartbeat-interval-ms). Its default is 0, which sends no heartbeats.
 
 In the run, with `heartbeat.interval.ms=2000`, the same writes to the uncaptured database moved the stored offset to the newest file, `mysql-bin.000011`. The task restart that had failed before stayed `RUNNING` and took no snapshot.
-
-## Confirm the diagnosis
-
-Compare what the server still has with what the reader asks for.
-
-```sql
-SHOW BINARY LOGS;              -- the oldest file listed is the oldest position anyone can read
-SHOW REPLICA STATUS\G          -- Relay_Source_Log_File, Last_IO_Error (5.7: SHOW SLAVE STATUS, Relay_Master_Log_File)
-SELECT @@GLOBAL.gtid_purged;   -- with GTIDs: everything in this set is gone from the server
-```
-
-For Debezium, read the stored position and look for its `file` in the list. The endpoint is in the Kafka Connect documentation from [3.5](https://github.com/apache/kafka/blob/3.5.0/docs/connect.html).
-
-```bash
-curl -s localhost:8083/connectors/inventory-connector/offsets
-```
-
-```json
-{"offsets":[{"partition":{"server":"dbserver1"},"offset":{"ts_sec":1794850317,"file":"mysql-bin.000003","pos":158}}]}
-```
-
-If the file is still listed, or the text in quotes is not one of those above, retention is not your problem.
 
 ## Prevent it
 
