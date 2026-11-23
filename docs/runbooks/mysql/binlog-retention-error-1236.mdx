@@ -25,6 +25,20 @@ runbook:
       - "Debezium 3.0.8.Final on Kafka Connect 3.9.0 with MySQL 8.4.13"
       - "Debezium 1.9.7.Final on Kafka Connect 3.2.0 with MySQL 8.0.46"
     lab: labs/runbooks/mysql/binlog-retention-error-1236
+    services:
+      date: "2026-11-23"
+      versions:
+        - "Amazon RDS for MySQL 8.4.13"
+        - "Amazon Aurora MySQL 3.14.0"
+        - "AWS DMS 3.6.1"
+        - "Airbyte source-mysql 3.53.10"
+        - "Flink CDC 3.7.0 on Flink 2.2.1"
+      labs:
+        - labs/runbooks/service-runs/aws/mysql-rds
+        - labs/runbooks/service-runs/aws/mysql-aurora
+        - labs/runbooks/service-runs/aws/dms-mysql
+        - labs/runbooks/service-runs/tools/airbyte-mysql
+        - labs/runbooks/service-runs/tools/flink-cdc-mysql
     summary: "A replica and a Debezium connector were stopped while the binary log file they needed was purged or expired, with and without GTIDs. The replica was rebuilt from a dump and the connector took a new snapshot. A connected reader in the middle of an older file was not purged."
 ---
 
@@ -45,6 +59,8 @@ PURGE BINARY LOGS TO 'mysql-bin.000012';          -- removes every file before t
 ```
 
 Once a reader's position is purged, the server cannot give the missing changes back. Rebuild a replica from a new dump of the source, and let a Debezium connector take a new snapshot with `snapshot.mode=when_needed`.
+
+Amazon Relational Database Service (RDS) and Aurora refuse the two statements above that change anything. Retention is set there in hours, with a stored procedure: see [Amazon RDS and Aurora](#amazon-rds-and-aurora).
 
 <TLDR title='Key takeaways'>
 
@@ -247,6 +263,8 @@ Last_SQL_Errno: 1032
 
 Set `snapshot.mode` to `when_needed` and restart the connector. The [Debezium documentation](https://debezium.io/documentation/reference/3.7/connectors/mysql.html#mysql-property-snapshot-mode) says this mode takes a snapshot when "A previously recorded offset specifies a binlog position or GTID that is not available on the server."
 
+This is a setting of the Debezium connector on Kafka Connect. Flink CDC did not act on it, and AWS Database Migration Service (DMS) has `reload-target` in its place: see [The same condition in other tools](#the-same-condition-in-other-tools).
+
 A `PUT` to `/config` replaces the whole configuration, so send every existing setting along with the changed one.
 
 ```bash
@@ -353,32 +371,102 @@ On Amazon RDS and Aurora the check reads the retention hours from `mysql.rds_con
 
 ## The same condition in other tools
 
-This section quotes each tool's own documentation, checked on 16 November 2026. None of it was run here.
+AWS DMS, Airbyte's MySQL source connector and Flink CDC were each stopped while the binary log file they needed was removed, on 23 November 2026. The versions are in the box at the end of the page. None of the three behaves like a Debezium connector on Kafka Connect, although two of them carry Debezium inside.
 
-**AWS Database Migration Service (DMS).** The task log shows `[SOURCE_CAPTURE ]E: Error 1236 (Could not find first log file name in binary log index file) reading binlog [1020493]`. The [AWS Knowledge Center article](https://repost.aws/knowledge-center/dms-cdc-error-1236-msql) says: "To resolve the error, check the binary log retention period on the source MySQL database. If needed, then increase the retention period. Restart the AWS DMS task to run the full-load phase again."
+### AWS DMS
 
-The [DMS guide for MySQL sources](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.MySQL.html) recommends `binlog_expire_logs_seconds` of "86400 seconds (1 day) or greater" on MySQL 8.0 and later.
+AWS DMS 3.6.1 read Amazon RDS for MySQL 8.4.13 with a full-load-and-CDC task. The task was stopped, RDS removed the file of its checkpoint 8 minutes 47 seconds later, and the task was resumed. The task log then had 11 lines ending in `try to reconnect`, 5 seconds apart, and these two:
 
-**Airbyte.** The MySQL source starts over instead of failing. Its [troubleshooting page](https://docs.airbyte.com/integrations/sources/mysql/mysql-troubleshooting) quotes the log line `Saved offset no longer present on the server, Airbyte is going to trigger a sync from scratch`, and recommends "a time period of 7 days" for `binlog_expire_logs_seconds`.
+```text
+[SOURCE_CAPTURE  ]E:  Error 1236 reading binlog, exit after 11 retries [1020493]  (mysql_endpoint_capture.c:1509)
+[SOURCE_CAPTURE  ]E:  Error 1236 (Could not find first log file name in binary log index file) reading binlog [1020493]  (mysql_endpoint_capture.c:1511)
+```
 
-**Flink CDC.** The [MySQL connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/mysql-cdc/) runs the Debezium embedded engine, and its error has the Debezium 1.9 wording. The [Flink CDC FAQ](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/faq/faq/) explains: "This error occurs because the binlog file being read by the job has been cleaned up on the MySQL server."
+The status did not follow at once. It still read `running` 1 minute 43 seconds after those lines, and then `failed` with the stop reason `Last Error Error 1236 reading binary log. Stop Reason FATAL_ERROR Error Level FATAL`. No row reached the target in between.
 
-The FAQ's fix is `set global expire_logs_days=7;`. In the run that statement returned `ERROR 3683` on MySQL 8.0.46 with default settings and `ERROR 1193` on 8.4.13, so use `binlog_expire_logs_seconds` there.
+The [AWS Knowledge Center article](https://repost.aws/knowledge-center/dms-cdc-error-1236-msql) says: "To resolve the error, check the binary log retention period on the source MySQL database. If needed, then increase the retention period. Restart the AWS DMS task to run the full-load phase again." The run agrees. A second `resume-processing` failed in the same way, and `reload-target` dropped the target table and loaded it again.
+
+After the reload, source and target had the same 25 rows and the same checksum. The row deleted during the outage was gone from the target as well, which a Debezium snapshot does not give you.
+
+The [DMS guide for MySQL sources](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.MySQL.html) recommends `binlog_expire_logs_seconds` of "86400 seconds (1 day) or greater" on MySQL 8.0 and later. On RDS that variable cannot be set, and the hours of the [next section](#amazon-rds-and-aurora) take its place.
+
+### Airbyte
+
+Airbyte's MySQL source connector 3.53.10 was run directly, with the Airbyte protocol commands and without the platform around it. It carries Debezium 3.4.3.Final, and by default it fails. The setting is `Invalid CDC Position Behavior (Advanced)`, with the values `Fail sync`, the default, and `Re-sync data`.
+
+With the default, the sync ended after 3 to 4 seconds with a configuration error and no records:
+
+```text
+Incumbent CDC state is invalid, reason: Saved offset no longer present on the server, please reset the connection, and then increase binlog retention and/or increase sync frequency. Connector last known binlog file mysql-bin.000003 is not found in the server. Server has [mysql-bin.000005].
+```
+
+A second sync gave the same error. With `Re-sync data` the first sync also ended with an error, `Triggering reset. Incumbent CDC state is invalid`, and saved the current position. The sync after that read every row of both tables again, with no delete record for the order that had been deleted.
+
+Airbyte's [troubleshooting page](https://docs.airbyte.com/integrations/sources/mysql/mysql-troubleshooting) still quotes an older log line, `Saved offset no longer present on the server, Airbyte is going to trigger a sync from scratch` (checked Nov 2026). The second half of that line is in none of the 153 jar files of the 3.53.10 image. The same page recommends "a time period of 7 days" for `binlog_expire_logs_seconds`.
+
+### Flink CDC
+
+Flink CDC 3.7.0 ran on Flink 2.2.1. Its [MySQL connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/mysql-cdc/) carries Debezium 1.9.8.Final, so a job restored from its savepoint printed the Debezium 1.9 wording:
+
+```text
+java.lang.IllegalStateException: The connector is trying to read binlog starting at Struct{version=1.9.8.Final,connector=mysql,name=mysql_binlog_source,ts_ms=...,db=,server_id=0,file=mysql-bin.000003,pos=158,row=0}, but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed.
+```
+
+The job did not fail. No restart strategy was set, so Flink chose its exponential-delay strategy, and the job was `RESTARTING` at every one of 19 readings over 90 seconds without ever reaching `FAILED`. With `restart-strategy.type` set to `none` it was `FAILED` at the first reading.
+
+The advice in the message did not work here. With `'debezium.snapshot.mode' = 'when_needed'` in the table options, the restored job threw the same exception and kept restarting. Two other starts ran, with different results:
+
+| How the job was started | Result |
+| --- | --- |
+| A new job without the savepoint | `RUNNING`. It read every row of both tables as it was then. No delete arrived for the order deleted during the outage |
+| A new job with `'scan.startup.mode' = 'latest-offset'` | `RUNNING`. It printed only rows written after it started. Every change of the outage was skipped without a message |
+
+The [Flink CDC FAQ](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/faq/faq/) explains the error: "This error occurs because the binlog file being read by the job has been cleaned up on the MySQL server." Its fix is `set global expire_logs_days=7;`. In the lab of this page that statement returned `ERROR 3683` on MySQL 8.0.46 with default settings and `ERROR 1193` on 8.4.13, so use `binlog_expire_logs_seconds` there.
 
 ## Amazon RDS and Aurora
 
-This section also comes from documentation, checked on 16 November 2026, and was not run. On these services a stored procedure sets retention, in hours:
+Amazon RDS for MySQL 8.4.13 and Aurora MySQL 3.14.0 were run on 23 November 2026, each with a MySQL 8.4.13 replica as the reader. On these services a stored procedure sets retention, in hours:
 
 ```sql
 CALL mysql.rds_set_configuration('binlog retention hours', 24);
 CALL mysql.rds_show_configuration;
 ```
 
-**Amazon Relational Database Service (RDS) for MySQL.** The [RDS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-stored-proc-configuring.html) says: "The default value of binlog retention hours is NULL. For RDS for MySQL, NULL means binary logs aren't retained (0 hours)." The maximum is 168 hours (7 days).
+The statements of the self-hosted sections were refused on both:
 
-**Aurora MySQL.** The [Aurora documentation](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/mysql-stored-proc-configuring.html) says that NULL "means binary logs are cleaned up lazily", and that binary logs "might remain in the system for a certain period, which is usually not longer than a day." For version 2.11.0 and higher and for version 3 the maximum is 2160 hours (90 days).
+```text
+SET GLOBAL binlog_expire_logs_seconds = 604800;
+ERROR 1227 (42000): Access denied; you need (at least one of) the SUPER or SYSTEM_VARIABLES_ADMIN privilege(s) for this operation
+PURGE BINARY LOGS BEFORE NOW();
+ERROR 1227 (42000): Access denied; you need (at least one of) the SUPER or BINLOG_ADMIN privilege(s) for this operation
+```
 
-A CDC reader on RDS with the default therefore has no retention to rely on. Set the hours before the first sync.
+Do not read retention from `binlog_expire_logs_seconds` either. On RDS it stayed at 2592000 whatever the hours were, and on Aurora it read 0.
+
+### Amazon RDS for MySQL
+
+The [RDS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-stored-proc-configuring.html) says: "The default value of binlog retention hours is NULL. For RDS for MySQL, NULL means binary logs aren't retained (0 hours)." The run put a number on that. With the default, files left `SHOW BINARY LOGS` in rounds five minutes apart, and the file of a stopped reader was gone about 9 minutes after the reader stopped.
+
+The replica then stopped as a replica of a self-hosted source does:
+
+```text
+                Last_IO_Errno: 13114
+                Last_IO_Error: Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file'
+```
+
+With 24 hours set, a reader stopped for 22 minutes lost no file and read on from its position. The maximum is 168 hours (7 days), and 169 answered `ERROR 1644 (45000): For binlog retention hours the value must be between 1 and 168 inclusive or be NULL`.
+
+A replica outside RDS meets one more thing. RDS writes a row to `mysql.rds_heartbeat2` at the start of each new file, and the replica's SQL thread stopped on it with error 1146 until the filter `REPLICATE_WILD_IGNORE_TABLE = ('mysql.%')` was set.
+
+### Aurora MySQL
+
+A new cluster has no binary log: `SHOW BINARY LOGS` answered `ERROR 1381 (HY000): You are not using binary logging`. It came with `binlog_format = ROW` in the DB cluster parameter group and a reboot of the writer.
+
+The [Aurora documentation](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/mysql-stored-proc-configuring.html) says that NULL "means binary logs are cleaned up lazily", and that binary logs "might remain in the system for a certain period, which is usually not longer than a day." In the run no file was removed in 68 minutes with NULL. Once retention was set to 1 hour, the files closed more than an hour before were gone about three minutes later, and the stopped reader got the same error 1236.
+
+For version 2.11.0 and higher and for version 3 the documented maximum is 2160 hours (90 days). The cluster accepted 2160, and it stored 2161 as 2160 without an error.
+
+With the default, a CDC reader therefore has no retention to rely on, on either service. Set the hours before the first sync.
 
 <R.HowWeReproduced />
 

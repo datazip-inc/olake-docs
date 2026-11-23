@@ -29,6 +29,18 @@ runbook:
       - "PostgreSQL 12.22"
       - "PostgreSQL 19rc2 (release candidate)"
     lab: labs/runbooks/postgres/replication-slot-filling-disk
+    services:
+      date: "2026-11-23"
+      versions:
+        - "Debezium 3.7.1.Final"
+        - "AWS DMS 3.6.1 on Amazon RDS for PostgreSQL 17.11"
+        - "Airbyte source-postgres 3.8.12"
+        - "Amazon RDS for PostgreSQL 18.6"
+      labs:
+        - labs/runbooks/service-runs/tools/debezium-postgres
+        - labs/runbooks/service-runs/aws/dms-postgres
+        - labs/runbooks/service-runs/tools/airbyte-postgres
+        - labs/runbooks/service-runs/aws/postgres-rds-disk-full
     summary: "A logical slot with no consumer was left on a server that kept writing, until a 256 MB disk was full and PostgreSQL would not start. The same server was then used to show each way a slot stops moving, each fix, and what max_slot_wal_keep_size does to the slot and to its consumers."
 ---
 
@@ -124,7 +136,7 @@ Three settings sound alike, and only one of them limits a slot:
 The run produced each of them.
 
 1. **Nobody is connected.** The consumer was stopped, deleted or never started. The slot shows `active = f`.
-2. **The consumer is connected and does not confirm.** A consumer process was frozen in the run, with `SIGSTOP`. For 60 seconds the slot showed `active = t` while it held 99 MB, then the server ended the connection.
+2. **The consumer is connected and does not confirm.** A consumer process frozen with `SIGSTOP` kept the slot at `active = t` for 60 seconds while it held 99 MB, then the server ended the connection. A paused Debezium connector is in this group as well: its slot stayed `active = t` and held 141 MB.
 3. **A transaction is open.** With a healthy consumer that confirmed every 10 seconds, one session that sat `idle in transaction` kept `restart_lsn` in place, and the slot held 97 MB.
 4. **The slot's database is idle and another one is busy.** WAL is shared by all databases of an instance. A slot in a database with no changes held 129 MB that another database had written.
 
@@ -160,6 +172,8 @@ FROM pg_replication_slots s LEFT JOIN pg_stat_replication r ON r.pid = s.active_
  cdc_slot  | 334 | pg_recvlogical   | streaming | 0/188E83A8 | 0/18494B30 | 2026-11-16 18:42:57.4736+00
 ```
 
+A paused Debezium 3.7.1 connector differs in one column. Its `reply_time` kept moving every 10 seconds while `flush_lsn` stood still, so read both.
+
 For an open transaction, look for the oldest session that holds a transaction ID:
 
 ```sql
@@ -190,6 +204,8 @@ Seven of the eight versions needed those two checkpoints, and 12.22 was back at 
 
 So do not expect the disk back the moment the consumer reports that it has caught up. Debezium's documentation describes the same lag: "If the value for confirmed_flush_lsn is regularly increasing and the value of restart_lsn lags then the database needs to reclaim the space" ([Debezium connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-wal-disk-space), checked Nov 2026).
 
+With Debezium the two steps followed its offset commits. On 3.7.1 with the default `offset.flush.interval.ms` of 60 seconds, `confirmed_flush_lsn` moved at the first commit after the connector was back and `restart_lsn` at the second, 64 seconds later. Five checkpoints in between changed nothing.
+
 A consumer that is connected and frozen holds WAL in the same way. With the default `wal_sender_timeout` of 60 seconds, the server gave up on it after one minute, and the slot went to `active = f`:
 
 ```text
@@ -197,6 +213,8 @@ LOG:  terminating walsender process due to replication timeout
 ```
 
 The timeout frees the connection, not the WAL. Nothing was released until the consumer process was resumed, reconnected and confirmed.
+
+That minute is the default of a self-hosted server, and of Aurora, Cloud SQL and Azure flexible server in the runs of 23 November 2026. Amazon Relational Database Service (RDS) for PostgreSQL 17.11 came with 30 seconds. With `wal_sender_timeout = 0` the server never ends the connection: a frozen Debezium connector kept its slot at `active = t` for all 160 seconds of its run, and the server log had no line about it.
 
 ## Fix 2: drop a slot that is no longer needed
 
@@ -252,9 +270,11 @@ CREATE PUBLICATION quiet_pub FOR TABLE heartbeat;
 UPDATE heartbeat SET ts = now() WHERE id = 1;
 ```
 
-If your tool already has a publication, the heartbeat table has to be added to that one.
+If your tool already has a publication, the heartbeat table has to be added to that one. With Debezium 3.7.1 a heartbeat table outside the publication left the slot stuck on PostgreSQL 15.19 and 18.7. On 14.25 the slot moved all the same, which is no reason to leave the table out.
 
-Not every consumer needs this. `pg_recvlogical` was attached to the same slot with no change in `quietdb` at all, and it advanced the slot by itself, because it confirms the position that the server reports in its keepalive messages. Whether your tool does that is in [its documentation](#how-cdc-tools-describe-the-same-thing).
+On Amazon RDS this case needs no busy neighbour: a slot there grows while its own database is quiet. See [AWS DMS and Amazon RDS](#aws-dms-and-amazon-rds).
+
+Not every consumer needs this. `pg_recvlogical` was attached to the same slot with no change in `quietdb` at all, and it advanced the slot by itself, because it confirms the position that the server reports in its keepalive messages. What Debezium, AWS Database Migration Service (DMS) and Airbyte did is in [How CDC tools behave on the same slot](#how-cdc-tools-behave-on-the-same-slot).
 
 ## Fix 4: end the transaction that holds the slot
 
@@ -278,7 +298,11 @@ LOG:  database system is ready to accept connections
 
 The slot was still there and still held 160 MB. Dropping it and running `CHECKPOINT;` took `pg_wal` from 176 MB to 64 MB, and the disk from 82% to 44% used. The same recovery worked on all eight versions.
 
-Growing the volume gets you to the same point and was not run here.
+On a managed service there is no other file to delete, and growing the volume is the way out. On Amazon RDS for PostgreSQL 18.6 with a 20 GB volume the same `PANIC` came when an unread slot held 19 GB of WAL. RDS then started PostgreSQL again about every two minutes, and each start ended with `FATAL:  could not write to file "pg_wal/xlogtemp.3361": No space left on device`.
+
+`aws rds modify-db-instance --allocated-storage 25 --apply-immediately` was accepted in that state. The first connection worked 289 seconds later, the slot still held 19 GB, and dropping it followed by `CHECKPOINT;` freed the space.
+
+Nothing announced the full volume. The instance status stayed `available` for at least 13 minutes while every connection was refused, and RDS wrote no event for it. Alert on the CloudWatch metric `FreeStorageSpace`, not on the status.
 
 ## Prevent it
 
@@ -290,6 +314,8 @@ Growing the volume gets you to the same point and was not run here.
 ALTER SYSTEM SET max_slot_wal_keep_size = '64MB';
 SELECT pg_reload_conf();
 ```
+
+On a managed service the setting goes through the service. Amazon RDS for PostgreSQL 17.11 refused `ALTER SYSTEM` with `ERROR:  ALTER SYSTEM command is not supported`, and its DB parameter group has `max_slot_wal_keep_size` as a dynamic parameter. On Azure Database for PostgreSQL flexible server 17.11 it could not be set at all: `Value of server parameter 'max_slot_wal_keep_size' cannot be set because it's declared as read-only.`
 
 The run repeated the full-disk test of Fix 5 with this setting. On the same 256 MB disk, with a slot nobody read, eight rounds of 24 MB were written, which is more than the 144 MB that were free.
 
@@ -345,38 +371,88 @@ The cost is the same as for the cap. The slot's consumer gets `can no longer acc
 ### Watch and tidy
 
 - Alert on `retained_wal` per slot from the query in the short answer, and on `safe_wal_size` once a cap is set.
-- Drop the slot when you retire a connector or a task. By their documentation, Debezium and AWS DMS both leave it in place when they stop.
+- Drop the slot when you retire a connector or a task. In the runs Debezium left its slot and its publication after a stop, a delete and a shutdown. AWS DMS left its slot when a task was stopped and dropped it when the task was deleted.
 - Keep one slot per consumer, so that a slot without a reader is easy to recognise.
 - Look for sessions that sit `idle in transaction`. One of them held the slot of a healthy consumer in the run.
 - Create slots deliberately. The prerequisites and their errors are in [Enable PostgreSQL logical replication for CDC](/docs/runbooks/postgres/enable-logical-replication/).
 
-## How CDC tools describe the same thing
+## How CDC tools behave on the same slot
 
-The statements in this section are quoted from each vendor's documentation as it read on 16 November 2026. None of these tools was run for this page.
+Debezium, AWS DMS and Airbyte were each put through the conditions above on 23 November 2026. The versions are in the box at the end of the page, and every number in this section is from those runs.
 
 ### Debezium
 
-Debezium documents the idle-database case: "Debezium then cannot confirm the LSN as replication slots work per-database and Debezium is not invoked. As WAL is shared by all databases, the amount used tends to grow until an event is emitted by the database for which Debezium is capturing changes" ([WAL disk space consumption](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-wal-disk-space), checked Nov 2026).
+Debezium 3.7.1.Final ran on Kafka Connect 4.3.1 against PostgreSQL 18.7. What the slot showed depended on how the connector had stopped reading:
 
-Its fix is the heartbeat of Fix 3. `heartbeat.interval.ms` defaults to `0`, which sends no heartbeats, and `heartbeat.action.query` holds the statement that writes to a heartbeat table. The heartbeat table has to be in the connector's publication.
+| State of the connector | `active` | Held by the slot after 128 MB of writes |
+| --- | --- | --- |
+| `RUNNING` | `t` | 129 MB for 53 seconds, until the next offset commit |
+| `PAUSED` | `t` | 141 MB for the 90 seconds it was watched |
+| `STOPPED`, deleted, or the worker shut down | `f` | 141 MB |
 
-From Debezium 3.4 there is also `lsn.flush.mode` ([3.4 release notes](https://debezium.io/releases/3.4/release-notes), checked Nov 2026). Its default is `connector`. The value `connector_and_driver` lets the PostgreSQL JDBC driver "flush the server-reported keep-alive LSN", which is what `pg_recvlogical` did in the run above.
+After a stop, a delete and a worker shutdown the slot was still there, and so was the publication Debezium had created. `slot.drop.on.stop=true` dropped the slot on each of the three. The connector did not start over afterwards, and its task failed:
+
+```text
+io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [...], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+```
+
+For the idle database, Debezium's documentation gives the cause: "Debezium then cannot confirm the LSN as replication slots work per-database and Debezium is not invoked. As WAL is shared by all databases, the amount used tends to grow until an event is emitted by the database for which Debezium is capturing changes" ([WAL disk space consumption](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-wal-disk-space), checked Nov 2026). The run tried each remedy on a connector that captured the quiet database:
+
+| Connector settings | The slot of the quiet database |
+| --- | --- |
+| Defaults | 135 MB held, never moved |
+| `heartbeat.interval.ms=5000` | 135 MB held. Kafka received 21 heartbeat records |
+| The same with `heartbeat.action.query`, the heartbeat table in the publication | 928 bytes held after 60 seconds |
+| The same, the heartbeat table not in the publication | 135 MB held on PostgreSQL 18.7 and 15.19, 600 bytes after 40 seconds on 14.25 |
+| `lsn.flush.mode=connector_and_driver`, no heartbeat | 56 bytes held after 20 seconds |
+
+`lsn.flush.mode` is among the properties of 3.7.1 and not among those of 3.0.8, which accepted the setting and did nothing with it. Debezium's [3.4 release notes](https://debezium.io/releases/3.4/release-notes) (checked Nov 2026) introduce it, and no release between the two was run. Its default is `connector`, and 3.7.1 says what that means when it starts:
+
+```text
+Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.
+```
+
+An outage of Kafka takes the consumer away as well. With Kafka unreachable the worker stopped the connector after 14 seconds, and when Kafka was back it waited out the default rebalance delay of five minutes on this single-worker stack. An outage of 2 minutes 40 seconds left the slot without a consumer for 7 minutes 26 seconds.
 
 ### AWS DMS and Amazon RDS
 
-AWS Database Migration Service (DMS) states the mechanism in one sentence: "PostgreSQL writes the database changes to WAL files that are discarded only after AWS DMS successfully reads changes from the logical replication slot" ([PostgreSQL as a DMS source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), checked Nov 2026). It also says that slots outlive tasks: "Slots open automatically as soon as a task starts and remain open even when the task is no longer running. Make sure to manually delete open slots."
+AWS DMS 3.6.1 ran a task with full load and ongoing replication from Amazon RDS for PostgreSQL 17.11. DMS created its own slot with the `test_decoding` plugin. It also added a table `awsdms_ddl_audit` and an event trigger to the source database.
 
-Its heartbeat is the endpoint setting `HeartbeatEnable`, off by default: "The WAL heartbeat feature mimics a dummy transaction, so that idle logical replication slots don't hold onto old WAL logs that result in storage full situations on the source." On the cap, the same page says that when `restart_lsn` falls behind by more than `max_slot_wal_keep_size`, "the DMS task fails due to removal of required WAL files".
+AWS states the mechanism in one sentence: "PostgreSQL writes the database changes to WAL files that are discarded only after AWS DMS successfully reads changes from the logical replication slot" ([PostgreSQL as a DMS source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), checked Nov 2026). A stopped task showed it: the slot went to `active = f`, and after a further 1.5 GB of writes it held 2,253 MB. After a resume the slot was active in 16 seconds and down to 100 MB in 187 seconds.
 
-The open-transaction case has its own heading in the DMS troubleshooting guide: "ReplicationSlotDiskUsage increases and restart_lsn stops moving forward during long transactions, such as ETL workloads" ([Troubleshooting](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Troubleshooting.html#CHAP_Troubleshooting.PostgreSQL.AvoidLongTransactions), checked Nov 2026).
+On RDS the same numbers are in CloudWatch ([RDS metrics](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html), checked Nov 2026). `TransactionLogsDiskUsage` read 2,432 MB when `pg_wal` was 2,432 MB, and `OldestReplicationSlotLag` read 2,253 MB when the slot held 2,253 MB. `ReplicationSlotDiskUsage` stayed at 0 MB.
 
-On Amazon Relational Database Service (RDS), the size of `pg_wal` is the CloudWatch metric `TransactionLogsDiskUsage`, described as "The disk space used by transaction logs", and the slot that is furthest behind is `OldestReplicationSlotLag` ([RDS metrics](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html), checked Nov 2026).
+What a task leaves behind depends on how it ends. The same AWS page says: "Slots open automatically as soon as a task starts and remain open even when the task is no longer running. Make sure to manually delete open slots." In the run a stopped task left its slot, and deleting the task dropped it.
+
+The audit table, the event trigger and the heartbeat table stayed in the database after both tasks were deleted.
+
+The heartbeat is the endpoint setting `HeartbeatEnable`, off by default: "The WAL heartbeat feature mimics a dummy transaction, so that idle logical replication slots don't hold onto old WAL logs that result in storage full situations on the source." Without it the slot of a quiet database held 1,541 MB and did not move in five minutes. With `HeartbeatEnable=true` and `HeartbeatFrequency=1` the slot was down to 1,984 bytes 42 seconds after the task was running again, and DMS updated a table `awsdms_heartbeat` every minute.
+
+The open-transaction case has its own heading in the DMS troubleshooting guide: "ReplicationSlotDiskUsage increases and restart_lsn stops moving forward during long transactions, such as ETL workloads" ([Troubleshooting](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Troubleshooting.html#CHAP_Troubleshooting.PostgreSQL.AvoidLongTransactions), checked Nov 2026). With one session idle in a transaction, the running task moved `confirmed_flush_lsn` and not `restart_lsn`, and the slot held 1,091 MB until the transaction ended. The metric that showed it was `OldestReplicationSlotLag`, while `ReplicationSlotDiskUsage` stayed at 0 MB for this one-row transaction.
+
+Three settings of RDS itself change the picture:
+
+- **A slot is never idle there.** RDS switches the WAL file every 300 seconds (`archive_timeout`), and each switch added one 64 MB segment that a slot without a heartbeat kept. A slot whose database had no writes grew from 198 MB to 454 MB in 17 minutes, which is about 18 GB a day.
+- **`pg_wal` has a floor.** `wal_keep_size` is 2,048 MB by default, so the directory stayed at 2,304 MB after the slot had caught up. A `TransactionLogsDiskUsage` of a few gigabytes does not point to a slot.
+- **`wal_sender_timeout` is 30 seconds**, not the 60 seconds of a self-hosted server.
+
+One statement of the DMS page was not run: that when `restart_lsn` falls behind by more than `max_slot_wal_keep_size`, "the DMS task fails due to removal of required WAL files".
 
 ### Airbyte
 
-Airbyte's PostgreSQL source describes the symptom from the connector's side: "You may also notice that the `confirmed_flush_lsn` column of the server's `pg_replication_slots` view doesn't advance as expected", and adds "Airbyte's connector depends on Debezium" ([Troubleshooting Postgres Sources](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting), checked Nov 2026). Its fix is again a heartbeat table, added to the publication and written by the connector's `Debezium heartbeat query` setting.
+Airbyte's PostgreSQL source connector 3.8.12 was run directly, with the Airbyte protocol commands and without the platform around it. It carries Debezium 3.4.3.Final, which fits the sentence on its troubleshooting page that "Airbyte's connector depends on Debezium" ([Troubleshooting Postgres Sources](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting), checked Nov 2026).
 
-When the WAL it needs has been removed, Airbyte does not fail. It logs "Saved offset is before Replication slot's confirmed_flush_lsn, Airbyte will trigger sync from scratch" and reads the tables again.
+Airbyte reads in batches, so between two syncs nobody is connected and the slot shows `active = f`. The connector moved the slot once per sync, when the sync started, to the position the previous sync had saved. The slot therefore always held at least one sync interval of WAL. In the run, 130 MB written to a table outside the publication were released only at the start of the third sync after them, once a published change had followed.
+
+The idle-database case looked as the same page describes it: "You may also notice that the `confirmed_flush_lsn` column of the server's `pg_replication_slots` view doesn't advance as expected". Two syncs of a quiet database ran 137 and 141 seconds, ended with `Heartbeat timeout: no progress for 2 minutes`, and left the slot holding 130 MB. With a heartbeat table in the publication and the connector's `Debezium heartbeat query` setting, the sync ended after 24 seconds and the next one freed the slot.
+
+A slot that had been invalidated did not make the connector start over. With `wal_status = lost` every sync ended after two seconds with a configuration error, with or without saved state:
+
+```text
+Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+```
+
+A slot that was dropped and created again gave `Replication slot 'airbyte_slot' has advanced beyond the source's state LSN.` until the saved state was cleared, and the sync after that read every row again. Airbyte's troubleshooting page still quotes an older log line, "Saved offset is before Replication slot's confirmed_flush_lsn, Airbyte will trigger sync from scratch" (checked Nov 2026). That text is in none of the 193 jar files of the 3.8.12 image.
 
 :::note[How OLake Go handles this]
 

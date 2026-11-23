@@ -24,6 +24,22 @@ runbook:
       - "SQL Server 2022 (RTM-CU27-GDR) 16.0.4305.5, Developer Edition on Linux"
       - "SQL Server 2019 (RTM-CU32-GDR) 15.0.4510.2, Developer Edition on Linux"
     lab: labs/runbooks/sql-server/enable-cdc-change-tables-empty
+    services:
+      date: "2026-11-23"
+      versions:
+        - "Amazon RDS for SQL Server 2022 Standard (16.0.4305.5)"
+        - "Azure SQL Database (12.0.2000.8)"
+        - "AWS DMS 3.6.1"
+        - "Debezium 3.7.1.Final"
+        - "Airbyte source-mssql 5.1.5"
+        - "Flink CDC 3.7.0 on Flink 2.2.1"
+      labs:
+        - labs/runbooks/service-runs/aws/sqlserver-rds
+        - labs/runbooks/service-runs/azure/sql-database
+        - labs/runbooks/service-runs/aws/dms-sqlserver
+        - labs/runbooks/service-runs/tools/debezium-sqlserver
+        - labs/runbooks/service-runs/tools/airbyte-sqlserver
+        - labs/runbooks/service-runs/tools/flink-cdc-sqlserver
     summary: "Change data capture was enabled with SQL Server Agent off, so the change table stayed empty, and then with the Agent on. Five ways enabling fails were reproduced with their fixes, as were the LSN range error after clean-up and a schema change. Error 15404 could not be reproduced in a Linux container."
 ---
 
@@ -81,6 +97,8 @@ Msg 22830 is a wrapper. The command and the inner error at its end say what went
 Msg 22830, Level 16, State 1, Server mssql, Procedure sys.sp_cdc_enable_db_internal, Line 281
 Could not update the metadata that indicates database lab_owner is enabled for Change Data Capture. The failure occurred when executing the command 'SetCDCTracked(Value = 1)'. The error returned was 15517: 'Cannot execute as the database principal because the principal "dbo" does not exist, this type of principal cannot be impersonated, or you do not have permission.'. Use the action and error to determine the cause of the failure and resubmit the request.
 ```
+
+On Amazon Relational Database Service (RDS), `sys.sp_cdc_enable_db` gave Msg 22902 to the master user, who is not a `sysadmin` there. On Azure SQL Database below the S3 service objective it gave Msg 22830 with the inner error 22871. Both are under [Managed services and other tools](#managed-services-and-other-tools).
 
 One difference between the versions is harmless. When a table is enabled with `@supports_net_changes = 1`, SQL Server 2022 also prints `Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.` and 2019 does not.
 
@@ -180,7 +198,7 @@ To turn CDC off, `sys.sp_cdc_disable_table` removes one capture instance and `sy
 Each fix below was run on both versions, and the enable call succeeded afterwards.
 
 - **Msg 22901.** Enable the database before the table.
-- **Msg 22902 and 22904.** Have a `sysadmin` enable the database. A `db_owner` can then enable tables.
+- **Msg 22902 and 22904.** Have a `sysadmin` enable the database. A `db_owner` can then enable tables. On Amazon RDS the master user is not a `sysadmin`, and the database is enabled with `msdb.dbo.rds_cdc_enable_db`.
 - **Msg 22906.** Drop or rename the schema or user named `cdc`. In the run, `DROP SCHEMA cdc` was enough.
 - **Msg 22939.** Use `@supports_net_changes = 0`, or give the table a primary key first.
 
@@ -217,6 +235,8 @@ environment:
 On a Linux host installed from packages, Microsoft's [Agent set-up page](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup-sql-agent?view=sql-server-ver16) gives `sudo /opt/mssql/bin/mssql-conf set sqlagent.enabled true` followed by a restart of the service. That path was not run here.
 
 In the run, 4 rows were changed while the Agent was off, and one more later. After the Agent started, the capture job's `start_execution_date` was set, the row that had been waiting was captured, and a new insert arrived within 10 seconds. Nothing had to be enabled again.
+
+On Amazon RDS the Agent was running and the master user could not stop it, and Azure SQL Database has no Agent at all. On RDS the next cause is the one to check.
 
 If the Agent is running and the table is still empty, the capture job may be stopped:
 
@@ -306,8 +326,11 @@ EXEC sys.sp_cdc_disable_table
 Three results from the run are worth planning for.
 
 - **There is a gap.** The row written after the `ALTER TABLE` and before the new instance is in the old change table without its note, and not in the new one. Its note value reached no change table.
+- **An update of the new column alone leaves no trace.** In the runs of 23 November 2026, an `UPDATE` that set only `note` before the second instance existed put no row in the old change table. A reader gets no event for it, and no error.
 - **Two is the limit.** A third instance failed with Msg 22962, so drop the old one before the next schema change.
 - **Other changes behave differently.** After `DROP COLUMN note`, the change table kept the column and new rows had NULL in it. After `ALTER COLUMN quantity BIGINT`, the change table column became `bigint` by itself.
+
+Tools differ in what they do with the second instance. Debezium and Flink CDC switched to it by themselves, AWS Database Migration Service (DMS) did not need it, and Airbyte's documented fix cost it its saved position. The details are under [Managed services and other tools](#managed-services-and-other-tools).
 
 ## Prevent it
 
@@ -351,21 +374,118 @@ For schema changes it [switches to a second capture instance](/docs/connectors/m
 
 ## Managed services and other tools
 
-This section quotes documentation, checked on 16 November 2026. None of it was run here.
+Two managed services and four tools were put through the cases of this page on 23 November 2026. The versions are in the box at the end of the page.
 
-**Amazon Relational Database Service (RDS) for SQL Server.** The database is enabled with a different procedure there. The [RDS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.SQLServer.CommonDBATasks.CDC.html) says: "Before you use CDC with your Amazon RDS DB instances, enable it in the database by running msdb.dbo.rds_cdc_enable_db." Tables are enabled with `sys.sp_cdc_enable_table` as usual.
+### Amazon RDS for SQL Server
 
-**Azure SQL Database** has no Agent to start. Microsoft's [overview for Azure SQL Database](https://learn.microsoft.com/en-us/azure/azure-sql/database/change-data-capture-overview?view=azuresql) says: "In Azure SQL Database, a change data capture scheduler replaces the SQL Server Agent jobs that capture and cleanup change data for the source tables." It also says: "The CDC capture job runs every 20 seconds, and the cleanup job runs every hour."
+The instance ran SQL Server 2022 Standard Edition, build 16.0.4305.5, which is the build of the lab above. The database is enabled with a different procedure there. The [RDS documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.SQLServer.CommonDBATasks.CDC.html) says: "Before you use CDC with your Amazon RDS DB instances, enable it in the database by running msdb.dbo.rds_cdc_enable_db."
 
-**Debezium.** The SQL Server connector reads `sys.fn_cdc_get_max_lsn()` too. Its [documentation](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html) says: "The most likely reason for a missing LSN is that the SQL Server Agent is not running." The log line is `No maximum LSN recorded in the database; SQL Server Agent is not running` from Debezium 2.0 on, and `No maximum LSN recorded in the database; please ensure that the SQL Server Agent is running` in 1.9 ([1.9.7 source](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerStreamingChangeEventSource.java), [2.0.0 source](https://github.com/debezium/debezium/blob/v2.0.0.Final/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerStreamingChangeEventSource.java)).
+```text
+EXEC sys.sp_cdc_enable_db;
+Msg 22902 ... Caller is not authorized to initiate the requested action. Sysadmin privileges are required.
+EXEC msdb.dbo.rds_cdc_enable_db;
+Procedure or function 'rds_cdc_enable_db' expects parameter '@db_name', which was not supplied.
+EXEC msdb.dbo.rds_cdc_enable_db 'cdclab';
+CDC enabled on database cdclab
+```
 
-For a new column the same page describes the gap seen in the run. With an [online schema update](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html#online-schema-updates), "a potential processing gap can occur after you update the schema in the source database, but before you create the new capture instance."
+Tables are enabled with `sys.sp_cdc_enable_table` as usual. It printed `Job 'cdc.cdclab_capture' started successfully.`, and an inserted row was in the change table 2 seconds later. To turn CDC off again, `sys.sp_cdc_disable_db` gave Msg 22902 as well, and `msdb.dbo.rds_cdc_disable_db 'cdclab'` worked.
 
-**AWS Database Migration Service (DMS).** The [SQL Server source page](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.SQLServer.html) warns about the log: "SQL Server tlog entries won't be marked for re-use until the MS CDC capture job processes those changes." On RDS for SQL Server, the [ongoing replication page](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.SQLServer.CDC.html) says, "AWS DMS needs to use MS-CDC for tables with or without primary keys."
+A stopped Agent is not the cause on RDS. `sys.dm_server_services` showed it `Running`, and the master user was denied the procedure that would stop it.
 
-**Airbyte.** The [SQL Server source page](https://docs.airbyte.com/integrations/sources/mssql) says: "Airbyte recommends retaining at least 7 days of CDC data." For a new column, its [troubleshooting page](https://docs.airbyte.com/integrations/sources/mssql/mssql-troubleshooting) recommends disabling and enabling CDC on the table again, which replaces the capture instance where the steps above run two side by side.
+A stopped capture job gave the same symptom: after `sys.sp_cdc_stop_job`, two inserts stayed out of the change table for the 15 seconds they were watched. One manual `sys.sp_cdc_scan` captured them, and after `sys.sp_cdc_start_job` new rows were captured again.
 
-**Flink CDC.** The [SQL Server connector page](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/sqlserver-cdc/) lists the same prerequisite: "The SQL Server Agent is running."
+One table that this page mentions cannot be read there. `msdb.dbo.cdc_jobs` answered Msg 229, `The SELECT permission was denied`, for the master user too, and `sys.sp_cdc_help_jobs` returned the job settings.
+
+### Azure SQL Database
+
+Azure SQL Database has no Agent to start. Microsoft's [overview for Azure SQL Database](https://learn.microsoft.com/en-us/azure/azure-sql/database/change-data-capture-overview?view=azuresql) says: "In Azure SQL Database, a change data capture scheduler replaces the SQL Server Agent jobs that capture and cleanup change data for the source tables." In the run `sys.dm_server_services` did not exist (Msg 208), and `sys.sp_cdc_enable_table` printed nothing about an Agent.
+
+The service objective decides whether CDC can be enabled at all. At S0, `sys.sp_cdc_enable_db` failed:
+
+```text
+Msg 22830 ... The error returned was 22871: 'Change Data Capture is not supported on Free, Basic or Standard tier Single Database (S0,S1,S2) and Database in Elastic pool with max eDTUs < 100 or max vCore < 1. Please upgrade to a higher Service Objective.'
+```
+
+After scaling to S3 the same call worked, for a login that is `db_owner` and not `sysadmin`.
+
+The same Microsoft page says: "The CDC capture job runs every 20 seconds, and the cleanup job runs every hour." In the run the scans started 5 seconds apart, and four changed rows were in the change table 5 seconds after their commit.
+
+The hourly clean-up is what moves the minimum LSN under a reader. With the retention set to 1 minute, nothing was removed for 56 minutes. The clean-up then ran one hour after CDC had been enabled on the database, 2 of 21 change rows were left, and the reader's next call failed with Msg 313 as in [the lab](#the-range-moves-when-clean-up-runs).
+
+The job procedures differ too:
+
+| Statement | Azure SQL Database |
+| --- | --- |
+| `sys.sp_cdc_stop_job`, `sys.sp_cdc_start_job` | `Msg 2812 ... Could not find stored procedure` |
+| `sys.sp_cdc_help_jobs` | Works. Capture: `maxtrans` 10000, `maxscans` 100. Clean-up: `retention` 4320, `threshold` 4999 |
+| `sys.sp_cdc_change_job` for the retention | Accepted |
+| `msdb.dbo.cdc_jobs` | `Msg 40515`. The table is `cdc.cdc_jobs` in the database itself |
+
+The schema change went as in the lab: no `note` column in the old change table, a second capture instance for it, and Msg 22962 for a third.
+
+### Debezium
+
+Debezium 3.7.1.Final ran against SQL Server 2022 (16.0.4305.5). Its [documentation](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html) says: "The most likely reason for a missing LSN is that the SQL Server Agent is not running."
+
+With the Agent off, the connector and its task stayed `RUNNING` and the snapshot arrived. A row written afterwards did not, and the task logged one line at `ERROR` level, once:
+
+```text
+No maximum LSN recorded in the database; SQL Server Agent is not running
+```
+
+That is the wording from Debezium 2.0 on. Version 1.9 says `No maximum LSN recorded in the database; please ensure that the SQL Server Agent is running` ([1.9.7 source](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerStreamingChangeEventSource.java), [2.0.0 source](https://github.com/debezium/debezium/blob/v2.0.0.Final/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerStreamingChangeEventSource.java)).
+
+For a new column the same page describes the gap. With an [online schema update](https://debezium.io/documentation/reference/3.7/connectors/sqlserver.html#online-schema-updates), "a potential processing gap can occur after you update the schema in the source database, but before you create the new capture instance." The run showed what the gap looks like from the topic:
+
+| Written before the second capture instance | Event |
+| --- | --- |
+| An insert with a note | `op=c` without a `note` field |
+| An update that set only the note | none |
+
+The task stayed `RUNNING` and logged nothing about either. Four seconds after `dbo_orders_v2` was created, it logged `Migrating schema to Capture instance "dbo_orders_v2"` and the next insert arrived with its note. The connector was not restarted.
+
+Dropping the old instance while the connector ran was not silent. The task logged `Invalid object name 'cdclab.cdc.dbo_orders_CT'.` eight times, restarted itself after 10 seconds and went on without losing the row written in between.
+
+### AWS DMS
+
+AWS DMS 3.6.1 read an RDS for SQL Server source. It did not read the change tables. Its task log said `TLOG access mode is 'PreferTlog'`, and a new column needed no second capture instance:
+
+```text
+[TARGET_APPLY    ]I:  Alter table. Action: 3, statement: ALTER TABLE `dms_from_mssql`.`orders` ADD COLUMN `note` VARCHAR(50) CHARACTER SET utf16  (odbc_endpoint_imp.c:7394)
+```
+
+DMS added the column to the target within two seconds of the `ALTER TABLE`. A row inserted with a note and an update that set only a note were both in the target, while the change table on the source still had its four columns. The schema change fix of this page is not needed for a DMS task.
+
+MS-CDC still has to be on for each table. The [ongoing replication page](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.SQLServer.CDC.html) says that on RDS for SQL Server, "AWS DMS needs to use MS-CDC for tables with or without primary keys." A table with a primary key and without `sys.sp_cdc_enable_table` lost its updates: inserts and deletes arrived, the task stayed `running`, and the log had one warning:
+
+```text
+[SOURCE_CAPTURE  ]W:  MS-REPLICATION is not enabled for table '[dbo].[items]'. Therefore, UPDATE changes to it will not be captured. If you want UPDATE changes to be captured, either define a Primary Key for the table (if missing) or enable Microsoft CDC instead.  (sqlserver_log_utils.c:1312)
+```
+
+The [SQL Server source page](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.SQLServer.html) warns about the log: "SQL Server tlog entries won't be marked for re-use until the MS CDC capture job processes those changes." With the capture job stopped and 60,000 rows written, the log grew from 8 MB to 72 MB and `log_reuse_wait_desc` read `REPLICATION`. The target had every row all the same, and the log was free again after the capture job was started and the next log backup had run.
+
+### Airbyte
+
+Airbyte's SQL Server source connector 5.1.5 was run directly, with the Airbyte protocol commands and without the platform around it. Its [source page](https://docs.airbyte.com/integrations/sources/mssql) says: "Airbyte recommends retaining at least 7 days of CDC data."
+
+After the column was added, the connector's discovery listed `note`. The sync then delivered the two new rows with `"note": null`, although both rows have a note in the source table, and it delivered nothing for the update that set only a note. Nothing in the output marks those values as wrong.
+
+For a new column, its [troubleshooting page](https://docs.airbyte.com/integrations/sources/mssql/mssql-troubleshooting) recommends disabling and enabling CDC on the table again. In the run that replaced the capture instance: the new one had 5 columns, a new start LSN and an empty change table. A change row that no sync had read yet went with the old one, and the next sync failed:
+
+```text
+Incumbent CDC state is invalid, reason: Saved offset no longer present on the server, please reset the connection. To prevent this, increase transaction log retention and/or increase sync frequency. Saved LSN '0000002b:00000b10:0003' is no longer available in SQL Server transaction logs.
+```
+
+That is the default, `Fail sync`, of the setting `Invalid CDC Position Behavior (Advanced)`. With `Re-sync data`, one sync ended with `Triggering reset` and the next read every row of the table again, this time with the notes.
+
+### Flink CDC
+
+Flink CDC 3.7.0 ran on Flink 2.2.1, and its SQL Server connector carries Debezium 1.9.8.Final. The [connector page](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/sqlserver-cdc/) lists the prerequisite: "The SQL Server Agent is running."
+
+With the Agent off, the job gave no sign of it in its status. It was `RUNNING` at every reading for 100 seconds with 0 restarts, it printed the snapshot, and an insert made meanwhile never arrived. The TaskManager log had 223 warnings with the Debezium 1.9 wording, `No maximum LSN recorded in the database; please ensure that the SQL Server Agent is running`.
+
+A new column needs a new job, because the columns are declared in the table definition. The job that did not declare `note` kept running with its four columns and logged nothing. A job that declared it printed NULL for a row read through the old change table, and switched by itself once the second capture instance existed, with the same `Migrating schema to Capture instance "dbo_orders_v2"` line as Debezium.
 
 <R.HowWeReproduced />
 

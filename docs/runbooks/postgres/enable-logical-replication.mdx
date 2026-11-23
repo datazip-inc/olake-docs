@@ -29,7 +29,19 @@ runbook:
       - "PostgreSQL 12.22"
       - "PostgreSQL 19rc2 (release candidate)"
     lab: labs/runbooks/postgres/enable-logical-replication
-    summary: "A stock server was taken from its defaults to a working pgoutput slot, one prerequisite at a time. Each missing prerequisite was requested first, so its error is on record for every version, and each fix was applied and checked. The managed-service sections come from the vendors' documentation and were not run."
+    summary: "A stock server was taken from its defaults to a working pgoutput slot, one prerequisite at a time. Each missing prerequisite was requested first, so its error is on record for every version, and each fix was applied and checked. The four managed services were taken through the same steps in separate runs."
+    services:
+      date: "2026-11-23"
+      versions:
+        - "Amazon RDS for PostgreSQL 17.11"
+        - "Amazon Aurora PostgreSQL 17.11"
+        - "Google Cloud SQL for PostgreSQL 17.11"
+        - "Azure Database for PostgreSQL flexible server 17.11"
+      labs:
+        - labs/runbooks/service-runs/aws/postgres-rds
+        - labs/runbooks/service-runs/aws/postgres-aurora
+        - labs/runbooks/service-runs/gcp/cloudsql-postgres
+        - labs/runbooks/service-runs/azure/postgres-flexible-server
 ---
 
 import * as R from '@site/src/components/runbooks';
@@ -348,43 +360,98 @@ FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version'
 
 ## Managed services
 
-Nothing in this section was run. Each statement is quoted from the vendor's documentation as it read on 16 November 2026, and the publication, the role grants on tables, the replica identity and the slot are the same SQL as above.
+Each of the four services was taken through the steps of this page on 23 November 2026, on its smallest instance of PostgreSQL 17.11. The publication, the grants on tables, the replica identity and the slot are the same SQL as above and gave the same results. The switch, the role and the plugin list differ:
 
-| Platform | Switch | Takes effect after | Role |
+| Platform | Switch | Took effect after | What the capture role needs |
 | --- | --- | --- | --- |
-| Self-hosted | `wal_level = logical` | a restart | `REPLICATION` attribute |
-| Amazon RDS for PostgreSQL | `rds.logical_replication = 1` in a custom DB parameter group | a reboot | `rds_replication` role |
-| Amazon Aurora PostgreSQL | `rds.logical_replication = 1` in a custom DB cluster parameter group | a reboot of the writer instance | `rds_superuser` to set it up |
-| Google Cloud SQL | flag `cloudsql.logical_decoding` set to `on` | a restart | `REPLICATION` attribute |
-| Azure Database for PostgreSQL flexible server | server parameter `wal_level = logical` | a restart | `REPLICATION` attribute |
+| Self-hosted | `wal_level = logical` | a restart | the `REPLICATION` attribute |
+| Amazon RDS for PostgreSQL | `rds.logical_replication = 1` in a custom DB parameter group | a reboot, 47 seconds | membership in `rds_replication` |
+| Amazon Aurora PostgreSQL | `rds.logical_replication = 1` in a custom DB cluster parameter group | a reboot of the writer instance, 47 seconds | membership in `rds_replication` |
+| Google Cloud SQL | flag `cloudsql.logical_decoding` set to `on` | a restart the service does itself, 38 seconds | the `REPLICATION` attribute |
+| Azure Database for PostgreSQL flexible server | server parameter `wal_level = logical` | a restart, 63 to 124 seconds | the `REPLICATION` attribute |
 
-Sources: the four vendor pages linked in the sections below (checked Nov 2026). The first row is from the run on this page.
+On RDS and Aurora the master user has the permission from the start, through `rds_superuser`. On Cloud SQL and Azure the administrator account does not, and a logical slot it asked for failed with a permission error before the server ever looked at `wal_level`.
 
 ### Amazon RDS for PostgreSQL
 
-AWS documents one parameter: "Set the rds.logical_replication static parameter to 1", followed by "Reboot the DB instance for the static rds.logical_replication parameter to take effect" ([Performing logical replication for Amazon RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html), checked Nov 2026). You do not set `wal_level` yourself. The AWS Knowledge Center says: "If you set rds.logical_replication to 1, then Amazon RDS sets the wal_level, max_wal_senders, max_replication_slots, and max_connections parameters" ([Knowledge Center](https://repost.aws/knowledge-center/diskfull-error-rds-postgresql), checked Nov 2026).
+AWS documents one parameter: "Set the rds.logical_replication static parameter to 1", followed by "Reboot the DB instance for the static rds.logical_replication parameter to take effect" ([Performing logical replication for Amazon RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html), checked Nov 2026). The run went that way. The parameter group refused `ApplyMethod=immediate` for it, and after a reboot of 47 seconds `SHOW wal_level` returned `logical`.
 
-On RDS the permission comes from a role. The same AWS page names "The rds_replication role to grant permissions to manage logical slots and to stream data using logical slots". It also carries the warning that applies to every platform: "If you set up a logical replication slot and don't read from the slot, data can be written and quickly fill up your DB instance's storage."
+You do not set `wal_level` yourself. The parameter group of family `postgres17` has no parameter of that name, and `ALTER SYSTEM SET wal_level = logical` answered `ERROR:  ALTER SYSTEM command is not supported`.
+
+The AWS Knowledge Center says: "If you set rds.logical_replication to 1, then Amazon RDS sets the wal_level, max_wal_senders, max_replication_slots, and max_connections parameters" ([Knowledge Center](https://repost.aws/knowledge-center/diskfull-error-rds-postgresql), checked Nov 2026). In the run only `wal_level` changed. `max_replication_slots` was 20, `max_wal_senders` 35 and `max_connections` 79 before and after.
+
+Before the switch, the error depends on automated backups and on how the tool connects:
+
+| State of the instance | Request | Answer |
+| --- | --- | --- |
+| Automated backups on | a logical slot | `ERROR:  logical decoding requires "wal_level" >= "logical"` |
+| Automated backups on | a replication connection | `FATAL:  no pg_hba.conf entry for host "<client-ip>", user "rbadmin", database "appdb", SSL encryption` |
+| Automated backups off | a logical slot | `ERROR:  replication slots can only be used if "max_replication_slots" > 0` |
+| Automated backups off | a replication connection | `FATAL:  number of requested standby connections exceeds "max_wal_senders" (currently 0)` |
+
+With automated backups off, an instance without the switch runs with `wal_level = minimal` and no slots at all. Backups are not needed for logical replication itself: an 18.6 instance created with a backup retention of 0 and `rds.logical_replication = 1` had `wal_level = logical` and 20 slots.
+
+On RDS the permission comes from a role. The same AWS page names "The rds_replication role to grant permissions to manage logical slots and to stream data using logical slots". A role without it got:
+
+```text
+ERROR:  permission denied to use replication slots
+DETAIL:  Only roles with the REPLICATION attribute or privileges of the "rds_replication" role may use replication slots.
+```
+
+The self-hosted fix is refused there. `ALTER ROLE cdc_user REPLICATION`, run by the master user, answered `ERROR:  permission denied to alter role`. `GRANT rds_replication TO cdc_user;` worked, and the role then created, read and dropped a slot while its `rolreplication` stayed `f`.
+
+The AWS page also carries the warning that applies to every platform: "If you set up a logical replication slot and don't read from the slot, data can be written and quickly fill up your DB instance's storage."
 
 The step-by-step version with console screenshots is on this site: [How to set up PostgreSQL CDC on AWS RDS](/blog/how-to-set-up-postgresql-cdc-on-aws-rds/) and the [RDS set-up guide](/docs/connectors/postgres/setup/rds/).
 
 ### Amazon Aurora PostgreSQL
 
-The parameter has the same name and lives in the cluster parameter group: "Your Aurora PostgreSQL DB cluster must be configured to use a custom DB cluster parameter group" ([Setting up logical replication for your Aurora PostgreSQL DB cluster](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.Configure.html), checked Nov 2026). The same page says that "Setting up logical replication requires rds_superuser privileges", and that the change needs the writer: "Reboot the writer instance of your Aurora PostgreSQL DB cluster so that your changes takes effect."
+The parameter has the same name and lives in the cluster parameter group: "Your Aurora PostgreSQL DB cluster must be configured to use a custom DB cluster parameter group" ([Setting up logical replication for your Aurora PostgreSQL DB cluster](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.Configure.html), checked Nov 2026). The change needs the writer: "Reboot the writer instance of your Aurora PostgreSQL DB cluster so that your changes takes effect." In the run that reboot took 47 seconds.
 
-AWS gives two checks for afterwards: `SHOW rds.logical_replication;` returns `on` and `SHOW wal_level;` returns `logical`. On the plugin, the overview page says: "By default, Aurora PostgreSQL DB clusters use the native PostgreSQL pgoutput plugin when sending data" ([Overview of PostgreSQL logical replication with Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.html), checked Nov 2026).
+AWS gives two checks for afterwards, and both answered as documented: `SHOW rds.logical_replication;` returned `on` and `SHOW wal_level;` returned `logical`.
 
-The overview page also rules out one source. Logical decoding from read replicas, which PostgreSQL 16 added, "isn't supported on Aurora PostgreSQL".
+The same AWS page says that "Setting up logical replication requires rds_superuser privileges". That is about the account that sets it up. The role that reads the changes needed `rds_replication` and nothing more: with that grant, and never a member of `rds_superuser`, it created, read and dropped a slot.
+
+Without the grant Aurora answered in its own words:
+
+```text
+ERROR:  must be superuser, replication role, or rds_replication role to use logical replication slots
+```
+
+Three more answers differed from RDS:
+
+- `ALTER SYSTEM` gave `ERROR:  must be superuser to execute ALTER SYSTEM command`.
+- A new cluster had 20 WAL senders where the RDS instance had 35.
+- A backup retention of 0 was refused with `Retention period must be between 1 and 35.`
+
+On the plugin, the overview page says: "By default, Aurora PostgreSQL DB clusters use the native PostgreSQL pgoutput plugin when sending data" ([Overview of PostgreSQL logical replication with Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.html), checked Nov 2026). The same page rules out one source, and that statement was not run: logical decoding from read replicas, which PostgreSQL 16 added, "isn't supported on Aurora PostgreSQL".
 
 See also the [Aurora set-up guide](/docs/connectors/postgres/setup/aurora/).
 
 ### Google Cloud SQL for PostgreSQL
 
-Cloud SQL has its own flag: "In Cloud SQL, you enable this feature by setting the cloudsql.logical_decoding flag to on" ([Set up logical replication and decoding](https://docs.cloud.google.com/sql/docs/postgres/replication/configure-logical-replication), checked Nov 2026). Google adds that "This setting is different from the setting used in standard PostgreSQL", and that changing the flag "requires a restart of your instance".
+Cloud SQL has its own flag: "In Cloud SQL, you enable this feature by setting the cloudsql.logical_decoding flag to on" ([Set up logical replication and decoding](https://docs.cloud.google.com/sql/docs/postgres/replication/configure-logical-replication), checked Nov 2026). Google adds that changing the flag "requires a restart of your instance". In the run `gcloud sql instances patch` did that restart by itself, and the instance was back after 38 seconds with `wal_level = logical`.
 
-The role is the standard attribute: "To use logical decoding features, you create a PostgreSQL user with the REPLICATION attribute", for example `ALTER USER existing_user WITH REPLICATION;`. On plugins: "Cloud SQL supports the built-in pgoutput decoder, the test_decoding contrib module, and wal2json."
+The role is the standard attribute: "To use logical decoding features, you create a PostgreSQL user with the REPLICATION attribute". The built-in `postgres` user does not have it. With the flag on, a slot asked for by `postgres` still failed, in words that differ from those of a stock PostgreSQL 17:
 
-Google states the two limits per instance: `max_replication_slots` and `max_wal_senders` both default to 10, and their ceilings grow with the memory of the instance.
+```text
+ERROR:  must be superuser or replication role to use replication slots
+FATAL:  insufficient privileges to start walsender
+```
+
+The first line answers a slot request and the second a replication connection. `ALTER USER cdc_user WITH REPLICATION;` run by `postgres` fixed it for a new role, and `postgres` could give the attribute to itself in the same way.
+
+The order of the two errors matters when you read a log. A role without the attribute got the permission error whether the flag was on or off. Only a role with the attribute got `logical decoding requires "wal_level" >= "logical"` while the flag was off.
+
+Google states the two limits per instance: `max_replication_slots` and `max_wal_senders` both default to 10, and their ceilings grow with the memory of the instance. The run filled both:
+
+```text
+ERROR:  all replication slots are in use
+HINT:  Free one or increase "max_replication_slots".
+FATAL:  number of requested standby connections exceeds "max_wal_senders" (currently 10)
+```
+
+On the smallest size there was no room to raise them. Setting the flag to 12 answered `For Instances in db-f1-micro with 1024MB RAM, max_replication_slots cannot exceed 10.` Dropping one slot let the next request through.
 
 See also the [Cloud SQL set-up guide](/docs/connectors/postgres/setup/gcp/).
 
@@ -392,9 +459,27 @@ See also the [Cloud SQL set-up guide](/docs/connectors/postgres/setup/gcp/).
 
 Azure exposes the PostgreSQL setting itself. Microsoft lists the prerequisites as "Set the parameter wal_level to logical", "Save the changes and restart the server to apply the changes" and "Grant the admin user replication permissions" with `ALTER ROLE <adminname> WITH REPLICATION;` ([Logical replication and logical decoding](https://learn.microsoft.com/en-us/azure/postgresql/configure-maintain/concepts-logical), checked Nov 2026).
 
-Two behaviours on that page are specific to Azure. An unused slot can be removed for you: when storage runs low and the slot is not in use, the service "automatically drops that unused logical replication slot". And with high availability on PostgreSQL 16 and earlier, "logical replication slots aren't preserved during failover events".
+In the run the parameter was accepted in 14 seconds and marked as pending a restart. The first restart took 124 seconds and two later ones 63 and 64 seconds.
+
+The third prerequisite is easy to miss. Before it was done, the admin user got `ERROR:  permission denied to use replication slots` on a server that still had `wal_level = replica`, so the permission is checked first. The admin user could give the attribute to itself and to a separate capture role, and that role needed no membership in `azure_pg_admin`.
+
+Two limits showed in the same run. A new server allowed 10 slots and 10 WAL senders. And [`max_slot_wal_keep_size`](/docs/runbooks/postgres/replication-slot-filling-disk/#prevent-it) is read-only there, so that cap on a slot is not available.
+
+Two behaviours on Microsoft's page are specific to Azure and were not run. An unused slot can be removed for you: when storage runs low and the slot is not in use, the service "automatically drops that unused logical replication slot". And with high availability on PostgreSQL 16 and earlier, "logical replication slots aren't preserved during failover events".
 
 See also the [Azure set-up guide](/docs/connectors/postgres/setup/azure/).
+
+### Output plugins on the four services
+
+Each service sets `output_plugin_libraries` itself, so [step 5](#5-choose-an-output-plugin) looks different there. On all four, slots for `pgoutput`, `test_decoding` and `wal2json` were created with nothing to install or allow.
+
+| Service, PostgreSQL 17.11 | `SHOW output_plugin_libraries` | A slot for `decoderbufs` |
+| --- | --- | --- |
+| Amazon RDS and Aurora | `pgoutput, test_decoding, wal2json, decoder_raw, pglogical, pglogical_output, pgactive` | `ERROR:  library "decoderbufs" may not be used as an output plugin` |
+| Google Cloud SQL | `pgoutput, test_decoding, pglogical_output, wal2json, decoderbufs, pg_squeeze` | created |
+| Azure flexible server | `pgoutput, test_decoding, pglogical, pglogical_output, wal2json, pg_squeeze` | `ERROR:  library "decoderbufs" may not be used as an output plugin` |
+
+Cloud SQL and Azure gave no way to change the list. Cloud SQL answered `The requested flag is either misspelled or unsupported by Cloud SQL.`, and Azure has no server parameter of that name. Debezium's default `plugin.name` is `decoderbufs`, which RDS, Aurora and Azure refused, so set `plugin.name=pgoutput` there.
 
 ## Keep it working
 
