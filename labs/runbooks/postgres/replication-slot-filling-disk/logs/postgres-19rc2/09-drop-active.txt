@@ -1,0 +1,129 @@
+# ./run.sh drop-active    PostgreSQL 19rc2    2026-11-16T18:52:19Z
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/33D80D78
+(1 row)
+
+
+## A consumer is connected to the slot.
+$ pg_recvlogical -d appdb --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null -v  &
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |       3209 | 0/33D80D40  | 0/33D80D78          | 56 bytes     | reserved   |               | 
+(1 row)
+
+
+## Drop the slot while it is in use
+SELECT pg_drop_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" is active for PID 3209
+
+## Ending the session is not enough: this consumer reconnects after 5 seconds.
+SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot';
+ pg_terminate_backend 
+----------------------
+ t
+(1 row)
+
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |       3274 | 0/33D80D40  | 0/33D80D78          | 56 bytes     | reserved   |               | 
+(1 row)
+
+--- consumer output
+pg_recvlogical: starting log streaming at 0/00000000 (slot cdc_slot)
+pg_recvlogical: streaming initiated
+pg_recvlogical: confirming write up to 0/00000000, flush to 0/00000000 (slot cdc_slot)
+pg_recvlogical: error: unexpected termination of replication stream: FATAL:  terminating connection due to administrator command
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+pg_recvlogical: starting log streaming at 0/33D80D78 (slot cdc_slot)
+pg_recvlogical: streaming initiated
+pg_recvlogical: confirming write up to 0/33D80D78, flush to 0/33D80D78 (slot cdc_slot)
+---
+
+## End the session and drop the slot at once. pg_terminate_backend only sends the signal, so the drop is repeated if the process is still there.
+attempt 1:
+SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot' AND active;
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_terminate_backend 
+----------------------
+ t
+(1 row)
+
+ERROR:  replication slot "cdc_slot" is active for PID 3274
+attempt 2:
+SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot' AND active;
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_terminate_backend 
+----------------------
+(0 rows)
+
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+(0 rows)
+
+
+## What the consumer gets on its next attempts
+--- consumer output
+pg_recvlogical: error: unexpected termination of replication stream: FATAL:  terminating connection due to administrator command
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+pg_recvlogical: starting log streaming at 0/33D80D78 (slot cdc_slot)
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/33D80D78 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" does not exist
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+---
+
+## PostgreSQL 14 and later: pg_terminate_backend can wait for the process to exit (here up to 5000 ms).
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/33D80DE8
+(1 row)
+
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |       3417 | 0/33D80DB0  | 0/33D80DE8          | 56 bytes     | reserved   |               | 
+(1 row)
+
+SELECT pg_terminate_backend(active_pid, 5000) FROM pg_replication_slots WHERE slot_name = 'cdc_slot' AND active;
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_terminate_backend 
+----------------------
+ t
+(1 row)
+
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+(0 rows)
+
+
+## Stop the consumer.
+$ kill -TERM <pid of pg_recvlogical>

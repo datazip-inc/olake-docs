@@ -1,0 +1,84 @@
+# ./run.sh wal-level    PostgreSQL 14.25    2026-11-16T17:51:23Z
+
+## The default
+SHOW wal_level;
+ wal_level 
+-----------
+ replica
+(1 row)
+
+
+## Ask for logical decoding, from SQL and over the replication protocol
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ERROR:  logical decoding requires wal_level >= logical
+$ pg_recvlogical -d appdb --slot cdc_slot_2 --create-slot -P pgoutput
+pg_recvlogical: error: could not send replication command "CREATE_REPLICATION_SLOT "cdc_slot_2" LOGICAL "pgoutput" NOEXPORT_SNAPSHOT": ERROR:  logical decoding requires wal_level >= logical
+SELECT slot_name, plugin, slot_type, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | slot_type | database | active 
+-----------+--------+-----------+----------+--------
+(0 rows)
+
+--- server log
+2026-11-16 17:51:24.046 UTC [110] ERROR:  logical decoding requires wal_level >= logical
+2026-11-16 17:51:24.167 UTC [117] ERROR:  logical decoding requires wal_level >= logical
+---
+
+## A publication can be created at this level. Some versions answer with a warning.
+CREATE PUBLICATION early_pub FOR TABLE orders;
+WARNING:  wal_level is insufficient to publish logical changes
+HINT:  Set wal_level to logical before creating subscriptions.
+CREATE PUBLICATION
+DROP PUBLICATION early_pub;
+DROP PUBLICATION
+
+## Change the setting and reload: it does not take effect.
+ALTER SYSTEM SET wal_level = logical;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+SHOW wal_level;
+ wal_level 
+-----------
+ replica
+(1 row)
+
+SELECT name, setting, context, pending_restart FROM pg_settings WHERE name = 'wal_level';
+   name    | setting |  context   | pending_restart 
+-----------+---------+------------+-----------------
+ wal_level | replica | postmaster | t
+(1 row)
+
+SET wal_level = logical;
+ERROR:  parameter "wal_level" cannot be changed without restarting the server
+--- server log
+2026-11-16 17:51:26.277 UTC [187] WARNING:  wal_level is insufficient to publish logical changes
+2026-11-16 17:51:26.277 UTC [187] HINT:  Set wal_level to logical before creating subscriptions.
+2026-11-16 17:51:26.834 UTC [1] LOG:  parameter "wal_level" cannot be changed without restarting the server
+2026-11-16 17:51:28.385 UTC [242] ERROR:  parameter "wal_level" cannot be changed without restarting the server
+2026-11-16 17:51:28.385 UTC [242] STATEMENT:  SET wal_level = logical;
+---
+
+## Restart the server.
+$ docker compose restart pg
+SHOW wal_level;
+ wal_level 
+-----------
+ logical
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/175B250
+(1 row)
+
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+

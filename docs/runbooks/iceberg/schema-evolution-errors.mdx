@@ -1,0 +1,583 @@
+---
+title: "Iceberg schema evolution errors (Spark, Trino and PyIceberg):"
+description: "Iceberg schema evolution errors run in Spark 3.3 to 4.0, PyIceberg 0.7 and 0.12 and Trino 484: type changes, missing and extra columns, mergeSchema, case."
+sidebar_label: Schema evolution errors
+unlisted: true
+keywords:
+  - iceberg schema evolution
+  - Cannot write incompatible data to table
+  - INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_FIND_DATA
+  - Cannot change column type
+  - write.spark.accept-any-schema
+  - mergeSchema iceberg
+  - Mismatch in fields
+  - union_by_name
+  - Cannot write nullable values to non-null column
+  - multiple columns with the same name after lower-case normalization
+  - Cannot safely cast
+  - INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_SAFELY_CAST
+runbook:
+  family: iceberg
+  author: shubham
+  reproduced:
+    date: "2026-11-17"
+    versions:
+      - "Spark 3.5.6 with Iceberg 1.12.0"
+      - "Spark 3.3.3 with Iceberg 1.4.3"
+      - "Spark 4.0.5 with Iceberg 1.12.0"
+      - "PyIceberg 0.12.0 (PyArrow 26.0.1) and 0.7.1 (PyArrow 17.0.0)"
+      - "Trino 484"
+      - "Iceberg REST catalog fixture 1.10.1 and MinIO RELEASE.2025-04-03T14-56-28Z"
+    lab: labs/runbooks/iceberg/schema-evolution-errors
+    summary: "Column types were changed, columns added, renamed, reordered and nested, and data was written with missing, extra, nullable, differently typed and differently cased columns, in Spark on three versions, then in PyIceberg on two versions and in Trino against the same tables. Flink was not run."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+An Iceberg table's schema changes without rewriting data, and a write whose columns no longer match it fails. Each engine reports this differently:
+
+- **Spark 3.5:** a DataFrame without a column the table gained stops with `[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_FIND_DATA]`.
+- **PyIceberg:** an Arrow table whose columns differ from the table's, for example a nullable `id` for a required `id`, stops with `ValueError: Mismatch in fields:`.
+- **Trino:** an `INSERT` with fewer values than the table has columns stops with `Insert query has mismatched column types`.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Change the table first, then write by column name.
+
+- **Spark and Trino:** add columns with `ALTER TABLE ... ADD COLUMN`.
+  :::note
+  A Spark write that changes the table itself, needs both `write.spark.accept-any-schema` set to `true` on the table and the `mergeSchema` option on the writer.
+  :::
+- **PyIceberg:** add columns with `update_schema().union_by_name()`.
+- **Column types:** can only widen, such as `int` to `long`, `float` to `double`, or a decimal to more digits of precision.
+
+<TLDR title='Key takeaways'>
+
+- Renames and reorders are metadata only: the row written before a rename read back under the new name in Spark and Trino. A write by position after a reorder put values in the wrong columns without any error.
+- `mergeSchema` alone did nothing on any Spark version. With `write.spark.accept-any-schema` it added the column, and it also made `INSERT ... VALUES` fail with `Field col1 not found in source schema`.
+- A column named `ID` next to `id` is possible in Spark with `spark.sql.caseSensitive=true`. After that, case-insensitive Spark queries failed and Trino refused to read the table.
+
+</TLDR>
+
+## How Iceberg tracks columns
+
+Iceberg identifies every column by a field ID, not by its name or position. Renaming, reordering, adding and dropping columns therefore change only the table metadata, and old data files are read through the IDs. In the run, the row written before `RENAME COLUMN last_name TO surname` read back as `surname` in Spark and in Trino.
+
+Types are the exception, because the data files hold values of the old type. The [Iceberg specification](https://iceberg.apache.org/spec/) allows `int` to `long`, `float` to `double` and `decimal(P, S)` to `decimal(P', S)` when P' is larger, for format versions 1 and 2, and adds `date` to `timestamp` and `timestamp_ns` for version 3.
+
+Every write is checked against the table's current schema. Spark checks the columns itself, by name for `writeTo` and by position for `INSERT ... VALUES` and `insertInto`. On a table with `write.spark.accept-any-schema` set, the messages came from Iceberg's own check instead, such as `Field phone not found in source schema`.
+
+:::note[Spark versions on this page]
+The Spark messages come from runs on **Spark 3.3.3 with Iceberg 1.4.3**, **Spark 3.5.6 with Iceberg 1.12.0**, and **Spark 4.0.5 with Iceberg 1.12.0**. In the Spark source, `INCOMPATIBLE_DATA_FOR_TABLE`, `INSERT_COLUMN_ARITY_MISMATCH` and `NOT_SUPPORTED_CHANGE_COLUMN` are in the [3.5.6 error definitions](https://github.com/apache/spark/blob/v3.5.6/common/utils/src/main/resources/error/error-classes.json) and not in [3.4.4](https://github.com/apache/spark/blob/v3.4.4/core/src/main/resources/error/error-classes.json), so **Spark 3.4** does not print those three classes. `FIELDS_ALREADY_EXISTS` is renamed `FIELD_ALREADY_EXISTS` in the [4.0.0 definitions](https://github.com/apache/spark/blob/v4.0.0/common/utils/src/main/resources/error/error-conditions.json); **Spark 3.4** was not run.
+:::
+
+## Issue 1: Changing a column's data type to something Iceberg does not allow
+
+### Spark
+
+Spark refused `bigint` to `int`, `string` to `int` and `decimal(12,2)` to `decimal(12,4)` before asking Iceberg, and Iceberg refused `bigint` to `string` and `date` to `timestamp`. The `bigint` to `string` change gave the same text on all three versions:
+
+```text
+org.apache.spark.SparkException: Unsupported table change: Cannot change column type: id: long -> string
+Caused by: java.lang.IllegalArgumentException: Cannot change column type: id: long -> string
+```
+
+| Change | Spark 3.3.3, Iceberg 1.4.3 | Spark 3.5.6, Iceberg 1.12.0 | Spark 4.0.5, Iceberg 1.12.0 |
+| --- | --- | --- | --- |
+| Narrow a type, `bigint` to `int` | `Cannot update demo.db.types_t field id: bigint cannot be cast to int` | `[NOT_SUPPORTED_CHANGE_COLUMN] ALTER TABLE ALTER/CHANGE COLUMN is not supported for changing ...` | Same, with `SQLSTATE: 0A000` |
+| `bigint` to `string`, `date` to `timestamp` | `Cannot change column type: id: long -> string`, `Cannot change column type: created: date -> timestamptz` | Same | Same |
+
+The widenings worked. `ALTER TABLE ... ALTER COLUMN id TYPE bigint`, `amount TYPE double` and `price TYPE decimal(12,2)` all ran, and the row written before them read with the new types.
+
+One documented promotion did not work. On a table with `'format-version' = '3'`, **Spark 3.5.6 and 4.0.5 with Iceberg 1.12.0** refused `ALTER TABLE ... ALTER COLUMN created TYPE timestamp_ntz` with `Cannot change column type: created: date -> timestamp`, although the specification lists `date` to `timestamp` for version 3.
+
+### Trino
+
+**Trino 484** refused the same kinds of change through Iceberg, for example `Failed to set column type: Cannot change column type: id: long -> int` and `Failed to set column type: Cannot change column type: amount: double -> string`. It widened `integer` to `bigint` and `real` to `double`.
+
+### PyIceberg
+
+**PyIceberg 0.7.1 and 0.12.0** refused `long` to `int` with `ValidationError: Cannot change column type: id: long -> int`.
+
+### Flink
+
+Flink was not run for this page; this comes from the Iceberg documentation. Its page on [Flink data definition language (DDL)](https://iceberg.apache.org/docs/latest/flink-ddl/) describes `ALTER TABLE ... MODIFY` as: "Change a column's type (only safe type promotions such as INT to BIGINT), position, or comment, make a required column optional (the reverse is not allowed), or replace the primary key (primary key columns must be NOT NULL):"
+
+## Issue 2: Writing a value of the wrong type
+
+Here the table does not change. The data sends a column with a different type than the table's column, and the engine either casts (converts) the value to the column's type or refuses the write.
+
+### Spark
+
+The test table:
+
+```sql
+CREATE TABLE demo.db.cast_t (id int, amount double, label string) USING iceberg
+```
+
+Spark casts a value to the column's type when it considers the cast safe, and refuses the write otherwise. Each write below sent one column with a different type, and **Spark 3.3.3, 3.5.6 and 4.0.5** gave the same result for each:
+
+| Write | Table column | Value sent | Result |
+| --- | --- | --- | --- |
+| DataFrame column `id` with data type `bigint` | `id` with data type `int` | `1` | Written as `1` |
+| DataFrame column `amount` with data type `float` | `amount` with data type `double` | `3.0` | Written as `3.0` |
+| DataFrame column `label` with data type `int` | `label` with data type `string` | `5` | Written as the text `"5"` |
+| `INSERT INTO demo.db.cast_t VALUES (CAST(6 AS BIGINT), 6.0, 'f')` | `id` with data type `int` | `6` as `bigint` | Written as `6` |
+| DataFrame column `id` with data type `string` | `id` with data type `int` | `"2"` | Refused |
+| `INSERT INTO demo.db.cast_t VALUES ('x', 5.0, 'e')` | `id` with data type `int` | `'x'` | Refused |
+
+A `string` into the `int` column was refused with the error mentioned below.
+
+<Tabs groupId="spark-version">
+<TabItem value="3.3.3" label="Spark 3.3.3" default>
+
+```text
+Cannot write incompatible data to table 'demo.db.cast_t':
+- Cannot safely cast 'id': string to int
+```
+
+</TabItem>
+<TabItem value="3.5.6" label="Spark 3.5.6">
+
+```text
+[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_SAFELY_CAST] Cannot write incompatible data for the table `demo`.`db`.`cast_t`: Cannot safely cast `id` "STRING" to "INT".
+```
+
+</TabItem>
+<TabItem value="4.0.5" label="Spark 4.0.5">
+
+```text
+[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_SAFELY_CAST] Cannot write incompatible data for the table `demo`.`db`.`cast_t`: Cannot safely cast `id` "STRING" to "INT". SQLSTATE: KD000
+```
+
+</TabItem>
+</Tabs>
+
+To fix a refused write, cast the column in the writer, or change the table first if the new type is a widening.
+
+### PyIceberg
+
+The test table `py.events` has `id long` (required), `name string` and `created timestamp`. Each append below sent `id` with a different type:
+
+| Arrow table appended | Table column | Values sent | PyIceberg 0.7.1 | PyIceberg 0.12.0 |
+| --- | --- | --- | --- | --- |
+| `id` as `int32` | `id long` | `3`, `4` | Written | Written |
+| `id` as `string` | `id long` | `"5"`, `"6"` | Refused | Refused |
+
+The refused append printed the same on both versions:
+
+```text
+ValueError: Mismatch in fields:
+┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃    ┃ Table field                    ┃ Dataframe field                ┃
+┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ ❌ │ 1: id: required long           │ 1: id: required string         │
+│ ✅ │ 2: name: optional string       │ 2: name: optional string       │
+│ ✅ │ 3: created: optional timestamp │ 3: created: optional timestamp │
+└────┴────────────────────────────────┴────────────────────────────────┘
+```
+
+### Trino
+
+The test table `iceberg.db.trino_t` had columns `id` as `bigint`, `name` as `varchar` and `amount` as `double`. **Trino 484** refused a string for `id`:
+
+```sql
+INSERT INTO iceberg.db.trino_t VALUES ('x', 'b', 2.0)
+```
+
+```text
+Query 20261117_090132_00015_aiwkz failed: line 1:1: Insert query has mismatched column types: Table: [bigint, varchar, double], Query: [varchar(1), varchar(1), decimal(2,1)]
+```
+
+## Issue 3: The Iceberg table has a column the DataFrame or INSERT does not send
+
+A column was added to the Iceberg table, and the writer still sent only the old columns. Spark refused every such write. Trino refused an `INSERT` without a column list and wrote one with a column list. PyIceberg wrote Arrow data that left out an optional column.
+
+### Spark
+
+The test created the Iceberg table with two columns, then added a third:
+
+```sql
+CREATE TABLE demo.db.miss_t (id bigint, name string) USING iceberg
+ALTER TABLE demo.db.miss_t ADD COLUMN email string
+```
+
+The Iceberg table now had `id`, `name` and `email`. Each write below sent only `id` and `name`, and all three were refused on **Spark 3.3.3, 3.5.6 and 4.0.5**:
+
+| Write | What it sent | Result |
+| --- | --- | --- |
+| A DataFrame `(1, "a")` with `writeTo(...).append()` | `id` and `name` | Refused |
+| `INSERT INTO demo.db.miss_t VALUES (2, 'b')` | Two values for three columns | Refused |
+| `INSERT INTO demo.db.miss_t (id, name) VALUES (3, 'c')` | `id` and `name`, named in the `INSERT` | Refused |
+
+Naming the columns in the `INSERT` did not help. The errors, by version:
+
+<Tabs groupId="spark-version">
+<TabItem value="3.3.3" label="Spark 3.3.3" default>
+
+The DataFrame:
+
+```text
+Cannot write incompatible data to table 'demo.db.miss_t':
+- Cannot find data for output column 'email'
+```
+
+Both `INSERT` statements:
+
+```text
+Cannot write to 'demo.db.miss_t', not enough data columns:
+Table columns: 'id', 'name', 'email'
+Data columns: 'col1', 'col2'
+```
+
+</TabItem>
+<TabItem value="3.5.6" label="Spark 3.5.6">
+
+The DataFrame, and the `INSERT` with `(id, name)`:
+
+```text
+[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_FIND_DATA] Cannot write incompatible data for the table `demo`.`db`.`miss_t`: Cannot find data for the output column `email`.
+```
+
+The `INSERT` without a column list:
+
+```text
+[INSERT_COLUMN_ARITY_MISMATCH.NOT_ENOUGH_DATA_COLUMNS] Cannot write to `demo`.`db`.`miss_t`, the reason is not enough data columns:
+Table columns: `id`, `name`, `email`.
+Data columns: `col1`, `col2`.
+```
+
+</TabItem>
+<TabItem value="4.0.5" label="Spark 4.0.5">
+
+The DataFrame, and the `INSERT` with `(id, name)`:
+
+```text
+[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_FIND_DATA] Cannot write incompatible data for the table `demo`.`db`.`miss_t`: Cannot find data for the output column `email`. SQLSTATE: KD000
+```
+
+The `INSERT` without a column list:
+
+```text
+[INSERT_COLUMN_ARITY_MISMATCH.NOT_ENOUGH_DATA_COLUMNS] Cannot write to `demo`.`db`.`miss_t`, the reason is not enough data columns:
+Table columns: `id`, `name`, `email`.
+Data columns: `col1`, `col2`. SQLSTATE: 21S01
+```
+
+</TabItem>
+</Tabs>
+
+To fix it, send every column the Iceberg table has, or let the Iceberg table accept a missing one. The test set `write.spark.accept-any-schema` to `true` on the Iceberg table:
+
+```sql
+ALTER TABLE demo.db.miss_t SET TBLPROPERTIES ('write.spark.accept-any-schema' = 'true')
+```
+
+After that, a DataFrame with only `id` and `name` was written on all three Spark versions, both without `mergeSchema`, `(4, "d")`, and with it, `(5, "e")`. 
+
+### Trino
+
+The Iceberg table `iceberg.db.trino_t` had columns `id` as `bigint`, `name` as `varchar` and `amount` as `double`. **Trino 484** refused an `INSERT` that sent two values for three columns:
+
+```sql
+INSERT INTO iceberg.db.trino_t VALUES (2, 'b')
+```
+
+```text
+Query 20261117_090131_00014_aiwkz failed: line 1:1: Insert query has mismatched column types: Table: [bigint, varchar, double], Query: [integer, varchar(1)]
+```
+
+Naming the columns in the `INSERT` fixes it. The row was written, with the columns it left out stored as `NULL`:
+
+```sql
+INSERT INTO iceberg.db.trino_t (id, name) VALUES (3, 'c')
+```
+
+### PyIceberg
+
+The Iceberg table `py.events` has columns `id` as `long` (required), `name` as `string` and `created` as `timestamp` (optional). Arrow data with only `id` and `name` was appended and written on **PyIceberg 0.7.1 and 0.12.0**.
+
+## Issue 4: The DataFrame or Arrow data has a column the Iceberg table does not have
+
+The writer sends a new column that the Iceberg table does not have yet. The write fails unless the Iceberg table is changed first or, in Spark, the write is allowed to add the column.
+
+### Spark
+
+The Iceberg table `demo.db.extra_t` had columns `id` and `name`. Each write sent a DataFrame with an extra `phone` column, `(1, "a", "555-0100")`, and gave the same result on **Spark 3.3.3, 3.5.6 and 4.0.5**:
+
+| Write | Result |
+| --- | --- |
+| `writeTo(...).append()` | Refused with `too many data columns` |
+| The same, with the `mergeSchema` option | Refused with `too many data columns` |
+| `write.spark.accept-any-schema` set on the Iceberg table, no `mergeSchema` | Refused with `IllegalArgumentException: Field phone not found in source schema` |
+| `write.spark.accept-any-schema` and `mergeSchema` | Written, and `phone` added to the Iceberg table |
+
+The `too many data columns` error, by version:
+
+| Spark 3.3.3, Iceberg 1.4.3 | Spark 3.5.6, Iceberg 1.12.0 | Spark 4.0.5, Iceberg 1.12.0 |
+| --- | --- | --- |
+| `Cannot write to 'demo.db.extra_t', too many data columns` | `[INSERT_COLUMN_ARITY_MISMATCH.TOO_MANY_DATA_COLUMNS]` | Same as **Spark 3.5.6** |
+
+Both settings are needed, as the [Spark writes documentation](https://iceberg.apache.org/docs/latest/spark-writes/) describes: "The target table must be configured to accept any schema change by setting the property `write.spark.accept-any-schema` to `true`." and "The writer must enable the `mergeSchema` option."
+
+```python
+spark.sql("ALTER TABLE demo.db.extra_t SET TBLPROPERTIES ('write.spark.accept-any-schema' = 'true')")
+df.writeTo("demo.db.extra_t").option("mergeSchema", "true").append()
+```
+
+The property has a cost. After it was set, `INSERT INTO demo.db.extra_t VALUES (3, 'c', '555-0102')`, with the right number of values, failed with `Field col1 not found in source schema` on all three versions. Spark names the columns of `VALUES` `col1`, `col2` and so on, and the Iceberg table has no column with those names. An `INSERT` that names each value worked:
+
+```sql
+INSERT INTO demo.db.extra_t SELECT 4 AS id, 'd' AS name, '555-0103' AS phone
+```
+
+### PyIceberg
+
+The Iceberg table `py.events` has columns `id`, `name` and `created`. Appending Arrow data with an extra `email` column was refused on 0.7.1 and 0.12.0:
+
+```text
+ValueError: PyArrow table contains more columns: email. Update the schema first (hint, use union_by_name).
+```
+
+Add the column to the Iceberg table from the Arrow schema, then append. This worked on 0.7.1 and 0.12.0 and added `email` as field 4:
+
+```python
+with tbl.update_schema() as update:
+    update.union_by_name(arrow_table.schema)
+tbl.append(arrow_table)
+```
+
+## Issue 5: A column was renamed
+
+### Spark
+
+The Iceberg table `demo.db.ren_t` had columns `id`, `first_name` and `last_name`, and `RENAME COLUMN last_name TO surname` renamed the column in the Iceberg table only. The writer code was not changed, so its DataFrame still had `last_name`. That write failed with: <br/><br/> `Cannot find data for the output column naming surname`. Rename the column in the writer as well.
+
+### Trino
+
+The row written before the rename read back under `surname`, as in Spark.
+
+### Flink
+
+Flink was not run; this comes from the Iceberg documentation. The [Flink writes page](https://iceberg.apache.org/docs/latest/flink-writes/) says the Dynamic Iceberg Sink evolves table schemas while it writes, and lists renames as unsupported: "Renaming is unsupported because schema comparison is name-based, and renames would require additional metadata or hints to resolve."
+
+## Issue 6: Columns were reordered and values landed in the wrong columns
+
+### Spark
+
+A reorder is more dangerous than a rename, because writes by position do not fail. `ALTER COLUMN surname AFTER id` changed the Iceberg table's order from `id, first_name, surname` to `id, surname, first_name`. Each write below then sent its values in the old order, `id, first_name, surname`.
+
+All four writes returned `OK` on all three Spark versions. The two writes by position stored the first name in `surname`:
+
+| Write | Matches columns by | Values sent | Stored as `id, surname, first_name` |
+| --- | --- | --- | --- |
+| `df.write.insertInto("demo.db.ren_t")` | Position | `3, 'Grace', 'Hopper'` | `3, Grace, Hopper` (swapped) |
+| `INSERT INTO demo.db.ren_t SELECT 5, 'Barbara', 'Liskov'` | Position | `5, 'Barbara', 'Liskov'` | `5, Barbara, Liskov` (swapped) |
+| `df.writeTo("demo.db.ren_t").append()` | Name | `4, 'Edsger', 'Dijkstra'` | `4, Dijkstra, Edsger` |
+| `INSERT INTO demo.db.ren_t (id, first_name, surname) SELECT 6, 'Donald', 'Knuth'` | Name | `6, 'Donald', 'Knuth'` | `6, Knuth, Donald` |
+
+### Trino
+
+Trino ran no writes here. After the Spark writes, `SELECT * FROM iceberg.db.ren_t ORDER BY id` in **Trino 484** returned the same swapped rows 3 and 5:
+
+```text
+ id | surname  | first_name
+  1 | Lovelace | Ada
+  3 | Grace    | Hopper
+  4 | Dijkstra | Edsger
+  5 | Barbara  | Liskov
+  6 | Knuth    | Donald
+```
+
+The wrong values are stored in the Iceberg table, so every engine that reads it gets them.
+
+## Issue 7: A field was added inside a struct
+
+### Spark
+
+The Iceberg table started as `nest_t (id bigint, point struct<x: double, y: double>)`, with one row, `x=1.0, y=2.0`. Then `ALTER TABLE demo.db.nest_t ADD COLUMN point.z double` added a field inside the struct, so `point` became `struct<x, y, z>`.
+
+Two writes followed, with the same result on all three Spark versions:
+
+| DataFrame `point` | Result |
+| --- | --- |
+| `struct<x: double, y: double>`, no `z` | Refused |
+| `struct<y: double, x: double, z: double>`, fields in another order | Written, `x` and `y` matched by name |
+
+The refused write is **Issue 3** one level down: the Iceberg table has a struct field the DataFrame does not send.
+
+<Tabs groupId="spark-version">
+<TabItem value="3.3.3" label="Spark 3.3.3" default>
+
+```text
+Cannot write incompatible data to table 'demo.db.nest_t':
+- Cannot find data for output column 'point.z'
+```
+
+</TabItem>
+<TabItem value="3.5.6" label="Spark 3.5.6">
+
+```text
+[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_FIND_DATA] Cannot write incompatible data for the table `demo`.`db`.`nest_t`: Cannot find data for the output column `point`.`z`.
+```
+
+</TabItem>
+<TabItem value="4.0.5" label="Spark 4.0.5">
+
+```text
+[INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_FIND_DATA] Cannot write incompatible data for the table `demo`.`db`.`nest_t`: Cannot find data for the output column `point`.`z`. SQLSTATE: KD000
+```
+
+</TabItem>
+</Tabs>
+
+After that, `RENAME COLUMN point.x TO lon` worked. `ALTER COLUMN point.y TYPE float` was refused, because `double` to `float` is a narrowing, the same as for a top-level column. The Iceberg table ended as:
+
+```text
+point: struct<lon:double, y:double, z:double>
+1 | Row(lon=1.0, y=2.0, z=None)
+3 | Row(lon=1.0, y=2.0, z=0.5)
+```
+
+## Issue 8: Required (`NOT NULL`) columns
+
+### Spark
+
+The Iceberg table is `req_t (id bigint NOT NULL, name string)`. A DataFrame column is nullable when its schema allows nulls, even if no row holds one, and `"id bigint, name string"` makes `id` nullable by default. Each write below sent one row:
+
+| Write | Spark 3.3.3 | Spark 3.5.6 and 4.0.5 |
+| --- | --- | --- |
+| DataFrame with nullable `id`, value `1` | Refused | Written |
+| DataFrame with nullable `id`, value `NULL` | Refused | Refused |
+| DataFrame with `"id bigint NOT NULL, name string"`, value `5` | Written | Written |
+| `INSERT INTO demo.db.req_t VALUES (NULL, 'e')` | Refused | Refused |
+
+**Spark 3.3.3** checks only the schemas, before it reads any rows. The DataFrame schema allows nulls in `id` and the Iceberg table **does not**, so it refused the write even when the value was `1`. **Spark 3.5.6 and 4.0.5** accept that schema and check each value as it is written, so `1` was written and only `NULL` failed. The errors:
+
+| Spark 3.3.3, Iceberg 1.4.3 | Spark 3.5.6, Iceberg 1.12.0 | Spark 4.0.5, Iceberg 1.12.0 |
+| --- | --- | --- |
+| `- Cannot write nullable values to non-null column 'id'` | `java.lang.NullPointerException: Null value appeared in non-nullable field` | `[NOT_NULL_ASSERT_VIOLATION] NULL value appeared in non-nullable field` |
+
+On **Spark 3.5.6**, the `INSERT` failed with `[INTERNAL_ERROR] The Spark SQL phase optimization failed with an internal error` instead. Rerunning the two nullable writes with `spark.sql.iceberg.check-nullability=false` gave the same results on all three versions.
+
+The setting did change Iceberg's own check, which runs only on a table with `write.spark.accept-any-schema` on. With it on, a nullable `id` with value `6` failed on all three versions with the message below. With `check-nullability` also set to `false`, the same write with value `7` was written:
+
+```text
+Cannot write incompatible dataset to table with schema:
+table {
+  1: id: required long
+  2: name: optional string
+}
+Provided schema:
+table {
+  1: id: optional long
+  2: name: optional string
+}
+Problems:
+* id should be required, but is optional
+```
+
+Changing nullability in the Iceberg table works one way only, from required to optional:
+
+- `ALTER COLUMN id DROP NOT NULL` ran.
+- `ALTER COLUMN name SET NOT NULL` failed with `Cannot change nullable column to non-nullable: name`.
+- `ADD COLUMN code string NOT NULL` failed with `Incompatible change: cannot add required column: code`.
+
+### Trino
+
+**Trino 484** refused adding a required column too: `This connector does not support adding not null columns`.
+
+### PyIceberg
+
+`table.append()` with an Arrow table whose `id` is nullable, the Arrow default, into a table where `id` is required. **PyIceberg 0.7.1 and 0.12.0** printed the same:
+
+```text
+ValueError: Mismatch in fields:
+┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃    ┃ Table field                    ┃ Dataframe field                ┃
+┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ ❌ │ 1: id: required long           │ 1: id: optional long           │
+│ ✅ │ 2: name: optional string       │ 2: name: optional string       │
+│ ✅ │ 3: created: optional timestamp │ 3: created: optional timestamp │
+└────┴────────────────────────────────┴────────────────────────────────┘
+```
+
+With `id` declared `nullable=False`, the append was written on both versions. Declare required fields with `pa.field("id", pa.int64(), nullable=False)` in the Arrow schema.
+
+### Flink
+
+From the Flink DDL page quoted in **Issue 1**: `ALTER TABLE ... MODIFY` can make a required column optional, and the reverse is not allowed.
+
+## Issue 9: Column names that differ only in case
+
+### Spark
+
+With Spark's default `spark.sql.caseSensitive=false`, a DataFrame with columns `ID` and `Name` was written into `id` and `name`, and `ADD COLUMN ID` was refused because `id` exists. With `spark.sql.caseSensitive=true` the same DataFrame failed with `Cannot find data for the output column` for `id`, and `ADD COLUMN ID int` succeeded.
+
+| Change | Spark 3.3.3, Iceberg 1.4.3 | Spark 3.5.6, Iceberg 1.12.0 | Spark 4.0.5, Iceberg 1.12.0 |
+| --- | --- | --- | --- |
+| Add `ID` next to `id` | `Cannot add column, because ID already exists in root` | `[FIELDS_ALREADY_EXISTS] Cannot add column, ...` | `[FIELD_ALREADY_EXISTS] Cannot add column, ...` |
+
+The table then had `id bigint` and `ID int`, and it broke readers. Spark with the default setting failed `SELECT *` with `Invalid projection for field ID: Cannot project int to incompatible type: LongType` and `SELECT id` with a reference that is ambiguous.
+
+Keep column names unique when case is ignored. On a second table with the same pair, renaming one of them with `spark.sql.caseSensitive=true` repaired it: after `ALTER TABLE demo.db.case_fix_t RENAME COLUMN ID TO id_int`, **Spark 3.5.6** ran `SELECT *` and `SELECT id` with the default setting, and **Trino 484** read the table. The repair was run on that line only.
+
+### Trino
+
+Reading a table that Spark gave both an `id` and an `ID` column:
+
+```text
+Query 20261117_090123_00004_aiwkz failed: Table iceberg.db.case_t has multiple columns with the same name after lower-case normalization: 'id' and 'ID'
+```
+
+### PyIceberg
+
+**PyIceberg 0.7.1 and 0.12.0** loaded and scanned the table.
+
+## Issue 10: Nanosecond timestamps
+
+### PyIceberg
+
+The Iceberg table `py.events` has a `created` column of type `timestamp`, which stores microseconds. The Arrow data appended to it sent `created` as `pa.timestamp("ns")`, in nanoseconds. The append was refused on both versions, and nothing was written:
+
+| Arrow table appended | PyIceberg 0.7.1 | PyIceberg 0.12.0 |
+| --- | --- | --- |
+| `created` as `pa.timestamp("ns")` | `TypeError: Iceberg does not yet support 'ns' timestamp precision. Use 'downcast-ns-timestamp-to-us-on-write' configuration property to automatically downcast 'ns' to 'us' on write.` | `UnsupportedPyArrowTypeException: Column 'created' has an unsupported type: timestamp[ns]`, caused by the same `TypeError` |
+
+The appends that were written on this page sent `created` as `pa.timestamp("us")`, which matches the column. The setting named in the error was not tried here.
+
+## Confirm the diagnosis
+
+Compare the table's current schema with the schema of the data. In Spark, `DESCRIBE TABLE demo.db.<table>` and `df.printSchema()`; in PyIceberg, `tbl.schema()` and `arrow_table.schema`; in Trino, `DESCRIBE iceberg.db.<table>`. Look at the names, the nullability and the order, not only the types.
+
+Then check how the write maps columns. `writeTo` and `INSERT` with a column list match by name, while `insertInto` and `INSERT ... VALUES` or `INSERT ... SELECT` without a column list match by position. Finally check the table properties for `write.spark.accept-any-schema`, which changes both the checks and the messages.
+
+## Prevent it
+
+- Change the schema with `ALTER TABLE` or `update_schema()` before the writer that needs it, and write by name.
+- Use only the widenings the specification allows; anything else is a new column.
+- Avoid `insertInto` and positional `INSERT` on tables whose columns get reordered.
+- Set `write.spark.accept-any-schema` only on tables written by DataFrames, because it broke `INSERT ... VALUES` in the run.
+- Keep column names unique when case is ignored, and read every changed table from each engine that queries it.
+
+:::note[How OLake handles this]
+
+OLake Go runs schema discovery at the start of every sync and adds new source columns to the Iceberg schema with new field IDs, as its [schema evolution page](/docs/features/schema/) describes; the page notes that new columns sync automatically when **Sync new columns automatically** is enabled. It applies Iceberg's widening promotions, such as INT to LONG and FLOAT to DOUBLE.
+
+The same page lists the changes that fail the sync, for example writing a `STRING` value into an `INT`, `DOUBLE`, `LONG` or `FLOAT` column.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Iceberg: [specification, schema evolution](https://iceberg.apache.org/spec/), [schema evolution](https://iceberg.apache.org/docs/latest/evolution/), [Spark DDL](https://iceberg.apache.org/docs/latest/spark-ddl/), [Spark writes](https://iceberg.apache.org/docs/latest/spark-writes/), [Spark configuration](https://iceberg.apache.org/docs/latest/spark-configuration/), for `spark.sql.iceberg.check-nullability`; [Flink DDL](https://iceberg.apache.org/docs/latest/flink-ddl/), [Flink writes](https://iceberg.apache.org/docs/latest/flink-writes/)
+- PyIceberg: [API](https://py.iceberg.apache.org/api/)
+- Trino: [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
+- Apache Spark: error definitions at [3.4.4](https://github.com/apache/spark/blob/v3.4.4/core/src/main/resources/error/error-classes.json) and [3.5.6](https://github.com/apache/spark/blob/v3.5.6/common/utils/src/main/resources/error/error-classes.json)
+- GitHub: [iceberg#5556](https://github.com/apache/iceberg/issues/5556), `mergeSchema` for `MERGE INTO`; [iceberg-python#674](https://github.com/apache/iceberg-python/issues/674), `Mismatch in fields`
+- Stack Overflow, the most viewed schema evolution questions: [73375284](https://stackoverflow.com/questions/73375284), [77502843](https://stackoverflow.com/questions/77502843)
+

@@ -1,0 +1,66 @@
+
+## one more insert, which no sync has read yet
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (4, 8, N'written before the re-enable');
+
+SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;
+rows_in_change_table
+--------------------
+4
+
+
+## CDC is disabled and enabled on the table, with the two calls from Airbyte's troubleshooting page
+EXEC sys.sp_cdc_disable_table @source_schema = N'dbo', @source_name = N'orders', @capture_instance = N'dbo_orders';
+
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'orders', @role_name = NULL;
+Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.
+
+EXEC sys.sp_cdc_get_captured_columns @capture_instance = N'dbo_orders';
+source_schema|source_table|capture_instance|column_name|column_id|column_ordinal|data_type|character_maximum_length|numeric_precision|numeric_precision_radix|numeric_scale|datetime_precision
+-------------|------------|----------------|-----------|---------|--------------|---------|------------------------|-----------------|-----------------------|-------------|------------------
+dbo|orders|dbo_orders|id|1|1|int|NULL|10|10|0|NULL
+dbo|orders|dbo_orders|customer_id|2|2|int|NULL|10|10|0|NULL
+dbo|orders|dbo_orders|quantity|3|3|int|NULL|10|10|0|NULL
+dbo|orders|dbo_orders|placed_at|4|4|datetime2|NULL|NULL|NULL|NULL|0
+dbo|orders|dbo_orders|note|5|5|nvarchar|100|NULL|NULL|NULL|NULL
+
+SELECT capture_instance, start_lsn, create_date, supports_net_changes FROM cdc.change_tables ORDER BY create_date;
+capture_instance|start_lsn|create_date|supports_net_changes
+----------------|---------|-----------|--------------------
+dbo_orders|0x0000002C000003680049|2026-11-23 09:39:09.227|1
+
+SELECT ct.capture_instance, cc.column_name, cc.column_ordinal FROM cdc.captured_columns cc JOIN cdc.change_tables ct ON ct.object_id = cc.object_id ORDER BY ct.capture_instance, cc.column_ordinal;
+capture_instance|column_name|column_ordinal
+----------------|-----------|--------------
+dbo_orders|id|1
+dbo_orders|customer_id|2
+dbo_orders|quantity|3
+dbo_orders|placed_at|4
+dbo_orders|note|5
+
+SELECT sys.fn_cdc_get_min_lsn(N'dbo_orders') AS min_lsn_dbo_orders, sys.fn_cdc_get_max_lsn() AS max_lsn;
+min_lsn_dbo_orders|max_lsn
+------------------|-------
+0x0000002C000003680049|0x0000002C00000B18003A
+
+
+## one insert after the re-enable
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (1, 9, N'written after the re-enable');
+
+SELECT __$operation AS op, id, customer_id, quantity, note FROM cdc.dbo_orders_CT ORDER BY __$start_lsn, __$seqval, __$operation;
+op|id|customer_id|quantity|note
+--|--|-----------|--------|----
+2|9|1|9|written after the re-enable
+
+SELECT * FROM dbo.orders ORDER BY id;
+id|customer_id|quantity|placed_at|note
+--|-----------|--------|---------|----
+1|1|1|2026-11-23 09:35:12|note on an old row
+2|2|2|2026-11-23 09:35:12|NULL
+3|3|2|2026-11-23 09:35:12|NULL
+4|4|1|2026-11-23 09:35:12|NULL
+5|1|5|2026-11-23 09:35:44|NULL
+6|2|6|2026-11-23 09:35:57|first note
+7|3|7|2026-11-23 09:35:57|second note
+8|4|8|2026-11-23 09:38:59|written before the re-enable
+9|1|9|2026-11-23 09:39:12|written after the re-enable
+

@@ -1,0 +1,66 @@
+# Service test: a Flink CDC job on SQL Server and a column added to a CDC-enabled table.
+# One SQL Server and a Flink session cluster (one JobManager, one TaskManager). The SQL Server CDC
+# connector jar is mounted into Flink's lib directory. Only the Flink REST port is published.
+# The SQL Server image is x86-64 only. On Apple silicon it runs emulated.
+#
+#   AGENT=false ./run.sh ...     the same server with SQL Server Agent off (run.sh agent-off does this)
+name: rbt-flk-mssql
+
+x-flink: &flink
+  image: flink:2.2.1-scala_2.12-java17
+  volumes:
+    - ./lib/flink-sql-connector-sqlserver-cdc-3.7.0-2.2.jar:/opt/flink/lib/flink-sql-connector-sqlserver-cdc-3.7.0-2.2.jar:ro
+    - state:/state
+  environment:
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      jobmanager.memory.process.size: 900m
+      taskmanager.memory.process.size: 1280m
+      taskmanager.numberOfTaskSlots: 4
+      parallelism.default: 1
+      execution.checkpointing.dir: file:///state/checkpoints
+      execution.checkpointing.savepoint-dir: file:///state/savepoints
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04
+    platform: linux/amd64
+    # A fixed host name: the Agent jobs record the server name, and the container is created twice
+    # (with the Agent on, then with it off) over the same data volume.
+    hostname: mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: Lab_Passw0rd_2026
+      MSSQL_AGENT_ENABLED: "${AGENT:-true}"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Lab_Passw0rd_2026 -C -Q 'SELECT 1' > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+
+  jobmanager:
+    <<: *flink
+    command: jobmanager
+    ports:
+      - "18382:8081"
+    mem_limit: 1100m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8081/overview > /dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  taskmanager:
+    <<: *flink
+    command: taskmanager
+    depends_on:
+      - jobmanager
+    mem_limit: 1500m
+
+volumes:
+  state:
+  mssql-data:

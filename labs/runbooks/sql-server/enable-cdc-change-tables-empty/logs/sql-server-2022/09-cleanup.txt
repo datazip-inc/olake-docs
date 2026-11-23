@@ -1,0 +1,116 @@
+-- The reader saved its position in the previous step.
+SELECT reader, last_lsn FROM dbo.reader_position;
+reader|last_lsn
+------|--------
+lab|0x0000002C00000C500004
+
+(1 rows affected)
+
+-- Two changes arrive while the reader is away.
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (2, 11);
+
+(1 rows affected)
+
+UPDATE dbo.orders SET quantity = quantity + 1 WHERE id = 2;
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:10';
+
+SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;
+SELECT sys.fn_cdc_get_min_lsn(N'dbo_orders') AS min_lsn, sys.fn_cdc_get_max_lsn() AS max_lsn;
+rows_in_change_table
+--------------------
+11
+
+(1 rows affected)
+min_lsn|max_lsn
+-------|-------
+0x0000002A00000C380047|0x0000002C00000CB80003
+
+(1 rows affected)
+
+-- Retention of one minute instead of days, so that the lab does not have to wait.
+EXEC sys.sp_cdc_change_job @job_type = N'cleanup', @retention = 1;
+
+-- More than a minute later, one more change.
+WAITFOR DELAY '00:01:10';
+
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (3, 12);
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:10';
+
+-- Run the clean-up job now instead of waiting for 02:00.
+EXEC sys.sp_cdc_start_job @job_type = N'cleanup';
+Job 'cdc.cdclab_cleanup' started successfully.
+
+WAITFOR DELAY '00:00:10';
+
+-- What is left. Retention counts back from the newest captured change, not from the clock.
+SELECT start_lsn, tran_end_time FROM cdc.lsn_time_mapping ORDER BY start_lsn;
+start_lsn|tran_end_time
+---------|-------------
+0x0000002C00000CB80003|2026-11-16 18:05:03.723
+0x0000002C00000D480003|2026-11-16 18:06:25.013
+
+(2 rows affected)
+
+SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;
+SELECT sys.fn_cdc_get_min_lsn(N'dbo_orders') AS min_lsn, sys.fn_cdc_get_max_lsn() AS max_lsn;
+rows_in_change_table
+--------------------
+3
+
+(1 rows affected)
+min_lsn|max_lsn
+-------|-------
+0x0000002C00000CB80003|0x0000002C00000D480003
+
+(1 rows affected)
+
+-- The reader comes back and asks for everything after its saved position.
+DECLARE @saved BINARY(10) = (SELECT last_lsn FROM dbo.reader_position WHERE reader = N'lab');
+DECLARE @from BINARY(10) = sys.fn_cdc_increment_lsn(@saved), @to BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT @from AS from_lsn, sys.fn_cdc_get_min_lsn(N'dbo_orders') AS min_lsn;
+SELECT COUNT(*) FROM cdc.fn_cdc_get_all_changes_dbo_orders(@from, @to, N'all');
+from_lsn|min_lsn
+--------|-------
+0x0000002C00000C500005|0x0000002C00000CB80003
+
+(1 rows affected)
+Msg 313, Level 16, State 3, Server mssql, Line 5
+An insufficient number of arguments were supplied for the procedure or function cdc.fn_cdc_get_all_changes_ ... .
+
+-- Recovery: changes between the saved position and the new minimum are gone from the change
+-- table. Read the source table again, then carry on from the current maximum.
+DECLARE @max BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT COUNT(*) AS rows_reloaded_from_source FROM dbo.orders;
+UPDATE dbo.reader_position SET last_lsn = @max, saved_at = SYSUTCDATETIME() WHERE reader = N'lab';
+rows_reloaded_from_source
+-------------------------
+10
+
+(1 rows affected)
+
+(1 rows affected)
+
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (4, 13);
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:10';
+
+DECLARE @saved BINARY(10) = (SELECT last_lsn FROM dbo.reader_position WHERE reader = N'lab');
+DECLARE @from BINARY(10) = sys.fn_cdc_increment_lsn(@saved), @to BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT __$operation, id, customer_id, quantity FROM cdc.fn_cdc_get_all_changes_dbo_orders(@from, @to, N'all');
+__$operation|id|customer_id|quantity
+------------|--|-----------|--------
+2|1011|4|13
+
+(1 rows affected)
+
+-- Back to seven days.
+EXEC sys.sp_cdc_change_job @job_type = N'cleanup', @retention = 10080;
+

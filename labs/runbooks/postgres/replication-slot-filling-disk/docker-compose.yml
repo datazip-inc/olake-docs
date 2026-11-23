@@ -1,0 +1,54 @@
+# Lab: a replication slot that nobody reads keeps the write-ahead log (WAL) until the disk is full.
+# No host port is published. Every query runs through `docker compose exec`.
+#
+#   PG_VERSION=13.23 ./run.sh up      another PostgreSQL version (default 18.7)
+name: pg-replication-slot-filling-disk
+
+services:
+  # The main server. Everything is at its default except wal_level here and, in init.sql,
+  # max_wal_size = 64MB and min_wal_size = 32MB, so that a few hundred megabytes of writes are
+  # enough to see what a slot does to pg_wal.
+  pg:
+    image: postgres:${PG_VERSION:-18.7}
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_PASSWORD: labpw
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d appdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  # The same server on a 256 MB disk (a tmpfs), started only by `./run.sh disk-full`.
+  # The container stands in for a host: it stays up when PostgreSQL shuts down, so the full disk is
+  # still there afterwards. `touch /tmp/start-postgres` inside it starts PostgreSQL again.
+  pgfull:
+    profiles: ["disk-full"]
+    image: postgres:${PG_VERSION:-18.7}
+    init: true
+    entrypoint:
+      - bash
+      - -c
+      - |
+        while true; do
+          docker-entrypoint.sh postgres -c wal_level=logical -c shared_buffers=32MB
+          echo "postgres exited with status $$?; waiting for /tmp/start-postgres"
+          until [ -e /tmp/start-postgres ]; do sleep 1; done
+          rm -f /tmp/start-postgres
+        done
+    environment:
+      POSTGRES_PASSWORD: labpw
+      PGDATA: /disk/pgdata
+    tmpfs:
+      - /disk:size=256m
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d appdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 60

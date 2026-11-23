@@ -1,0 +1,125 @@
+# Enable CDC for the database and the tables
+# 2026-11-23 10:34:44 UTC, Azure SQL Database, 12.0.2000.8, objective S3, Standard
+SELECT DATABASEPROPERTYEX(DB_NAME(), 'ServiceObjective') AS objective;
+SELECT name, is_cdc_enabled FROM sys.databases WHERE name = DB_NAME();
+objective
+---------
+S3
+
+(1 rows affected)
+name|is_cdc_enabled
+----|--------------
+cdclab|0
+
+(1 rows affected)
+
+-- A table cannot be enabled before its database.
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'orders', @role_name = NULL;
+Msg 22901, Level 16, State 1, Server <server>, Procedure sys.sp_cdc_enable_table, Line 46
+The database 'cdclab' is not enabled for Change Data Capture. Ensure that the correct database context is set and retry the operation. To report on the databases enabled for Change Data Capture, query the is_cdc_enabled column in the sys.databases catalog view.
+
+-- Who is calling? A customer login on Azure SQL Database cannot be a sysadmin.
+SELECT IS_SRVROLEMEMBER(N'sysadmin') AS is_sysadmin, IS_MEMBER(N'db_owner') AS is_db_owner, USER_NAME() AS user_name;
+is_sysadmin|is_db_owner|user_name
+-----------|-----------|---------
+0|1|dbo
+
+(1 rows affected)
+
+EXEC sys.sp_cdc_enable_db;
+
+SELECT name, is_cdc_enabled FROM sys.databases WHERE name = DB_NAME();
+name|is_cdc_enabled
+----|--------------
+cdclab|1
+
+(1 rows affected)
+
+-- What the call created.
+SELECT name, type_desc FROM sys.database_principals WHERE name = N'cdc';
+SELECT name AS schema_name FROM sys.schemas WHERE name = N'cdc';
+SELECT name AS cdc_table FROM sys.tables WHERE schema_id = SCHEMA_ID(N'cdc') ORDER BY name;
+name|type_desc
+----|---------
+cdc|SQL_USER
+
+(1 rows affected)
+schema_name
+-----------
+cdc
+
+(1 rows affected)
+cdc_table
+---------
+captured_columns
+change_tables
+ddl_history
+index_columns
+lsn_time_mapping
+
+(5 rows affected)
+
+-- One capture instance per table. With no @capture_instance the name is <schema>_<table>.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'orders',
+  @role_name = NULL, @supports_net_changes = 1;
+
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'customers',
+  @role_name = NULL, @supports_net_changes = 1;
+
+-- A table with no primary key: net changes need a key.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'audit_notes',
+  @role_name = NULL, @supports_net_changes = 1;
+Msg 22939, Level 16, State 1, Server <server>, Procedure sys.sp_cdc_enable_table_internal, Line 361
+The parameter @supports_net_changes is set to 1, but the source table does not have a primary key defined and no alternate unique index has been specified.
+
+-- All changes do not.
+EXEC sys.sp_cdc_enable_table
+  @source_schema = N'dbo', @source_name = N'audit_notes',
+  @role_name = NULL, @supports_net_changes = 0;
+
+SELECT s.name + N'.' + t.name AS table_name, t.is_tracked_by_cdc
+FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = N'dbo' AND t.is_ms_shipped = 0 ORDER BY t.name;
+table_name|is_tracked_by_cdc
+----------|-----------------
+dbo.audit_notes|1
+dbo.customers|1
+dbo.orders|1
+dbo.reader_position|0
+
+(4 rows affected)
+
+SELECT capture_instance,
+       OBJECT_SCHEMA_NAME(source_object_id) + N'.' + OBJECT_NAME(source_object_id) AS source_table,
+       supports_net_changes, start_lsn
+FROM cdc.change_tables ORDER BY capture_instance;
+capture_instance|source_table|supports_net_changes|start_lsn
+----------------|------------|--------------------|---------
+dbo_audit_notes|dbo.audit_notes|0|0x00000032000003280056
+dbo_customers|dbo.customers|1|0x00000031000009300084
+dbo_orders|dbo.orders|1|0x0000003000000BA00082
+
+(3 rows affected)
+
+-- The jobs. On SQL Server their settings are in msdb.dbo.cdc_jobs.
+EXEC sys.sp_cdc_help_jobs;
+job_type|maxtrans|maxscans|continuous|pollinginterval|retention|threshold
+--------|--------|--------|----------|---------------|---------|---------
+capture|10000|100|0|0|0|0
+cleanup|0|0|0|0|4320|4999
+
+SELECT job_type, maxtrans, maxscans, continuous, pollinginterval, retention, threshold FROM msdb.dbo.cdc_jobs;
+Msg 40515, Level 15, State 1, Server <server>, Line 16
+Reference to database and/or server name in 'msdb.dbo.cdc_jobs' is not supported in this version of SQL Server.
+
+SELECT job_type, maxtrans, maxscans, continuous, pollinginterval, retention, threshold FROM cdc.cdc_jobs ORDER BY job_type;
+job_type|maxtrans|maxscans|continuous|pollinginterval|retention|threshold
+--------|--------|--------|----------|---------------|---------|---------
+capture|10000|100|0|0|0|0
+cleanup|0|0|0|0|4320|4999
+
+(2 rows affected)
+

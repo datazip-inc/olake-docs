@@ -1,0 +1,367 @@
+---
+title: "Kafka Connect: will not recover until manually restarted"
+description: "How to read the cause under Kafka Connect's task failure line, when a restart helps, and how errors.tolerance and a dead letter queue keep a sink running."
+sidebar_label: Task failed, will not recover
+unlisted: true
+keywords:
+  - Task is being killed and will not recover until manually restarted
+  - Task threw an uncaught and unrecoverable exception
+  - Tolerance exceeded in error handler
+  - Exiting WorkerSinkTask due to unrecoverable exception
+  - errors.tolerance
+  - errors.log.enable
+  - kafka connect dead letter queue
+  - errors.deadletterqueue.topic.name
+  - kafka connect restart failed task
+runbook:
+  family: kafka-connect
+  author: shubham
+  reproduced:
+    date: "2026-11-17"
+    versions:
+      - "Kafka Connect 4.3.1 with the file sink from Apache Kafka and the Debezium JDBC sink 3.7.1.Final on PostgreSQL 16.15"
+      - "Kafka Connect 3.2.0 with the file sink from Apache Kafka"
+    lab: labs/runbooks/kafka-connect/task-failed-will-not-recover
+    summary: "One record that is not JSON was written to a topic that a file sink reads. The task was killed, three restart calls did not get it past the record, and errors.tolerance=all with a dead letter queue did, on both versions. The lab also skipped a record by moving the sink's offset and ran the same failure on a source task. On 4.3.1 a record that a JDBC sink itself rejected killed the task with the dead letter queue in place."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+A Kafka Connect task goes to `FAILED` and the worker log says `Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted`. That line is the same for every failure. This page shows where the cause is, when a restart helps, and how to keep one bad record from stopping a sink.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** The cause is in the `trace` field of the failed task, at the last `Caused by:` line. Read it with `GET /connectors/<name>/status` before you restart anything. The first line of the trace tells you which issue you have:
+
+- **`Tolerance exceeded in error handler`:** a record could not be converted or transformed. On a sink connector, `errors.tolerance=all` with a dead letter queue lets the task carry on and keeps the record. See [Issue 1](#issue-1-a-record-the-converter-or-a-transformation-cannot-read).
+- **`Exiting WorkerSinkTask due to unrecoverable exception`:** the sink itself rejected the record. In our run those settings did not help, and moving the offset did. See [Issue 2](#issue-2-a-record-the-sink-itself-rejects).
+
+<TLDR title='Key takeaways'>
+
+- The wrapper line names no cause. The first line of the trace tells you which stage failed, and the last `Caused by:` tells you why.
+- A restart does not get past a bad record. Two task restarts in a row ended in `FAILED` on the same record, on **Kafka Connect 3.2.0** and on **Kafka Connect 4.3.1**.
+- With `errors.tolerance=all` and a dead letter queue the same sink wrote the 4 good records and put the bad one in the queue, with headers that name its topic, partition and offset.
+
+</TLDR>
+
+## What you see
+
+One record that is not JSON reached a sink that expects JSON. The worker log printed the wrapper line and the exception, the same five lines on both versions:
+
+```text
+ERROR  ||  WorkerSinkTask{id=orders-file-sink-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler
+Caused by: org.apache.kafka.connect.errors.DataException: Converting byte[] to Kafka Connect data failed due to serialization error:
+Caused by: org.apache.kafka.common.errors.SerializationException: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+Caused by: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+```
+
+The status call shows a `RUNNING` connector with a `FAILED` task and the same exception. This is **Kafka Connect 4.3.1**; **Kafka Connect 3.2.0** gives the same states without the `version` fields.
+
+```json
+{
+  "name": "orders-file-sink",
+  "connector": { "state": "RUNNING", "worker_id": "172.28.0.4:8083", "version": "4.3.1" },
+  "tasks": [
+    {
+      "id": 0,
+      "state": "FAILED",
+      "worker_id": "172.28.0.4:8083",
+      "version": "4.3.1",
+      "trace": "org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler\n\tat org.apache.kafka.connect.runtime.errors.RetryWithToleranceOperator.execAndHandleError(RetryWithToleranceOperator.java:259)\n\tat ..."
+    }
+  ],
+  "type": "sink"
+}
+```
+
+A source task prints the same line with `WorkerSourceTask{id=...}` in front.
+
+### The same line across versions
+
+The wording of the wrapper changed twice. The meaning did not.
+
+| Kafka Connect | What the log says |
+| --- | --- |
+| 0.10.2 and 0.11.0 | Two lines: `Task <id> threw an uncaught and unrecoverable exception`, then `Task is being killed and will not recover until manually restarted` |
+| 1.0 to 2.6 | Two lines: `WorkerSinkTask{id=<id>} Task threw an uncaught and unrecoverable exception`, then `WorkerSinkTask{id=<id>} Task is being killed and will not recover until manually restarted` |
+| 2.7 and later | One line: `WorkerSinkTask{id=<id>} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted` |
+
+The 3.2.0 and 4.3.1 lines are from the runs on this page. The other rows come from `WorkerTask.java` in the Kafka source at the [0.10.2.2](https://github.com/apache/kafka/blob/0.10.2.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerTask.java), [1.0.0](https://github.com/apache/kafka/blob/1.0.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerTask.java), [2.6.0](https://github.com/apache/kafka/blob/2.6.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerTask.java) and [2.7.0](https://github.com/apache/kafka/blob/2.7.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerTask.java) tags.
+
+### What each version lets you do
+
+The fixes below need these features. The last column names the Kafka Improvement Proposal (KIP) or the source file each row comes from.
+
+| Kafka Connect | Added | Where it comes from |
+| --- | --- | --- |
+| 2.0 | `errors.tolerance`, `errors.log.enable`, the dead letter queue for sink connectors, and the `Tolerance exceeded in error handler` message | [KIP-298](https://cwiki.apache.org/confluence/display/KAFKA/KIP-298%3A+Error+Handling+in+Connect), marked "Released: 2.0.0" |
+| 2.6 | A sink connector can report a record it rejects to the dead letter queue | [KIP-610](https://cwiki.apache.org/confluence/display/KAFKA/KIP-610%3A+Error+Reporting+in+Sink+Connectors), source at [2.6.0](https://github.com/apache/kafka/blob/2.6.0/connect/api/src/main/java/org/apache/kafka/connect/sink/ErrantRecordReporter.java) |
+| 3.0 | `POST /connectors/<name>/restart?includeTasks=true&onlyFailed=true` | [KIP-745](https://cwiki.apache.org/confluence/display/KAFKA/KIP-745%3A+Connect+API+to+restart+connector+and+tasks), source at [2.8.2](https://github.com/apache/kafka/blob/2.8.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java) and [3.0.0](https://github.com/apache/kafka/blob/3.0.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java) |
+| 3.5 | `PUT /connectors/<name>/stop` and `GET /connectors/<name>/offsets` | Source at [3.4.1](https://github.com/apache/kafka/blob/3.4.1/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java) and [3.5.0](https://github.com/apache/kafka/blob/3.5.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java) |
+| 3.6 | `PATCH` and `DELETE` on `/connectors/<name>/offsets` | [KIP-875](https://cwiki.apache.org/confluence/display/KAFKA/KIP-875%3A+First-class+offsets+support+in+Kafka+Connect), source at [3.6.0](https://github.com/apache/kafka/blob/3.6.0/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java) |
+
+## How a record kills a task
+
+Kafka Connect does not restart a failed task. In the runs the task stayed `FAILED` until a restart call or a configuration change, while the connector went on reporting `RUNNING`.
+
+A record passes through stages on its way to a sink: the key and value converters, any transformations, and then the connector's own `put` call. The [Kafka documentation](https://kafka.apache.org/43/kafka-connect/user-guide/#error-reporting-in-connect) describes the default: "By default, any error encountered during conversion or within transformations will cause the connector to fail."
+
+The first line of the trace tells you where the record stopped:
+
+| First line of the trace | Stage | What handles it | Issue |
+| --- | --- | --- | --- |
+| `ConnectException: Tolerance exceeded in error handler` | A converter or a transformation | `errors.tolerance`, and on sink connectors the dead letter queue | 1, and 3 on a source |
+| `ConnectException: Exiting WorkerSinkTask due to unrecoverable exception.` | The sink connector's own code | The connector. In our run with a Java Database Connectivity (JDBC) sink, nothing | 2 |
+| An exception of the connector itself, such as `io.debezium.DebeziumException: The db history topic is missing.` | A source connector's own code | The connector. That example is on [its own page](/docs/runbooks/debezium/schema-history-topic-missing/) | Not on this page |
+
+:::note[Versions on this page]
+The runs used **Kafka Connect 4.3.1** and **Kafka Connect 3.2.0**, from the Debezium Connect images `3.7.1.Final` and `1.9`, with a Kafka 4.3.1 broker in both. The cluster has one broker. The sink is the file sink that ships with Apache Kafka, reading the topic `orders` with the JSON converter: 5 records, of which the third, `id=3;item=lamp;quantity=1`, is not JSON. Issue 2 used the Debezium JDBC sink 3.7.1.Final into PostgreSQL and ran on **Kafka Connect 4.3.1** only. Unless an issue says otherwise, both versions gave the same result.
+:::
+
+## Issue 1: A record the converter or a transformation cannot read
+
+The trace starts with `Tolerance exceeded in error handler`, and the last `Caused by:` names the problem with the record. In the run it was the record that is not JSON, as under [What you see](#what-you-see).
+
+### A restart does not get past the record
+
+With the bad record still next in line, no restart call helped. The answers were the same on 3.2.0 and 4.3.1:
+
+| Call | Answer | Result |
+| --- | --- | --- |
+| `POST /connectors/orders-file-sink/restart` | HTTP 204 | Task not restarted, still `FAILED`. Without parameters this call restarts the connector object and leaves its tasks alone |
+| `POST /connectors/orders-file-sink/tasks/0/restart` | HTTP 204 | Task restarted and killed again on the same record |
+| `POST /connectors/orders-file-sink/restart?includeTasks=true&onlyFailed=true` | HTTP 202, task `RESTARTING` | Task restarted and killed again on the same record |
+
+A restart only helps once the cause that the last `Caused by:` names is gone. The lab did not run a failure that a restart alone fixes. These are the calls to use after you have removed the cause:
+
+```bash
+# Every version: one task
+curl -X POST localhost:8083/connectors/orders-file-sink/tasks/0/restart
+# Kafka Connect 3.0 and later: the connector and every failed task in one call
+curl -X POST 'localhost:8083/connectors/orders-file-sink/restart?includeTasks=true&onlyFailed=true'
+```
+
+**Fix 1: tolerate bad records and keep them.** This is for records that fail in a converter or a transformation, on a sink connector. Add the error settings to the connector:
+
+```json
+{
+  "errors.tolerance": "all",
+  "errors.deadletterqueue.topic.name": "dlq.orders",
+  "errors.deadletterqueue.topic.replication.factor": "1",
+  "errors.deadletterqueue.context.headers.enable": "true",
+  "errors.log.enable": "true",
+  "errors.log.include.messages": "true"
+}
+```
+
+What happens to the failed task after the configuration change depends on the version:
+
+<Tabs groupId="kafka-connect-version">
+<TabItem value="3.2.0" label="Kafka Connect 3.2.0" default>
+
+The task stayed `FAILED`, and came back with the new settings only after a restart call:
+
+```bash
+curl -X POST localhost:8083/connectors/orders-file-sink/tasks/0/restart
+```
+
+[KAFKA-9228](https://issues.apache.org/jira/browse/KAFKA-9228) describes that behaviour for converter settings and lists 3.7.1 and 3.8.0 as its fix versions.
+
+</TabItem>
+<TabItem value="4.3.1" label="Kafka Connect 4.3.1">
+
+The task restarted by itself when the configuration changed.
+
+</TabItem>
+</Tabs>
+
+Once the task was `RUNNING`, on both versions:
+
+| After the fix | Result |
+| --- | --- |
+| Sink file | The 4 good records |
+| Consumer group | No lag |
+| `dlq.orders` | 1 record: the original bytes, with 10 headers that say where it came from and why it failed |
+
+```text
+Offset:0
+header __connect.errors.topic:orders
+header __connect.errors.partition:0
+header __connect.errors.offset:2
+header __connect.errors.connector.name:orders-file-sink
+header __connect.errors.task.id:0
+header __connect.errors.stage:VALUE_CONVERTER
+header __connect.errors.class.name:org.apache.kafka.connect.json.JsonConverter
+header __connect.errors.exception.class.name:org.apache.kafka.connect.errors.DataException
+header __connect.errors.exception.message:Converting byte[] to Kafka Connect data failed due to serialization error:
+value  id=3;item=lamp;quantity=1
+```
+
+The tenth header, `__connect.errors.exception.stacktrace`, holds the full stack trace. The headers are there only with `errors.deadletterqueue.context.headers.enable=true`.
+
+**Fix 2: skip the record by moving the offset.** Use this when you cannot change the error settings. You need the offset of the bad record, from the log line or the consumer group under [Confirm the diagnosis](#confirm-the-diagnosis). The skipped record is not kept anywhere, so copy it out of the topic first if you need it.
+
+<Tabs groupId="kafka-connect-version">
+<TabItem value="3.2.0" label="Kafka Connect 3.2.0" default>
+
+This version has no stop or offsets endpoints, and `PUT /connectors/<name>/stop` answered HTTP 404. Delete the connector, move its consumer group with the Kafka tool, and create the connector again with the same name and configuration:
+
+```bash
+curl -X DELETE localhost:8083/connectors/orders2-file-sink
+kafka-consumer-groups.sh --bootstrap-server kafka:9092 --group connect-orders2-file-sink \
+  --topic orders2:0 --reset-offsets --to-offset 3 --execute
+```
+
+The tool reported `NEW-OFFSET 3`, and the recreated sink went from 2 records to 4.
+
+</TabItem>
+<TabItem value="4.3.1" label="Kafka Connect 4.3.1">
+
+On Kafka Connect 3.6 or later, stop the connector, set its offset to the record after the bad one, and resume:
+
+```bash
+curl -X PUT localhost:8083/connectors/orders2-file-sink/stop
+curl -X PATCH -H 'Content-Type: application/json' localhost:8083/connectors/orders2-file-sink/offsets \
+  --data '{"offsets":[{"partition":{"kafka_topic":"orders2","kafka_partition":0},"offset":{"kafka_offset":3}}]}'
+curl -X PUT localhost:8083/connectors/orders2-file-sink/resume
+```
+
+Kafka Connect answered `The offsets for this connector have been altered successfully`. The task came back `RUNNING` and the sink file went from 2 records to 4.
+
+</TabItem>
+</Tabs>
+
+### Check the committed offset before you jump
+
+The jump skips everything below the new offset, not only the bad record. This ran on **Kafka Connect 4.3.1** only.
+
+A second sink was created on the first topic with the bad record already in it. It failed on its first batch and had written nothing, and `GET /connectors/<name>/offsets` returned `{"offsets":[]}`. Moved to offset 3, it wrote the 2 records after the bad one and never wrote the 2 good records before it.
+
+Jump only when the committed offset equals the offset of the bad record.
+
+### The replication factor on a small cluster
+
+`errors.deadletterqueue.topic.replication.factor` defaults to 3. On the one-broker lab cluster, a connector without the setting failed before it read a record:
+
+```text
+org.apache.kafka.connect.errors.ConnectException: Could not initialize dead letter queue with topic=dlq.orders.rf
+Caused by: java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.InvalidReplicationFactorException: Unable to replicate the partition 3 time(s): The target replication factor of 3 cannot be reached because only 1 broker(s) are registered or some brokers have all their log directories cordoned.
+```
+
+**Fix:** set the factor to the number of brokers you have, if it is below 3. Setting it to 1 fixed it, on both versions. On 3.2.0 the task again stayed `FAILED` after the change until it was restarted by hand.
+
+### Do not tolerate without a trace
+
+A connector with `errors.tolerance=all` and none of the other settings also kept running and wrote the 4 good records, on both versions. The bad record was gone: no dead letter queue, and no line in the worker log.
+
+**Fix:** always set the dead letter queue and the `errors.log.*` settings with `errors.tolerance=all`, as in Fix 1.
+
+## Issue 2: A record the sink itself rejects
+
+This ran on **Kafka Connect 4.3.1** only; the 3.2.0 image has no JDBC sink connector. The sink was the Debezium JDBC sink into PostgreSQL, with `errors.tolerance=all` and a dead letter queue set from the start.
+
+A well-formed record that broke a `CHECK` constraint on the table killed the task all the same:
+
+```text
+ERROR  ||  WorkerSinkTask{id=orders-jdbc-sink-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted. Error: JDBC sink connector failure   [org.apache.kafka.connect.runtime.WorkerSinkTask]
+ERROR  ||  WorkerSinkTask{id=orders-jdbc-sink-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+org.apache.kafka.connect.errors.ConnectException: Exiting WorkerSinkTask due to unrecoverable exception.
+Caused by: org.apache.kafka.connect.errors.ConnectException: JDBC sink connector failure
+Caused by: org.apache.kafka.connect.errors.ConnectException: Failed to flush records for table 'orders_jdbc'
+```
+
+Here the wrapper is printed twice, the first time with the connector's message after `Error:`. Three more `Caused by:` lines follow, and the last one is the database speaking:
+
+```text
+Caused by: org.postgresql.util.PSQLException: ERROR: new row for relation "orders_jdbc" violates check constraint "orders_jdbc_quantity_check"
+  Detail: Failing row contains (3, lamp, 0).
+```
+
+The dead letter queue topic existed and held 0 records. KIP-610 explains the limit: the dead letter queue of KIP-298 "only supports error reporting within contexts of the transform operation, and key, value, and header converter operation", and a sink has to report the records it rejects itself. Whether your sink does is in its own documentation.
+
+**Fix:** move the offset past the record, as in Issue 1 Fix 2. With the offset moved from 2 to 3, the task came back and the table held rows 1, 2 and 4. Fixing the table or the record and restarting the task is the other way; the lab did not run it.
+
+## Issue 3: A source task that fails in a transformation
+
+The dead letter queue settings belong to sink connectors. The Kafka documentation lists them under the sink connector configuration only.
+
+In the run a source connector failed in a transformation, with the same wrapper, on both versions:
+
+```text
+ERROR  ||  WorkerSourceTask{id=lines-source-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler
+Caused by: org.apache.kafka.connect.errors.DataException: Only Struct objects supported for [field extraction], found: java.lang.String
+```
+
+**Fix:** `errors.tolerance=all` lets the task run, but the run kept no copy of the records. With it and `errors.deadletterqueue.topic.name` set, both records were dropped and no dead letter queue topic was created. On 3.2.0 the task again stayed `FAILED` after the change until it was restarted by hand.
+
+The only record of them was the `errors.log.enable` line, once per record:
+
+```text
+ERROR  ||  Error encountered in task lines-source-0. Executing stage 'TRANSFORMATION' with class 'org.apache.kafka.connect.transforms.ExtractField$Value'.   [org.apache.kafka.connect.runtime.errors.LogReporter]
+```
+
+## Confirm the diagnosis
+
+**1. Read the trace (all issues).** Print the exception lines of every task trace, without the stack frames:
+
+```bash
+curl -s localhost:8083/connectors/orders-file-sink/status | jq -r '.tasks[].trace // empty' | grep -vE '^[[:space:]]+(at |\.\.\. )'
+```
+
+```text
+org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler
+Caused by: org.apache.kafka.connect.errors.DataException: Converting byte[] to Kafka Connect data failed due to serialization error:
+Caused by: org.apache.kafka.common.errors.SerializationException: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+Caused by: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+```
+
+Read from the bottom. The last line is the cause: the record starts with `id`, which is not JSON. The first line says the value converter gave up on it, and matches it to an issue with the table under [How a record kills a task](#how-a-record-kills-a-task).
+
+**2. See how far a sink got (Issues 1 and 2).** The consumer group is named `connect-<connector name>`.
+
+```bash
+kafka-consumer-groups.sh --bootstrap-server kafka:9092 --describe --group connect-orders-file-sink
+```
+
+```text
+GROUP TOPIC PARTITION CURRENT-OFFSET LOG-END-OFFSET LAG
+connect-orders-file-sink orders 0 2 5 3
+```
+
+In the run the sink had written 2 records and stood at offset 2, which is the bad record. The 2 good records behind it were waiting.
+
+**3. Find the record that failed (Issue 1).** The trace does not say which record failed. The log does, if the connector has `errors.log.enable=true` and `errors.log.include.messages=true`. Both settings work with `errors.tolerance` left at `none`.
+
+```text
+ERROR  ||  Error encountered in task orders2-file-sink-0. Executing stage 'VALUE_CONVERTER' with class 'org.apache.kafka.connect.json.JsonConverter', where consumed record is {topic='orders2', partition=0, offset=2, timestamp=1794895730906, timestampType=CreateTime}.   [org.apache.kafka.connect.runtime.errors.LogReporter]
+```
+
+Kafka Connect 3.2.0 wrote the same line. With `errors.log.enable=true` alone, on 4.3.1, the line ended after the class name and gave no topic, partition or offset.
+
+## Prevent it
+
+- Alert on a `FAILED` task, not on the connector state. In every run on this page the connector stayed `RUNNING`.
+- Give every sink connector a dead letter queue, with headers on, and watch the size of that topic.
+- Set `errors.log.enable=true` and `errors.log.include.messages=true`, so that the log names the topic, partition and offset of a record that fails.
+- Set `errors.deadletterqueue.topic.replication.factor` to match the cluster.
+- Do not set `errors.tolerance=all` on its own.
+
+:::note[How OLake Go handles this]
+
+OLake Go does not run on Kafka Connect, so it has no tasks to restart and none of the settings on this page. Its PostgreSQL connector has a `Retry Count` setting, which [its page](/docs/connectors/postgres/#configuration) describes this way: "Number of retry attempts for transient failures during connection or sync operations."
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Kafka 4.3: [error reporting in Connect](https://kafka.apache.org/43/kafka-connect/user-guide/#error-reporting-in-connect), [REST API](https://kafka.apache.org/43/kafka-connect/user-guide/#rest-api), [`errors.tolerance`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#sinkconnectorconfigs_errors.tolerance), [`errors.log.include.messages`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#sinkconnectorconfigs_errors.log.include.messages), [`errors.deadletterqueue.topic.name`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#sinkconnectorconfigs_errors.deadletterqueue.topic.name), [`errors.deadletterqueue.topic.replication.factor`](https://kafka.apache.org/43/configuration/kafka-connect-configs/#sinkconnectorconfigs_errors.deadletterqueue.topic.replication.factor)
+- Apache Kafka 2.8: [REST API before the restart parameters](https://kafka.apache.org/28/kafka-connect/user-guide/)
+- [KIP-298](https://cwiki.apache.org/confluence/display/KAFKA/KIP-298%3A+Error+Handling+in+Connect), [KIP-610](https://cwiki.apache.org/confluence/display/KAFKA/KIP-610%3A+Error+Reporting+in+Sink+Connectors), [KIP-745](https://cwiki.apache.org/confluence/display/KAFKA/KIP-745%3A+Connect+API+to+restart+connector+and+tasks), [KIP-875](https://cwiki.apache.org/confluence/display/KAFKA/KIP-875%3A+First-class+offsets+support+in+Kafka+Connect)
+- Stack Overflow, the most viewed questions: [62538379](https://stackoverflow.com/questions/62538379), [55420059](https://stackoverflow.com/questions/55420059), [60296796](https://stackoverflow.com/questions/60296796), [55445770](https://stackoverflow.com/questions/55445770)
+- A `FAILED` Debezium source task with the same wrapper: [the db history topic is missing](/docs/runbooks/debezium/schema-history-topic-missing/)

@@ -1,0 +1,89 @@
+# Lab: MySQL binary log retention, purging, and a reader whose position was purged.
+# One source server, plus one of two readers at a time: a second MySQL server (profile
+# "replication") or Kafka with Kafka Connect and Debezium (profile "debezium").
+# Nothing is published on the host except the Kafka Connect REST port.
+name: mysql-binlog-retention-1236
+
+services:
+  source:
+    image: ${MYSQL_IMAGE:-mysql:8.4.13}
+    platform: ${MYSQL_PLATFORM:-}
+    hostname: source
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --gtid-mode=${GTID:-OFF}
+      - --enforce-gtid-consistency=${GTID:-OFF}
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    mem_limit: 640m
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -uroot -prootpw -e 'SELECT 1 FROM inventory.customers LIMIT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  replica:
+    profiles: ["replication"]
+    image: ${MYSQL_IMAGE:-mysql:8.4.13}
+    platform: ${MYSQL_PLATFORM:-}
+    hostname: replica
+    command:
+      - --server-id=2
+      - --log-bin=mysql-bin
+      - --relay-log=relay-bin
+      - --replicate-wild-ignore-table=noise.%
+      - --gtid-mode=${GTID:-OFF}
+      - --enforce-gtid-consistency=${GTID:-OFF}
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+    mem_limit: 640m
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -uroot -prootpw -e 'SELECT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  kafka:
+    profiles: ["debezium"]
+    image: apache/kafka:4.3.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx384m
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  connect:
+    profiles: ["debezium"]
+    image: ${DEBEZIUM_IMAGE:-quay.io/debezium/connect:3.7.1.Final}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      source:
+        condition: service_healthy
+    ports:
+      - "${CONNECT_PORT:-18183}:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: lab-connect
+      CONFIG_STORAGE_TOPIC: lab_connect_configs
+      OFFSET_STORAGE_TOPIC: lab_connect_offsets
+      STATUS_STORAGE_TOPIC: lab_connect_statuses
+      HEAP_OPTS: -Xms256m -Xmx640m
+    mem_limit: 1024m

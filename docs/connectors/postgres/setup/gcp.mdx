@@ -1,5 +1,5 @@
 ---
-title: "OLake Google Cloud SQL Setup | CDC with wal2json Plugin"
+title: "OLake Google Cloud SQL Setup | CDC with pgoutput Plugin"
 seo_title: "Google Cloud SQL PostgreSQL CDC Setup for OLake"
 description: Learn to configure OLake CDC on Google Cloud SQL PostgreSQL. Enable logical replication, create replication slots, manage network access, and troubleshoot.
 sidebar_label: 5. Google Cloud SQL for PostgreSQL
@@ -32,9 +32,9 @@ Google Cloud SQL for PostgreSQL supports CDC through logical replication using t
 In Google Cloud Console, navigate to your Cloud SQL instance and enable the logical decoding flag:
 
    1. Go to **Cloud SQL** → Select your instance
-   2. Click **Edit** → **Flags**
+   2. Click **Edit** → **Flags and parameters**
    3. Add flag: `cloudsql.logical_decoding = on`
-   4. **Save** and **Restart** the instance
+   4. **Save**. Cloud SQL restarts the instance by itself to apply the flag
 
    ![gcp-logical-decoding](/img/docs/cdc/postgres/gcp-logical-decoding.webp)
 
@@ -49,7 +49,7 @@ Set up connectivity for OLake:
 
    **Option A: Direct Connection (Requires TLS)**
    1. Go to **Connections** → **Networking**
-   2. Click **Add network**
+   2. Click **Add a network**
    3. Add OLake's IP addresses with `/32` CIDR
    4. **Save** the configuration
 
@@ -68,7 +68,7 @@ Connect as `cloudsqlsuperuser` (usually `postgres`) and create a dedicated CDC u
    ```
 
    :::info[Superuser Requirements]
-   The `postgres` user in Cloud SQL has `cloudsqlsuperuser` privileges, which includes replication permissions by default.
+   The `postgres` user in Cloud SQL has `cloudsqlsuperuser` privileges and can give the `REPLICATION` attribute to other roles. It does not have the attribute itself. Create the replication slot in step 5 as `cdc_user`, or run `ALTER USER postgres WITH REPLICATION;` first.
    :::
 
    **Optional: Read-only Access for Initial Snapshot**
@@ -165,6 +165,8 @@ Best practices:
 - Use a unique slot name per OLake connection; slot names cannot start with a number
 ::::
 
+Run this as a role that has the `REPLICATION` attribute, such as `cdc_user` from step 3. The built-in `postgres` user does not have it by default.
+
 ```sql
 -- Replace 'your_olake_slot_name' with the slot name from your OLake configuration
 SELECT pg_create_logical_replication_slot('your_olake_slot_name', 'pgoutput');
@@ -246,8 +248,8 @@ Now that you have configured the Google Cloud database and created the CDC user,
   - The flag was saved before restarting
   - The instance has fully restarted (check Cloud SQL logs)
 
-- **Permission Errors:** If you see `ERROR: permission denied to create replication slot`:
-  - Use the `postgres` user (which has `cloudsqlsuperuser` role)
+- **Permission Errors:** If you see `ERROR: must be superuser or replication role to use replication slots`, or `FATAL: insufficient privileges to start walsender` on a replication connection (the wording of Cloud SQL for PostgreSQL 17):
+  - The built-in `postgres` user does not have the `REPLICATION` attribute by default, even with the `cloudsqlsuperuser` role
   - Ensure the user has `REPLICATION` privileges: `ALTER ROLE user WITH REPLICATION;`
   - Verify the user can connect to the specific database
 
@@ -275,7 +277,7 @@ Now that you have configured the Google Cloud database and created the CDC user,
 
 - **Statement Timeout:** Ensure `statement_timeout` is `0` or greater than 5 minutes to avoid interrupting long-running snapshot queries.
 
-- **SSL Configuration:** Cloud SQL enforces SSL by default. If connecting directly:
+- **SSL Configuration:** Cloud SQL does not enforce SSL unless the instance is set to require it. An instance created with the `gcloud` defaults accepted unencrypted connections (`sslMode: ALLOW_UNENCRYPTED_AND_ENCRYPTED`). If connecting directly:
   - Use `sslmode=require` in connection strings
   - For client certificates, use `sslmode=verify-full`
   - Download the server CA certificate if needed

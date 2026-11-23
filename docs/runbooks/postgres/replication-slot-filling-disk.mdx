@@ -1,0 +1,569 @@
+---
+title: "PostgreSQL replication slot is filling the disk"
+description: "Find the replication slot that holds PostgreSQL WAL, let it catch up or drop it safely, and cap it with max_slot_wal_keep_size. Run on PostgreSQL 12 to 19."
+sidebar_label: Replication slot filling the disk
+unlisted: true
+keywords:
+  - postgres drop replication slot
+  - max_slot_wal_keep_size
+  - max_wal_size
+  - pg_replication_slots
+  - pg_drop_replication_slot
+  - replication slot is active for PID
+  - requested WAL segment has already been removed
+  - can no longer access replication slot
+  - pg_wal No space left on device
+  - idle_replication_slot_timeout
+runbook:
+  family: postgres
+  author: shubham
+  reproduced:
+    date: "2026-11-16"
+    versions:
+      - "PostgreSQL 18.7"
+      - "PostgreSQL 17.12"
+      - "PostgreSQL 16.15"
+      - "PostgreSQL 15.19"
+      - "PostgreSQL 14.25"
+      - "PostgreSQL 13.23"
+      - "PostgreSQL 12.22"
+      - "PostgreSQL 19rc2 (release candidate)"
+    lab: labs/runbooks/postgres/replication-slot-filling-disk
+    services:
+      date: "2026-11-23"
+      versions:
+        - "Debezium 3.7.1.Final"
+        - "AWS DMS 3.6.1 on Amazon RDS for PostgreSQL 17.11"
+        - "Airbyte source-postgres 3.8.12"
+        - "Amazon RDS for PostgreSQL 18.6"
+      labs:
+        - labs/runbooks/service-runs/tools/debezium-postgres
+        - labs/runbooks/service-runs/aws/dms-postgres
+        - labs/runbooks/service-runs/tools/airbyte-postgres
+        - labs/runbooks/service-runs/aws/postgres-rds-disk-full
+    summary: "A logical slot with no consumer was left on a server that kept writing, until a 256 MB disk was full and PostgreSQL would not start. The same server was then used to show each way a slot stops moving, each fix, and what max_slot_wal_keep_size does to the slot and to its consumers."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+The `pg_wal` directory of a PostgreSQL server grows past `max_wal_size` and keeps growing. This page covers the case where a replication slot is holding the write-ahead log (WAL) for a consumer that stopped reading, or stopped confirming what it read. If nothing changes, the disk fills, PostgreSQL stops with a `PANIC`, and it does not start again until there is space.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** List the slots by the WAL they hold. The first row is the slot that holds the disk:
+
+```sql
+SELECT slot_name, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) DESC NULLS LAST;
+```
+
+Then:
+
+- **Its consumer is still wanted:** get it reading again. The WAL goes over the next checkpoints.
+- **Its consumer is gone:** drop the slot with `SELECT pg_drop_replication_slot('slot_name');`.
+- **PostgreSQL 13 and later:** `max_slot_wal_keep_size` puts a ceiling on what any slot may hold.
+
+<TLDR title='Key takeaways'>
+
+- A slot keeps all WAL written after its `restart_lsn`, for every database of the instance. In the run, a slot nobody read held 257 MB while `max_wal_size` was 64 MB.
+- WAL is released when the consumer confirms a position and a checkpoint follows. A slot with `active = t` held 99 MB in the run while its consumer was frozen, and 97 MB while a transaction stayed open.
+- `max_slot_wal_keep_size` (PostgreSQL 13 and later) trades a full disk for a lost slot. The server kept running, and every reader of the slot got an error and needed a new snapshot.
+
+</TLDR>
+
+## What you see
+
+Before the disk is full there is no error. The `pg_wal` directory is larger than `max_wal_size`, and a disk alert may fire.
+
+Run this query. The slot with the largest `retained_wal` is the one that holds the disk.
+
+<Tabs groupId="postgres-version">
+<TabItem value="12" label="PostgreSQL 12" default>
+
+```sql
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
+```
+
+`wal_status` and `safe_wal_size` arrived in PostgreSQL 13.
+
+</TabItem>
+<TabItem value="13+" label="PostgreSQL 13 and later">
+
+```sql
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size
+FROM pg_replication_slots ORDER BY slot_name;
+```
+
+</TabItem>
+</Tabs>
+
+This is its output for the slot that nobody read. The lab also selected `invalidation_reason`, a column from PostgreSQL 17:
+
+```text
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | f      |            | 0/812EC58   | 0/812EC90           | 257 MB       | extended   |               | 
+```
+
+Two columns do different jobs. `confirmed_flush_lsn` is what the consumer has confirmed, and `restart_lsn` is what decides how much WAL stays. Each row points at one issue:
+
+| Issue | What the query shows |
+| --- | --- |
+| [1. The consumer stopped reading](#issue-1-the-consumer-stopped-reading) | `active = f`, or `active = t` and `confirmed_flush_lsn` does not move |
+| [2. A slot that is no longer needed](#issue-2-a-slot-that-is-no-longer-needed) | `active = f`, and its consumer is not coming back |
+| [3. An idle database next to a busy one](#issue-3-an-idle-database-next-to-a-busy-one) | `confirmed_flush_lsn` does not move, and the slot's database has no writes |
+| [4. An open transaction holds the slot](#issue-4-an-open-transaction-holds-the-slot) | `active = t`, `confirmed_flush_lsn` moves, `restart_lsn` does not |
+| [5. The disk is already full](#issue-5-the-disk-is-already-full) | No answer: PostgreSQL does not start, and its log shows `No space left on device` |
+
+A slot with `wal_status = lost` has already been invalidated, which is covered in [What an invalidated slot costs](#what-an-invalidated-slot-costs).
+
+When the disk is full, writers fail first and the server follows. This is the server log of PostgreSQL 18.7 on a 256 MB disk, with a slot that nobody read:
+
+```text
+ERROR:  could not extend file "base/16384/16447": No space left on device
+HINT:  Check free disk space.
+PANIC:  could not write to file "pg_wal/xlogtemp.334": No space left on device
+LOG:  all server processes terminated; reinitializing
+LOG:  database system was not properly shut down; automatic recovery in progress
+FATAL:  could not extend file "base/16384/16438" with FileFallocate(): No space left on device
+LOG:  startup process (PID 338) exited with exit code 1
+LOG:  shutting down due to startup process failure
+LOG:  database system is shut down
+```
+
+After the last line `pg_isready` answered `no response`. The PostgreSQL manual describes the same ending: "If the disk holding the WAL files grows full, database server panic and consequent shutdown might occur" ([Disk Full Failure](https://www.postgresql.org/docs/current/diskusage.html#DISK-FULL)).
+
+All eight versions ended the same way, with small differences on the way there. The `PANIC` named `pg_wal/xlogtemp` in seven runs and `pg_logical/replorigin_checkpoint.tmp` on 16.15, and on 12.22, 13.23 and 14.25 it came with no `ERROR` before it. Which file the `FATAL` during recovery named depends on timing: on 19rc2 it was `pg_wal/xlogtemp` in one run and a data file in another. The last-but-one line reads `aborting startup due to startup process failure` on 12.22 to 14.25.
+
+### What changes by version
+
+The mechanism is the same from PostgreSQL 12 to 19. The settings, the columns and the messages are not.
+
+| PostgreSQL | Ceiling for a slot | Columns of `pg_replication_slots` that help | Server log when a slot is invalidated |
+| --- | --- | --- | --- |
+| 12.22 | None. `max_slot_wal_keep_size` is an `unrecognized configuration parameter` | `active`, `active_pid`, `restart_lsn`, `confirmed_flush_lsn` | Not applicable |
+| 13.23, 14.25, 15.19 | `max_slot_wal_keep_size` | adds `wal_status`, `safe_wal_size` | `invalidating slot "cdc_slot" because its restart_lsn 0/329B3410 exceeds max_slot_wal_keep_size` |
+| 16.15 | `max_slot_wal_keep_size` | adds `conflicting` | `invalidating obsolete replication slot "cdc_slot"` |
+| 17.12 | `max_slot_wal_keep_size` | adds `inactive_since`, `invalidation_reason` | `invalidating obsolete replication slot "cdc_slot"` |
+| 18.7, 19rc2 | `max_slot_wal_keep_size`, `idle_replication_slot_timeout` | same as 17.12 | `invalidating obsolete replication slot "cdc_slot"` |
+
+What a consumer of an invalidated slot gets also depends on the version and on how it reads:
+
+| PostgreSQL | SQL functions such as `pg_logical_slot_get_changes` | Streaming (a CDC tool, `pg_recvlogical`) | A physical slot (`pg_receivewal`, a standby) |
+| --- | --- | --- | --- |
+| 13.23, 14.25, 15.19 | `can no longer get changes from replication slot "cdc_slot"` | `cannot read from logical replication slot "cdc_slot"` | `requested WAL segment 000000010000000000000032 has already been removed` |
+| 16.15, 17.12 | `can no longer get changes from replication slot "cdc_slot"` | `can no longer get changes from replication slot "cdc_slot"` | the same `requested WAL segment` error |
+| 18.7, 19rc2 | `can no longer access replication slot "cdc_slot"` | `can no longer access replication slot "cdc_slot"` | `can no longer access replication slot "standby_slot"` |
+
+Every row is from a run on that version.
+
+## How a replication slot holds WAL
+
+A checkpoint removes or recycles the WAL files that nothing needs any more. `max_wal_size` decides how often checkpoints run, and it is not a limit on the directory: the manual calls it "a soft limit" ([WAL settings](https://www.postgresql.org/docs/current/runtime-config-wal.html)). In the run, with no slot and `max_wal_size = 64MB`, 96 MB of writes left `pg_wal` at 64 MB after a checkpoint.
+
+A replication slot adds one more thing that needs WAL: everything after its `restart_lsn`, the oldest position its consumer may still ask for. With a slot that nobody read, 256 MB of writes left 272 MB in `pg_wal`, in 17 files, and the slot showed `wal_status = extended`. The manual defines that value as "max_wal_size is exceeded but the files are still retained, either by the replication slot or by wal_keep_size" ([pg_replication_slots](https://www.postgresql.org/docs/current/view-pg-replication-slots.html)).
+
+The slot does not check whether anyone is there. The manual says it plainly: "Replication slots persist across crashes and know nothing about the state of their consumer(s). They will prevent removal of required resources even when there is no connection using them" ([Replication Slots](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html)).
+
+Three settings sound alike, and only one of them limits a slot:
+
+| Setting | What it does | Limits a slot |
+| --- | --- | --- |
+| `max_wal_size` | Starts a checkpoint when the WAL written since the last one is about to exceed it | No. In the run it was 64 MB and `pg_wal` reached 272 MB |
+| `wal_keep_size` (`wal_keep_segments` up to 12) | Keeps at least this much past WAL in case a standby needs it | No |
+| `max_slot_wal_keep_size` (13 and later) | Sets the most WAL a slot may hold. The default, `-1`, is no limit | Yes |
+
+:::note[Versions on this page]
+The runs used **PostgreSQL 12.22, 13.23, 14.25, 15.19, 16.15, 17.12 and 18.7**, and **PostgreSQL 19rc2**, a release candidate. Output with no version named is from **18.7**. Three boundaries come from the release notes and not from the runs: `max_slot_wal_keep_size` and the rename of `wal_keep_segments` to `wal_keep_size` arrived in [13](https://www.postgresql.org/docs/release/13.0/), `invalidation_reason` and `inactive_since` in [17](https://www.postgresql.org/docs/release/17.0/), and `idle_replication_slot_timeout` in [18](https://www.postgresql.org/docs/release/18.0/). Before [PostgreSQL 10](https://www.postgresql.org/docs/release/10.0/) the directory was called `pg_xlog`.
+:::
+
+## Confirm the diagnosis
+
+For a connected consumer, join the slot to its WAL sender. A `flush_lsn` that stays behind `sent_lsn` and an old `reply_time` mean the consumer receives and does not confirm:
+
+```sql
+SELECT s.slot_name, r.pid, r.application_name, r.state, r.sent_lsn, r.flush_lsn, r.reply_time
+FROM pg_replication_slots s LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid ORDER BY s.slot_name;
+```
+
+```text
+ slot_name | pid | application_name |   state   |  sent_lsn  | flush_lsn  |         reply_time          
+-----------+-----+------------------+-----------+------------+------------+-----------------------------
+ cdc_slot  | 334 | pg_recvlogical   | streaming | 0/188E83A8 | 0/18494B30 | 2026-11-16 18:42:57.4736+00
+```
+
+A paused Debezium 3.7.1 connector differs in one column. Its `reply_time` kept moving every 10 seconds while `flush_lsn` stood still, so read both.
+
+For an open transaction, look for the oldest session that holds a transaction ID:
+
+```sql
+SELECT pid, datname, state, now() - xact_start AS open_for, backend_xid, left(query, 50) AS last_statement
+FROM pg_stat_activity WHERE backend_xid IS NOT NULL ORDER BY xact_start;
+```
+
+To measure the directory itself, without shell access:
+
+```sql
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+```
+
+Before PostgreSQL 10 the function names differ. AWS documents the expression for PostgreSQL 9 as `pg_xlog_location_diff(pg_current_xlog_location(),restart_lsn)` ([AWS Knowledge Center](https://repost.aws/knowledge-center/diskfull-error-rds-postgresql), checked Nov 2026). No 9.x server was run for this page.
+
+## Issue 1: The consumer stopped reading
+
+The consumer is still wanted, and it has stopped reading. Start it, or restart it if it is connected and stuck.
+
+In the run the consumer read a 257 MB backlog and confirmed it in its first status report. `confirmed_flush_lsn` jumped to the end at once. `restart_lsn` and the directory followed over the next two checkpoints, 12 seconds apart:
+
+```text
+after checkpoint 1: restart_lsn 0/C089120, retained by the slot 196 MB, pg_wal 256 MB in 16 files
+after checkpoint 2: restart_lsn 0/18494B30, retained by the slot 2393 kB, pg_wal 64 MB in 4 files
+```
+
+Seven of the eight versions needed those two checkpoints, and 12.22 was back at 64 MB after the first.
+
+So do not expect the disk back the moment the consumer reports that it has caught up. Debezium's documentation describes the same lag: "If the value for confirmed_flush_lsn is regularly increasing and the value of restart_lsn lags then the database needs to reclaim the space" ([Debezium connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-wal-disk-space), checked Nov 2026).
+
+With Debezium the two steps followed its offset commits. On 3.7.1 with the default `offset.flush.interval.ms` of 60 seconds, `confirmed_flush_lsn` moved at the first commit after the connector was back and `restart_lsn` at the second, 64 seconds later. Five checkpoints in between changed nothing.
+
+### A consumer that is connected and frozen
+
+Such a consumer holds WAL in the same way: in the run the slot showed `active = t` and held 99 MB. A paused Debezium connector is in this group as well: its slot stayed `active = t` and held 141 MB. With the default `wal_sender_timeout` of 60 seconds, the server gave up on it after one minute, and the slot went to `active = f`:
+
+```text
+LOG:  terminating walsender process due to replication timeout
+```
+
+The timeout frees the connection, not the WAL. Nothing was released until the consumer process was resumed, reconnected and confirmed.
+
+That minute is the default of a self-hosted server, and of Aurora, Cloud SQL and Azure flexible server in the runs of 23 November 2026. Amazon Relational Database Service (RDS) for PostgreSQL 17.11 came with 30 seconds. With `wal_sender_timeout = 0` the server never ends the connection: a frozen Debezium connector kept its slot at `active = t` for all 160 seconds of its run, and the server log had no line about it.
+
+## Issue 2: A slot that is no longer needed
+
+The consumer is gone for good, or you accept a new snapshot. Drop the slot.
+
+A slot that is in use cannot be dropped. The message is the same on all eight versions:
+
+```text
+SELECT pg_drop_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" is active for PID 3314
+```
+
+Ending that session is not enough when the consumer reconnects by itself. In the run `pg_terminate_backend` ended the session, the consumer was back 5 seconds later, and the slot was active again under a new process ID (PID).
+
+The order that works is to stop the consumer in the tool that runs it, then drop the slot. When you cannot stop it, end the session and drop the slot in one go. `pg_terminate_backend` only sends a signal, so the drop can still find the process there. That depends on timing, not on the version. Each version was run twice, and it happened at least once on **13.23**, **15.19**, **16.15**, **18.7** and **19rc2**. Each time the drop worked on the second attempt. On 16.15:
+
+```text
+SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot' AND active;
+SELECT pg_drop_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" is active for PID 3225
+```
+
+From **PostgreSQL 14**, `pg_terminate_backend` takes a timeout in milliseconds and waits for the process to exit. With that form the drop worked the first time on every version from 14.25 up:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-13" label="PostgreSQL 12 and 13" default>
+
+```sql
+SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot' AND active;
+SELECT pg_drop_replication_slot('cdc_slot');
+```
+
+If the drop answers `replication slot "cdc_slot" is active for PID`, run it again.
+
+</TabItem>
+<TabItem value="14+" label="PostgreSQL 14 and later">
+
+```sql
+SELECT pg_terminate_backend(active_pid, 5000) FROM pg_replication_slots WHERE slot_name = 'cdc_slot' AND active;
+SELECT pg_drop_replication_slot('cdc_slot');
+```
+
+</TabItem>
+</Tabs>
+
+The consumer then finds its slot gone:
+
+```text
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" does not exist
+```
+
+The WAL goes at the next checkpoint, so run `CHECKPOINT;` after the drop if you need the space now.
+
+After the drop, the slot is gone from `pg_replication_slots` and its position with it. A new slot starts at the current position and holds none of the changes written before it, so the consumer needs a new snapshot of its tables.
+
+## Issue 3: An idle database next to a busy one
+
+The slot is healthy, its database has few or no changes, and another database of the same instance writes a lot. WAL is shared by all databases of an instance, so the slot holds what the busy one writes. The fix is a heartbeat: a small write in the slot's database on a schedule.
+
+In the run, `quietdb` had a slot and no changes, and `appdb` wrote 128 MB. The slot in `quietdb` held all of it. A consumer that confirms only the changes it has read found nothing to confirm: it read 0 changes.
+
+The lab stands in for such a consumer with two SQL functions: `pg_logical_slot_peek_binary_changes` reads, and `pg_replication_slot_advance` confirms the last position read.
+
+One updated row in `quietdb` changed that. The consumer read 4 messages, confirmed the last position, and `restart_lsn` moved. A second update moved it the rest of the way, and the next checkpoint took `pg_wal` back to 64 MB.
+
+```sql
+CREATE TABLE heartbeat (id int PRIMARY KEY, ts timestamptz NOT NULL);
+INSERT INTO heartbeat VALUES (1, now());
+CREATE PUBLICATION quiet_pub FOR TABLE heartbeat;
+-- then, on a schedule:
+UPDATE heartbeat SET ts = now() WHERE id = 1;
+```
+
+If your tool already has a publication, the heartbeat table has to be added to that one. With Debezium 3.7.1 a heartbeat table outside the publication left the slot stuck on PostgreSQL 15.19 and 18.7. On 14.25 the slot moved all the same, which is no reason to leave the table out.
+
+On Amazon RDS this case needs no busy neighbour: a slot there grows while its own database is quiet. See [AWS DMS and Amazon RDS](#aws-dms-and-amazon-rds).
+
+Not every consumer needs this. `pg_recvlogical` was attached to the same slot with no change in `quietdb` at all, and it advanced the slot by itself, because it confirms the position that the server reports in its keepalive messages. What Debezium, AWS Database Migration Service (DMS) and Airbyte did is in [How CDC tools behave on the same slot](#how-cdc-tools-behave-on-the-same-slot).
+
+## Issue 4: An open transaction holds the slot
+
+The consumer confirms and `restart_lsn` still does not move. A logical slot cannot move its `restart_lsn` past the start of the oldest transaction that is still open.
+
+In the run a session inserted one row and then sat `idle in transaction` for 60 seconds. Other sessions wrote 96 MB, the consumer confirmed all of it, and the slot still held 97 MB. When the transaction ended, `restart_lsn` moved and the next checkpoint took `pg_wal` from 112 MB back to 64 MB.
+
+Find the session with the `pg_stat_activity` query in [Confirm the diagnosis](#confirm-the-diagnosis), then commit it, roll it back, or end it with `pg_terminate_backend`.
+
+## Issue 5: The disk is already full
+
+When PostgreSQL has shut down on a full disk, you cannot run any of the queries on this page. Do not delete files from `pg_wal` by hand: the server needs them to recover.
+
+The manual's advice is to free space by "deleting other things" or to move files to another file system ([Disk Full Failure](https://www.postgresql.org/docs/current/diskusage.html#DISK-FULL)). The run did the first: it deleted a 48 MB file that had nothing to do with PostgreSQL and started the server.
+
+```text
+LOG:  database system was not properly shut down; automatic recovery in progress
+LOG:  redo done at 0/BE3D418 system usage: CPU: user: 0.05 s, system: 0.09 s, elapsed: 0.14 s
+LOG:  database system is ready to accept connections
+```
+
+The slot was still there and still held 160 MB. Dropping it and running `CHECKPOINT;` took `pg_wal` from 176 MB to 64 MB, and the disk from 82% to 44% used. The same recovery worked on all eight versions.
+
+On a managed service there is no other file to delete, and growing the volume is the way out. On Amazon RDS for PostgreSQL 18.6 with a 20 GB volume the same `PANIC` came when an unread slot held 19 GB of WAL. RDS then started PostgreSQL again about every two minutes, and each start ended with `FATAL:  could not write to file "pg_wal/xlogtemp.3361": No space left on device`.
+
+`aws rds modify-db-instance --allocated-storage 25 --apply-immediately` was accepted in that state. The first connection worked 289 seconds later, the slot still held 19 GB, and dropping it followed by `CHECKPOINT;` freed the space.
+
+Nothing announced the full volume. The instance status stayed `available` for at least 13 minutes while every connection was refused, and RDS wrote no event for it. Alert on the CloudWatch metric `FreeStorageSpace`, not on the status.
+
+## Prevent it
+
+### Cap what a slot may hold
+
+`max_slot_wal_keep_size` exists from **PostgreSQL 13** and takes effect with a reload. The manual: "if restart_lsn of a replication slot falls behind the current LSN by more than the given size, the standby using the slot may no longer be able to continue replication due to removal of required WAL files" ([Replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html)).
+
+```sql
+ALTER SYSTEM SET max_slot_wal_keep_size = '64MB';
+SELECT pg_reload_conf();
+```
+
+On a managed service the setting goes through the service. Amazon RDS for PostgreSQL 17.11 refused `ALTER SYSTEM` with `ERROR:  ALTER SYSTEM command is not supported`, and its DB parameter group has `max_slot_wal_keep_size` as a dynamic parameter. On Azure Database for PostgreSQL flexible server 17.11 it could not be set at all: `Value of server parameter 'max_slot_wal_keep_size' cannot be set because it's declared as read-only.`
+
+The run repeated the full-disk test of Issue 5 with this setting. On the same 256 MB disk, with a slot nobody read, eight rounds of 24 MB were written, which is more than the 144 MB that were free.
+
+Every round succeeded, `pg_wal` peaked at 112 MB, and the server kept accepting connections. The slot paid for it:
+
+<Tabs groupId="postgres-version">
+<TabItem value="13-15" label="PostgreSQL 13 to 15" default>
+
+```text
+LOG:  invalidating slot "cdc_slot" because its restart_lsn 0/B003BC0 exceeds max_slot_wal_keep_size
+```
+
+</TabItem>
+<TabItem value="16+" label="PostgreSQL 16 and later">
+
+```text
+LOG:  invalidating obsolete replication slot "cdc_slot"
+DETAIL:  The slot's restart_lsn 0/C007508 exceeds the limit by 50301688 bytes.
+HINT:  You might need to increase "max_slot_wal_keep_size".
+```
+
+On 16.15 the `HINT` has no quotes around the setting name.
+
+</TabItem>
+</Tabs>
+
+The seven versions that have the setting all passed this test.
+
+That is the trade: the cap protects the database and gives up the slot.
+
+A slot does not go at the moment it passes the cap. With the cap at 64 MB, a slot that nobody read went through these states on 18.7. For this test `max_wal_size` was raised to 1 GB, so that no checkpoint ran between the queries:
+
+| After | `retained_wal` | `wal_status` | `safe_wal_size` | `restart_lsn` |
+| --- | --- | --- | --- | --- |
+| The cap was set | 56 bytes | `reserved` | 75 MB | `0/33530B90` |
+| 32 MB of writes | 34 MB | `reserved` | 41 MB | `0/33530B90` |
+| 80 MB of writes | 83 MB | `unreserved` | -8476 kB | `0/33530B90` |
+| The next `CHECKPOINT` | empty | `lost` | empty | empty |
+
+`unreserved` is the last state before the loss: the slot no longer holds all the WAL it needs, and the next checkpoint removes some of it. After that checkpoint `invalidation_reason` read `wal_removed`.
+
+#### What an invalidated slot costs
+
+Every reader of the slot gets an error from then on. The SQL functions answered as below, and the streaming wording is in the [version table](#what-changes-by-version).
+
+<Tabs groupId="postgres-version">
+<TabItem value="13-15" label="PostgreSQL 13 to 15" default>
+
+```text
+ERROR:  can no longer get changes from replication slot "cdc_slot"
+DETAIL:  This slot has never previously reserved WAL, or it has been invalidated.
+```
+
+13.23 leaves out the word `it`.
+
+</TabItem>
+<TabItem value="16-17" label="PostgreSQL 16 and 17">
+
+```text
+ERROR:  can no longer get changes from replication slot "cdc_slot"
+DETAIL:  This slot has been invalidated because it exceeded the maximum reserved size.
+```
+
+</TabItem>
+<TabItem value="18+" label="PostgreSQL 18 and later">
+
+```text
+ERROR:  can no longer access replication slot "cdc_slot"
+DETAIL:  This replication slot has been invalidated due to "wal_removed".
+```
+
+</TabItem>
+</Tabs>
+
+Raising the cap afterwards did not bring the slot back. The only way forward was to drop it and create a new one, and the new slot held none of the changes written in between. A tool in that position needs a new snapshot of its tables.
+
+So size the cap for the longest outage of the consumer that you want to survive without a snapshot, and alert well before it. `safe_wal_size` in the slot query counts down to the point of no return.
+
+#### The cap waits for a connected consumer
+
+The slot is invalidated at a checkpoint, and the checkpoint first has to end the session of a consumer that is still connected. For a consumer that was reading, the two log lines are 2 milliseconds apart:
+
+```text
+2026-11-16 18:47:03.294 UTC [75] LOG:  terminating process 4023 to release replication slot "cdc_slot"
+2026-11-16 18:47:03.296 UTC [75] LOG:  invalidating obsolete replication slot "cdc_slot"
+```
+
+For a consumer process that was frozen and did not read from its connection, `CHECKPOINT` did not return within 20 seconds, on every version from 13.23 to 19rc2. `pg_stat_activity` showed the checkpointer waiting on `ReplicationSlotDrop` and the WAL sender on `ClientWrite`. The slot was invalidated only after the process was resumed, so a hung consumer can hold a checkpoint, and the cap with it.
+
+### Let idle slots expire (PostgreSQL 18 and later)
+
+`idle_replication_slot_timeout` invalidates a slot that no connection has used for the given time. In the run it was set to 20 seconds, and the checkpoint after that marked the slot `lost`:
+
+```text
+LOG:  invalidating obsolete replication slot "cdc_slot"
+DETAIL:  The slot's idle time of 26s exceeds the configured "idle_replication_slot_timeout" duration of 20s.
+```
+
+The cost is the same as for the cap. The slot's consumer gets `can no longer access replication slot` and needs a new snapshot.
+
+### Monitor and clean up
+
+- Alert on `retained_wal` per slot from the slot query in [What you see](#what-you-see), and on `safe_wal_size` once a cap is set.
+- Drop the slot when you retire a connector or a task. In the runs Debezium left its slot and its publication after a stop, a delete and a shutdown. AWS DMS left its slot when a task was stopped and dropped it when the task was deleted.
+- Keep one slot per consumer, so that a slot without a reader is easy to recognise.
+- Look for sessions that sit `idle in transaction`. One of them held the slot of a healthy consumer in the run.
+- Create slots deliberately. The prerequisites and their errors are in [Enable PostgreSQL logical replication for CDC](/docs/runbooks/postgres/enable-logical-replication/).
+
+## How CDC tools behave on the same slot
+
+Debezium, AWS DMS and Airbyte were each put through the conditions above on 23 November 2026. The versions are in the box at the end of the page, and every number in this section is from those runs.
+
+### Debezium
+
+Debezium 3.7.1.Final ran on Kafka Connect 4.3.1 against PostgreSQL 18.7. What the slot showed depended on how the connector had stopped reading:
+
+| State of the connector | `active` | Held by the slot after 128 MB of writes |
+| --- | --- | --- |
+| `RUNNING` | `t` | 129 MB for 53 seconds, until the next offset commit |
+| `PAUSED` | `t` | 141 MB for the 90 seconds it was watched |
+| `STOPPED`, deleted, or the worker shut down | `f` | 141 MB |
+
+After a stop, a delete and a worker shutdown the slot was still there, and so was the publication Debezium had created. `slot.drop.on.stop=true` dropped the slot on each of the three. The connector did not start over afterwards, and its task failed:
+
+```text
+io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [...], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+```
+
+For the idle database, Debezium's documentation gives the cause: "Debezium then cannot confirm the LSN as replication slots work per-database and Debezium is not invoked. As WAL is shared by all databases, the amount used tends to grow until an event is emitted by the database for which Debezium is capturing changes" ([WAL disk space consumption](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-wal-disk-space), checked Nov 2026). The run tried each remedy on a connector that captured the quiet database:
+
+| Connector settings | The slot of the quiet database |
+| --- | --- |
+| Defaults | 135 MB held, never moved |
+| `heartbeat.interval.ms=5000` | 135 MB held. Kafka received 21 heartbeat records |
+| The same with `heartbeat.action.query`, the heartbeat table in the publication | 928 bytes held after 60 seconds |
+| The same, the heartbeat table not in the publication | 135 MB held on PostgreSQL 18.7 and 15.19, 600 bytes after 40 seconds on 14.25 |
+| `lsn.flush.mode=connector_and_driver`, no heartbeat | 56 bytes held after 20 seconds |
+
+`lsn.flush.mode` is among the properties of 3.7.1 and not among those of 3.0.8, which accepted the setting and did nothing with it. Debezium's [3.4 release notes](https://debezium.io/releases/3.4/release-notes) (checked Nov 2026) introduce it, and no release between the two was run. Its default is `connector`, and 3.7.1 says what that means when it starts:
+
+```text
+Using LSN flush mode 'connector': Debezium will flush LSN on event processing. The pgjdbc driver keepalive flush is DISABLED; consider using heartbeat.action.query to prevent WAL growth on low-activity databases.
+```
+
+An outage of Kafka takes the consumer away as well. With Kafka unreachable the worker stopped the connector after 14 seconds, and when Kafka was back it waited out the default rebalance delay of five minutes on this single-worker stack. An outage of 2 minutes 40 seconds left the slot without a consumer for 7 minutes 26 seconds.
+
+### AWS DMS and Amazon RDS
+
+AWS DMS 3.6.1 ran a task with full load and ongoing replication from Amazon RDS for PostgreSQL 17.11. DMS created its own slot with the `test_decoding` plugin. It also added a table `awsdms_ddl_audit` and an event trigger to the source database.
+
+AWS states the mechanism in one sentence: "PostgreSQL writes the database changes to WAL files that are discarded only after AWS DMS successfully reads changes from the logical replication slot" ([PostgreSQL as a DMS source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), checked Nov 2026). A stopped task showed it: the slot went to `active = f`, and after a further 1.5 GB of writes it held 2,253 MB. After a resume the slot was active in 16 seconds and down to 100 MB in 187 seconds.
+
+On RDS the same numbers are in CloudWatch ([RDS metrics](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html), checked Nov 2026). `TransactionLogsDiskUsage` read 2,432 MB when `pg_wal` was 2,432 MB, and `OldestReplicationSlotLag` read 2,253 MB when the slot held 2,253 MB. `ReplicationSlotDiskUsage` stayed at 0 MB.
+
+What a task leaves behind depends on how it ends. The same AWS page says: "Slots open automatically as soon as a task starts and remain open even when the task is no longer running. Make sure to manually delete open slots." In the run a stopped task left its slot, and deleting the task dropped it.
+
+The audit table, the event trigger and the heartbeat table stayed in the database after both tasks were deleted.
+
+The heartbeat is the endpoint setting `HeartbeatEnable`, off by default: "The WAL heartbeat feature mimics a dummy transaction, so that idle logical replication slots don't hold onto old WAL logs that result in storage full situations on the source." Without it the slot of a quiet database held 1,541 MB and did not move in five minutes. With `HeartbeatEnable=true` and `HeartbeatFrequency=1` the slot was down to 1,984 bytes 42 seconds after the task was running again, and DMS updated a table `awsdms_heartbeat` every minute.
+
+The open-transaction case has its own heading in the DMS troubleshooting guide: "ReplicationSlotDiskUsage increases and restart_lsn stops moving forward during long transactions, such as ETL workloads" ([Troubleshooting](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Troubleshooting.html#CHAP_Troubleshooting.PostgreSQL.AvoidLongTransactions), checked Nov 2026). With one session idle in a transaction, the running task moved `confirmed_flush_lsn` and not `restart_lsn`, and the slot held 1,091 MB until the transaction ended. The metric that showed it was `OldestReplicationSlotLag`, while `ReplicationSlotDiskUsage` stayed at 0 MB for this one-row transaction.
+
+Three settings of RDS itself change the picture:
+
+- **A slot is never idle there.** RDS switches the WAL file every 300 seconds (`archive_timeout`), and each switch added one 64 MB segment that a slot without a heartbeat kept. A slot whose database had no writes grew from 198 MB to 454 MB in 17 minutes, which is about 18 GB a day.
+- **`pg_wal` has a floor.** `wal_keep_size` is 2,048 MB by default, so the directory stayed at 2,304 MB after the slot had caught up. A `TransactionLogsDiskUsage` of a few gigabytes does not point to a slot.
+- **`wal_sender_timeout` is 30 seconds**, not the 60 seconds of a self-hosted server.
+
+One statement of the DMS page was not run: that when `restart_lsn` falls behind by more than `max_slot_wal_keep_size`, "the DMS task fails due to removal of required WAL files".
+
+### Airbyte
+
+Airbyte's PostgreSQL source connector 3.8.12 was run directly, with the Airbyte protocol commands and without the platform around it. It carries Debezium 3.4.3.Final, which fits the sentence on its troubleshooting page that "Airbyte's connector depends on Debezium" ([Troubleshooting Postgres Sources](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting), checked Nov 2026).
+
+Airbyte reads in batches, so between two syncs nobody is connected and the slot shows `active = f`. The connector moved the slot once per sync, when the sync started, to the position the previous sync had saved. The slot therefore always held at least one sync interval of WAL. In the run, 130 MB written to a table outside the publication were released only at the start of the third sync after them, once a published change had followed.
+
+The idle-database case looked as the same page describes it: "You may also notice that the `confirmed_flush_lsn` column of the server's `pg_replication_slots` view doesn't advance as expected". Two syncs of a quiet database ran 137 and 141 seconds, ended with `Heartbeat timeout: no progress for 2 minutes`, and left the slot holding 130 MB. With a heartbeat table in the publication and the connector's `Debezium heartbeat query` setting, the sync ended after 24 seconds and the next one freed the slot.
+
+A slot that had been invalidated did not make the connector start over. With `wal_status = lost` every sync ended after two seconds with a configuration error, with or without saved state:
+
+```text
+Replication slot 'airbyte_slot' is not valid: wal_status = 'lost', invalidation_reason = 'wal_removed'.
+```
+
+A slot that was dropped and created again gave `Replication slot 'airbyte_slot' has advanced beyond the source's state LSN.` until the saved state was cleared, and the sync after that read every row again. Airbyte's troubleshooting page still quotes an older log line, "Saved offset is before Replication slot's confirmed_flush_lsn, Airbyte will trigger sync from scratch" (checked Nov 2026). That text is in none of the 193 jar files of the 3.8.12 image.
+
+:::note[How OLake Go handles this]
+
+OLake Go reads the same kind of slot, so it has the same limit. Its PostgreSQL connector uses a `pgoutput` slot that, in the words of its docs, "retains WAL segments until read" ([PostgreSQL connector](/docs/connectors/postgres/#configuration)). A slot whose job no longer runs holds WAL like any other slot.
+
+The set-up guide says to "Drop unused slots or ensure CDC consumers are actively reading", and lists `max_slot_wal_keep_size` among the server settings ([generic guide](/docs/connectors/postgres/setup/generic/#performance-and-monitoring)). The connector docs also say not to share one slot between jobs.
+
+The same docs recommend `wal_sender_timeout = 0`. With that setting the 60-second timeout of Issue 1 does not apply, so watch `flush_lsn` for a consumer that is connected and no longer confirms.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- PostgreSQL manual: [pg_replication_slots](https://www.postgresql.org/docs/current/view-pg-replication-slots.html), [replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html), [WAL settings](https://www.postgresql.org/docs/current/runtime-config-wal.html), [replication slots in logical decoding](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), [WAL configuration](https://www.postgresql.org/docs/current/wal-configuration.html), [disk full failure](https://www.postgresql.org/docs/current/diskusage.html#DISK-FULL), [administration functions](https://www.postgresql.org/docs/current/functions-admin.html)
+- PostgreSQL release notes: [10](https://www.postgresql.org/docs/release/10.0/), [13](https://www.postgresql.org/docs/release/13.0/), [14](https://www.postgresql.org/docs/release/14.0/), [17](https://www.postgresql.org/docs/release/17.0/), [18](https://www.postgresql.org/docs/release/18.0/)
+- Debezium: [WAL disk space consumption](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-wal-disk-space), [3.4 release notes](https://debezium.io/releases/3.4/release-notes)
+- AWS: [PostgreSQL as a DMS source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), [DMS troubleshooting](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Troubleshooting.html), [RDS metrics](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html), [Knowledge Center on full storage](https://repost.aws/knowledge-center/diskfull-error-rds-postgresql)
+- Airbyte: [Troubleshooting Postgres Sources](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting)

@@ -1,0 +1,581 @@
+---
+title: "Enable PostgreSQL logical replication for CDC"
+description: "Set wal_level, a replication role, a publication, an output plugin and replica identity for CDC, with the error each missing one gives on PostgreSQL 12 to 19."
+sidebar_label: Enable logical replication
+unlisted: true
+keywords:
+  - postgres logical replication
+  - enable logical replication postgres
+  - logical decoding requires wal_level >= logical
+  - rds.logical_replication
+  - cloudsql.logical_decoding
+  - all replication slots are in use
+  - publication does not exist
+  - could not access file wal2json
+  - output_plugin_libraries
+  - replica identity full
+runbook:
+  family: postgres
+  author: shubham
+  reproduced:
+    date: "2026-11-16"
+    versions:
+      - "PostgreSQL 18.7"
+      - "PostgreSQL 17.12"
+      - "PostgreSQL 16.15"
+      - "PostgreSQL 15.19"
+      - "PostgreSQL 14.25"
+      - "PostgreSQL 13.23"
+      - "PostgreSQL 12.22"
+      - "PostgreSQL 19rc2 (release candidate)"
+    lab: labs/runbooks/postgres/enable-logical-replication
+    summary: "A stock server was taken from its defaults to a working pgoutput slot, one prerequisite at a time. Each missing prerequisite was requested first, so its error is on record for every version, and each fix was applied and checked. The four managed services were taken through the same steps in separate runs."
+    services:
+      date: "2026-11-23"
+      versions:
+        - "Amazon RDS for PostgreSQL 17.11"
+        - "Amazon Aurora PostgreSQL 17.11"
+        - "Google Cloud SQL for PostgreSQL 17.11"
+        - "Azure Database for PostgreSQL flexible server 17.11"
+      labs:
+        - labs/runbooks/service-runs/aws/postgres-rds
+        - labs/runbooks/service-runs/aws/postgres-aurora
+        - labs/runbooks/service-runs/gcp/cloudsql-postgres
+        - labs/runbooks/service-runs/azure/postgres-flexible-server
+---
+
+import * as R from '@site/src/components/runbooks';
+
+A change data capture (CDC) tool reads PostgreSQL through logical decoding, and logical decoding needs six things on the server. Each missing one has its own error. One of them does not fail in the tool at all: it fails in the application that writes to the table.
+
+This page sets the six up in order on a self-hosted server and shows the error each gives when it is missing. It then lists what Amazon RDS, Aurora, Google Cloud SQL and Azure Database for PostgreSQL do differently.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Logical decoding needs six things on the server, and each error on this page points at one of them:
+
+- **`wal_level = logical`:** set it and restart the server. PostgreSQL 19rc2 also created a logical slot with `wal_level = replica`.
+- **A free slot and WAL sender:** `max_replication_slots` and `max_wal_senders`, 10 each by default.
+- **A role with the `REPLICATION` attribute,** and `SELECT` on the tables it copies.
+- **A publication** for the tables, created by an administrator.
+- **An output plugin:** the built-in `pgoutput` needs nothing installed.
+- **A replica identity,** usually a primary key, on every published table that receives updates or deletes.
+
+On a managed service the first one is a setting of the service, and the rest is the same SQL. The whole set-up, in order, is under [Confirm the diagnosis](#confirm-the-diagnosis).
+
+<TLDR title='Key takeaways'>
+
+- `wal_level = logical` took a restart on PostgreSQL 12 to 18. After `ALTER SYSTEM` and a reload the server still reported `replica`, with `pending_restart = t`.
+- The built-in `pgoutput` plugin needed nothing installed on any of the eight versions. `wal2json` and `decoderbufs` needed a package, and on the minor releases from August 2026 an entry in `output_plugin_libraries` as well.
+- A published table without a primary key rejects every `UPDATE` and `DELETE` until it has a replica identity. `REPLICA IDENTITY FULL`, a primary key and a unique index each fixed it in the run.
+
+</TLDR>
+
+## What you see
+
+Each missing prerequisite gives its own message, and each message points at one issue. Every message below was captured in the lab, and the last column gives the versions that printed it.
+
+| Issue | Message | Printed by |
+| --- | --- | --- |
+| [1. wal_level is not logical](#issue-1-wal_level-is-not-logical) | `ERROR:  logical decoding requires wal_level >= logical` | 12.22, 13.23, 14.25, 15.19, 16.15 |
+| | `ERROR:  logical decoding requires "wal_level" >= "logical"` | 17.12, 18.7 |
+| | No error: the slot is created with `wal_level = replica` | 19rc2 |
+| [2. No free slot or WAL sender](#issue-2-no-free-slot-or-wal-sender) | `ERROR:  all replication slots are in use` | all eight |
+| | `FATAL:  number of requested standby connections exceeds max_wal_senders (currently 2)` | 12.22 to 16.15. From 17.12 the setting name is in double quotes |
+| [3. The role cannot replicate](#issue-3-the-role-cannot-replicate) | `ERROR:  must be superuser or replication role to use replication slots` | 12.22, 13.23, 14.25, 15.19 |
+| | `ERROR:  permission denied to use replication slots` | 16.15, 17.12, 18.7, 19rc2 |
+| | `FATAL:  must be superuser or replication role to start walsender` | 12.22, 13.23, 14.25, 15.19 |
+| | `FATAL:  permission denied to start WAL sender` | 16.15, 17.12, 18.7, 19rc2 |
+| [4. The publication is missing or misnamed](#issue-4-the-publication-is-missing-or-misnamed) | `ERROR:  publication "cdc_publication" does not exist` | 12.22 to 17.12 |
+| | `WARNING:  skipped loading publication "cdc_publication"` | 18.7, 19rc2 |
+| [5. The output plugin is not installed or allowed](#issue-5-the-output-plugin-is-not-installed-or-allowed) | `ERROR:  could not access file "wal2json": No such file or directory` | 12.22, 13.23. On later versions only once the plugin is allowed |
+| | `ERROR:  library "wal2json" may not be used as an output plugin` | 14.25, 15.19, 16.15, 17.12, 18.7, 19rc2 |
+| [6. A table has no replica identity](#issue-6-a-table-has-no-replica-identity) | `ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates` | all eight |
+
+## Why six prerequisites
+
+Logical decoding turns the write-ahead log (WAL) back into row changes. The WAL has to carry enough detail (`wal_level`), and the server needs room for a slot that remembers how far the reader got and for a process that sends the changes (the two limits). A role has to be allowed to do this, a publication has to say which tables are sent, and an output plugin has to choose the format.
+
+The sixth is about the rows. For an update or a delete, PostgreSQL has to tell the reader which row changed, and it does that with the table's replica identity. The PostgreSQL manual puts it this way: "A published table must have a replica identity configured in order to be able to replicate UPDATE and DELETE operations" ([Replica Identity](https://www.postgresql.org/docs/current/logical-replication-publication.html)).
+
+:::note[Versions on this page]
+The runs used **PostgreSQL 12.22, 13.23, 14.25, 15.19, 16.15, 17.12 and 18.7**, and **PostgreSQL 19rc2**, a release candidate, each on a self-hosted server. Output with no version named is from **18.7**. Two boundaries come from PostgreSQL itself and not from the runs. The setting `output_plugin_libraries` arrived in the minor releases of 13 August 2026: [18.6](https://www.postgresql.org/docs/release/18.6/), [17.11](https://www.postgresql.org/docs/release/17.11/), [16.15](https://www.postgresql.org/docs/release/16.15/), [15.19](https://www.postgresql.org/docs/release/15.19/) and [14.24](https://www.postgresql.org/docs/release/14.24/). The warning about a skipped publication is in the [source of 18.0](https://github.com/postgres/postgres/blob/REL_18_0/src/backend/replication/pgoutput/pgoutput.c) and is not in the 17 branch. The managed services were run separately on 23 November 2026, each on PostgreSQL 17.11.
+:::
+
+## Confirm the diagnosis
+
+On a self-hosted server, the six in order:
+
+```sql
+ALTER SYSTEM SET wal_level = logical;
+-- restart PostgreSQL, then:
+CREATE ROLE cdc_user LOGIN PASSWORD 'change-me';
+ALTER ROLE cdc_user REPLICATION;
+GRANT USAGE ON SCHEMA public TO cdc_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+```
+
+Every published table that receives updates or deletes also needs a primary key or another replica identity, as in [Issue 6](#issue-6-a-table-has-no-replica-identity).
+
+With the six in place, the capture role created its own slot, three statements changed a row, and the role read them back as ten `pgoutput` messages: `B`, `R`, `I`, `C` for the insert, then `B`, `U`, `C` and `B`, `D`, `C`.
+
+```sql
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+SELECT lsn, xid, chr(get_byte(data, 0)) AS message
+FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+```
+
+`peek` reads without consuming, so the tool still gets these changes. If the slot was only a test, drop it with `SELECT pg_drop_replication_slot('cdc_slot');`. A slot that is left behind keeps WAL until the disk is full.
+
+## Issue 1: wal_level is not logical
+
+A new server has `wal_level = replica`. A request for a logical slot fails, from SQL and over the replication protocol alike:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-16" label="PostgreSQL 12.22 to 16.15" default>
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ERROR:  logical decoding requires wal_level >= logical
+```
+
+</TabItem>
+<TabItem value="17-18" label="PostgreSQL 17.12 and 18.7">
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ERROR:  logical decoding requires "wal_level" >= "logical"
+```
+
+</TabItem>
+<TabItem value="19" label="PostgreSQL 19rc2">
+
+No error. The slot is created with `wal_level = replica`, as described under **PostgreSQL 19** below.
+
+</TabItem>
+</Tabs>
+
+Changing the setting and reloading is not enough. The value on disk changes, the running server keeps the old one, and `pg_settings` says so:
+
+```text
+ALTER SYSTEM SET wal_level = logical;
+SELECT pg_reload_conf();
+SELECT name, setting, context, pending_restart FROM pg_settings WHERE name = 'wal_level';
+   name    | setting |  context   | pending_restart 
+-----------+---------+------------+-----------------
+ wal_level | replica | postmaster | t
+```
+
+`SET wal_level = logical;` in a session answers `ERROR:  parameter "wal_level" cannot be changed without restarting the server`. After a restart, `SHOW wal_level` returned `logical` and the same slot request succeeded.
+
+A publication can be created before the restart. PostgreSQL 13.23 to 18.7 answered `CREATE PUBLICATION` with `WARNING:  "wal_level" is insufficient to publish logical changes` (the quoting differs by version), so the statement succeeding proves nothing about `wal_level`.
+
+**PostgreSQL 19.** Version 19 was at release candidate 2 on the day of the run. There the slot request succeeded with `wal_level = replica`, and `SHOW effective_wal_level` went from `replica` to `logical` while a logical slot existed and back when it was dropped.
+
+The [19 release notes](https://www.postgresql.org/docs/19/release-19.html) say: "Logical replication can now be enabled without a server restart when wal_level is set to replica." With `wal_level = minimal` the request answered `ERROR:  replication slots can only be used if "wal_level" >= "replica"`.
+
+## Issue 2: No free slot or WAL sender
+
+Each consumer holds one replication slot, and one WAL sender process while it is connected. Both limits were 10 by default on every version in the run, and both can only change with a restart. With the limits lowered to 2, the third slot and the third connection were refused:
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('slot_3', 'pgoutput');
+ERROR:  all replication slots are in use
+HINT:  Free one or increase "max_replication_slots".
+```
+
+```text
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  number of requested standby connections exceeds "max_wal_senders" (currently 2)
+```
+
+Look at who holds the slots before raising a limit:
+
+```sql
+SELECT slot_name, plugin, slot_type, database, active FROM pg_replication_slots ORDER BY slot_name;
+```
+
+In the run, dropping one unused slot let the refused request through at once. A slot that nothing reads also keeps WAL on disk, which is the subject of [PostgreSQL replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/).
+
+To raise the limits, set `max_replication_slots` and `max_wal_senders` and restart. The manual's sizing rule is: "max_wal_senders should be set to at least the same as max_replication_slots, plus the number of physical replicas that are connected at the same time" ([Configuration Settings](https://www.postgresql.org/docs/current/logical-replication-config.html)).
+
+## Issue 3: The role cannot replicate
+
+A role needs the `REPLICATION` attribute to use a slot and to open a replication connection. Without it, both are refused, and the wording changed in PostgreSQL 16:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-15" label="PostgreSQL 12.22 to 15.19" default>
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
+ERROR:  must be superuser or replication role to use replication slots
+```
+
+```text
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  must be superuser or replication role to start walsender
+```
+
+</TabItem>
+<TabItem value="16+" label="PostgreSQL 16.15 to 19rc2">
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- as cdc_user
+ERROR:  permission denied to use replication slots
+DETAIL:  Only roles with the REPLICATION attribute may use replication slots.
+```
+
+```text
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  permission denied to start WAL sender
+DETAIL:  Only roles with the REPLICATION attribute may start a WAL sender process.
+```
+
+</TabItem>
+</Tabs>
+
+The fix and the check are the same everywhere:
+
+```sql
+ALTER ROLE cdc_user REPLICATION;
+SELECT rolname, rolsuper, rolreplication FROM pg_roles WHERE rolname = 'cdc_user';
+```
+
+The attribute covers the slot and nothing else. The first copy of a table is an ordinary `SELECT`, which answered `ERROR:  permission denied for table orders` until the role was granted `USAGE` on the schema and `SELECT` on the tables.
+
+**pg_hba.conf.** A CDC tool opens a logical replication connection (`replication=database` in the connection string). In `pg_hba.conf` that connection is matched by an ordinary row for the database, not by a row with the `replication` keyword. The manual says of that keyword: "it doesn't match with logical replication connections" ([pg_hba.conf](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html)).
+
+The run showed both sides. From another address, the logical connection was accepted by the row `host all all all`, and a physical one (`replication=true`) was refused:
+
+```text
+psql: error: connection to server at "172.28.0.2", port 5432 failed: FATAL:  no pg_hba.conf entry for replication connection from host "172.28.0.2", user "cdc_user", no encryption
+```
+
+## Issue 4: The publication is missing or misnamed
+
+A publication names the tables whose changes are sent. The capture role usually cannot create it. In the run it was refused three times, in this order: without the `CREATE` privilege on the database, for `FOR ALL TABLES`, and for a table it does not own.
+
+```text
+ERROR:  permission denied for database appdb
+ERROR:  must be superuser to create FOR ALL TABLES publication
+ERROR:  must be owner of table orders
+```
+
+PostgreSQL 19rc2 words the second one as `must be superuser to create a FOR ALL TABLES or ALL SEQUENCES publication`.
+
+The rules behind those three are in the manual: "To create a publication, the invoking user must have the CREATE privilege for the current database", and "The FOR ALL TABLES and FOR TABLES IN SCHEMA clauses require the invoking user to be a superuser" ([CREATE PUBLICATION](https://www.postgresql.org/docs/current/sql-createpublication.html)). So an administrator creates it, then checks it:
+
+```sql
+CREATE PUBLICATION cdc_pub FOR TABLE orders, documents;
+SELECT pubname, puballtables, pubinsert, pubupdate, pubdelete, pubtruncate FROM pg_publication;
+SELECT pubname, schemaname, tablename FROM pg_publication_tables WHERE pubname = 'cdc_pub' ORDER BY tablename;
+```
+
+Two clauses depend on the version. `FOR TABLES IN SCHEMA` answered `syntax error at or near "TABLES"` on 12.22, 13.23 and 14.25 and worked from 15.19. `publish_via_partition_root` answered `unrecognized publication parameter` on 12.22 and worked from 13.23.
+
+### publication "x" does not exist
+
+This error does not come from `CREATE PUBLICATION`. It comes from the output plugin, when a consumer names a publication that the plugin cannot find, and it appears at the first change, not when the consumer connects.
+
+In the run, a consumer started with a misspelled publication name. The slot showed `active = t` and nothing was wrong until one row was inserted. Then:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-17" label="PostgreSQL 12.22 to 17.12" default>
+
+The consumer stopped with an error. This is 17.12:
+
+```text
+pg_recvlogical: error: unexpected termination of replication stream: ERROR:  publication "cdc_publication" does not exist
+CONTEXT:  slot "typo_slot", output plugin "pgoutput", in the change callback, associated LSN 0/19659E0
+```
+
+</TabItem>
+<TabItem value="18+" label="PostgreSQL 18.7 and 19rc2">
+
+The consumer stayed connected and received nothing. The only sign was a warning in the server log:
+
+```text
+WARNING:  skipped loading publication "cdc_publication"
+DETAIL:  The publication does not exist at this point in the WAL.
+HINT:  Create the publication if it does not exist.
+```
+
+</TabItem>
+</Tabs>
+
+On 18 and later, a wrong publication name therefore looks like a table with no changes. The warning in the server log is the only sign.
+
+The same message appears when the name is right and the slot is older than the publication. The plugin looks the publication up as of the change it is decoding, and a change made before `CREATE PUBLICATION` finds none. On 12.22 to 17.12 that slot failed on every read, even after later changes, and `pg_publication` listed the publication the whole time.
+
+The fix that worked was to drop the slot and create it again after the publication. The new slot then delivered the next insert as four `pgoutput` messages: begin, relation, insert, commit. On 18.7 the old slot skipped the early change with the warning and delivered the later one.
+
+## Issue 5: The output plugin is not installed or allowed
+
+`pgoutput` and `test_decoding` ship with PostgreSQL. On all eight versions a slot for either was created on a stock server. `wal2json` and `decoderbufs` are separate projects, and a stock server has neither.
+
+What the server answers depends on its minor release. 12.22 and 13.23 looked for the file, and the later versions refused before looking:
+
+<Tabs groupId="postgres-version">
+<TabItem value="12-13" label="PostgreSQL 12.22 and 13.23" default>
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('s_wal2json', 'wal2json');
+ERROR:  could not access file "wal2json": No such file or directory
+```
+
+</TabItem>
+<TabItem value="14+" label="PostgreSQL 14.25 to 19rc2">
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('s_wal2json', 'wal2json');
+ERROR:  library "wal2json" may not be used as an output plugin
+HINT:  If it is safe for all REPLICATION users to use this library as an output plugin, add it to "output_plugin_libraries" and reload the server configuration.
+```
+
+</TabItem>
+</Tabs>
+
+The second answer is new. The release notes of 13 August 2026 introduce `output_plugin_libraries` and state: "By default, only the output plugins shipped as part of PostgreSQL (pgoutput and test_decoding) are included in output_plugin_libraries. Installations that rely on other output plugins must add them after updating the server" ([release 18.6](https://www.postgresql.org/docs/release/18.6/)).
+
+**Allow the plugin.** With `ALTER SYSTEM`, write the names as separate values. Written as one quoted string, the list became a single name that matched nothing, and the server then refused `pgoutput` too:
+
+```text
+ALTER SYSTEM SET output_plugin_libraries = 'pgoutput, test_decoding, wal2json, decoderbufs';
+SELECT pg_reload_conf();
+SHOW output_plugin_libraries;
+             output_plugin_libraries              
+--------------------------------------------------
+ "pgoutput, test_decoding, wal2json, decoderbufs"
+SELECT * FROM pg_create_logical_replication_slot('s_pgoutput_2', 'pgoutput');
+ERROR:  library "pgoutput" may not be used as an output plugin
+```
+
+This form worked, with a reload and no restart:
+
+```sql
+ALTER SYSTEM SET output_plugin_libraries = pgoutput, test_decoding, wal2json, decoderbufs;
+SELECT pg_reload_conf();
+```
+
+After that the server looked for the file and answered `could not access file "wal2json": No such file or directory`, as the older versions do.
+
+**Install the plugin.** On Debian and Ubuntu the packages are `postgresql-NN-wal2json` and `postgresql-NN-decoderbufs` in the PostgreSQL apt repository. On 18.7 the run installed `wal2json` 2.7 and `decoderbufs` 3.7.0, and both slots were created without a restart. For 19rc2 the repository had `wal2json` and no `decoderbufs` package yet.
+
+**Plan for a restart all the same.** The 15.19 and 16.15 servers were one minor release behind the repository, and installing the plugin package also set up `postgresql-15 (15.20-1.pgdg13+1)` and `postgresql-16 (16.16-1.pgdg13+1)`. The running server could then load neither the new plugins nor its own `test_decoding`:
+
+```text
+ERROR:  could not load library "/usr/lib/postgresql/16/lib/wal2json.so": /usr/lib/postgresql/16/lib/wal2json.so: undefined symbol: heap_datum_check
+ERROR:  could not load library "/usr/lib/postgresql/16/lib/test_decoding.so": /usr/lib/postgresql/16/lib/test_decoding.so: undefined symbol: heap_datum_check
+```
+
+After a restart the servers reported 15.20 and 16.16, and both slots were created.
+
+Debezium users meet this issue by default. The Debezium connector's `plugin.name` property defaults to `decoderbufs`, and its documentation lists the supported values as `decoderbufs` and `pgoutput` ([Debezium connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-property-plugin-name), checked Nov 2026). Setting it to `pgoutput` removes the need to install or allow anything.
+
+## Issue 6: A table has no replica identity
+
+Adding a table without a primary key to a publication is accepted without a message. From that moment, inserts work and every `UPDATE` and `DELETE` on the table fails, for every session and not only for the CDC tool:
+
+```text
+UPDATE events_nopk SET reading = 22.0 WHERE device_id = 1;
+ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates
+HINT:  To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.
+DELETE FROM events_nopk WHERE device_id = 2;
+ERROR:  cannot delete from table "events_nopk" because it does not have a replica identity and publishes deletes
+HINT:  To enable deleting from the table, set REPLICA IDENTITY using ALTER TABLE.
+```
+
+The wording was identical on all eight versions. Find the tables at risk before you publish them:
+
+```sql
+SELECT c.relname,
+       CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity,
+       EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS has_primary_key
+FROM pg_class c WHERE c.relname IN ('orders', 'events_nopk', 'documents') ORDER BY c.relname;
+```
+
+A row with `default` and no primary key is a table that will reject updates. Each of these three fixed it in the run:
+
+```sql
+-- 1: the whole row is the key
+ALTER TABLE events_nopk REPLICA IDENTITY FULL;
+-- 2: a primary key, with the default identity
+ALTER TABLE events_nopk ADD PRIMARY KEY (device_id);
+-- 3: a unique index on NOT NULL columns, named as the identity
+CREATE UNIQUE INDEX events_nopk_device ON events_nopk (device_id);
+ALTER TABLE events_nopk REPLICA IDENTITY USING INDEX events_nopk_device;
+```
+
+The manual's advice on the first: "replica identity FULL should only be used as a fallback if no other solution is possible" ([Replica Identity](https://www.postgresql.org/docs/current/logical-replication-publication.html)).
+
+The identity also decides what the consumer receives. With the default identity, an update arrived as the new row and a delete as the key alone. With `REPLICA IDENTITY FULL`, both carried the whole old row:
+
+```text
+ table public.orders: DELETE: id[bigint]:2
+ table public.orders: DELETE: id[bigint]:3 customer_id[integer]:3 status[text]:'new' updated_at[timestamp with time zone]:'2026-11-16 17:45:55.28245+00'
+```
+
+Large values behave the same way. PostgreSQL stores a big column value out of line, a technique it calls TOAST (The Oversized-Attribute Storage Technique). An update that did not touch a 32,000-character column sent a placeholder in its place, and after `REPLICA IDENTITY FULL` the old row carried the full value:
+
+```text
+ table public.documents: UPDATE: id[bigint]:1 title[text]:'second title' body[text]:unchanged-toast-datum
+```
+
+What each identity left the table and the consumer with on 18.7, read with the `test_decoding` plugin:
+
+| Replica identity | `UPDATE` and `DELETE` on the table | An `UPDATE` sends | A `DELETE` sends | A large column the `UPDATE` did not touch |
+| --- | --- | --- | --- | --- |
+| `DEFAULT`, no primary key | Refused for every session | Nothing | Nothing | Nothing |
+| `DEFAULT`, with a primary key | Allowed | The new row | The key | `unchanged-toast-datum` |
+| `FULL` | Allowed | The old row and the new row | The whole old row | The full value in the old row, `unchanged-toast-datum` in the new row |
+
+## Managed services
+
+Each of the four services was taken through the steps of this page on 23 November 2026, on its smallest instance of PostgreSQL 17.11. The publication, the grants on tables, the replica identity and the slot are the same SQL as above and gave the same results. The switch, the role and the plugin list differ:
+
+| Platform | Switch | Took effect after | What the capture role needs |
+| --- | --- | --- | --- |
+| Self-hosted | `wal_level = logical` | a restart | the `REPLICATION` attribute |
+| Amazon RDS for PostgreSQL | `rds.logical_replication = 1` in a custom DB parameter group | a reboot, 47 seconds | membership in `rds_replication` |
+| Amazon Aurora PostgreSQL | `rds.logical_replication = 1` in a custom DB cluster parameter group | a reboot of the writer instance, 47 seconds | membership in `rds_replication` |
+| Google Cloud SQL | flag `cloudsql.logical_decoding` set to `on` | a restart the service does itself, 38 seconds | the `REPLICATION` attribute |
+| Azure Database for PostgreSQL flexible server | server parameter `wal_level = logical` | a restart, 63 to 124 seconds | the `REPLICATION` attribute |
+
+On RDS and Aurora the master user has the permission from the start, through `rds_superuser`. On Cloud SQL and Azure the administrator account does not, and a logical slot it asked for failed with a permission error before the server ever looked at `wal_level`.
+
+### Amazon RDS for PostgreSQL
+
+AWS documents one parameter: "Set the rds.logical_replication static parameter to 1", followed by "Reboot the DB instance for the static rds.logical_replication parameter to take effect" ([Performing logical replication for Amazon RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html), checked Nov 2026). The run went that way. The parameter group refused `ApplyMethod=immediate` for it, and after a reboot of 47 seconds `SHOW wal_level` returned `logical`.
+
+You do not set `wal_level` yourself. The parameter group of family `postgres17` has no parameter of that name, and `ALTER SYSTEM SET wal_level = logical` answered `ERROR:  ALTER SYSTEM command is not supported`.
+
+The AWS Knowledge Center says: "If you set rds.logical_replication to 1, then Amazon RDS sets the wal_level, max_wal_senders, max_replication_slots, and max_connections parameters" ([Knowledge Center](https://repost.aws/knowledge-center/diskfull-error-rds-postgresql), checked Nov 2026). In the run only `wal_level` changed. `max_replication_slots` was 20, `max_wal_senders` 35 and `max_connections` 79 before and after.
+
+Before the switch, the error depends on automated backups and on how the tool connects:
+
+| State of the instance | Request | Answer |
+| --- | --- | --- |
+| Automated backups on | a logical slot | `ERROR:  logical decoding requires "wal_level" >= "logical"` |
+| Automated backups on | a replication connection | `FATAL:  no pg_hba.conf entry for host "<client-ip>", user "rbadmin", database "appdb", SSL encryption` |
+| Automated backups off | a logical slot | `ERROR:  replication slots can only be used if "max_replication_slots" > 0` |
+| Automated backups off | a replication connection | `FATAL:  number of requested standby connections exceeds "max_wal_senders" (currently 0)` |
+
+With automated backups off, an instance without the switch runs with `wal_level = minimal` and no slots at all. Backups are not needed for logical replication itself: an 18.6 instance created with a backup retention of 0 and `rds.logical_replication = 1` had `wal_level = logical` and 20 slots.
+
+On RDS the permission comes from a role. The same AWS page names "The rds_replication role to grant permissions to manage logical slots and to stream data using logical slots". A role without it got:
+
+```text
+ERROR:  permission denied to use replication slots
+DETAIL:  Only roles with the REPLICATION attribute or privileges of the "rds_replication" role may use replication slots.
+```
+
+The self-hosted fix is refused there. `ALTER ROLE cdc_user REPLICATION`, run by the master user, answered `ERROR:  permission denied to alter role`. `GRANT rds_replication TO cdc_user;` worked, and the role then created, read and dropped a slot while its `rolreplication` stayed `f`.
+
+The AWS page also carries the warning that applies to every platform: "If you set up a logical replication slot and don't read from the slot, data can be written and quickly fill up your DB instance's storage."
+
+The step-by-step version with console screenshots is on this site: [How to set up PostgreSQL CDC on AWS RDS](/blog/how-to-set-up-postgresql-cdc-on-aws-rds/) and the [RDS set-up guide](/docs/connectors/postgres/setup/rds/).
+
+### Amazon Aurora PostgreSQL
+
+The parameter has the same name and lives in the cluster parameter group: "Your Aurora PostgreSQL DB cluster must be configured to use a custom DB cluster parameter group" ([Setting up logical replication for your Aurora PostgreSQL DB cluster](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.Configure.html), checked Nov 2026). The change needs the writer: "Reboot the writer instance of your Aurora PostgreSQL DB cluster so that your changes takes effect." In the run that reboot took 47 seconds.
+
+AWS gives two checks for afterwards, and both answered as documented: `SHOW rds.logical_replication;` returned `on` and `SHOW wal_level;` returned `logical`.
+
+The same AWS page says that "Setting up logical replication requires rds_superuser privileges". That is about the account that sets it up. The role that reads the changes needed `rds_replication` and nothing more: with that grant, and never a member of `rds_superuser`, it created, read and dropped a slot.
+
+Without the grant Aurora answered in its own words:
+
+```text
+ERROR:  must be superuser, replication role, or rds_replication role to use logical replication slots
+```
+
+Three more answers differed from RDS:
+
+- `ALTER SYSTEM` gave `ERROR:  must be superuser to execute ALTER SYSTEM command`.
+- A new cluster had 20 WAL senders where the RDS instance had 35.
+- A backup retention of 0 was refused with `Retention period must be between 1 and 35.`
+
+On the plugin, the overview page says: "By default, Aurora PostgreSQL DB clusters use the native PostgreSQL pgoutput plugin when sending data" ([Overview of PostgreSQL logical replication with Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.html), checked Nov 2026). The same page rules out one source, and that statement was not run: logical decoding from read replicas, which PostgreSQL 16 added, "isn't supported on Aurora PostgreSQL".
+
+See also the [Aurora set-up guide](/docs/connectors/postgres/setup/aurora/).
+
+### Google Cloud SQL for PostgreSQL
+
+Cloud SQL has its own flag: "In Cloud SQL, you enable this feature by setting the cloudsql.logical_decoding flag to on" ([Set up logical replication and decoding](https://docs.cloud.google.com/sql/docs/postgres/replication/configure-logical-replication), checked Nov 2026). Google adds that changing the flag "requires a restart of your instance". In the run `gcloud sql instances patch` did that restart by itself, and the instance was back after 38 seconds with `wal_level = logical`.
+
+The role is the standard attribute: "To use logical decoding features, you create a PostgreSQL user with the REPLICATION attribute". The built-in `postgres` user does not have it. With the flag on, a slot asked for by `postgres` still failed, in words that differ from those of a stock PostgreSQL 17:
+
+```text
+ERROR:  must be superuser or replication role to use replication slots
+FATAL:  insufficient privileges to start walsender
+```
+
+The first line answers a slot request and the second a replication connection. `ALTER USER cdc_user WITH REPLICATION;` run by `postgres` fixed it for a new role, and `postgres` could give the attribute to itself in the same way.
+
+The order of the two errors matters when you read a log. A role without the attribute got the permission error whether the flag was on or off. Only a role with the attribute got `logical decoding requires "wal_level" >= "logical"` while the flag was off.
+
+Google states the two limits per instance: `max_replication_slots` and `max_wal_senders` both default to 10, and their ceilings grow with the memory of the instance. The run filled both:
+
+```text
+ERROR:  all replication slots are in use
+HINT:  Free one or increase "max_replication_slots".
+FATAL:  number of requested standby connections exceeds "max_wal_senders" (currently 10)
+```
+
+On the smallest size there was no room to raise them. Setting the flag to 12 answered `For Instances in db-f1-micro with 1024MB RAM, max_replication_slots cannot exceed 10.` Dropping one slot let the next request through.
+
+See also the [Cloud SQL set-up guide](/docs/connectors/postgres/setup/gcp/).
+
+### Azure Database for PostgreSQL flexible server
+
+Azure exposes the PostgreSQL setting itself. Microsoft lists the prerequisites as "Set the parameter wal_level to logical", "Save the changes and restart the server to apply the changes" and "Grant the admin user replication permissions" with `ALTER ROLE <adminname> WITH REPLICATION;` ([Logical replication and logical decoding](https://learn.microsoft.com/en-us/azure/postgresql/configure-maintain/concepts-logical), checked Nov 2026).
+
+In the run the parameter was accepted in 14 seconds and marked as pending a restart. The first restart took 124 seconds and two later ones 63 and 64 seconds.
+
+The third prerequisite is easy to miss. Before it was done, the admin user got `ERROR:  permission denied to use replication slots` on a server that still had `wal_level = replica`, so the permission is checked first. The admin user could give the attribute to itself and to a separate capture role, and that role needed no membership in `azure_pg_admin`.
+
+Two limits showed in the same run. A new server allowed 10 slots and 10 WAL senders. And [`max_slot_wal_keep_size`](/docs/runbooks/postgres/replication-slot-filling-disk/#prevent-it) is read-only there, so that cap on a slot is not available.
+
+Two behaviours on Microsoft's page are specific to Azure and were not run. An unused slot can be removed for you: when storage runs low and the slot is not in use, the service "automatically drops that unused logical replication slot". And with high availability on PostgreSQL 16 and earlier, "logical replication slots aren't preserved during failover events".
+
+See also the [Azure set-up guide](/docs/connectors/postgres/setup/azure/).
+
+### Output plugins on the four services
+
+Each service sets `output_plugin_libraries` itself, so [Issue 5](#issue-5-the-output-plugin-is-not-installed-or-allowed) looks different there. On all four, slots for `pgoutput`, `test_decoding` and `wal2json` were created with nothing to install or allow.
+
+| Service, PostgreSQL 17.11 | `SHOW output_plugin_libraries` | A slot for `decoderbufs` |
+| --- | --- | --- |
+| Amazon RDS and Aurora | `pgoutput, test_decoding, wal2json, decoder_raw, pglogical, pglogical_output, pgactive` | `ERROR:  library "decoderbufs" may not be used as an output plugin` |
+| Google Cloud SQL | `pgoutput, test_decoding, pglogical_output, wal2json, decoderbufs, pg_squeeze` | created |
+| Azure flexible server | `pgoutput, test_decoding, pglogical, pglogical_output, wal2json, pg_squeeze` | `ERROR:  library "decoderbufs" may not be used as an output plugin` |
+
+Cloud SQL and Azure gave no way to change the list. Cloud SQL answered `The requested flag is either misspelled or unsupported by Cloud SQL.`, and Azure has no server parameter of that name. Debezium's default `plugin.name` is `decoderbufs`, which RDS, Aurora and Azure refused, so set `plugin.name=pgoutput` there.
+
+## Prevent it
+
+- Create the publication before the slot. A slot that is older than its publication failed on every read on PostgreSQL 12.22 to 17.12.
+- On PostgreSQL 18 and later, search the server log for `skipped loading publication` after any change to a publication name. The consumer does not report it.
+- Make `output_plugin_libraries` part of any minor upgrade to 14.24, 15.19, 16.15, 17.11, 18.6 or later, and add every third-party output plugin you use. The manual's query for finding them is `SELECT DISTINCT plugin FROM pg_replication_slots WHERE plugin IS NOT NULL;` ([Replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html)).
+- Give a table its primary key before it joins a publication, not after the first failed `UPDATE`.
+- Give each consumer its own slot, and drop the slot when the consumer is retired.
+
+:::note[How OLake Go handles this]
+
+OLake Go needs the same six prerequisites and checks four of them for you. Its connection test, `check` on the command line, reports `wal_level`, the replication privilege, the slot and the publication as passed or failed, and it expects the slot and the publication to exist already ([PostgreSQL connector](/docs/connectors/postgres/#configuration)). It reads through `pgoutput` and does not support `wal2json`.
+
+It has the same limits as any reader of the slot. With the default replica identity a delete arrives with the primary key only, and a large column that an update did not touch arrives as `__olake_unavailable_value__` ([troubleshooting](/docs/connectors/postgres/#troubleshooting)).
+
+For the second, the docs give two ways out: `REPLICA IDENTITY FULL` on the table, or the [Preserve TOAST Values](/docs/connectors/postgres/#toast-columns-preserve) option, which reads the previous value from the Iceberg destination. That option can only be set when the source is created.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- PostgreSQL manual: [logical replication configuration](https://www.postgresql.org/docs/current/logical-replication-config.html), [replica identity](https://www.postgresql.org/docs/current/logical-replication-publication.html), [CREATE PUBLICATION](https://www.postgresql.org/docs/current/sql-createpublication.html), [pg_hba.conf](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html), [replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html), [WAL settings](https://www.postgresql.org/docs/current/runtime-config-wal.html)
+- PostgreSQL release notes: [10](https://www.postgresql.org/docs/release/10.0/), for publications and the `pg_hba.conf` rule; [13](https://www.postgresql.org/docs/release/13.0/), for `publish_via_partition_root`; [15](https://www.postgresql.org/docs/release/15.0/), for `FOR TABLES IN SCHEMA`; [18.6](https://www.postgresql.org/docs/release/18.6/), for `output_plugin_libraries`; [19](https://www.postgresql.org/docs/19/release-19.html), for `effective_wal_level`
+- Plugins: [wal2json](https://github.com/eulerto/wal2json), [postgres-decoderbufs](https://github.com/debezium/postgres-decoderbufs)
+- Vendors: [Amazon RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html), [Amazon Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.Configure.html), [Google Cloud SQL](https://docs.cloud.google.com/sql/docs/postgres/replication/configure-logical-replication), [Azure](https://learn.microsoft.com/en-us/azure/postgresql/configure-maintain/concepts-logical)

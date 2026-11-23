@@ -1,0 +1,64 @@
+# A role without the REPLICATION attribute
+# 2026-11-23 10:25:59 UTC, instance rbtest-pg, POSTGRES_17 POSTGRES_17_11 db-f1-micro ENTERPRISE asia-south1
+
+NOTICE:  role "cdc_user" does not exist, skipping
+CREATE USER cdc_user WITH PASSWORD '...';   -- run as postgres, password not shown
+SELECT rolname, rolsuper, rolreplication FROM pg_roles WHERE rolname IN ('cdc_user', 'postgres') ORDER BY 1;
+ rolname  | rolsuper | rolreplication 
+----------+----------+----------------
+ cdc_user | f        | f
+ postgres | f        | f
+(2 rows)
+
+
+# as cdc_user
+SELECT * FROM pg_create_logical_replication_slot('e3_slot', 'pgoutput');
+ERROR:  must be superuser or replication role to use replication slots
+SELECT * FROM orders;
+ERROR:  permission denied for table orders
+psql "dbname=appdb user=cdc_user replication=database" -c "IDENTIFY_SYSTEM;"
+psql: error: connection to server at "<instance-ip>", port 5432 failed: FATAL:  insufficient privileges to start walsender
+
+# as postgres: the statement Google documents
+ALTER USER cdc_user WITH REPLICATION;
+SELECT rolname, rolsuper, rolreplication FROM pg_roles WHERE rolname = 'cdc_user';
+ rolname  | rolsuper | rolreplication 
+----------+----------+----------------
+ cdc_user | f        | t
+(1 row)
+
+GRANT USAGE ON SCHEMA public TO cdc_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+
+# as cdc_user again
+SELECT * FROM pg_create_logical_replication_slot('e3_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ e3_slot   | 0/5102F00
+(1 row)
+
+SELECT * FROM orders;
+ id | customer | quantity 
+----+----------+----------
+  1 | a        |        1
+  2 | b        |        2
+(2 rows)
+
+SELECT slot_name, plugin, slot_type, database, active FROM pg_replication_slots;
+ slot_name |  plugin  | slot_type | database | active 
+-----------+----------+-----------+----------+--------
+ e3_slot   | pgoutput | logical   | appdb    | f
+(1 row)
+
+SELECT pg_drop_replication_slot('e3_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+psql "dbname=appdb user=cdc_user replication=database" -c "IDENTIFY_SYSTEM;"
+      systemid       | timeline |  xlogpos  | dbname 
+---------------------+----------+-----------+--------
+ 7711308707035168785 |        1 | 0/5102FA8 | appdb
+(1 row)
+

@@ -1,0 +1,67 @@
+# Service test: a Flink CDC job on MySQL whose binary log position was purged.
+# One MySQL server and a Flink session cluster (one JobManager, one TaskManager). The MySQL CDC
+# connector jar and the MySQL JDBC driver are mounted into Flink's lib directory. Only the Flink REST port is published.
+#
+#   MYSQL_IMAGE=mysql:8.0.46 ./run.sh all     another MySQL version (default 8.4.13)
+name: rbt-flk-mysql
+
+x-flink: &flink
+  image: flink:2.2.1-scala_2.12-java17
+  volumes:
+    - ./lib/flink-sql-connector-mysql-cdc-3.7.0-2.2.jar:/opt/flink/lib/flink-sql-connector-mysql-cdc-3.7.0-2.2.jar:ro
+    # The connector jar does not carry the MySQL JDBC driver (its licence does not allow it), so the
+    # driver is a second jar. See `./run.sh fetch`.
+    - ./lib/mysql-connector-java-8.0.28.jar:/opt/flink/lib/mysql-connector-java-8.0.28.jar:ro
+    - ./sql:/sql:ro
+    - state:/state
+  environment: &flinkenv
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      jobmanager.memory.process.size: 1024m
+      taskmanager.memory.process.size: 1536m
+      taskmanager.numberOfTaskSlots: 4
+      parallelism.default: 1
+      execution.checkpointing.dir: file:///state/checkpoints
+      execution.checkpointing.savepoint-dir: file:///state/savepoints
+
+services:
+  source:
+    image: ${MYSQL_IMAGE:-mysql:8.4.13}
+    hostname: source
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --gtid-mode=${GTID:-OFF}
+      - --enforce-gtid-consistency=${GTID:-OFF}
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -uroot -prootpw -e 'SELECT 1 FROM inventory.customers LIMIT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  jobmanager:
+    <<: *flink
+    command: jobmanager
+    ports:
+      - "18381:8081"
+    mem_limit: 1280m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8081/overview > /dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  taskmanager:
+    <<: *flink
+    command: taskmanager
+    depends_on:
+      - jobmanager
+    mem_limit: 1792m
+
+volumes:
+  state:

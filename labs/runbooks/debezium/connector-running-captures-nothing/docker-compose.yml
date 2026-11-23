@@ -1,0 +1,86 @@
+# Lab: a Debezium connector that is RUNNING and writes no change events.
+# The broker runs with topic auto-creation off, which is what most managed clusters do.
+# Nothing is published on the host except the Kafka Connect REST port.
+name: dbz-running-captures-nothing
+
+services:
+  kafka:
+    image: apache/kafka:4.3.1
+    mem_limit: 704m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "${AUTO_CREATE_TOPICS:-false}"
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx320m
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx96m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.4}
+    mem_limit: 608m
+    command:
+      - --server-id=223344
+      - --log-bin=mysql-bin
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --innodb-buffer-pool-size=64M
+      - --max-connections=40
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -uroot -prootpw -e 'SELECT 1 FROM inventory.orders LIMIT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16}
+    mem_limit: 224m
+    command: ["postgres", "-c", "wal_level=logical", "-c", "shared_buffers=32MB"]
+    environment:
+      POSTGRES_PASSWORD: postgrespw
+      POSTGRES_DB: inventory
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U postgres -d inventory -c 'SELECT 1 FROM public.orders LIMIT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  connect:
+    image: ${DEBEZIUM_IMAGE:-quay.io/debezium/connect:3.7.1.Final}
+    mem_limit: 1408m
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${CONNECT_PORT:-18083}:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: lab-connect
+      CONFIG_STORAGE_TOPIC: lab_connect_configs
+      OFFSET_STORAGE_TOPIC: lab_connect_offsets
+      STATUS_STORAGE_TOPIC: lab_connect_statuses
+      OFFSET_FLUSH_INTERVAL_MS: 10000
+      HEAP_OPTS: -Xms256M -Xmx640M
+      # Worker setting. true is the Kafka Connect default; the topics-worker-off step turns it off.
+      CONNECT_TOPIC_CREATION_ENABLE: "${TOPIC_CREATION_ENABLE:-true}"

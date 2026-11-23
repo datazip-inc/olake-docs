@@ -1,0 +1,47 @@
+# ./run.sh catch-up    PostgreSQL 19rc2    2026-11-16T18:48:45Z
+
+## Start the consumer. It reads the backlog and confirms what it has received.
+current WAL position: 0/182D4BF8
+$ pg_recvlogical -d appdb --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null -v  &
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |        332 | 0/0C177A30  | 0/182D65C8          | 193 MB       | extended   |               | 
+(1 row)
+
+SELECT s.slot_name, r.pid, r.application_name, r.state, r.sent_lsn, r.flush_lsn, r.reply_time
+FROM pg_replication_slots s LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid ORDER BY s.slot_name;
+ slot_name | pid | application_name |   state   |  sent_lsn  | flush_lsn  |          reply_time           
+-----------+-----+------------------+-----------+------------+------------+-------------------------------
+ cdc_slot  | 332 | pg_recvlogical   | streaming | 0/182D65C8 | 0/182D65C8 | 2026-11-16 18:48:55.430283+00
+(1 row)
+
+
+## The backlog is confirmed. restart_lsn and pg_wal follow over the next checkpoints, while writes go on at 1 MB per round.
+after checkpoint 1: restart_lsn 0/0C177A30, retained by the slot 195 MB, pg_wal 256 MB in 16 files
+after checkpoint 2: restart_lsn 0/184DC598, retained by the slot 2444 kB, pg_wal 64 MB in 4 files
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |        332 | 0/184DC598  | 0/184DC650          | 2444 kB      | reserved   |               | 
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         4 | 64 MB
+(1 row)
+
+--- consumer output
+pg_recvlogical: starting log streaming at 0/00000000 (slot cdc_slot)
+pg_recvlogical: streaming initiated
+pg_recvlogical: confirming write up to 0/00000000, flush to 0/00000000 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/182D65C8, flush to 0/182D65C8 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/184DC650, flush to 0/184DC650 (slot cdc_slot)
+---

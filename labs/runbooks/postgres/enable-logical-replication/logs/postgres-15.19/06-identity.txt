@@ -1,0 +1,138 @@
+# ./run.sh identity    PostgreSQL 15.19    2026-11-16T17:50:43Z
+
+## A table without a primary key joins the publication. Nothing complains.
+ALTER PUBLICATION cdc_pub ADD TABLE events_nopk;
+ALTER PUBLICATION
+SELECT c.relname, CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity,
+       EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS has_primary_key
+FROM pg_class c WHERE c.relname IN ('orders', 'events_nopk', 'documents') ORDER BY c.relname;
+   relname   | replica_identity | has_primary_key 
+-------------+------------------+-----------------
+ documents   | default          | t
+ events_nopk | default          | f
+ orders      | default          | t
+(3 rows)
+
+
+## Inserts work. Updates and deletes on that table now fail for every session.
+INSERT INTO events_nopk VALUES (3, 19.0, 'third');
+INSERT 0 1
+UPDATE events_nopk SET reading = 22.0 WHERE device_id = 1;
+ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates
+HINT:  To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.
+DELETE FROM events_nopk WHERE device_id = 2;
+ERROR:  cannot delete from table "events_nopk" because it does not have a replica identity and publishes deletes
+HINT:  To enable deleting from the table, set REPLICA IDENTITY using ALTER TABLE.
+
+## Fix 1: REPLICA IDENTITY FULL
+ALTER TABLE events_nopk REPLICA IDENTITY FULL;
+ALTER TABLE
+UPDATE events_nopk SET reading = 22.0 WHERE device_id = 1;
+UPDATE 1
+DELETE FROM events_nopk WHERE device_id = 2;
+DELETE 1
+
+## Fix 2: a primary key, with the default identity
+ALTER TABLE events_nopk REPLICA IDENTITY DEFAULT;
+ALTER TABLE
+UPDATE events_nopk SET reading = 23.0 WHERE device_id = 1;
+ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates
+HINT:  To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.
+ALTER TABLE events_nopk ADD PRIMARY KEY (device_id);
+ALTER TABLE
+UPDATE events_nopk SET reading = 23.0 WHERE device_id = 1;
+UPDATE 1
+
+## Fix 3: a unique index on NOT NULL columns, named as the replica identity
+ALTER TABLE events_nopk DROP CONSTRAINT events_nopk_pkey;
+ALTER TABLE
+UPDATE events_nopk SET reading = 24.0 WHERE device_id = 1;
+ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates
+HINT:  To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.
+CREATE UNIQUE INDEX events_nopk_device ON events_nopk (device_id);
+CREATE INDEX
+ALTER TABLE events_nopk REPLICA IDENTITY USING INDEX events_nopk_device;
+ALTER TABLE
+UPDATE events_nopk SET reading = 24.0 WHERE device_id = 1;
+UPDATE 1
+
+## What a consumer receives. The test_decoding plugin is used here because its output is text.
+SELECT * FROM pg_create_logical_replication_slot('peek_slot', 'test_decoding');
+ slot_name |    lsn    
+-----------+-----------
+ peek_slot | 0/19B29C8
+(1 row)
+
+UPDATE orders SET status = 'paid' WHERE id = 1;
+UPDATE 1
+DELETE FROM orders WHERE id = 2;
+DELETE 1
+SELECT data FROM pg_logical_slot_get_changes('peek_slot', NULL, NULL);
+                                                                           data                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ BEGIN 777
+ table public.orders: UPDATE: id[bigint]:1 customer_id[integer]:1 status[text]:'paid' updated_at[timestamp with time zone]:'2026-11-16 17:49:55.745483+00'
+ COMMIT 777
+ BEGIN 778
+ table public.orders: DELETE: id[bigint]:2
+ COMMIT 778
+(6 rows)
+
+ALTER TABLE orders REPLICA IDENTITY FULL;
+ALTER TABLE
+UPDATE orders SET status = 'shipped' WHERE id = 1;
+UPDATE 1
+DELETE FROM orders WHERE id = 3;
+DELETE 1
+SELECT data FROM pg_logical_slot_get_changes('peek_slot', NULL, NULL);
+                                                                                                                                                     data                                                                                                                                                      
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ BEGIN 779
+ COMMIT 779
+ BEGIN 780
+ table public.orders: UPDATE: old-key: id[bigint]:1 customer_id[integer]:1 status[text]:'paid' updated_at[timestamp with time zone]:'2026-11-16 17:49:55.745483+00' new-tuple: id[bigint]:1 customer_id[integer]:1 status[text]:'shipped' updated_at[timestamp with time zone]:'2026-11-16 17:49:55.745483+00'
+ COMMIT 780
+ BEGIN 781
+ table public.orders: DELETE: id[bigint]:3 customer_id[integer]:3 status[text]:'new' updated_at[timestamp with time zone]:'2026-11-16 17:49:55.745483+00'
+ COMMIT 781
+(8 rows)
+
+
+## A large value that an UPDATE does not touch is left out of the change.
+SELECT id, title, length(body) AS body_chars, pg_column_size(body) AS stored_bytes FROM documents;
+ id |    title    | body_chars | stored_bytes 
+----+-------------+------------+--------------
+  1 | first title |      32000 |        32000
+(1 row)
+
+UPDATE documents SET title = 'second title' WHERE id = 1;
+UPDATE 1
+SELECT left(data, 150) AS data FROM pg_logical_slot_get_changes('peek_slot', NULL, NULL);
+                                                   data                                                   
+----------------------------------------------------------------------------------------------------------
+ BEGIN 782
+ table public.documents: UPDATE: id[bigint]:1 title[text]:'second title' body[text]:unchanged-toast-datum
+ COMMIT 782
+(3 rows)
+
+ALTER TABLE documents REPLICA IDENTITY FULL;
+ALTER TABLE
+UPDATE documents SET title = 'third title' WHERE id = 1;
+UPDATE 1
+SELECT CASE WHEN length(data) > 240 THEN left(data, 110) || ' ... ' || right(data, 100) ELSE data END AS data, length(data) AS chars
+FROM pg_logical_slot_get_changes('peek_slot', NULL, NULL);
+                                                                                                          data                                                                                                           | chars 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------
+ BEGIN 783                                                                                                                                                                                                               |     9
+ COMMIT 783                                                                                                                                                                                                              |    10
+ BEGIN 784                                                                                                                                                                                                               |     9
+ table public.documents: UPDATE: old-key: id[bigint]:1 title[text]:'second title' body[text]:'c4ca4238a0b923820 ... 9998dc4dd82eb3c5' new-tuple: id[bigint]:1 title[text]:'third title' body[text]:unchanged-toast-datum | 32177
+ COMMIT 784                                                                                                                                                                                                              |    10
+(5 rows)
+
+SELECT pg_drop_replication_slot('peek_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
