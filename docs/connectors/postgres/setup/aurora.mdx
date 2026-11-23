@@ -1,7 +1,7 @@
 ---
-title: "OLake PostgreSQL Aurora Setup | CDC with wal2json Plugin"
+title: "OLake PostgreSQL Aurora Setup | CDC with pgoutput Plugin"
 seo_title: "AWS Aurora PostgreSQL CDC Setup for OLake"
-description: Configure OLake CDC on AWS Aurora PostgreSQL using wal2json plugin. Enable logical replication, create replication slots, and troubleshoot common issues.
+description: Configure OLake CDC on AWS Aurora PostgreSQL using pgoutput plugin. Enable logical replication, create replication slots, and troubleshoot common issues.
 sidebar_label: 1. AWS Aurora Postgres
 sidebar_position: 1
 ---
@@ -15,7 +15,6 @@ Aurora PostgreSQL supports CDC through PostgreSQL logical decoding. In an Aurora
 - An Amazon Aurora PostgreSQL cluster (PostgreSQL version 10+).
 - Access to modify the cluster's parameter group (to enable logical replication).
 - Ability to reboot the Aurora cluster (required for static parameter changes).
-- The cluster should have **Backups enabled** (Aurora usually has continuous backups by default). This is important because binlog retention in Aurora is tied to backup retention.
 - The RDS master user or another user with the `rds_superuser` and `rds_replication` roles.
 
 **Steps:**
@@ -28,7 +27,7 @@ In the AWS RDS console, create or edit the **cluster parameter group** for your 
 
 Configure these key parameters:
    - **`rds.logical_replication = 1`** - Enables logical replication (required for pgoutput)
-   - **`wal_level = logical`** - May be set automatically by the above parameter
+   - **`wal_level`** - Not a parameter of the group. Aurora sets it to `logical` when `rds.logical_replication` is `1`
    - **`max_wal_senders`** and **`max_replication_slots`** - Set to accommodate your CDC connections
    - **`wal_sender_timeout = 0`** - Prevents timeouts during long snapshots
    
@@ -241,9 +240,7 @@ Now that you have configured the database and created the CDC user, you can add 
 
 ## Troubleshooting
 
-- **Permission Errors:** If you see `ERROR: permission denied to create replication slot` or the connector logs an authentication error for replication, it means the user lacks replication privileges. Use the master user or ensure your user has the `rds_superuser` (or at least `rds_replication`) role. On Aurora, using the default `postgres` user is simplest, since it already has the needed privileges.
-
-- **Plugin Not Found:** If you get an error like `ERROR: could not access file "pgoutput": No such file or directory` when creating a slot, ensure PostgreSQL version is 10+ and `rds.logical_replication` is applied. Re-check the parameter group (step 1) and reboot.
+- **Permission Errors:** If you see `ERROR: must be superuser, replication role, or rds_replication role to use logical replication slots` (the wording of Aurora PostgreSQL 17) or the connector logs an authentication error for replication, it means the user lacks replication privileges. Use the master user or ensure your user has the `rds_superuser` (or at least `rds_replication`) role. On Aurora, using the default `postgres` user is simplest, since it already has the needed privileges.
 
 - **No Changes Captured:** If the slot exists and the connector is running but no changes are coming through:
   - Verify that `wal_level` is indeed **logical** on the Aurora instance (you can `SHOW wal_level;` to confirm).
@@ -254,7 +251,7 @@ Now that you have configured the database and created the CDC user, you can add 
 
 - **WAL Retention and Bloat:** Logical replication slots will retain WAL segments on the cluster until they are consumed. If a slot is not actively read, the WAL will pile up and can eventually fill storage. On Aurora, monitor the “Write-Ahead Log consumption” or free storage. If your connector falls far behind or is stopped, you may see disk usage grow or even an error in the database logs about WAL retention. To resolve, resume consumption or if the slot is no longer needed, drop it. **Always drop unused logical slots**
 
-- **Replica Identity Issues:** PostgreSQL requires a primary key (or other replica identity) on tables to capture UPDATE/DELETE properly. If a table has no primary key and you have not set `REPLICA IDENTITY FULL`, deleting or updating rows can cause logical decoding to skip or not output those changes. If you see messages about **“no replica identity”** or missing information for some changes, consider setting `REPLICA IDENTITY FULL` on those tables:
+- **Replica Identity Issues:** PostgreSQL requires a primary key (or other replica identity) on tables to capture UPDATE/DELETE properly. If a published table has no primary key and you have not set `REPLICA IDENTITY FULL`, the `UPDATE` or `DELETE` itself fails in the application with `ERROR: cannot update table "my_table" because it does not have a replica identity and publishes updates`. Inserts still work and are captured. If you see messages about **“no replica identity”** or missing information for some changes, consider setting `REPLICA IDENTITY FULL` on those tables:
   
   ```sql
   ALTER TABLE my_table REPLICA IDENTITY FULL;
