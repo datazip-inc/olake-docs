@@ -98,7 +98,7 @@ const config = {
     require.resolve('./src/clientModules/hashScroll.ts'),
     // Smooth (animated) scrolling for in-page links only; honours reduced motion
     require.resolve('./src/clientModules/smoothAnchors.ts'),
-    // Image fade-in, theme-toggle fade and navbar scroll shadow (all honour reduced motion)
+    // Image fade-in (honours reduced motion), theme-swap guard and navbar scroll shadow
     require.resolve('./src/clientModules/imageFade.ts'),
     require.resolve('./src/clientModules/uiFeel.ts'),
     require.resolve('./src/clientModules/deferredGtag.ts'),
