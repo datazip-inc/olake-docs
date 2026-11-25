@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { useHistory } from '@docusaurus/router'
+import AskOlake from '@site/src/components/AskOlake'
 
 /**
  * Lets the browser paint before a client-side page change starts.
@@ -60,5 +61,10 @@ function useYieldBeforeNavigation() {
 
 export default function Root({ children }: { children: React.ReactNode }) {
   useYieldBeforeNavigation()
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      <AskOlake />
+    </>
+  )
 }

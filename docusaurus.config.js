@@ -58,7 +58,11 @@ const config = {
   customFields: {
     latestOlakeVersion: latestOlakeRelease.version,
     latestOlakeReleaseLabel: latestOlakeRelease.label,
-    latestOlakeReleasePath: latestOlakeRelease.docPath
+    latestOlakeReleasePath: latestOlakeRelease.docPath,
+    // Integration ID of the "Chat SDK" integration in app.kapa.ai, which answers the Ask OLake
+    // assistant (src/components/AskOlake). It is public by design: it only works on the domains
+    // enabled for that integration. While it is empty the assistant is not rendered.
+    kapaIntegrationId: 'fdebd83c-c800-4a7d-8025-445f834c9bcb'
   },
 
   // Set the production url of your site here
