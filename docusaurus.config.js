@@ -58,7 +58,11 @@ const config = {
   customFields: {
     latestOlakeVersion: latestOlakeRelease.version,
     latestOlakeReleaseLabel: latestOlakeRelease.label,
-    latestOlakeReleasePath: latestOlakeRelease.docPath
+    latestOlakeReleasePath: latestOlakeRelease.docPath,
+    // Base URL of the Ask OLake backend (the Worker in /ask-olake), for example
+    // http://localhost:8787/api during development. While it is empty the assistant
+    // (src/components/AskOlake) is not rendered.
+    askOlakeApiUrl: process.env.ASK_OLAKE_API_URL || ''
   },
 
   // Set the production url of your site here
