@@ -412,7 +412,6 @@ const fusionDocSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
-        'fusion/release/maintenance/vX.Y.Z',
         'fusion/release/maintenance/v0.2.0',
         'fusion/release/maintenance/v0.1.0',
       ],
