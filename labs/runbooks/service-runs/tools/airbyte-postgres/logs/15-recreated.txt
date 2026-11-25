@@ -1,0 +1,136 @@
+
+## the cap is removed, the lost slot is dropped and created again, and one more row is written
+ALTER SYSTEM RESET max_slot_wal_keep_size;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+SELECT pg_drop_replication_slot('airbyte_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('airbyte_slot', 'pgoutput');
+  slot_name   |    lsn     
+--------------+------------
+ airbyte_slot | 0/14602BB8
+(1 row)
+
+INSERT INTO orders (customer_id, status) VALUES (7, 'new');
+INSERT 0 1
+SELECT slot_name, database, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots WHERE slot_name = 'airbyte_slot';
+  slot_name   | database | active | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+--------------+----------+--------+-------------+---------------------+--------------+------------+---------------+---------------------
+ airbyte_slot | appdb    | f      | 0/14602B80  | 0/14602BB8          | 1056 bytes   | reserved   |               | 
+(1 row)
+
+SELECT id, customer_id, status FROM orders ORDER BY id;
+ id | customer_id | status  
+----+-------------+---------
+  1 |           1 | paid
+  2 |           2 | shipped
+  3 |           3 | paid
+  5 |           5 | new
+  6 |           6 | new
+  7 |           7 | new
+(6 rows)
+
+
+## a sync with the state saved before the slot was lost
+state handed to the connector: [{"global": {"shared_state": {"state": {"[\"appdb\",{\"server\":\"appdb\"}]": "{\"lsn_proc\":170195056,\"messageType\":\"COMMIT\",\"lsn_commit\":170195056,\"lsn\":170195056,\"txId\":859,\"ts_usec\":1795426022070076}"}}, "stream_states": [{"stream_descriptor": {"name": "orders", "namespace": "public"}, "stream_state": {"cursors": {}, "state_type": "ctid_based", "stream_name": "", "stream_namespace": "", "version": 3}}]}, "sourceStats": {"recordCount": 0.0}, "type": "GLOBAL"}]
+started 2026-11-23 09:29:46 UTC
+$ docker run --rm --network rbt-abt-pg_default airbyte/source-postgres:3.8.12 read --config /work/config-app.json --catalog /work/catalog-app.json --state /work/state5.json
+exit code 1 after 2 s; messages by type: {"LOG": 43, "TEXT": 17, "TRACE": 2}
+records per stream: none
+--- connector log lines (warnings, errors, and lines about the saved position)
+INFO DefaultDispatcher-worker-2#global-round-1-create-partitions i.a.i.s.p.c.PostgresSourceDebeziumOperations(generateColdStartOffset-JhqZ4pE):179 Initial Debezium state constructed: {["appdb",{"server":"appdb"}]={"transaction_id":null,"lsn":341847968,"lsn_proc":341847968,"lsn_commit":341847968,"txId":961,"ts_usec":1795426188683650}}
+WARN DefaultDispatcher-worker-3#global i.a.c.r.RootReader$FeedExceptionHandler(handleException):152 canceled feed 'global' due to thrown exception io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14602BB8}, source LSN: LSN{0/A24F870}.
+ERROR main i.a.c.AirbyteConnectorRunnable(run):38 Failed class io.airbyte.cdk.read.ReadOperation operation execution. io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14602BB8}, source LSN: LSN{0/A24F870}.
+OUT io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14602BB8}, source LSN: LSN{0/A24F870}.
+OUT 	at io.airbyte.integrations.source.postgres.cdc.ReplicationSlotManager.validate(ReplicationSlotManager.kt:99)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.validate-rZbDqnk(PostgresSourceDebeziumOperations.kt:214)
+OUT 	at io.airbyte.integrations.source.postgres.cdc.PostgresSourceDebeziumOperations.startup-rZbDqnk(PostgresSourceDebeziumOperations.kt:147)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreatorDebeziumOperations.runStartup-rZbDqnk(CdcPartitionsCreatorDebeziumOperations.kt:24)
+OUT 	at io.airbyte.cdk.read.cdc.CdcPartitionsCreator.run(CdcPartitionsCreator.kt:110)
+OUT 	at io.airbyte.cdk.read.FeedReader.createPartitionsWithResources(FeedReader.kt:198)
+OUT 	at io.airbyte.cdk.read.FeedReader.access$createPartitionsWithResources(FeedReader.kt:36)
+OUT 	at io.airbyte.cdk.read.FeedReader$createPartitions$3.invokeSuspend(FeedReader.kt:132)
+OUT 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+OUT 	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+OUT 	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+OUT 	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+OUT 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+TRACE STREAM_STATUS orders STARTED
+TRACE ERROR failure_type=config_error
+  message: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14602BB8}, source LSN: LSN{0/A24F870}.
+  internal_message: io.airbyte.cdk.ConfigErrorException: Replication slot 'airbyte_slot' has advanced beyond the source's state LSN. Confirmed flush LSN: LSN{0/14602BB8}, source LSN: LSN{0/A24F870}.
+--- state messages: 0
+complete output: logs/raw/07-recreated.jsonl.gz
+ended 2026-11-23 09:29:49 UTC
+--- the slot while the sync ran
+09:29:46  active|pid|restart_lsn|confirmed_flush_lsn = f|-|0/14602B80|0/14602BB8
+---
+
+## the same sync without any state, as after a reset of the connection
+no state is handed to the connector
+started 2026-11-23 09:29:49 UTC
+$ docker run --rm --network rbt-abt-pg_default airbyte/source-postgres:3.8.12 read --config /work/config-app.json --catalog /work/catalog-app.json
+exit code 0 after 14 s; messages by type: {"LOG": 261, "RECORD": 6, "STATE": 2, "TRACE": 2}
+records per stream: {"orders": 6}
+  orders first: {"_ab_cdc_deleted_at": null, "_ab_cdc_lsn": 341848008.0, "_ab_cdc_updated_at": "2026-11-23T09:29:50.613000Z", "customer_id": 3, "id": 3, "status": "paid", "updated_at": "2026-11-23T09:19:26.286784Z"}
+  orders first: {"_ab_cdc_deleted_at": null, "_ab_cdc_lsn": 341848008.0, "_ab_cdc_updated_at": "2026-11-23T09:29:50.613000Z", "customer_id": 5, "id": 5, "status": "new", "updated_at": "2026-11-23T09:20:04.286383Z"}
+  orders first: {"_ab_cdc_deleted_at": null, "_ab_cdc_lsn": 341848008.0, "_ab_cdc_updated_at": "2026-11-23T09:29:50.613000Z", "customer_id": 1, "id": 1, "status": "paid", "updated_at": "2026-11-23T09:20:04.412214Z"}
+  orders last:  {"_ab_cdc_deleted_at": null, "_ab_cdc_lsn": 341848008.0, "_ab_cdc_updated_at": "2026-11-23T09:29:50.613000Z", "customer_id": 2, "id": 2, "status": "shipped", "updated_at": "2026-11-23T09:27:02.065762Z"}
+  orders last:  {"_ab_cdc_deleted_at": null, "_ab_cdc_lsn": 341848008.0, "_ab_cdc_updated_at": "2026-11-23T09:29:50.613000Z", "customer_id": 6, "id": 6, "status": "new", "updated_at": "2026-11-23T09:29:37.210957Z"}
+  orders last:  {"_ab_cdc_deleted_at": null, "_ab_cdc_lsn": 341848008.0, "_ab_cdc_updated_at": "2026-11-23T09:29:50.613000Z", "customer_id": 7, "id": 7, "status": "new", "updated_at": "2026-11-23T09:29:46.470639Z"}
+--- connector log lines (warnings, errors, and lines about the saved position)
+INFO DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.i.s.p.c.PostgresSourceDebeziumOperations(generateColdStartOffset-JhqZ4pE):179 Initial Debezium state constructed: {["appdb",{"server":"appdb"}]={"transaction_id":null,"lsn":341848008,"lsn_proc":341848008,"lsn_commit":341848008,"txId":962,"ts_usec":1795426191330126}}
+INFO DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.i.s.p.c.ReplicationSlotManager(validate):104 Replication slot 'airbyte_slot' is valid. Confirmed flush LSN: LSN{0/14602BB8}, source state LSN: LSN{0/14602FC8}.
+INFO DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.i.s.p.c.ReplicationSlotManager(advanceLsn):37 ReplicationSlotInfo(name=airbyte_slot, xmin=null, catalogXmin=960, restartLsn=LSN{0/14602B80}, confirmedFlushLsn=LSN{0/14602BB8}, walStatus=reserved, invalidationReason=null)
+WARN DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.i.s.p.c.ReplicationSlotManager(advanceLsn):60 Unable to parse server version: '18.7 (Debian 18.7-1.pgdg13+2)' java.lang.NumberFormatException: For input string: "18.7 (Debian 18.7"
+INFO DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.i.s.p.c.ReplicationSlotManager(advanceLsn):68 Attempting to commit up to LSN{0/14602FC8} (341848008) to replication slot airbyte_slot
+INFO DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.i.s.p.c.ReplicationSlotManager(advanceLsn):81 Successfully committed LSN{0/14602FC8} (341848008) to replication slot airbyte_slot
+INFO DefaultDispatcher-worker-4#global-round-1-create-partitions i.a.c.r.c.CdcPartitionsCreator(run):128 Current offset is synthetic.
+INFO DefaultDispatcher-worker-2#global-round-1-partition-1-read i.a.c.r.c.CdcPartitionReader(run):178 Running Debezium engine version 3.4.3.Final.
+INFO DefaultDispatcher-worker-1 i.a.c.r.c.CdcPartitionReader(startWatchdog):289 Starting watchdog with timeout of 120 seconds
+WARN debezium-engine i.d.c.p.PostgresConnectorConfig(logLsnFlushModeInfo):1690 Using LSN flush mode 'manual': LSN will NOT be flushed to the database and WAL logs will NOT be cleared automatically. User is responsible for external LSN management.
+INFO debezium-engine i.d.c.p.PostgresConnectorConfig(logOffsetSlotMismatchStrategyInfo):1742 Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.
+WARN pool-2-thread-1 i.d.c.p.PostgresConnectorConfig(logLsnFlushModeInfo):1690 Using LSN flush mode 'manual': LSN will NOT be flushed to the database and WAL logs will NOT be cleared automatically. User is responsible for external LSN management.
+INFO pool-2-thread-1 i.d.c.p.PostgresConnectorConfig(logOffsetSlotMismatchStrategyInfo):1742 Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.
+INFO pool-2-thread-1 i.a.c.r.c.CdcPartitionReader$EventConsumer(accept):325 Received first event from Debezium, stopping watchdog
+INFO pool-2-thread-1 i.a.c.r.c.CdcPartitionReader$EventConsumer(findCloseReason):461 Heartbeat progressing to position: PostgresSourceCdcPosition(lsnCommit=LSN{0/14602FC8}, lsn=LSN{0/14602FC8})
+INFO pool-2-thread-1 i.a.c.r.c.CdcPartitionReader$EventConsumer(accept):343 Shutting down Debezium engine: heartbeat or tombstone indicates that WAL consumption has reached the target position.
+INFO DefaultDispatcher-worker-2#global-round-1-partition-1-read i.a.c.r.c.CdcPartitionReader(run):245 Debezium Engine has shut down and relinquished control, summary: {debezium-version=3.4.3.Final, records-emitted=0, records-discarded=0, heartbeats=1, tombstones=0, events=1, events-without-source-record=0, source-records-without-position=0, event-values-without-position=0, close-reason=HEARTBEAT_OR_TOMBSTONE_REACHED_TARGET_POSITION}.
+INFO DefaultDispatcher-worker-2#global-round-2-create-partitions i.a.c.r.c.CdcPartitionsCreator(run):133 Current position 'PostgresSourceCdcPosition(lsnCommit=LSN{0/14602FC8}, lsn=LSN{0/14602FC8})' equals or exceeds target position 'PostgresSourceCdcPosition(lsnCommit=LSN{0/14602FC8}, lsn=LSN{0/14602FC8})'.
+WARN DefaultDispatcher-worker-1#public.orders-round-1-create-partitions i.a.i.s.p.PostgresSourceJdbcConcurrentPartitionsCreator(run):156 No split boundaries found, using single partition
+TRACE STREAM_STATUS orders STARTED
+TRACE STREAM_STATUS orders COMPLETE
+--- state messages: 2
+last state: {"global": {"shared_state": {"state": {"[\"appdb\",{\"server\":\"appdb\"}]": "{\"lsn_proc\":341848008,\"lsn_commit\":341848008,\"lsn\":341848008,\"txId\":962,\"ts_usec\":1795426191330126}"}}, "stream_states": [{"stream_descriptor": {"name": "orders", "namespace": "public"}, "stream_state": {"cursors": {}, "state_type": "ctid_based", "stream_name": "", "stream_namespace": "", "version": 3}}]}, "sourceStats": {"recordCount": 6.0}, "type": "GLOBAL"}
+saved to work/state7.json
+complete output: logs/raw/07-recreated-nostate.jsonl.gz
+ended 2026-11-23 09:30:03 UTC
+--- the slot while the sync ran
+09:29:49  active|pid|restart_lsn|confirmed_flush_lsn = f|-|0/14602B80|0/14602BB8
+09:29:52  active|pid|restart_lsn|confirmed_flush_lsn = t|12635|0/14602B80|0/14602FC8
+09:30:02  active|pid|restart_lsn|confirmed_flush_lsn = f|-|0/14602B80|0/14602FC8
+---
+SELECT slot_name, database, active, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots WHERE slot_name = 'airbyte_slot';
+  slot_name   | database | active | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+--------------+----------+--------+-------------+---------------------+--------------+------------+---------------+---------------------
+ airbyte_slot | appdb    | f      | 0/14602B80  | 0/14602FC8          | 1192 bytes   | reserved   |               | 
+(1 row)
+

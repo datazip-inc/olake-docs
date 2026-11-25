@@ -3,7 +3,7 @@ import { GITHUB_REPO_URL } from '@site/src/components/landing/chrome/navItems'
 /** Hero copy and calls to action of the OLake Go page. */
 export const GO_HERO = {
   eyebrow: 'OLake Go',
-  headline: 'Fastest Replication into Apache Iceberg & S3',
+  headline: 'Open-Source Replication into Apache Iceberg & S3',
   body: 'OLake Go helps you ingest data from 8 different sources into Apache Iceberg and S3',
   primary: { label: 'Github', href: GITHUB_REPO_URL },
   secondary: { label: 'Visit Docs', href: '/docs' }

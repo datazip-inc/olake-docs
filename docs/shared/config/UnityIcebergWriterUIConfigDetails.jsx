@@ -14,7 +14,7 @@ const FIELDS = [
     authTypes: AUTH_ALL,
     parameter: 'REST Catalog URL',
     required: true,
-    sample: 'https://1234567890123456.1.gcp.databricks.com/',
+    sample: 'https://1234567890123456.1.gcp.databricks.com/api/2.1/unity-catalog/iceberg-rest',
     description:
       'Databricks workspace URL with Unity Catalog REST API endpoint. Use your actual workspace URL.',
   },
@@ -179,7 +179,7 @@ export default function UnityIcebergWriterUIConfigDetails({ authType }) {
       </table>
 
       <Admonition type="note" title="Catalog Name Supported for v0.3.5 and above">
-        For the catalog name, OLake Go only supports lowercase letters and underscores. Spaces
+        For the catalog name, OLake Go only supports lowercase letters, numbers (<strong>v0.12.1 and above</strong>) and underscores. Spaces
         and special characters are not supported.
       </Admonition>
     </>

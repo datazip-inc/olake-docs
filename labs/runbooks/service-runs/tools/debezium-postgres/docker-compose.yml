@@ -1,0 +1,69 @@
+# Runs for the page "PostgreSQL replication slot is filling the disk": what a Debezium PostgreSQL
+# connector does to its replication slot when it runs, is paused, is stopped, is deleted, freezes,
+# loses Kafka, or captures a database that nobody writes to.
+# Only the Kafka Connect REST port is published.
+#
+#   PG_VERSION=14.25 ./run.sh up                                   another PostgreSQL version (default 18.7)
+#   DEBEZIUM_IMAGE=quay.io/debezium/connect:3.0.8.Final ./run.sh up   another Debezium version
+name: rbt-dbz-pg
+
+services:
+  # Everything is at its default except wal_level here and, in init.sql, max_wal_size = 64MB and
+  # min_wal_size = 32MB.
+  pg:
+    image: postgres:${PG_VERSION:-18.7}
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_PASSWORD: labpw
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d quietdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  kafka:
+    image: apache/kafka:4.3.1
+    mem_limit: 704m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx320m
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx96m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  connect:
+    image: ${DEBEZIUM_IMAGE:-quay.io/debezium/connect:3.7.1.Final}
+    mem_limit: 1408m
+    depends_on:
+      kafka:
+        condition: service_healthy
+      pg:
+        condition: service_healthy
+    ports:
+      - "${CONNECT_PORT:-18301}:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: rbt-connect
+      CONFIG_STORAGE_TOPIC: rbt_connect_configs
+      OFFSET_STORAGE_TOPIC: rbt_connect_offsets
+      STATUS_STORAGE_TOPIC: rbt_connect_statuses
+      # How often Kafka Connect commits source offsets. Debezium confirms a position to PostgreSQL
+      # only when an offset commit happens. 60000 is the default of Kafka Connect and of this image.
+      OFFSET_FLUSH_INTERVAL_MS: "${OFFSET_FLUSH_MS:-60000}"
+      HEAP_OPTS: -Xms256M -Xmx640M

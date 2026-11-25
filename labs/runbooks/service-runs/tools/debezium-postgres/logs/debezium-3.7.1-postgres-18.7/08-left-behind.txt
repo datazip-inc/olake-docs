@@ -1,0 +1,365 @@
+
+## default settings, with a publication that Debezium creates itself
+  plugin.name=pgoutput, publication.autocreate.mode=filtered, database.dbname=appdb, topic.prefix=app, slot.name=dbz_owned, publication.name=dbz_owned_pub, table.include.list=public.notes
+$ PUT /connectors/owned/config  ->  HTTP 201
+08:52:48  owned: connector=RUNNING tasks=[RUNNING]
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_owned | pgoutput | appdb    | t
+(1 row)
+
+SELECT pubname, puballtables FROM pg_publication ORDER BY pubname;
+    pubname    | puballtables 
+---------------+--------------
+ cdc_pub       | f
+ dbz_owned_pub | f
+(2 rows)
+
+
+after PUT /connectors/owned/stop:
+$ PUT /connectors/owned/stop  ->  HTTP 204
+08:52:54  owned: connector=STOPPED tasks=[]
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_owned | pgoutput | appdb    | f
+(1 row)
+
+SELECT pubname, puballtables FROM pg_publication ORDER BY pubname;
+    pubname    | puballtables 
+---------------+--------------
+ cdc_pub       | f
+ dbz_owned_pub | f
+(2 rows)
+
+
+after DELETE /connectors/owned:
+$ DELETE /connectors/owned  ->  HTTP 204
+08:53:06  owned: no such connector
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_owned | pgoutput | appdb    | f
+(1 row)
+
+SELECT pubname, puballtables FROM pg_publication ORDER BY pubname;
+    pubname    | puballtables 
+---------------+--------------
+ cdc_pub       | f
+ dbz_owned_pub | f
+(2 rows)
+
+
+created again, then the worker is shut down (docker compose stop connect):
+$ PUT /connectors/owned/config  ->  HTTP 201
+08:53:07  owned: connector=RUNNING tasks=[RUNNING]
+ Container rbt-dbz-pg-connect-1  Stopping
+ Container rbt-dbz-pg-connect-1  Stopped
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_owned | pgoutput | appdb    | f
+(1 row)
+
+SELECT pubname, puballtables FROM pg_publication ORDER BY pubname;
+    pubname    | puballtables 
+---------------+--------------
+ cdc_pub       | f
+ dbz_owned_pub | f
+(2 rows)
+
+ Container rbt-dbz-pg-pg-1  Waiting
+ Container rbt-dbz-pg-kafka-1  Waiting
+ Container rbt-dbz-pg-kafka-1  Healthy
+ Container rbt-dbz-pg-pg-1  Healthy
+ Container rbt-dbz-pg-connect-1  Starting
+ Container rbt-dbz-pg-connect-1  Started
+08:53:26  owned: connector=RUNNING tasks=[RUNNING]
+
+retiring the connector for good: stop it, reset its offsets, delete it, then drop what it left on the server:
+$ PUT /connectors/owned/stop  ->  HTTP 204
+08:53:27  owned: connector=STOPPED tasks=[]
+$ DELETE /connectors/owned/offsets  ->  HTTP 200
+$ DELETE /connectors/owned  ->  HTTP 204
+SELECT pg_drop_replication_slot('dbz_owned');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+DROP PUBLICATION dbz_owned_pub;
+DROP PUBLICATION
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+SELECT pubname, puballtables FROM pg_publication ORDER BY pubname;
+ pubname | puballtables 
+---------+--------------
+ cdc_pub | f
+(1 row)
+
+
+## the slot is dropped by hand while the connector is stopped, then the connector is resumed
+$ PUT /connectors/app/config  ->  HTTP 201
+08:53:37  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:53:38  active t, confirmed_flush_lsn 0/3EC2C40, restart_lsn 0/3EC2C08, retained 10162 kB, sender streaming (flush_lsn , reply 08:53:36), pg_wal 32 MB
+08:53:43  active t, confirmed_flush_lsn 0/3EC2C40, restart_lsn 0/3EC2C08, retained 10162 kB, sender streaming (flush_lsn , reply 08:53:36), pg_wal 32 MB
+08:53:49  active t, confirmed_flush_lsn 0/46B1918, restart_lsn 0/3EC2C08, retained 10162 kB, sender streaming (flush_lsn 0/46B1918, reply 08:53:47), pg_wal 32 MB
+08:53:49  the slot has confirmed the backlog
+$ PUT /connectors/app/stop  ->  HTTP 204
+08:53:50  app: connector=STOPPED tasks=[]
+SELECT pg_drop_replication_slot('dbz_app');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+INSERT INTO notes (body) VALUES ('written while the slot was gone');
+INSERT 0 1
+$ PUT /connectors/app/resume  ->  HTTP 202
+08:53:53  app: connector=RUNNING tasks=[FAILED]
+08:54:03  app: connector=RUNNING tasks=[FAILED]
+  io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [sourceInfoSchema=Schema{io.debezium.co [...] lastEventKeySent=null, maximumKey=null]], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+--- Kafka Connect log
+2026-11-23T08:53:52,858 INFO   ||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:53:52,862 INFO   Postgres||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:53:52,900 WARN   Postgres||lifecycle  Last recorded offset is no longer available on the server.   [io.debezium.connector.common.BaseSourceTask]
+io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [sourceInfoSchema=Schema{io.debezium.connector.postgresql.Source:STRUCT}, sourceInfo=source_info[server='app'db='appdb', lsn=LSN{0/48AB878}, txId=816, messageType=INSERT, lastCommitLsn=LSN{0/46B1918}, timestamp=2026-11-23T08:53:38.167216Z, snapshot=FALSE, schema=, table=], lastSnapshotRecord=false, lastCompl
+---
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+
+## slot.drop.on.stop=true, then: pause
+$ PUT /connectors/app/config  ->  HTTP 201
+08:54:13  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:54:14  active t, confirmed_flush_lsn 0/4AAE608, restart_lsn 0/4AAE5D0, retained 10146 kB, sender streaming (flush_lsn , reply 08:54:12), pg_wal 32 MB
+08:54:19  active t, confirmed_flush_lsn 0/4AAE608, restart_lsn 0/4AAE5D0, retained 10146 kB, sender streaming (flush_lsn , reply 08:54:12), pg_wal 32 MB
+08:54:24  active t, confirmed_flush_lsn 0/529D030, restart_lsn 0/4AAE5D0, retained 10146 kB, sender streaming (flush_lsn 0/529D030, reply 08:54:23), pg_wal 32 MB
+08:54:25  the slot has confirmed the backlog
+08:54:26  topic app.public.notes holds 5 events
+$ PUT /connectors/app/pause  ->  HTTP 202
+08:54:27  app: connector=PAUSED tasks=[PAUSED]
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_app   | pgoutput | appdb    | t
+(1 row)
+
+three rows are written to notes now:
+INSERT INTO notes (body) VALUES ('written after pause 1'), ('written after pause 2'), ('written after pause 3');
+INSERT 0 3
+$ PUT /connectors/app/resume  ->  HTTP 202
+08:54:35  app: connector=RUNNING tasks=[RUNNING]
+08:54:53  app: connector=RUNNING tasks=[RUNNING]
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_app   | pgoutput | appdb    | t
+(1 row)
+
+08:54:55  topic app.public.notes holds 8 events
+rows in notes: 8
+--- Kafka Connect log
+---
+
+## slot.drop.on.stop=true, then: stop
+$ PUT /connectors/app/config  ->  HTTP 201
+08:55:03  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:55:04  active t, confirmed_flush_lsn 0/5698EA8, restart_lsn 0/5698E70, retained 10171 kB, sender streaming (flush_lsn , reply 08:55:02), pg_wal 32 MB
+08:55:09  active t, confirmed_flush_lsn 0/5698EA8, restart_lsn 0/5698E70, retained 10171 kB, sender streaming (flush_lsn , reply 08:55:02), pg_wal 32 MB
+08:55:14  active t, confirmed_flush_lsn 0/5E8D9F8, restart_lsn 0/5698E70, retained 10171 kB, sender streaming (flush_lsn 0/5E8D9F8, reply 08:55:12), pg_wal 32 MB
+08:55:14  the slot has confirmed the backlog
+08:55:16  topic app.public.notes holds 5 events
+$ PUT /connectors/app/stop  ->  HTTP 204
+08:55:17  app: connector=STOPPED tasks=[]
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+three rows are written to notes now:
+INSERT INTO notes (body) VALUES ('written after stop 1'), ('written after stop 2'), ('written after stop 3');
+INSERT 0 3
+$ PUT /connectors/app/resume  ->  HTTP 202
+08:55:26  app: connector=RUNNING tasks=[FAILED]
+08:55:44  app: connector=RUNNING tasks=[FAILED]
+  io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [sourceInfoSchema=Schema{io.debezium.co [...] lastEventKeySent=null, maximumKey=null]], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+08:55:46  topic app.public.notes holds 5 events
+rows in notes: 8
+--- Kafka Connect log
+2026-11-23T08:55:25,836 INFO   ||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+   slot.drop.on.stop = true
+2026-11-23T08:55:25,838 INFO   Postgres||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:55:25,872 WARN   Postgres||lifecycle  Last recorded offset is no longer available on the server.   [io.debezium.connector.common.BaseSourceTask]
+---
+
+## slot.drop.on.stop=true, then: delete
+$ PUT /connectors/app/config  ->  HTTP 201
+08:55:54  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:55:55  active t, confirmed_flush_lsn 0/6287BF8, restart_lsn 0/6287BC0, retained 10152 kB, sender streaming (flush_lsn , reply 08:55:53), pg_wal 32 MB
+08:56:00  active t, confirmed_flush_lsn 0/6287BF8, restart_lsn 0/6287BC0, retained 10152 kB, sender streaming (flush_lsn , reply 08:55:53), pg_wal 32 MB
+08:56:05  active t, confirmed_flush_lsn 0/6A77BB8, restart_lsn 0/6287BC0, retained 10152 kB, sender streaming (flush_lsn 0/6A77BB8, reply 08:56:03), pg_wal 32 MB
+08:56:06  the slot has confirmed the backlog
+08:56:07  topic app.public.notes holds 5 events
+$ DELETE /connectors/app  ->  HTTP 204
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+three rows are written to notes now:
+INSERT INTO notes (body) VALUES ('written after delete 1'), ('written after delete 2'), ('written after delete 3');
+INSERT 0 3
+$ PUT /connectors/app/config  ->  HTTP 201
+08:56:17  app: connector=RUNNING tasks=[FAILED]
+08:56:35  app: connector=RUNNING tasks=[FAILED]
+  io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [sourceInfoSchema=Schema{io.debezium.co [...] lastEventKeySent=null, maximumKey=null]], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+08:56:36  topic app.public.notes holds 5 events
+rows in notes: 8
+--- Kafka Connect log
+2026-11-23T08:56:16,056 INFO   ||  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:56:16,167 INFO   ||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+   slot.drop.on.stop = true
+2026-11-23T08:56:16,169 INFO   Postgres||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:56:16,210 WARN   Postgres||lifecycle  Last recorded offset is no longer available on the server.   [io.debezium.connector.common.BaseSourceTask]
+---
+
+## slot.drop.on.stop=true, then: restart
+$ PUT /connectors/app/config  ->  HTTP 201
+08:56:45  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:56:45  active t, confirmed_flush_lsn 0/6E72AE0, restart_lsn 0/6E72AA8, retained 10177 kB, sender streaming (flush_lsn , reply 08:56:44), pg_wal 32 MB
+08:56:50  active t, confirmed_flush_lsn 0/6E72AE0, restart_lsn 0/6E72AA8, retained 10177 kB, sender streaming (flush_lsn , reply 08:56:44), pg_wal 32 MB
+08:56:56  active t, confirmed_flush_lsn 0/7668E30, restart_lsn 0/6E72AA8, retained 10177 kB, sender streaming (flush_lsn 0/7668E30, reply 08:56:54), pg_wal 32 MB
+08:56:56  the slot has confirmed the backlog
+08:56:57  topic app.public.notes holds 5 events
+$ POST /connectors/app/restart?includeTasks=true  ->  HTTP 202
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+three rows are written to notes now:
+INSERT INTO notes (body) VALUES ('written after restart 1'), ('written after restart 2'), ('written after restart 3');
+INSERT 0 3
+08:57:06  app: connector=RUNNING tasks=[FAILED]
+08:57:24  app: connector=RUNNING tasks=[FAILED]
+  io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [sourceInfoSchema=Schema{io.debezium.co [...] lastEventKeySent=null, maximumKey=null]], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+08:57:26  topic app.public.notes holds 5 events
+rows in notes: 8
+--- Kafka Connect log
+2026-11-23T08:56:58,622 INFO   ||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+   slot.drop.on.stop = true
+2026-11-23T08:56:58,623 INFO   Postgres||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:56:58,660 WARN   Postgres||lifecycle  Last recorded offset is no longer available on the server.   [io.debezium.connector.common.BaseSourceTask]
+---
+
+## slot.drop.on.stop=true, then: worker-shutdown
+$ PUT /connectors/app/config  ->  HTTP 201
+08:57:34  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:57:35  active t, confirmed_flush_lsn 0/7A64000, restart_lsn 0/7A63FC8, retained 10161 kB, sender streaming (flush_lsn , reply 08:57:33), pg_wal 32 MB
+08:57:40  active t, confirmed_flush_lsn 0/7A64000, restart_lsn 0/7A63FC8, retained 10176 kB, sender streaming (flush_lsn , reply 08:57:33), pg_wal 32 MB
+08:57:45  active t, confirmed_flush_lsn 0/82524F8, restart_lsn 0/7A63FC8, retained 10176 kB, sender streaming (flush_lsn 0/82524F8, reply 08:57:43), pg_wal 32 MB
+08:57:45  the slot has confirmed the backlog
+08:57:46  topic app.public.notes holds 5 events
+ Container rbt-dbz-pg-connect-1  Stopping
+ Container rbt-dbz-pg-connect-1  Stopped
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+three rows are written to notes now:
+INSERT INTO notes (body) VALUES ('written after worker-shutdown 1'), ('written after worker-shutdown 2'), ('written after worker-shutdown 3');
+INSERT 0 3
+ Container rbt-dbz-pg-kafka-1  Waiting
+ Container rbt-dbz-pg-pg-1  Waiting
+ Container rbt-dbz-pg-pg-1  Healthy
+ Container rbt-dbz-pg-kafka-1  Healthy
+ Container rbt-dbz-pg-connect-1  Starting
+ Container rbt-dbz-pg-connect-1  Started
+08:58:09  app: connector=RUNNING tasks=[FAILED]
+08:58:27  app: connector=RUNNING tasks=[FAILED]
+  io.debezium.DebeziumException: The connector is trying to read change stream starting at PostgresOffsetContext [sourceInfoSchema=Schema{io.debezium.co [...] lastEventKeySent=null, maximumKey=null]], but this is no longer available on the server. Reconfigure the connector to use a snapshot mode when needed.
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | plugin | database | active 
+-----------+--------+----------+--------
+(0 rows)
+
+08:58:28  topic app.public.notes holds 5 events
+rows in notes: 8
+--- Kafka Connect log
+2026-11-23T08:58:08,435 INFO   ||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+   slot.drop.on.stop = true
+2026-11-23T08:58:08,439 INFO   Postgres||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:58:08,550 WARN   Postgres||lifecycle  Last recorded offset is no longer available on the server.   [io.debezium.connector.common.BaseSourceTask]
+---
+
+## slot.drop.on.stop=true, then: worker-killed
+$ PUT /connectors/app/config  ->  HTTP 201
+08:58:38  app: connector=RUNNING tasks=[RUNNING]
+$ CALL write_wal(8);   -- in appdb
+08:58:38  active t, confirmed_flush_lsn 0/8653998, restart_lsn 0/8653960, retained 10149 kB, sender streaming (flush_lsn , reply 08:58:37), pg_wal 32 MB
+08:58:43  active t, confirmed_flush_lsn 0/8653998, restart_lsn 0/8653960, retained 10149 kB, sender streaming (flush_lsn , reply 08:58:37), pg_wal 32 MB
+08:58:49  active t, confirmed_flush_lsn 0/8E42E40, restart_lsn 0/8653960, retained 10149 kB, sender streaming (flush_lsn 0/8E42E40, reply 08:58:47), pg_wal 32 MB
+08:58:49  the slot has confirmed the backlog
+08:58:50  topic app.public.notes holds 5 events
+$ docker kill <connect container>
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_app   | pgoutput | appdb    | f
+(1 row)
+
+three rows are written to notes now:
+INSERT INTO notes (body) VALUES ('written after worker-killed 1'), ('written after worker-killed 2'), ('written after worker-killed 3');
+INSERT 0 3
+ Container rbt-dbz-pg-kafka-1  Waiting
+ Container rbt-dbz-pg-pg-1  Waiting
+ Container rbt-dbz-pg-pg-1  Healthy
+ Container rbt-dbz-pg-kafka-1  Healthy
+ Container rbt-dbz-pg-connect-1  Starting
+ Container rbt-dbz-pg-connect-1  Started
+08:59:11  app: connector=RUNNING tasks=[RUNNING]
+08:59:29  app: connector=RUNNING tasks=[RUNNING]
+SELECT slot_name, plugin, database, active FROM pg_replication_slots ORDER BY slot_name;
+ slot_name |  plugin  | database | active 
+-----------+----------+----------+--------
+ dbz_app   | pgoutput | appdb    | t
+(1 row)
+
+08:59:31  topic app.public.notes holds 8 events
+rows in notes: 8
+--- Kafka Connect log
+2026-11-23T08:59:11,481 INFO   ||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+   slot.drop.on.stop = true
+2026-11-23T08:59:11,484 INFO   Postgres||lifecycle  Using offset mismatch strategy 'no_validation': Connector will not validate slot position and will attempt to stream from the stored offset. Slot recreation is not detected.   [io.debezium.connector.postgresql.PostgresConnectorConfig]
+2026-11-23T08:59:11,626 WARN   Postgres||postgres-connector-task  Connector has enabled automated replication slot removal upon restart (slot.drop.on.stop = true). This setting is not recommended for production environments, as a new replication slot will be created after a connector restart, resulting in missed data change events.   [io.debezium.connector.postgresql.PostgresConnectorTask]
+---
+exit 0

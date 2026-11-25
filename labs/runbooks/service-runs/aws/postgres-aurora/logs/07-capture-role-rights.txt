@@ -1,0 +1,54 @@
+# Checks of docs/connectors/postgres/setup/aurora.mdx against Aurora PostgreSQL 17.11, 2026-11-23 10:02:12 UTC
+
+# 1. The guide (step 3) grants rds_superuser to the CDC user and says Aurora requires superuser-level privileges.
+#    Here cdc_user has rds_replication, USAGE on the schema and SELECT on the tables, and nothing else.
+CREATE PUBLICATION olake_publication FOR TABLE public.orders;
+SELECT r.rolname AS cdc_user_is_member_of FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles u ON u.oid = m.member WHERE u.rolname = 'cdc_user';
+ cdc_user_is_member_of 
+-----------------------
+ rds_replication
+(1 row)
+
+# as cdc_user: create the slot, read the table, read the slot, drop the slot
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');
+ pg_create_logical_replication_slot 
+------------------------------------
+ (olake_slot,0/45335C0)
+(1 row)
+
+SELECT count(*) FROM public.orders;
+ count 
+-------
+     2
+(1 row)
+
+INSERT INTO public.orders VALUES (99, 'x', 1);
+ERROR:  permission denied for table orders
+INSERT INTO public.orders VALUES (3, 'c', 3);
+SELECT lsn, xid, chr(get_byte(data, 0)) AS message FROM pg_logical_slot_peek_binary_changes('olake_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'olake_publication');
+    lsn    |  xid  | message 
+-----------+-------+---------
+ 0/45335C0 | 17933 | B
+ 0/45335C0 | 17933 | R
+ 0/45335C0 | 17933 | I
+ 0/4533638 | 17933 | C
+(4 rows)
+
+SELECT pg_drop_replication_slot('olake_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+# 2. the grant the guide gives does work, and it gives far more than CDC needs
+GRANT rds_superuser TO cdc_user;
+DROP TABLE public.events_nopk;
+CREATE ROLE made_by_cdc_user LOGIN;
+DROP ROLE made_by_cdc_user;
+REVOKE rds_superuser FROM cdc_user;
+DROP PUBLICATION olake_publication;
+# 3. the guide's troubleshooting texts against what the server says
+#    guide: ERROR: permission denied to create replication slot            server: see 04-role.txt of this run
+#    guide: backups matter 'because binlog retention in Aurora is tied to backup retention' (binlog is a MySQL term)
+#    backup retention of this cluster: 1 day; lowest value Aurora accepts:
+aws: [ERROR]: An error occurred (InvalidParameterValue) when calling the ModifyDBCluster operation: Invalid backup retention period: 0. Retention period must be between 1 and 35.

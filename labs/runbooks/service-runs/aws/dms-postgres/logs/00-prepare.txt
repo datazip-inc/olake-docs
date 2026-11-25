@@ -1,0 +1,40 @@
+$ aws rds modify-db-parameter-group --db-parameter-group-name rbtest-pg17 --parameters ParameterName=max_wal_size,ParameterValue=256,ApplyMethod=immediate   # 256 MB, so that 1 GB of writes shows what a slot holds
+rbtest-pg17
+# Source databases on rbtest-pg, as in the lab: appdb is written to, quietdb is not
+DROP TABLE IF EXISTS orders, events_nopk;
+CREATE DATABASE quietdb;
+CREATE TABLE orders (id bigserial PRIMARY KEY, customer_id int NOT NULL, status text NOT NULL, note text, updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE notes (id bigserial PRIMARY KEY, body text);
+INSERT INTO orders (customer_id, status) SELECT g, 'new' FROM generate_series(1, 4) g;
+-- The WAL volume is written to a table that no task captures, so the tools have nothing to apply.
+CREATE TABLE filler (id bigserial PRIMARY KEY, customer_id int NOT NULL, status text NOT NULL, note text) WITH (autovacuum_enabled = off);
+CREATE PROCEDURE write_wal(target_mb int) LANGUAGE plpgsql AS $$
+DECLARE
+  start_lsn pg_lsn := pg_current_wal_lsn();
+BEGIN
+  WHILE pg_wal_lsn_diff(pg_current_wal_lsn(), start_lsn) < target_mb::numeric * 1024 * 1024 LOOP
+    INSERT INTO filler (customer_id, status, note)
+    SELECT g % 1000, 'new', repeat(md5(g::text), 8) FROM generate_series(1, 5000) g;
+    COMMIT;
+    IF (SELECT count(*) FROM filler) >= 50000 THEN
+      TRUNCATE filler;
+      COMMIT;
+    END IF;
+  END LOOP;
+END $$;
+CREATE TABLE heartbeat (id int PRIMARY KEY, ts timestamptz NOT NULL);
+INSERT INTO heartbeat VALUES (1, now());
+# Target database on the Aurora cluster rbtest-apg
+CREATE DATABASE dmstarget;
+# settings on the source
+SELECT name, setting, unit FROM pg_settings WHERE name IN ('max_wal_size','wal_sender_timeout','checkpoint_timeout','wal_level','max_slot_wal_keep_size','wal_segment_size') ORDER BY 1;
+          name          | setting  | unit 
+------------------------+----------+------
+ checkpoint_timeout     | 300      | s
+ max_slot_wal_keep_size | -1       | MB
+ max_wal_size           | 256      | MB
+ wal_level              | logical  | 
+ wal_segment_size       | 67108864 | B
+ wal_sender_timeout     | 30000    | ms
+(6 rows)
+

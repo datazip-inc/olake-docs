@@ -1,0 +1,126 @@
+
+## before the change: one more row
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (6, 1);
+
+08:43:54  topic mssql.cdclab.dbo.orders holds 6 records
+
+## a column is added, a row is written with it, and an old row gets a value in it
+ALTER TABLE dbo.orders ADD note NVARCHAR(100) NULL;
+
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (7, 1, N'written before the second capture instance');
+
+UPDATE dbo.orders SET note = N'updated before the second capture instance' WHERE id = 1;
+
+SELECT OBJECT_NAME(object_id) AS change_table, STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY column_id) AS columns FROM sys.columns WHERE object_id IN (SELECT object_id FROM cdc.change_tables) AND name NOT LIKE N'\_\_$%' ESCAPE N'\' GROUP BY object_id ORDER BY 1;
+change_table|columns
+------------|-------
+dbo_orders_CT|id, customer_id, quantity, placed_at
+
+SELECT OBJECT_NAME(source_object_id) AS source_table, ddl_command, sys.fn_varbintohexstr(ddl_lsn) AS ddl_lsn FROM cdc.ddl_history;
+source_table|ddl_command|ddl_lsn
+------------|-----------|-------
+orders|ALTER TABLE dbo.orders ADD note NVARCHAR(100) NULL|0x0000002b00000d000001
+
+SELECT sys.fn_varbintohexstr(__$start_lsn) AS start_lsn, __$operation AS operation, id, quantity FROM cdc.dbo_orders_CT ORDER BY __$start_lsn, __$seqval, __$operation;
+start_lsn|operation|id|quantity
+---------|---------|--|--------
+0x0000002b000005700004|2|5|3
+0x0000002b00000b500004|2|1005|1
+0x0000002b00000d080004|2|1006|1
+
+08:44:18  topic mssql.cdclab.dbo.orders holds 7 records
+   1  op=r  id=1  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   2  op=r  id=2  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   3  op=r  id=3  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   4  op=r  id=4  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   5  op=c  id=5  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000570:0004
+   6  op=c  id=1005  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000b50:0004
+   7  op=c  id=1006  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000d08:0004
+08:44:29  orders: connector=RUNNING tasks=[RUNNING]
+--- Kafka Connect log (0 matching lines since the last mark)
+
+---
+
+## a second capture instance, then a new row
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'orders', @role_name = NULL, @supports_net_changes = 1, @capture_instance = N'dbo_orders_v2';
+Update mask evaluation will be disabled in net_changes_function because the CLR configuration option is disabled.
+
+SELECT capture_instance, sys.fn_varbintohexstr(start_lsn) AS start_lsn, create_date FROM cdc.change_tables ORDER BY create_date;
+capture_instance|start_lsn|create_date
+----------------|---------|-----------
+dbo_orders|0x0000002a00000bb80047|2026-11-23 08:40:33.030
+dbo_orders_v2|0x0000002b00000e480007|2026-11-23 08:44:30.710
+
+INSERT INTO dbo.orders (customer_id, quantity, note) VALUES (8, 2, N'written after the second capture instance');
+
+08:45:10  topic mssql.cdclab.dbo.orders holds 8 records
+   1  op=r  id=1  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   2  op=r  id=2  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   3  op=r  id=3  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   4  op=r  id=4  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   5  op=c  id=5  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000570:0004
+   6  op=c  id=1005  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000b50:0004
+   7  op=c  id=1006  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000d08:0004
+   8  op=c  id=1007  columns=id,customer_id,quantity,placed_at,note  note='written after the second capture instance'  commit_lsn=0000002c:000006a0:0004
+--- Kafka Connect log (3 matching lines since the last mark)
+2026-11-23T08:44:34,238 INFO   SQL_Server||streaming  Multiple capture instances present for the same table: Capture instance "dbo_orders" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_CT, startLsn=0000002a:00000bb8:0047, changeTableObjectId=1301579675, stopLsn=0000002b:00000e48:0007] and Capture instance "dbo_orders_v2" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_v2_CT, startLsn=0000002b:00000e48:0007, cha
+2026-11-23T08:44:34,324 INFO   SQL_Server||streaming  Schema will be changed for Capture instance "dbo_orders_v2" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_v2_CT, startLsn=0000002b:00000e48:0007, changeTableObjectId=1525580473, stopLsn=NULL]   [io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource]
+2026-11-23T08:44:34,357 INFO   SQL_Server||streaming  Migrating schema to Capture instance "dbo_orders_v2" [sourceTableId=cdclab.dbo.orders, changeTableId=cdclab.cdc.dbo_orders_v2_CT, startLsn=0000002b:00000e48:0007, changeTableObjectId=1525580473, stopLsn=NULL]   [io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource]
+---
+
+## the two rows whose note the connector never saw are changed again
+UPDATE dbo.orders SET quantity = quantity + 1 WHERE note LIKE N'%before the second capture instance';
+
+08:47:34  topic mssql.cdclab.dbo.orders holds 10 records
+   1  op=r  id=1  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   2  op=r  id=2  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   3  op=r  id=3  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   4  op=r  id=4  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=None
+   5  op=c  id=5  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000570:0004
+   6  op=c  id=1005  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000b50:0004
+   7  op=c  id=1006  columns=id,customer_id,quantity,placed_at  note=(no such field)  commit_lsn=0000002b:00000d08:0004
+   8  op=c  id=1007  columns=id,customer_id,quantity,placed_at,note  note='written after the second capture instance'  commit_lsn=0000002c:000006a0:0004
+   9  op=u  id=1  columns=id,customer_id,quantity,placed_at,note  note='updated before the second capture instance'  commit_lsn=0000002c:00000990:000b
+  10  op=u  id=1006  columns=id,customer_id,quantity,placed_at,note  note='written before the second capture instance'  commit_lsn=0000002c:00000990:000b
+
+## the source table against the events
+SELECT id, quantity, note FROM dbo.orders ORDER BY id;
+id|quantity|note
+--|--------|----
+1|2|updated before the second capture instance
+2|2|NULL
+3|2|NULL
+4|1|NULL
+5|3|NULL
+1005|1|NULL
+1006|2|written before the second capture instance
+1007|2|written after the second capture instance
+
+SELECT OBJECT_NAME(object_id) AS change_table, STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY column_id) AS columns FROM sys.columns WHERE object_id IN (SELECT object_id FROM cdc.change_tables) AND name NOT LIKE N'\_\_$%' ESCAPE N'\' GROUP BY object_id ORDER BY 1;
+change_table|columns
+------------|-------
+dbo_orders_CT|id, customer_id, quantity, placed_at
+dbo_orders_v2_CT|id, customer_id, quantity, placed_at, note
+
+SELECT sys.fn_varbintohexstr(__$start_lsn) AS start_lsn, __$operation AS operation, id, quantity FROM cdc.dbo_orders_CT ORDER BY __$start_lsn, __$seqval, __$operation;
+start_lsn|operation|id|quantity
+---------|---------|--|--------
+0x0000002b000005700004|2|5|3
+0x0000002b00000b500004|2|1005|1
+0x0000002b00000d080004|2|1006|1
+0x0000002c000006a00004|2|1007|2
+0x0000002c00000990000b|3|1|1
+0x0000002c00000990000b|4|1|2
+0x0000002c00000990000b|3|1006|1
+0x0000002c00000990000b|4|1006|2
+
+SELECT sys.fn_varbintohexstr(__$start_lsn) AS start_lsn, __$operation AS operation, id, quantity, note FROM cdc.dbo_orders_v2_CT ORDER BY __$start_lsn, __$seqval, __$operation;
+start_lsn|operation|id|quantity|note
+---------|---------|--|--------|----
+0x0000002c000006a00004|2|1007|2|written after the second capture instance
+0x0000002c00000990000b|3|1|1|updated before the second capture instance
+0x0000002c00000990000b|4|1|2|updated before the second capture instance
+0x0000002c00000990000b|3|1006|1|written before the second capture instance
+0x0000002c00000990000b|4|1006|2|written before the second capture instance
+
+08:48:10  orders: connector=RUNNING tasks=[RUNNING]

@@ -25,7 +25,7 @@ const faqPageSchema = (faqs: ProductFaqItem[]): JsonLdSchema => ({
 })
 
 export const GO_SEO = {
-  title: 'OLake Go — Fastest Open-Source Data Replication to Apache Iceberg & S3',
+  title: 'OLake Go — Open-Source Data Replication to Apache Iceberg & S3',
   description:
     'Open-source data replication tool that streams databases and streaming sources into Apache Iceberg and S3 with CDC, schema evolution and parallel chunking.',
   twitterDescription: 'Stream any source into your lakehouse with CDC, schema evolution and parallel chunking — up to 12.5× faster than Fivetran.',
@@ -56,7 +56,7 @@ export const GO_SEO = {
 // five JSON-LD objects from the legacy homepage (src/legacy/home-v1/index.jsx)
 // rather than shipping the site root with no structured data.
 export const HOME_SEO = {
-  title: 'Fastest Open Source Iceberg Ingestion & Maintenance Platform',
+  title: 'Open Source Iceberg Ingestion & Maintenance Platform',
   description:
     "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",
   canonicalUrl: `${SITE_URL}/`,
@@ -71,7 +71,7 @@ export const HOME_SEO = {
         url: `${SITE_URL}/`,
         logo: { '@type': 'ImageObject', url: 'https://olake.io/img/logo/olake-blue.svg', width: 32, height: 32 },
         contactPoint: [{ '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@olake.io' }],
-        sameAs: ['https://github.com/datazip-inc/olake', 'https://x.com/_olake', 'https://www.linkedin.com/company/datazipio/', 'https://www.youtube.com/@olakeio'],
+        sameAs: ['https://github.com/datazip-inc/olake-go', 'https://x.com/_olake', 'https://www.linkedin.com/company/datazipio/', 'https://www.youtube.com/@olakeio'],
         address: { '@type': 'PostalAddress', streetAddress: '16192 COASTAL HWY', addressLocality: 'LEWES', addressRegion: 'DE', postalCode: '19958', addressCountry: 'US' }
       }
     },
@@ -81,7 +81,7 @@ export const HOME_SEO = {
         '@context': 'https://schema.org',
         '@type': 'WebSite',
         url: `${SITE_URL}/`,
-        name: 'Fastest Open Source Iceberg Ingestion & Maintenance Platform',
+        name: 'Open Source Iceberg Ingestion & Maintenance Platform',
         description:
           'Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion\'s automated compaction and maintenance.',
         publisher: { '@type': 'Organization', name: 'OLake' },
@@ -94,7 +94,7 @@ export const HOME_SEO = {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
         url: `${SITE_URL}/`,
-        name: 'OLake - Fastest Open Source Iceberg Ingestion & Maintenance Platform',
+        name: 'OLake - Open Source Iceberg Ingestion & Maintenance Platform',
         isPartOf: { '@type': 'WebSite', name: 'OLake' },
         description:
           "Open-source platform to replicate databases into Apache Iceberg with OLake Go, and keep tables fast with OLake Fusion's automated compaction and maintenance.",

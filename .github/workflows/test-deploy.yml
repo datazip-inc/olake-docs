@@ -20,6 +20,8 @@ jobs:
     name: Test deployment
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,7 +34,41 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      # Every post cover needs its committed 1200x630 social card (static/img/og/), or og:image on the
+      # post 404s and shared links show no image. Fix with `npm run og-images` and commit the output.
+      - name: Check the Open Graph images
+        run: npm run og-images -- --check
       - name: Type check
         run: npm run typecheck
       - name: Test build website
         run: npm run build
+      # Fails on a redirect loop, a redirect to a missing page, or more than 2,000 rules
+      - name: Check the Cloudflare redirect rules
+        run: node scripts/cloudflare/prepare-build.mjs build
+
+      # A preview URL for the pull request. Off until the repository variable CLOUDFLARE_PREVIEWS
+      # is "true". Pull requests from forks and from Dependabot get no secrets, so they stop at
+      # the checks above.
+      - name: Deploy a preview to Cloudflare
+        id: preview
+        if: vars.CLOUDFLARE_PREVIEWS == 'true' && env.HAS_CLOUDFLARE_TOKEN == 'true'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.159.0'
+          command: preview --name pr-${{ github.event.pull_request.number }}
+      - name: Test the preview
+        if: steps.preview.outputs.preview-url != ''
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.preview-url }}
+        run: |
+          echo "Preview: $PREVIEW_URL" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/cloudflare/test-deploy.mjs build "$PREVIEW_URL" --json test-deploy.json > /dev/null \
+            || { node -e "const r=require('./test-deploy.json');console.log(r.allFailures.slice(0,50).join('\n'));"; exit 1; }
+
+      # Runbook pages (docs/runbooks) are listed only after a second person has re-run the page's lab
+      # and is named as its reviewer, and a redirect into the runbooks must not point at an unlisted
+      # page. Last, so the preview above still deploys for the reviewers.
+      - name: Check the runbook pages
+        run: node scripts/runbooks/check.mjs --report

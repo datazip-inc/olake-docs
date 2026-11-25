@@ -1,0 +1,34 @@
+import CodeBlock from '@theme/CodeBlock';
+
+There is nothing to switch on in S3. OLake Go lists the objects under a prefix, groups them into streams by their first folder, and remembers the newest `LastModified` time it has read. Four things decide whether that works for your bucket.
+
+| Requirement | Value | Why it matters |
+| --- | --- | --- |
+| Folder layout | `<prefix>/<stream>/.../file` | The first folder after the prefix is the stream name and becomes the table. Files sitting directly under the prefix belong to no stream. |
+| File format | CSV, JSON (lines or array), Parquet or XML, plain or gzip | One format per source. Mixed buckets need one source per format, or a file pattern that picks one. |
+| Read-only access | `s3:ListBucket` on the bucket, `s3:GetObject` on its objects | Listing finds the files and tracks their `LastModified` time; `GetObject` reads them. |
+| Files that are added, not rewritten | New file per batch | Incremental syncs read files newer than the saved cursor. A rewritten file gets a new `LastModified` time and is read again in full. |
+
+This is the layout the run on this page used, with one CSV file per day per stream:
+
+<CodeBlock language="text" title="Bucket layout">{`s3://${props.bucket ?? '<bucket>'}/${props.prefix ?? 'data/'}
+├── customers/
+│   └── 2026-10-29/customers.csv
+└── orders/
+    └── 2026-10-29/orders.csv`}</CodeBlock>
+
+On AWS, attach a policy with the two read actions to the user or role OLake Go runs as. On MinIO or another S3-compatible store, a user with read access to the bucket is enough, and the endpoint goes into the source form.
+
+<CodeBlock language="json" title="IAM policy for the OLake Go user or role">{`{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::${props.bucket ?? '<bucket>'}"] },
+    { "Effect": "Allow", "Action": ["s3:GetObject"], "Resource": ["arn:aws:s3:::${props.bucket ?? '<bucket>'}/*"] }
+  ]
+}`}</CodeBlock>
+
+Leave the access key fields empty on AWS to use the instance role, task role or environment credentials instead of static keys. Static keys are required for MinIO and LocalStack.
+
+:::warning[LastModified is the cursor]
+OLake Go reads a file when its `LastModified` time is newer than the cursor saved after the last sync. Uploading a corrected copy of an old file therefore re-reads the whole file and appends every row again. Add new files for new data; keep old files as they are.
+:::

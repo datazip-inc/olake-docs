@@ -1,0 +1,325 @@
+---
+title: "Iceberg compaction: when rewrite_data_files rewrites nothing"
+description: "Why CALL rewrite_data_files returns rewritten_data_files_count 0, what it leaves in storage and how it fails against a writer, measured on Iceberg 1.4 and 1.12."
+sidebar_label: Compaction rewrites nothing
+keywords:
+  - iceberg compaction
+  - rewrite_data_files
+  - rewritten_data_files_count 0
+  - iceberg small files
+  - min-input-files
+  - rewrite-all
+  - delete-file-threshold
+  - partial-progress.enabled
+  - Cannot commit, found new position delete for replaced data file
+  - rewrite_manifests
+  - write.distribution-mode
+  - write.spark.fanout.enabled
+runbook:
+  family: iceberg
+  author: shubham
+  reviewer: nayan
+  reproduced:
+    date: "2026-11-17"
+    versions:
+      - "Iceberg 1.12.0 on Spark 3.5.6 (Java 17)"
+      - "Iceberg 1.4.3 on Spark 3.3.3 (Java 11)"
+      - "Iceberg 1.1.0 on Spark 3.3.3, write settings only, with a local Hadoop catalog"
+      - "Iceberg REST catalog fixture 1.10.1 and MinIO RELEASE.2025-04-03T14-56-28Z"
+    lab: labs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing
+    summary: "Tables were written in many small commits and compacted against each threshold of rewrite_data_files, with file counts taken from the metadata tables and from the bucket. The same rows were written under three write settings, and compaction was run while a second writer appended and while it deleted, with and without partial progress."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+Iceberg compaction with `CALL <catalog>.system.rewrite_data_files(...)` can finish without an error and rewrite nothing. The procedure returns `rewritten_data_files_count` 0 and the small files are still in the table.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** The procedure splits the table into groups by partition and rewrites a group only when it crosses a threshold. With the defaults that usually means 5 or more small files in the same partition (`min-input-files`), so a table with many partitions of a few files each rewrites nothing.
+
+- **Few files per partition:** pass `options => map('min-input-files', '2')`.
+- **A one-off rewrite:** pass `map('rewrite-all', 'true')`.
+- **Files that carry deletes:** pass `delete-file-threshold`.
+- **After compaction:** run `rewrite_manifests` and `expire_snapshots`, because compaction leaves the old files in storage and the manifests as they are.
+
+<TLDR title='Key takeaways'>
+
+- On both **Iceberg 1.4.3** and **Iceberg 1.12.0**, four small files rewrote nothing and five were rewritten into one. Twenty-four files spread over six partitions also rewrote nothing.
+- Compaction replaced 30 files with 1 in the table, and the bucket went from 30 data files to 31. The current snapshot still referenced 31 manifests until `rewrite_manifests` made it 1.
+- A concurrent `DELETE` on the files being compacted failed the whole rewrite. With `partial-progress.enabled`, 7 of 8 partitions were compacted and the eighth was skipped, with `failed_data_files_count` still 0.
+
+</TLDR>
+
+## What you see
+
+On **Iceberg 1.12.0**, a table with four small files:
+
+```sql
+CALL demo.system.rewrite_data_files(table => 'db.four_files')
+```
+
+```text
+rewritten_data_files_count | added_data_files_count | rewritten_bytes_count | failed_data_files_count | removed_delete_files_count
+0 | 0 | 0 | 0 | 0
+```
+
+The Spark log, with `org.apache.iceberg.spark.actions` at INFO, says why in one line:
+
+```text
+INFO org.apache.iceberg.spark.actions.RewriteDataFilesSparkAction: Nothing found to rewrite in demo.db.four_files
+```
+
+After one more small commit, the same call returned `5 | 1 | 185881 | 0 | 0`, five files rewritten into one, and the log line read:
+
+`Rewrite Files Ready to be Committed - Rewriting 5 files (BIN-PACK, file group 1/1) in demo.db.four_files`.
+
+### The same call across versions
+
+| | Iceberg 1.4.3 on Spark 3.3.3 | Iceberg 1.12.0 on Spark 3.5.6 |
+| --- | --- | --- |
+| Output columns | `rewritten_data_files_count`, `added_data_files_count`, `rewritten_bytes_count` | The same three, then `failed_data_files_count`, `removed_delete_files_count` |
+| 4 files, then 5 | Nothing, then 5 rewritten into 1 | Same |
+| `remove-dangling-deletes` or `delete-ratio-threshold` | `Cannot use options [remove-dangling-deletes], they are not supported by the action or the rewriter BIN-PACK` | Accepted |
+| A file with 40% of its rows deleted | Not rewritten by default | Rewritten by default |
+| A group that fails with partial progress on | Two `ERROR` lines in the log | The same, plus `WARN ... partial-progress.enabled is true but 1 rewrite commits failed.` |
+
+The rows come from the runs. The documentation for each release fills in the versions between: `delete-ratio-threshold` (default 0.3), `remove-dangling-deletes` and `partial-progress.max-failed-commits` are absent from the [1.7.2 procedures page](https://iceberg.apache.org/docs/1.7.2/spark-procedures/) and listed from [1.8.1](https://iceberg.apache.org/docs/1.8.1/spark-procedures/). The `removed_delete_files_count` column is listed from [1.10.1](https://iceberg.apache.org/docs/1.10.1/spark-procedures/), and `max-files-to-rewrite` from [1.11.0](https://iceberg.apache.org/docs/1.11.0/spark-procedures/).
+
+Two lines of the [1.4.3 documentation](https://iceberg.apache.org/docs/1.4.3/spark-procedures/) did not match the run on **Iceberg 1.4.3 with Spark 3.3.3**. It lists `failed_data_files_count` as an output, which that procedure did not return, and it describes `min-input-files` as "Any file group exceeding this number of files will be rewritten regardless of other criteria", while a group of exactly 5 was rewritten.
+
+## How rewrite_data_files picks files
+
+The procedure first picks candidate files, then groups them, then rewrites only the groups that qualify. The [current procedures documentation](https://iceberg.apache.org/docs/latest/spark-procedures/) gives the rules as options with defaults:
+
+| Option | Default | What the documentation says |
+| --- | --- | --- |
+| `min-input-files` | 5 | "Any file group with this number of files or more will be rewritten regardless of other criteria (the file group should have at least two files)" |
+| `min-file-size-bytes` | 75% of target file size | "Files under this threshold will be considered for rewriting regardless of any other criteria" |
+| `max-file-size-bytes` | 180% of target file size | "Files with sizes above this threshold will be considered for rewriting regardless of any other criteria" |
+| `target-file-size-bytes` | 536870912 (512 MB, default value of `write.target-file-size-bytes`) | "Target output file size" |
+| `delete-file-threshold` | 2147483647 | "Minimum number of deletes that needs to be associated with a data file for it to be considered for rewriting" |
+| `rewrite-all` | false | "Force rewriting of all provided files overriding other options" |
+
+Groups follow the partitions. The same page says, under `max-file-group-size-bytes`: "The entire rewrite operation is broken down into pieces based on partitioning and within partitions based on size into file-groups."
+
+:::note[Versions on this page]
+The runs used **Iceberg 1.4.3 on Spark 3.3.3** and **Iceberg 1.12.0 on Spark 3.5.6**. Unless an issue says otherwise, both gave the same result.
+:::
+
+## Issue 1: Fewer than 5 files in the group
+
+The Iceberg table `db.four_files` is not partitioned. It got four commits of 1,000 rows, one file of about 37 KB each. All four files are candidates, far below 384 MB, but together they form one group of four, under `min-input-files` 5:
+
+| Files in the table | Result |
+| --- | --- |
+| 4 | Nothing rewritten: `Nothing found to rewrite in demo.db.four_files` |
+| 5, after one more commit | `5 \| 1 \| 185881 \| 0 \| 0`, five files rewritten into one |
+
+**Fix:** lower `min-input-files`, for example `options => map('min-input-files', '2')`.
+
+## Issue 2: Many files, but few in each partition
+
+The Iceberg table `db.by_kind` is partitioned by `kind`, which has six values. It got four commits, each writing one file to each of the six partitions. The `partitions` metadata table showed `file_count` 4 for every partition, 24 files in all:
+
+The default call rewrote nothing, because every partition is its own group of four, under `min-input-files` 5. With `options => map('min-input-files', '2')` the same table returned `20 | 5 | 167383 | 0 | 0` after one partition had been done on its own (Issue 3), and ended with one file per partition.
+
+**Fix:** lower `min-input-files` when partitions hold a few small files each: `options => map('min-input-files', '2')`. It compacted 20 files into 5 in the run.
+
+## Issue 3: A where filter selects too few files
+
+On the same `db.by_kind` table, `where => 'kind = "click"'` limited the call to one partition of four files, and it rewrote nothing for the same reason. Adding `min-input-files` 2 to a filtered call on another partition rewrote its 4 files into 1:
+
+```sql
+CALL demo.system.rewrite_data_files(table => 'db.by_kind', where => 'kind = "buy"', options => map('min-input-files', '2'))
+```
+
+**Fix:** compact one partition at a time with `where` and the same option, for large tables or partitions still being written.
+
+## Issue 4: Files already near the target size
+
+The Iceberg table `db.in_range` got eight commits, eight files averaging 37,138 bytes. Both calls below used `min-input-files` 2:
+
+| `target-file-size-bytes` | Result |
+| --- | --- |
+| 37138, the average file size | Nothing rewritten |
+| The default, 512 MB | Eight files rewritten into one |
+
+With the average as the target, every file was between 75% and 180% of it, so none was a candidate. Under the 512 MB default that range is 384 MB to 921.6 MB. Files in it with no deletes are not candidates, however many there are.
+
+**Fix:** choose `target-file-size-bytes` above the files you want merged. Files already near the target are left alone, by design.
+
+## Issue 5: Files with deletes are not rewritten
+
+The Iceberg tables here are merge-on-read (`'write.delete.mode' = 'merge-on-read'`, format version 2). Each got three commits of 1,000 rows, three files. A `DELETE` of 10% of the rows then wrote position delete files and left the data files as they were: three delete files on **Iceberg 1.12.0** and one on **Iceberg 1.4.3**.
+
+The default call rewrote nothing: three files are under `min-input-files`, and 10% is under the 0.3 `delete-ratio-threshold` of 1.12.0.
+
+| Call | Iceberg 1.4.3 | Iceberg 1.12.0 |
+| --- | --- | --- |
+| Default options | Nothing rewritten | Nothing rewritten |
+| `delete-file-threshold` 1 | `3 \| 2 \| 111627`, and the delete file stayed in the snapshot | `3 \| 1 \| 111725 \| 0 \| 0`, and the three delete files stayed in the snapshot, `total-delete-files` 3 |
+| `delete-file-threshold` 1 and `remove-dangling-deletes`, on a second table with the same deletes | `Cannot use options [remove-dangling-deletes], they are not supported by the action or the rewriter BIN-PACK` | `3 \| 1 \| 111725 \| 0 \| 3`. The three delete files went in an extra commit, `total-delete-files` 0 |
+| Default options, on a third table with 40% of the rows deleted | Nothing rewritten, because 1.4.3 has no ratio threshold | The three files rewritten |
+
+`delete-file-threshold` 1 makes every file with at least one delete a candidate. After it, the table read 2,700 live rows on both versions. The 40% `DELETE` wrote three position delete files on 1.12.0 and one on 1.4.3.
+
+**Fix:** rewrite files that carry deletes with `delete-file-threshold`, and add `remove-dangling-deletes` to drop the delete files that no longer apply. The documentation lists that option from 1.8.1, and 1.4.3 rejected it.
+
+## Issue 6: Sort and z-order rewrite nothing
+
+The Iceberg table `db.sorted` has four small files and no sort order. The sort strategies select files by the same rules, so both calls below rewrote nothing:
+
+```sql
+CALL demo.system.rewrite_data_files(table => 'db.sorted', strategy => 'sort', sort_order => 'id DESC NULLS LAST')
+CALL demo.system.rewrite_data_files(table => 'db.sorted', strategy => 'sort', sort_order => 'zorder(id, kind)')
+```
+
+Without a `sort_order`, on a table that has none, the procedure refused:
+
+```text
+Cannot sort data without a valid sort order, table 'demo.db.sorted' is unsorted and no sort order is provided
+```
+
+**Fix:** to sort files that the thresholds skip, data already compacted included, add `options => map('rewrite-all', 'true')`. The z-order call then returned `4 | 1 | 148801 | 0 | 0`. Give the table a sort order or pass `sort_order`.
+
+## Issue 7: A table with one file
+
+The Iceberg table `db.one_file` has one file of 1,000 rows. The default call rewrote nothing, because one file has nothing to combine with. With `rewrite-all` it returned `1 | 1 | 37582 | 0 | 0`, one file rewritten into one, which is work for no gain.
+
+`rewrite-all` rewrites every selected file, a single file included, so use it for a one-off rewrite with a `where` filter.
+
+## Issue 8: Compaction ran, but storage and manifests did not shrink
+
+The Iceberg table `db.many_commits` got 30 commits of 1,000 rows, then compaction, `rewrite_manifests` and `expire_snapshots`. The counts come from the metadata tables and from the bucket, listed with `mc`:
+
+| After | Data files in the table | Data files in the bucket | Manifests in the current snapshot | Snapshots |
+| --- | --- | --- | --- | --- |
+| 30 commits | 30 (1,112,810 bytes) | 30, 1.1 MiB | 30 | 30 |
+| `rewrite_data_files` | 1 (1,097,913 bytes) | 31, 2.1 MiB | 31 | 31 |
+| `rewrite_manifests`, then `expire_snapshots` with `older_than` now and `retain_last => 1` | 1 | 1, 1.0 MiB | 1 | 1 |
+
+The numbers are from **Iceberg 1.12.0**, and **Iceberg 1.4.3** gave the same counts. `all_data_files`, which lists files referenced by any snapshot, held 31 rows after compaction and 1 after expiry.
+
+**The old files stay in storage.** Compaction writes new files and a new snapshot, and the old snapshots still reference the old files. The [procedures documentation](https://iceberg.apache.org/docs/latest/spark-procedures/) says `expire_snapshots` "will never remove files which are still required by a non-expired snapshot."
+
+**Expiring with the defaults removed nothing.** `CALL demo.system.expire_snapshots(table => 'db.many_commits')` returned 0 for every count, because `older_than` defaults to 5 days ago. With a timestamp literal it removed 30 data files, 61 manifests and 31 manifest lists:
+
+```sql
+CALL demo.system.expire_snapshots(table => 'db.many_commits', older_than => TIMESTAMP '2026-11-17 07:57:43.758', retain_last => 1)
+```
+
+Procedure arguments take constants, so read the clock first and pass the value as a literal, as the lab does.
+
+**Manifests are not rewritten.** Each commit added one manifest, and the [configuration documentation](https://iceberg.apache.org/docs/latest/configuration/) sets `commit.manifest.min-count-to-merge` to 100, "Minimum number of manifests to accumulate before merging". `rewrite_manifests` returned `31 | 1` and left one manifest.
+
+The bucket also kept 34 `.metadata.json` files after expiry, one for each change to the table. The documented table property for those is `write.metadata.delete-after-commit.enabled`, false by default; it was not tested here.
+
+**Fix:** finish with `rewrite_manifests` and `expire_snapshots`, with a timestamp literal for `older_than`, so that the old files and manifests actually go.
+
+## Issue 9: Writes add many small files to each partition
+
+How many files a commit adds depends on the write settings as much as on the data. The same 6,000 rows, spread over 4 Spark tasks, were appended three times to a table partitioned by `kind`, which has 6 values:
+
+| Table properties | Files added by the commit |
+| --- | --- |
+| `write.distribution-mode` = `none` | 24 |
+| `write.distribution-mode` = `none`, `write.spark.fanout.enabled` = `true` | 24 |
+| `write.distribution-mode` = `hash`, `write.spark.fanout.enabled` = `false` | 6 |
+
+With `none`, each task wrote its own file in each partition. With `hash`, Spark first moved every partition's rows to one task, so each partition got one file. The counts were the same on **Iceberg 1.4.3** and **Iceberg 1.12.0**, and on **Iceberg 1.1.0**, run on **Spark 3.3.3** with a local Hadoop catalog because that release has no AWS bundle.
+
+The [configuration documentation](https://iceberg.apache.org/docs/latest/configuration/) describes `none` as "don't shuffle rows" and `hash` as "hash distribute by partition key", and sets `write.spark.fanout.enabled` to false by default: "Enables the fanout writer in Spark that does not require data to be clustered; uses more memory".
+
+Two related errors were not reproduced. `Incoming records violate the writer assumption that records are clustered by spec and by partition within each spec. Either cluster the incoming records or switch to fanout writers.` is the message in Iceberg's `ClusteredWriter` at [1.4.3](https://github.com/apache/iceberg/blob/apache-iceberg-1.4.3/core/src/main/java/org/apache/iceberg/io/ClusteredWriter.java) and [1.12.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.12.0/core/src/main/java/org/apache/iceberg/io/ClusteredWriter.java), and `Already closed files for partition` is in `PartitionedWriter` at [1.4.3](https://github.com/apache/iceberg/blob/apache-iceberg-1.4.3/core/src/main/java/org/apache/iceberg/io/PartitionedWriter.java). The unsorted writes above did not raise either, on any of the three versions.
+
+## Issue 10: Compaction failed while another writer deleted
+
+The Iceberg table `db.busy` is merge-on-read and has eight partitions. It held 49 files of about 3.6 MB, six per partition and seven in `p7`. Compaction ran with `max-concurrent-file-group-rewrites` 1 and `rewrite-job-order` `files-asc`, and a second writer committed 3 seconds after it started:
+
+| Second writer | Result |
+| --- | --- |
+| `INSERT` of 80,000 rows | Both committed |
+| `DELETE` in `p7` | Compaction failed, and nothing was compacted |
+
+**The append.** On **Iceberg 1.12.0** the `INSERT` committed at 4.4 seconds and compaction returned at 6.9 seconds, 49 files rewritten into 8. The table then held 16 data files, 8 compacted and 8 appended, and **Iceberg 1.4.3** ended the same way. Rewriting files does not conflict with new files: compaction validates that the files it replaces have not changed since it started, and an append changes none of them.
+
+**The delete.** On **Iceberg 1.12.0** a merge-on-read `DELETE` in `p7`, which writes position delete files, committed at 4.0 seconds. Compaction rewrote all 8 groups and then failed at the commit, and **Iceberg 1.4.3** failed the same way:
+
+```text
+java.lang.RuntimeException: Cannot commit rewrite because of a ValidationException or CommitFailedException. This usually means that this rewrite has conflicted with another concurrent Iceberg operation. To reduce the likelihood of conflicts, set partial-progress.enabled which will break up the rewrite into multiple smaller commits controlled by partial-progress.max-commits. Separate smaller rewrite commits can succeed independently while any commits that conflict with another Iceberg operation will be ignored. This mode will create additional snapshots in the table history, one for each commit.
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot commit, found new position delete for replaced data file: GenericDataFile{content=data, file_path=s3://warehouse/db/busy/data/p=p7/...
+```
+
+A position delete names the exact data file and row it deletes. Compaction was replacing those `p7` files, so committing would have left the deletes pointing at files no longer in the table, and Iceberg refused the commit.
+
+Nothing was compacted: the table still held 49 data files. The bucket went from 65 to 72 objects on 1.12.0, which is the 7 position delete files of the `DELETE`, so the failed rewrite left none of its own files behind. On 1.4.3 it went from 65 to 66, one delete file.
+
+**Fix:** run compaction where writers are not deleting, or set `partial-progress.enabled` so that one conflicting partition does not undo the rest (Issue 11).
+
+## Issue 11: Partial progress reported success but skipped a partition
+
+The same `DELETE` ran against the same compaction, this time with `partial-progress.enabled` set to `true`. Each group committed as soon as it was rewritten. The `DELETE` committed between two of them, and the `p7` group failed when its turn came, last because of `files-asc`:
+
+```text
+ERROR org.apache.iceberg.actions.RewriteDataFilesCommitManager: Cannot commit groups [RewriteFileGroup{info=FileGroupInfo{globalIndex=4, partitionIndex=1, partition=PartitionData{p=p7}}, ...}], attempting to clean up written files
+ERROR org.apache.iceberg.actions.BaseCommitService: Failure during rewrite commit process, partial progress enabled. Ignoring
+WARN org.apache.iceberg.spark.actions.RewriteDataFilesSparkAction: partial-progress.enabled is true but 1 rewrite commits failed. Check the logs to determine why the individual commits failed. If this is persistent it may help to increase partial-progress.max-commits which will split the rewrite operation into smaller commits.
+```
+
+The procedure still returned success: `42 | 7 | 151626428 | 0 | 0` on **Iceberg 1.12.0**, with `failed_data_files_count` 0. The table held 14 data files, 7 compacted and the 7 untouched in `p7`. **Iceberg 1.4.3** returned `42 | 7 | 151621977` and logged the two `ERROR` lines without the `WARN`.
+
+A commit that loses a race to another commit is retried. In both partial-progress runs the second writer's `DELETE` logged `Retrying task after failure: ... Commit failed: Requirement failed: branch main has changed`, then committed on its next attempt, because the compaction commit that got there first touched another partition.
+
+A validation failure is not retried: each run logged one `Cannot commit groups` for the failed group and no retry. The number of attempts is the table property `commit.retry.num-retries`, 4 by default in the [configuration documentation](https://iceberg.apache.org/docs/latest/configuration/).
+
+**Fix:** read the rewritten count, or the log for `Cannot commit groups`, and not the failed count.
+
+## Confirm the diagnosis
+
+Look at the files the procedure would consider, per partition and size, before changing options:
+
+```sql
+SELECT partition, file_count FROM demo.db.events.partitions ORDER BY 1;
+SELECT content, count(*) AS files, sum(file_size_in_bytes) AS bytes, round(avg(file_size_in_bytes)) AS avg_bytes
+FROM demo.db.events.files GROUP BY content ORDER BY content;
+SELECT snapshot_id, operation, summary['added-data-files'], summary['deleted-data-files'], summary['total-data-files'], summary['total-delete-files']
+FROM demo.db.events.snapshots ORDER BY committed_at DESC LIMIT 5;
+```
+
+In `files`, `content` 0 is data and 1 is position deletes. With the default options, a partition with fewer than 5 files, or with files between 75% and 180% of the target size, is not compacted unless its files carry enough deletes.
+
+Then read the Spark log for the call. `Nothing found to rewrite in <table>` means no group qualified, and `Rewrite Files Ready to be Committed - Rewriting N files` lists each group that did. Both lines come from `org.apache.iceberg.spark.actions.RewriteDataFilesSparkAction` at INFO.
+
+## Other engines
+
+Trino compacts with `ALTER TABLE ... EXECUTE optimize`, and its threshold is different. The [Trino 484 Iceberg connector documentation](https://trino.io/docs/current/connector/iceberg.html) says: "All files with a size below the optional file_size_threshold parameter (default value for the threshold is 100MB) are merged in case any of the following conditions are met per partition:", followed by "more than one data file to merge is present" and "at least one data file, with delete files attached, is present". Trino was not run for this page.
+
+Amazon Athena compacts with `OPTIMIZE [db_name.]table_name REWRITE DATA USING BIN_PACK [WHERE predicate]`. Its [OPTIMIZE page](https://docs.aws.amazon.com/athena/latest/ug/optimize-statement.html) says "Only partition columns are allowed in the WHERE clause predicate. Specifying a non-partition column will cause the query to fail." The [Athena engine version 3 page](https://docs.aws.amazon.com/athena/latest/ug/engine-versions-reference-0003.html) gives that failure as `Unexpected FilterNode found in plan; probably connector was not able to handle provided WHERE expression.` Athena was not run either.
+
+## Prevent it
+
+- Write fewer, larger commits where the writer allows it; 30 commits made 30 files, 30 manifests and 31 metadata files.
+- Schedule compaction per partition with `min-input-files` set for your partition sizes, and check `rewritten_data_files_count` after each run.
+- Keep compaction away from partitions that receive deletes while it runs, or turn on partial progress and watch for skipped groups.
+- Follow every compaction with `rewrite_manifests` and `expire_snapshots`, or storage keeps both copies of the data.
+
+:::note[How OLake handles this]
+
+OLake Fusion is OLake's table maintenance product. It runs compaction on a schedule per table, with three types ([types of compaction](/docs/fusion/compaction/types-of-compaction/)). Lite merges small files and converts equality delete files into position delete files, Medium merges files up to the target size and folds accumulated position deletes into the data files, and Full rewrites all data and delete files into files of the target size.
+
+If no schedule or size is set, Fusion uses 24 hours and a target file size of 512 MB ([compaction configuration](/docs/fusion/compaction/configuration/)).
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Iceberg: [Spark procedures](https://iceberg.apache.org/docs/latest/spark-procedures/), and the same page for [1.4.3](https://iceberg.apache.org/docs/1.4.3/spark-procedures/), [1.7.2](https://iceberg.apache.org/docs/1.7.2/spark-procedures/), [1.8.1](https://iceberg.apache.org/docs/1.8.1/spark-procedures/), [1.10.1](https://iceberg.apache.org/docs/1.10.1/spark-procedures/) and [1.11.0](https://iceberg.apache.org/docs/1.11.0/spark-procedures/); [maintenance](https://iceberg.apache.org/docs/latest/maintenance/); [configuration](https://iceberg.apache.org/docs/latest/configuration/)
+- Trino: [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html), for `optimize`
+- Amazon Athena: [OPTIMIZE](https://docs.aws.amazon.com/athena/latest/ug/optimize-statement.html), [engine version 3](https://docs.aws.amazon.com/athena/latest/ug/engine-versions-reference-0003.html)
+- GitHub: [iceberg#9679](https://github.com/apache/iceberg/issues/9679), the most-commented `rewrite_data_files` failure report
+- Stack Overflow, the most viewed compaction questions: [72362044](https://stackoverflow.com/questions/72362044), [75874677](https://stackoverflow.com/questions/75874677)

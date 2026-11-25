@@ -1,0 +1,66 @@
+# The reader comes back after the clean-up
+# 2026-11-23 11:35:08 UTC, Azure SQL Database, 12.0.2000.8, objective S3, Standard
+-- What is left after the automatic clean-up.
+SELECT COUNT(*) AS rows_in_change_table FROM cdc.dbo_orders_CT;
+SELECT sys.fn_cdc_get_min_lsn(N'dbo_orders') AS min_lsn, sys.fn_cdc_get_max_lsn() AS max_lsn, SYSUTCDATETIME() AS now_utc;
+rows_in_change_table
+--------------------
+2
+
+(1 rows affected)
+min_lsn|max_lsn|now_utc
+-------|-------|-------
+0x00000033000058000006|0x00000033000059F00005|2026-11-23 11:35:09.3905597
+
+(1 rows affected)
+
+SELECT MIN(tran_end_time) AS oldest_mapping, MAX(tran_end_time) AS newest_mapping, COUNT(*) AS mappings FROM cdc.lsn_time_mapping;
+oldest_mapping|newest_mapping|mappings
+--------------|--------------|--------
+2026-11-23 11:28:51.363|2026-11-23 11:33:52.943|2
+
+(1 rows affected)
+
+-- The reader comes back and asks for everything after its saved position.
+DECLARE @saved BINARY(10) = (SELECT last_lsn FROM dbo.reader_position WHERE reader = N'lab');
+DECLARE @from BINARY(10) = sys.fn_cdc_increment_lsn(@saved), @to BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT @from AS from_lsn, sys.fn_cdc_get_min_lsn(N'dbo_orders') AS min_lsn;
+SELECT COUNT(*) FROM cdc.fn_cdc_get_all_changes_dbo_orders(@from, @to, N'all');
+from_lsn|min_lsn
+--------|-------
+0x00000033000001200007|0x00000033000058000006
+
+(1 rows affected)
+Msg 313, Level 16, State 3, Server <server>, Line 5
+An insufficient number of arguments were supplied for the procedure or function cdc.fn_cdc_get_all_changes_ ... .
+
+-- Recovery: read the source table again, then carry on from the current maximum.
+DECLARE @max BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT COUNT(*) AS rows_reloaded_from_source FROM dbo.orders;
+UPDATE dbo.reader_position SET last_lsn = @max, saved_at = SYSUTCDATETIME() WHERE reader = N'lab';
+rows_reloaded_from_source
+-------------------------
+19
+
+(1 rows affected)
+
+(1 rows affected)
+
+INSERT INTO dbo.orders (customer_id, quantity) VALUES (4, 13);
+
+(1 rows affected)
+
+WAITFOR DELAY '00:00:40';
+
+DECLARE @saved BINARY(10) = (SELECT last_lsn FROM dbo.reader_position WHERE reader = N'lab');
+DECLARE @from BINARY(10) = sys.fn_cdc_increment_lsn(@saved), @to BINARY(10) = sys.fn_cdc_get_max_lsn();
+SELECT __$operation, id, customer_id, quantity FROM cdc.fn_cdc_get_all_changes_dbo_orders(@from, @to, N'all');
+__$operation|id|customer_id|quantity
+------------|--|-----------|--------
+2|21|4|13
+
+(1 rows affected)
+
+-- Back to seven days.
+EXEC sys.sp_cdc_change_job @job_type = N'cleanup', @retention = 10080;
+

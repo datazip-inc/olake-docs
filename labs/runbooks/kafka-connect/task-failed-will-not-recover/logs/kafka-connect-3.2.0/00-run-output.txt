@@ -1,0 +1,223 @@
+ Network kc-task-failed-will-not-recover_default  Creating
+ Network kc-task-failed-will-not-recover_default  Created
+ Container kc-task-failed-will-not-recover-kafka-1  Creating
+ Container kc-task-failed-will-not-recover-postgres-1  Creating
+ Container kc-task-failed-will-not-recover-kafka-1  Created
+ Container kc-task-failed-will-not-recover-postgres-1  Created
+ Container kc-task-failed-will-not-recover-connect-1  Creating
+ connect The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested 
+ Container kc-task-failed-will-not-recover-connect-1  Created
+ Container kc-task-failed-will-not-recover-postgres-1  Starting
+ Container kc-task-failed-will-not-recover-kafka-1  Starting
+ Container kc-task-failed-will-not-recover-kafka-1  Started
+ Container kc-task-failed-will-not-recover-postgres-1  Started
+ Container kc-task-failed-will-not-recover-kafka-1  Waiting
+ Container kc-task-failed-will-not-recover-postgres-1  Waiting
+ Container kc-task-failed-will-not-recover-postgres-1  Healthy
+ Container kc-task-failed-will-not-recover-kafka-1  Healthy
+ Container kc-task-failed-will-not-recover-connect-1  Starting
+ Container kc-task-failed-will-not-recover-connect-1  Started
+ Container kc-task-failed-will-not-recover-connect-1  Waiting
+ Container kc-task-failed-will-not-recover-kafka-1  Waiting
+ Container kc-task-failed-will-not-recover-postgres-1  Waiting
+ Container kc-task-failed-will-not-recover-connect-1  Healthy
+ Container kc-task-failed-will-not-recover-kafka-1  Healthy
+ Container kc-task-failed-will-not-recover-postgres-1  Healthy
+{"version":"3.2.0","commit":"38103ffaa962ef50","kafka_cluster_id":"5L6g3nShT-eMCtK--X86sw"}
+
+== A topic with two good records and a file sink that reads it
+  Created topic orders.
+  PUT /connectors/orders-file-sink/config: 201
+  orders-file-sink: connector=RUNNING tasks=[RUNNING]
+    {item=book, quantity=1, id=1}
+    {item=pen, quantity=3, id=2}
+  /tmp/orders-file-sink.txt: 2 lines
+
+== One record that is not JSON, then two good ones
+  orders-file-sink: connector=RUNNING tasks=[FAILED]
+{
+    "name": "orders-file-sink",
+    "connector": {
+        "state": "RUNNING",
+        "worker_id": "172.31.0.4:8083"
+    },
+    "tasks": [
+        {
+            "id": 0,
+            "state": "FAILED",
+            "worker_id": "172.31.0.4:8083",
+            "trace": "org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler\n\tat org.apache.kafka.connect.runtime.errors.RetryWithToleranceOperator.execAndHandleError(RetryWithToleranceOperator.java:223)\n\tat org.apache.kafka.connect.runtime.errors.RetryWithToleranceOperator.execute(RetryWithToleranceOperator.java:149)\n\tat org.apache.kafka.connect.runtime.WorkerSinkTask.convertAndTransformRecord(WorkerSinkTask.java:516)\n\tat org.apache.kafka.connect.runtime.WorkerSinkTask.convertMessages(WorkerSinkTask.java:493)\n\tat org.apache.kafka.connect.runtime.WorkerSinkTask.poll(WorkerSinkTask.java:332)\n\tat org.apache.kafka.connect.runtime.WorkerSinkTask.iterati
+        }
+    ],
+    "type": "sink"
+}
+
+== The log: the wrapper line and what precedes it
+2026-11-17 07:33:30,818 ERROR  ||  WorkerSinkTask{id=orders-file-sink-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler
+Caused by: org.apache.kafka.connect.errors.DataException: Converting byte[] to Kafka Connect data failed due to serialization error: 
+Caused by: org.apache.kafka.common.errors.SerializationException: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+Caused by: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+
+== The cause, from the status endpoint
+org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler
+Caused by: org.apache.kafka.connect.errors.DataException: Converting byte[] to Kafka Connect data failed due to serialization error: 
+Caused by: org.apache.kafka.common.errors.SerializationException: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+Caused by: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'id': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+
+
+== What reached the sink, and where its consumer group stands
+    {item=book, quantity=1, id=1}
+    {item=pen, quantity=3, id=2}
+  /tmp/orders-file-sink.txt: 2 lines
+  GROUP TOPIC PARTITION CURRENT-OFFSET LOG-END-OFFSET LAG
+  connect-orders-file-sink orders 0 2 5 3
+  orders:0:5
+
+== Restart calls while the bad record is still the next one to read
+  times the task has been killed so far: 1
+  POST /connectors/orders-file-sink/restart: HTTP 204 
+  after it: connector=RUNNING tasks=[FAILED], killed 1 times
+  POST /connectors/orders-file-sink/tasks/0/restart: HTTP 204 
+  after it: connector=RUNNING tasks=[FAILED], killed 2 times
+  POST /connectors/orders-file-sink/restart?includeTasks=true&onlyFailed=true: HTTP 202 {"name":"orders-file-sink","connector":{"state":"RUNNING","worker_id":"172.31.0.4:8083"},"tasks":[{"id":0,"state":"RESTARTING","worker_id":"172.31.0.4:8083","trace":"org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler\n\tat or
+  after it: connector=RUNNING tasks=[FAILED], killed 3 times
+  /tmp/orders-file-sink.txt: 2 lines
+
+== errors.tolerance=all with a dead letter queue, on the same connector
+  PUT /connectors/orders-file-sink/config: 200
+  orders-file-sink: connector=RUNNING tasks=[FAILED] (gave up waiting for /RUNNING tasks=\[RUNNING\]/)
+  the task did not pick up the new configuration by itself: restarting it
+  POST /connectors/orders-file-sink/tasks/0/restart: HTTP 204 
+  orders-file-sink: connector=RUNNING tasks=[RUNNING]
+{
+    "name": "orders-file-sink",
+    "connector": {
+        "state": "RUNNING",
+        "worker_id": "172.31.0.4:8083"
+    },
+    "tasks": [
+        {
+            "id": 0,
+            "state": "RUNNING",
+            "worker_id": "172.31.0.4:8083"
+        }
+    ],
+    "type": "sink"
+}
+    {item=book, quantity=1, id=1}
+    {item=pen, quantity=3, id=2}
+    {item=desk, quantity=1, id=4}
+    {item=chair, quantity=2, id=5}
+  /tmp/orders-file-sink.txt: 4 lines
+  dlq.orders:0:1
+
+== The record in the dead letter queue, with its headers
+  Offset:0
+  header __connect.errors.topic:orders
+  header __connect.errors.partition:0
+  header __connect.errors.offset:2
+  header __connect.errors.connector.name:orders-file-sink
+  header __connect.errors.task.id:0
+  header __connect.errors.stage:VALUE_CONVERTER
+  header __connect.errors.class.name:org.apache.kafka.connect.json.JsonConverter
+  header __connect.errors.exception.class.name:org.apache.kafka.connect.errors.DataException
+  header __connect.errors.exception.message:Converting byte[] to Kafka Connect data failed due to serialization error: 
+  header __connect.errors.exception.stacktrace:org.apache.kafka.connect.errors.DataException: Converting byte[] to Kafka Connect data failed due to serialization error: 
+  value  id=3;item=lamp;quantity=1
+
+== The line that errors.log.enable writes
+2026-11-17 07:35:35,067 ERROR  ||  Error encountered in task orders-file-sink-0. Executing stage 'VALUE_CONVERTER' with class 'org.apache.kafka.connect.json.JsonConverter', where consumed record is {topic='orders', partition=0, offset=2, timestamp=1794900810763, timestampType=CreateTime}.   [org.apache.kafka.connect.runtime.errors.LogReporter]
+  GROUP TOPIC PARTITION CURRENT-OFFSET LOG-END-OFFSET LAG
+  connect-orders-file-sink orders 0 5 5 0
+
+== A dead letter queue without errors.deadletterqueue.topic.replication.factor, on one broker
+  PUT /connectors/orders-file-sink-rf/config: 201
+  orders-file-sink-rf: connector=RUNNING tasks=[FAILED]
+connector=RUNNING tasks=[FAILED]
+org.apache.kafka.connect.errors.ConnectException: Could not initialize dead letter queue with topic=dlq.orders.rf
+Caused by: java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.InvalidReplicationFactorException: Unable to replicate the partition 3 time(s): The target replication factor of 3 cannot be reached because only 1 broker(s) are registered or some brokers have all their log directories cordoned.
+Caused by: org.apache.kafka.common.errors.InvalidReplicationFactorException: Unable to replicate the partition 3 time(s): The target replication factor of 3 cannot be reached because only 1 broker(s) are registered or some brokers have all their log directories cordoned.
+
+
+== Fix: set the replication factor to what the cluster has
+  PUT /connectors/orders-file-sink-rf/config: 200
+  orders-file-sink-rf: connector=RUNNING tasks=[FAILED] (gave up waiting for /RUNNING tasks=\[RUNNING\]/)
+  the task did not pick up the new configuration by itself: restarting it
+  POST /connectors/orders-file-sink-rf/tasks/0/restart: HTTP 204 
+  orders-file-sink-rf: connector=RUNNING tasks=[RUNNING]
+  /tmp/orders-file-sink-rf.txt: 4 lines
+  dlq.orders.rf:0:1
+
+== errors.tolerance=all with no dead letter queue and no error logging
+  PUT /connectors/orders-file-sink-silent/config: 201
+  orders-file-sink-silent: connector=RUNNING tasks=[RUNNING]
+  connector=RUNNING tasks=[RUNNING]
+    {item=book, quantity=1, id=1}
+    {item=pen, quantity=3, id=2}
+    {item=desk, quantity=1, id=4}
+    {item=chair, quantity=2, id=5}
+  /tmp/orders-file-sink-silent.txt: 4 lines
+  log lines that mention the dropped record: 0
+
+== A second topic and sink with no dead letter queue: two good records are written first
+  Created topic orders2.
+  PUT /connectors/orders2-file-sink/config: 201
+  orders2-file-sink: connector=RUNNING tasks=[RUNNING]
+  /tmp/orders2-file-sink.txt: 2 lines
+
+== Then the bad record and two good ones: the task is killed, and the log names the record
+  orders2-file-sink: connector=RUNNING tasks=[FAILED]
+2026-11-17 07:38:23,684 ERROR  ||  Error encountered in task orders2-file-sink-0. Executing stage 'VALUE_CONVERTER' with class 'org.apache.kafka.connect.json.JsonConverter', where consumed record is {topic='orders2', partition=0, offset=2, timestamp=1794901103604, timestampType=CreateTime}.   [org.apache.kafka.connect.runtime.errors.LogReporter]
+  GROUP TOPIC PARTITION CURRENT-OFFSET LOG-END-OFFSET LAG
+  connect-orders2-file-sink orders2 0 2 5 3
+
+== Move the sink's offset to the record after the bad one
+  PUT /connectors/orders2-file-sink/stop: HTTP 404 {"error_code":404,"message":"HTTP 404 Not Found"}
+  DELETE /connectors/orders2-file-sink: HTTP 204 
+  GROUP TOPIC PARTITION NEW-OFFSET
+  connect-orders2-file-sink orders2 0 3
+  PUT /connectors/orders2-file-sink/config: 201
+  orders2-file-sink: connector=RUNNING tasks=[RUNNING]
+    {item=book, quantity=1, id=1}
+    {item=pen, quantity=3, id=2}
+    {item=desk, quantity=1, id=4}
+    {item=chair, quantity=2, id=5}
+  /tmp/orders2-file-sink.txt: 4 lines
+
+== A source connector whose transformation fails on every record
+  PUT /connectors/lines-source/config: 201
+  lines-source: connector=RUNNING tasks=[FAILED]
+{
+    "name": "lines-source",
+    "connector": {
+        "state": "RUNNING",
+        "worker_id": "172.31.0.4:8083"
+    },
+    "tasks": [
+        {
+            "id": 0,
+            "state": "FAILED",
+            "worker_id": "172.31.0.4:8083",
+            "trace": "org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler\n\tat org.apache.kafka.connect.runtime.errors.RetryWithToleranceOperator.execAndHandleError(RetryWithToleranceOperator.java:223)\n\tat org.apache.kafka.connect.runtime.errors.RetryWithToleranceOperator.execute(RetryWithToleranceOperator.java:149)\n\tat org.apache.kafka.connect.runtime.TransformationChain.apply(TransformationChain.java:50)\n\tat org.apache.kafka.connect.runtime.WorkerSourceTask.sendRecords(WorkerSourceTask.java:355)\n\tat org.apache.kafka.connect.runtime.WorkerSourceTask.execute(WorkerSourceTask.java:258)\n\tat org.apache.kafka.connect.runtime.WorkerTask.doRun(WorkerTas
+        }
+    ],
+    "type": "source"
+}
+2026-11-17 07:39:24,520 ERROR  ||  WorkerSourceTask{id=lines-source-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+org.apache.kafka.connect.errors.ConnectException: Tolerance exceeded in error handler
+Caused by: org.apache.kafka.connect.errors.DataException: Only Struct objects supported for [field extraction], found: java.lang.String
+
+
+== The same connector with errors.tolerance=all and a dead letter queue name
+  PUT /connectors/lines-source/config: 200
+  lines-source: connector=RUNNING tasks=[FAILED] (gave up waiting for /RUNNING tasks=\[RUNNING\]/)
+  the task did not pick up the new configuration by itself: restarting it
+  POST /connectors/lines-source/tasks/0/restart: HTTP 204 
+  lines-source: connector=RUNNING tasks=[RUNNING]
+  connector=RUNNING tasks=[RUNNING]
+  lines: no such topic
+  dlq.lines: no such topic
+  'Error encountered in task lines-source' log lines: 2
+2026-11-17 07:40:06,051 ERROR  ||  Error encountered in task lines-source-0. Executing stage 'TRANSFORMATION' with class 'org.apache.kafka.connect.transforms.ExtractField$Value'.   [org.apache.kafka.connect.runtime.errors.LogReporter]
+  (skipped: this image has no JDBC sink connector)

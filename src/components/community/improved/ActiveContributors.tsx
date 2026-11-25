@@ -33,7 +33,7 @@ const ActiveContributors = () => {
     const fetchContributors = async () => {
       try {
         setLoading(true)
-        const response = await fetch('https://api.github.com/repos/datazip-inc/olake/contributors')
+        const response = await fetch('https://api.github.com/repos/datazip-inc/olake-go/contributors')
 
         if (!response.ok) {
           throw new Error(`Error fetching contributors: ${response.status}`)
@@ -93,7 +93,7 @@ const ActiveContributors = () => {
               <PiArrowRight aria-hidden='true' />
             </Button>
             <Button
-              href='https://github.com/datazip-inc/olake/graphs/contributors'
+              href='https://github.com/datazip-inc/olake-go/graphs/contributors'
               variant='secondary'
               size='lg'
               external
@@ -117,7 +117,7 @@ const ActiveContributors = () => {
           <p className='mt-[8px] text-[14px] text-olake-text-2'>
             Visit our{' '}
             <a
-              href='https://github.com/datazip-inc/olake/graphs/contributors'
+              href='https://github.com/datazip-inc/olake-go/graphs/contributors'
               target='_blank'
               rel='noopener noreferrer'
               className='text-olake-blue hover:text-olake-blue-hover'

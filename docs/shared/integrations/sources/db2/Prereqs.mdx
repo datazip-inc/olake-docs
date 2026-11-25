@@ -1,0 +1,41 @@
+OLake Go reads DB2 LUW (Linux, UNIX and Windows) tables through IBM's Data Server driver: a parallel full snapshot first, then incremental syncs that fetch only rows whose cursor column moved past the last value seen. The DB2 connector has no log-based change data capture (CDC), so four things must be in place before the first sync.
+
+| Setting | Value | Why it matters |
+| --- | --- | --- |
+| A read-only user | `CONNECT` on the database plus `SELECT` on each table | The snapshot and every incremental sync read the tables directly. DB2 authenticates users against the operating system or LDAP, so the account exists there first and is then granted in the database. |
+| Table statistics | `RUNSTATS` on every table you sync | OLake Go reads the row count and page count from `SYSCAT.TABLES` to split the snapshot into chunks. A table that has never had statistics collected stops the sync with `stats not populated`. Stale statistics are fine. |
+| A cursor column | a column that grows with every change, such as `UPDATED_AT` | Incremental syncs select `WHERE cursor > last value`. Rows updated without touching the cursor are not picked up. |
+| A primary key | on every table | OLake Go uses it to upsert changed rows into the Iceberg table. Without one, changed rows are appended. |
+
+```sql title="On the DB2 database, as the instance owner or a DBADM user"
+-- 1. A user for OLake Go. Create the operating system account first,
+--    for example: useradd -M olake && passwd olake
+GRANT CONNECT ON DATABASE TO USER olake;
+
+-- 2. Read access to the tables you sync
+GRANT SELECT ON TABLE db2inst1.customers TO USER olake;
+GRANT SELECT ON TABLE db2inst1.orders TO USER olake;
+
+-- 3. Statistics on every table you sync
+CALL SYSPROC.ADMIN_CMD('RUNSTATS ON TABLE db2inst1.customers AND INDEXES ALL');
+CALL SYSPROC.ADMIN_CMD('RUNSTATS ON TABLE db2inst1.orders AND INDEXES ALL');
+
+-- 4. A cursor column that your application always sets, for example
+--    updated_at TIMESTAMP DEFAULT CURRENT TIMESTAMP, updated on every change
+```
+
+Check the result before moving on. A `CARD` of `-1` means statistics were never collected:
+
+```sql
+SELECT tabname, card, npages FROM syscat.tables WHERE tabschema = 'DB2INST1';
+```
+
+Version, driver and SSL details are on the [DB2 connector page](/docs/connectors/db2/).
+
+:::info[The DB2 connector image is built for amd64 only]
+IBM's Data Server driver has no Linux arm64 build, so `olakego/source-db2` runs on amd64 hosts. On an Apple silicon Mac, turn on Rosetta in Docker Desktop and pull the image with `--platform linux/amd64`.
+:::
+
+:::warning[Deletes do not replicate in incremental mode]
+A deleted row has no cursor value to read, so it stays in the Iceberg table. If deletes matter, soft-delete in DB2 (a `deleted_at` column that also bumps `updated_at`) or schedule an occasional full refresh.
+:::

@@ -41,7 +41,7 @@ const ContactPage = () => {
     'url': 'https://olake.io/',
     'logo': 'https://olake.io/img/logo/olake-blue.svg',
     'sameAs': [
-      'https://github.com/datazip-inc/olake',
+      'https://github.com/datazip-inc/olake-go',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
@@ -60,9 +60,9 @@ const ContactPage = () => {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     'url': 'https://olake.io/',
-    'name': 'Fastest Open Source Data Replication Tool',
+    'name': 'OLake: Open Source Data Replication to Apache Iceberg',
     'description':
-      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     'publisher': {
       '@type': 'Organization',
       'name': 'OLake'
@@ -146,7 +146,7 @@ const ContactPage = () => {
   return (
     <LakesidePage
       title='Contact Us'
-      description='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool.'
+      description='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our open-source data replication tool.'
       activePath='/contact'
       heroBackground={
         <PageHero title='Contact Us'>
@@ -162,7 +162,7 @@ const ContactPage = () => {
         <meta property='og:title' content='Contact Us - OLake' />
         <meta
           property='og:description'
-          content='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our fastest open-source data replication tool.'
+          content='Get in touch with the OLake team. Contact us for support, partnerships, or questions about our open-source data replication tool.'
         />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:site_name' content='OLake' />

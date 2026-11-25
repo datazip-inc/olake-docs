@@ -60,6 +60,15 @@ const docSidebar = {
       ],
     },
     { type: 'doc', id: 'install/kubernetes', label: 'Kubernetes/Helm' },
+    {
+      type: 'category',
+      label: 'GitOps',
+      link: { type: 'doc', id: 'install/gitops/index' },
+      items: [
+        { type: 'doc', id: 'install/gitops/docker', label: 'Docker Compose' },
+        { type: 'doc', id: 'install/gitops/kubernetes', label: 'Kubernetes' },
+      ],
+    },
 
     // MOVE AND MANAGE DATA
     sectionHeader("MOVE AND MANAGE DATA"),
@@ -106,7 +115,7 @@ const docSidebar = {
           label: 'Parquet Writer',
           items: [
             { type: 'doc', id: 'writers/parquet/config', label: 'Configuration' },
-            { type: 'doc', id: 'writers/parquet/permission', label: 'IAM Permissions' },
+            { type: 'doc', id: 'writers/parquet/permission', label: 'Permissions' },
             { type: 'doc', id: 'writers/parquet/partitioning', label: 'Partitioning' },
             { type: 'doc', id: 'writers/parquet/troubleshoot', label: 'Troubleshooting' },
           ],
@@ -117,6 +126,148 @@ const docSidebar = {
     { type: 'doc', id: 'getting-started/job-level-properties', label: 'Job-level Properties' },
     { type: 'doc', id: 'getting-started/alerts-and-notifications', label: 'Alerts & Notifications' },
 
+    // INTEGRATIONS
+    {
+      type: 'category',
+      label: 'Integrations',
+      className: 'sidebar-section-category',
+      collapsible: true,
+      collapsed: true,
+      items: [
+        { type: 'doc', id: 'integrations/index', label: 'Overview' },
+        {
+          type: 'category',
+          label: 'Snowflake',
+          link: { type: 'doc', id: 'integrations/engines/snowflake' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-snowflake', label: 'Postgres to Snowflake' },
+            { type: 'doc', id: 'integrations/mysql-to-snowflake', label: 'MySQL to Snowflake' },
+            { type: 'doc', id: 'integrations/mongodb-to-snowflake', label: 'MongoDB to Snowflake' },
+            { type: 'doc', id: 'integrations/oracle-to-snowflake', label: 'Oracle to Snowflake' },
+            { type: 'doc', id: 'integrations/mariadb-to-snowflake', label: 'MariaDB to Snowflake' },
+            { type: 'doc', id: 'integrations/kafka-to-snowflake', label: 'Kafka to Snowflake' },
+            { type: 'doc', id: 'integrations/s3-to-snowflake', label: 'S3 to Snowflake' },
+            { type: 'doc', id: 'integrations/sql-server-to-snowflake', label: 'SQL Server to Snowflake' },
+            { type: 'doc', id: 'integrations/db2-to-snowflake', label: 'DB2 to Snowflake' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'ClickHouse',
+          link: { type: 'doc', id: 'integrations/engines/clickhouse' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-clickhouse', label: 'Postgres to ClickHouse' },
+            { type: 'doc', id: 'integrations/mysql-to-clickhouse', label: 'MySQL to ClickHouse' },
+            { type: 'doc', id: 'integrations/mongodb-to-clickhouse', label: 'MongoDB to ClickHouse' },
+            { type: 'doc', id: 'integrations/sql-server-to-clickhouse', label: 'SQL Server to ClickHouse' },
+            { type: 'doc', id: 'integrations/db2-to-clickhouse', label: 'DB2 to ClickHouse' },
+            { type: 'doc', id: 'integrations/kafka-to-clickhouse', label: 'Kafka to ClickHouse' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'DuckDB',
+          link: { type: 'doc', id: 'integrations/engines/duckdb' },
+          items: [
+            { type: 'doc', id: 'integrations/mysql-to-duckdb', label: 'MySQL to DuckDB' },
+            { type: 'doc', id: 'integrations/postgres-to-duckdb', label: 'Postgres to DuckDB' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Amazon Redshift',
+          link: { type: 'doc', id: 'integrations/engines/redshift' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-redshift', label: 'Postgres to Redshift' },
+            { type: 'doc', id: 'integrations/oracle-to-redshift', label: 'Oracle to Redshift' },
+            { type: 'doc', id: 'integrations/kafka-to-redshift', label: 'Kafka to Redshift' },
+            { type: 'doc', id: 'integrations/mysql-to-redshift', label: 'MySQL to Redshift' },
+            { type: 'doc', id: 'integrations/mongodb-to-redshift', label: 'MongoDB to Redshift' },
+            { type: 'doc', id: 'integrations/mariadb-to-redshift', label: 'MariaDB to Redshift' },
+            { type: 'doc', id: 'integrations/s3-to-redshift', label: 'S3 to Redshift' },
+            { type: 'doc', id: 'integrations/sql-server-to-redshift', label: 'SQL Server to Redshift' },
+            { type: 'doc', id: 'integrations/db2-to-redshift', label: 'DB2 to Redshift' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Google BigQuery',
+          link: { type: 'doc', id: 'integrations/engines/bigquery' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-bigquery', label: 'Postgres to BigQuery' },
+            { type: 'doc', id: 'integrations/oracle-to-bigquery', label: 'Oracle to BigQuery' },
+            { type: 'doc', id: 'integrations/mongodb-to-bigquery', label: 'MongoDB to BigQuery' },
+            { type: 'doc', id: 'integrations/mysql-to-bigquery', label: 'MySQL to BigQuery' },
+            { type: 'doc', id: 'integrations/kafka-to-bigquery', label: 'Kafka to BigQuery' },
+            { type: 'doc', id: 'integrations/mariadb-to-bigquery', label: 'MariaDB to BigQuery' },
+            { type: 'doc', id: 'integrations/s3-to-bigquery', label: 'S3 to BigQuery' },
+            { type: 'doc', id: 'integrations/db2-to-bigquery', label: 'DB2 to BigQuery' },
+            { type: 'doc', id: 'integrations/sql-server-to-bigquery', label: 'SQL Server to BigQuery' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Databricks',
+          link: { type: 'doc', id: 'integrations/engines/databricks' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-databricks', label: 'Postgres to Databricks' },
+            { type: 'doc', id: 'integrations/mysql-to-databricks', label: 'MySQL to Databricks' },
+            { type: 'doc', id: 'integrations/mariadb-to-databricks', label: 'MariaDB to Databricks' },
+            { type: 'doc', id: 'integrations/mongodb-to-databricks', label: 'MongoDB to Databricks' },
+            { type: 'doc', id: 'integrations/oracle-to-databricks', label: 'Oracle to Databricks' },
+            { type: 'doc', id: 'integrations/sql-server-to-databricks', label: 'SQL Server to Databricks' },
+            { type: 'doc', id: 'integrations/kafka-to-databricks', label: 'Kafka to Databricks' },
+            { type: 'doc', id: 'integrations/s3-to-databricks', label: 'S3 to Databricks' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Apache Iceberg',
+          link: { type: 'doc', id: 'integrations/engines/iceberg' },
+          items: [
+            { type: 'doc', id: 'integrations/postgres-to-iceberg', label: 'Postgres to Iceberg' },
+            { type: 'doc', id: 'integrations/mysql-to-iceberg', label: 'MySQL to Iceberg' },
+            { type: 'doc', id: 'integrations/mongodb-to-iceberg', label: 'MongoDB to Iceberg' },
+            { type: 'doc', id: 'integrations/oracle-to-iceberg', label: 'Oracle to Iceberg' },
+            { type: 'doc', id: 'integrations/sql-server-to-iceberg', label: 'SQL Server to Iceberg' },
+            { type: 'doc', id: 'integrations/kafka-to-iceberg', label: 'Kafka to Iceberg' },
+            { type: 'doc', id: 'integrations/postgres-to-aistor', label: 'Postgres to MinIO AIStor' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'More query engines',
+          collapsed: true,
+          items: [
+            { type: 'doc', id: 'integrations/engines/athena', label: 'Amazon Athena' },
+            { type: 'doc', id: 'integrations/engines/trino', label: 'Trino' },
+            { type: 'doc', id: 'integrations/engines/spark', label: 'Apache Spark' },
+            { type: 'doc', id: 'integrations/engines/emr', label: 'Spark on Amazon EMR' },
+            { type: 'doc', id: 'integrations/engines/dataproc', label: 'Google Cloud Dataproc' },
+            { type: 'doc', id: 'integrations/engines/starburst', label: 'Starburst' },
+            { type: 'doc', id: 'integrations/engines/presto', label: 'Presto' },
+            { type: 'doc', id: 'integrations/engines/doris', label: 'Apache Doris' },
+            { type: 'doc', id: 'integrations/engines/starrocks', label: 'StarRocks' },
+            { type: 'doc', id: 'integrations/engines/fabric', label: 'Microsoft Fabric' },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Catalogs',
+          collapsed: true,
+          items: [
+            { type: 'doc', id: 'integrations/catalogs/glue', label: 'AWS Glue' },
+            { type: 'doc', id: 'integrations/catalogs/polaris', label: 'Apache Polaris' },
+            { type: 'doc', id: 'integrations/catalogs/lakekeeper', label: 'Lakekeeper' },
+            { type: 'doc', id: 'integrations/catalogs/horizon', label: 'Snowflake Horizon' },
+            { type: 'doc', id: 'integrations/catalogs/unity', label: 'Unity Catalog' },
+            { type: 'doc', id: 'integrations/catalogs/biglake', label: 'BigLake' },
+            { type: 'doc', id: 'integrations/catalogs/s3tables', label: 'Amazon S3 Tables' },
+            { type: 'doc', id: 'integrations/catalogs/aistor', label: 'MinIO AIStor Tables' },
+          ],
+        },
+      ],
+    },
     // MONITORING AND OBSERVABILITY
     sectionHeader("MONITORING AND OBSERVABILITY"),
     { type: 'doc', id: 'monitoring-and-observability/metrics', label: 'Prometheus Integration' },
@@ -165,6 +316,7 @@ const docSidebar = {
       type: 'category',
       label: 'Versions',
       items: [
+        'release/ingestion/v1.2.0',
         'release/ingestion/v1.1.0',
         'release/ingestion/v1.0.0',
         'release/ingestion/v0.12.0',
@@ -229,8 +381,16 @@ const fusionDocSidebar = {
         { type: 'doc',  id: 'fusion/compaction/configuration', label: 'Configuration' },
       ],
     },
+    { type: 'doc', id: 'fusion/cleanup/configuration', label: 'Cleanup' },
     { type: 'doc', id: 'fusion/maintenance/runs-and-logs', label: 'Runs & Logs' },
     { type: 'doc', id: 'fusion/maintenance/metrics', label: 'Metrics' },
+    {
+      type: 'category',
+      label: 'Troubleshooting',
+      items: [
+        { type: 'doc', id: 'fusion/maintenance/troubleshooting/out-of-memory', label: 'Out of Memory' },
+      ],
+    },
 
     // CORE CONCEPTS
     sectionHeader("CORE CONCEPTS"),
@@ -260,4 +420,68 @@ const fusionDocSidebar = {
   ],
 };
 
-export default { ...docSidebar, ...fusionDocSidebar };
+// ─── INTEGRATIONS SIDEBAR ──────────────────────────────────────────────────────
+// One category per query engine, built from src/data/integrations/pairs.ts so a new pair shows
+// up as soon as its status is `live`. Draft pages stay `unlisted` and out of the sidebar.
+
+// ─── RUNBOOKS SIDEBAR ──────────────────────────────────────────────────────────
+// Set-up and operations guides backed by a reproduced failure (labs/runbooks). One category per
+// family. A page stays `unlisted` and out of the sidebar until scripts/runbooks/check.mjs passes
+// with a reviewer set.
+const runbooksSidebar = {
+  runbooksSidebar: [
+    { type: 'doc', id: 'runbooks/index', label: 'Overview' },
+    {
+      type: 'category',
+      label: 'PostgreSQL',
+      collapsed: false,
+      items: [
+        { type: 'doc', id: 'runbooks/postgres/replication-slot-filling-disk', label: 'Replication slot filling the disk' },
+        { type: 'doc', id: 'runbooks/postgres/enable-logical-replication', label: 'Enable logical replication' }
+      ]
+    },
+    {
+      type: 'category',
+      label: 'MySQL',
+      collapsed: false,
+      items: [{ type: 'doc', id: 'runbooks/mysql/binlog-retention-error-1236', label: 'Binlog retention and error 1236' }]
+    },
+    {
+      type: 'category',
+      label: 'SQL Server',
+      collapsed: false,
+      items: [{ type: 'doc', id: 'runbooks/sql-server/enable-cdc-change-tables-empty', label: 'Enable CDC and fix empty change tables' }]
+    },
+    {
+      type: 'category',
+      label: 'Debezium',
+      collapsed: false,
+      items: [
+        { type: 'doc', id: 'runbooks/debezium/connector-running-captures-nothing', label: 'Running but captures nothing' },
+        { type: 'doc', id: 'runbooks/debezium/schema-history-topic-missing', label: 'Schema history topic missing' }
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Kafka Connect',
+      collapsed: false,
+      items: [
+        { type: 'doc', id: 'runbooks/kafka-connect/connector-class-not-found', label: 'Connector class not found' },
+        { type: 'doc', id: 'runbooks/kafka-connect/task-failed-will-not-recover', label: 'Task failed, will not recover' }
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Apache Iceberg',
+      collapsed: false,
+      link: { type: 'doc', id: 'runbooks/iceberg/index' },
+      items: [
+        { type: 'doc', id: 'runbooks/iceberg/schema-evolution-errors', label: 'Schema evolution errors' },
+        { type: 'doc', id: 'runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing', label: 'Compaction rewrites nothing' },
+        { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' }
+      ]
+    }
+  ]
+};
+
+export default { ...docSidebar, ...fusionDocSidebar, ...runbooksSidebar };

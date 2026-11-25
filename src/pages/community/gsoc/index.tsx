@@ -90,7 +90,7 @@ const GSoCLandingPage = () => {
           <Column>
             <Card className='p-[24px] lg:p-[32px]'>
               <p className='text-[14px] leading-[1.65] text-olake-text-2 lg:text-[15px]'>
-                At OLake, GSoC contributors help us improve the fastest open-source data replication
+                At OLake, GSoC contributors help us improve OLake, an open-source data replication
                 tool—adding observability, improving CDC semantics, and extending our Apache Iceberg
                 integration. You&apos;ll work alongside maintainers and ship code that powers real
                 data pipelines.

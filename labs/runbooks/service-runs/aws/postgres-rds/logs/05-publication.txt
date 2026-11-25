@@ -1,0 +1,67 @@
+# The publication, slot and test statements of docs/connectors/postgres/setup/rds.mdx
+# 2026-11-23 08:57:45 UTC, instance rbtest-pg, postgres 17.11 db.t4g.micro
+
+# as the master user (member of rds_superuser)
+CREATE PUBLICATION olake_publication FOR ALL TABLES;
+SELECT pubname, puballtables, pubviaroot FROM pg_publication;
+      pubname      | puballtables | pubviaroot 
+-------------------+--------------+------------
+ olake_publication | t            | f
+(1 row)
+
+ALTER PUBLICATION olake_publication SET (publish_via_partition_root = true);
+DROP PUBLICATION olake_publication;
+CREATE PUBLICATION olake_publication FOR TABLES IN SCHEMA public;
+DROP PUBLICATION olake_publication;
+CREATE PUBLICATION olake_publication FOR TABLE public.orders;
+SELECT pg_create_logical_replication_slot('olake_slot', 'pgoutput');
+ pg_create_logical_replication_slot 
+------------------------------------
+ (olake_slot,0/C004F48)
+(1 row)
+
+CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, data TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+ALTER TABLE test_table REPLICA IDENTITY DEFAULT;
+ALTER PUBLICATION olake_publication ADD TABLE test_table;
+INSERT INTO test_table (data) VALUES ('PostgreSQL pgoutput CDC test - INSERT');
+SELECT lsn, xid, chr(get_byte(data, 0)) AS message FROM pg_logical_slot_peek_binary_changes('olake_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'olake_publication');
+    lsn    | xid | message 
+-----------+-----+---------
+ 0/C014320 | 896 | B
+ 0/C014320 | 896 | R
+ 0/C014320 | 896 | I
+ 0/C014460 | 896 | C
+(4 rows)
+
+-- a table without a key in the publication
+ALTER PUBLICATION olake_publication ADD TABLE events_nopk;
+INSERT INTO events_nopk VALUES (1, 20.5);
+UPDATE events_nopk SET reading = 22.0 WHERE device_id = 1;
+ERROR:  cannot update table "events_nopk" because it does not have a replica identity and publishes updates
+HINT:  To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.
+DELETE FROM events_nopk WHERE device_id = 1;
+ERROR:  cannot delete from table "events_nopk" because it does not have a replica identity and publishes deletes
+HINT:  To enable deleting from the table, set REPLICA IDENTITY using ALTER TABLE.
+ALTER PUBLICATION olake_publication DROP TABLE events_nopk;
+
+# as cdc_user (rds_replication, USAGE and SELECT only)
+CREATE PUBLICATION cdc_user_pub FOR ALL TABLES;
+ERROR:  permission denied for database appdb
+CREATE PUBLICATION cdc_user_pub FOR TABLE public.orders;
+ERROR:  permission denied for database appdb
+SELECT count(*) AS messages FROM pg_logical_slot_peek_binary_changes('olake_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'olake_publication');
+ messages 
+----------
+        8
+(1 row)
+
+
+# clean up
+SELECT pg_drop_replication_slot('olake_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+DROP PUBLICATION olake_publication;
+DROP TABLE test_table;

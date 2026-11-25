@@ -1,0 +1,39 @@
+import CodeBlock from '@theme/CodeBlock';
+
+With Glue as the catalog, Snowflake reads the tables through a **catalog integration**: an external volume that points at the S3 bucket, an integration that points at the Glue database, and one `CREATE ICEBERG TABLE` per table. These tables are read-only in Snowflake, and Snowflake picks up new snapshots when you refresh them.
+
+<CodeBlock language="sql" title="Snowsight, once">{`-- 1. The bucket OLake Go writes to
+CREATE OR REPLACE EXTERNAL VOLUME olake_s3_volume
+  STORAGE_LOCATIONS = ((
+    NAME = 'olake-s3',
+    STORAGE_PROVIDER = 'S3',
+    STORAGE_BASE_URL = 's3://<bucket>/',
+    STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::<account>:role/<snowflake-s3-role>',
+    STORAGE_AWS_EXTERNAL_ID = 'olake_s3_volume_ext_id'   -- any string; it goes into the role's trust policy
+  ));
+
+-- 2. The Glue database OLake Go created for the job
+CREATE OR REPLACE CATALOG INTEGRATION olake_glue
+  CATALOG_SOURCE = GLUE
+  CATALOG_NAMESPACE = '${props.schema ?? 'pg_to_snowflake_shop_public'}'
+  TABLE_FORMAT = ICEBERG
+  GLUE_AWS_ROLE_ARN = 'arn:aws:iam::<account>:role/<snowflake-glue-role>'
+  GLUE_CATALOG_ID = '<account>'
+  GLUE_REGION = '<region>'
+  ENABLED = TRUE;
+
+-- 3. The values your IAM roles must trust
+DESCRIBE EXTERNAL VOLUME olake_s3_volume;
+DESCRIBE CATALOG INTEGRATION olake_glue;
+
+-- 4. One table per Iceberg table
+CREATE OR REPLACE ICEBERG TABLE customers
+  EXTERNAL_VOLUME = 'olake_s3_volume'
+  CATALOG = 'olake_glue'
+  CATALOG_TABLE_NAME = 'customers';
+
+SELECT ${props.idCol ?? 'id'}, name, city, tier FROM customers ORDER BY ${props.idCol ?? 'id'};`}</CodeBlock>
+
+Step 3 is where the AWS side gets wired up. `DESCRIBE EXTERNAL VOLUME` returns `STORAGE_AWS_IAM_USER_ARN` and `STORAGE_AWS_EXTERNAL_ID`; put both into the trust policy of the S3 role. `DESCRIBE CATALOG INTEGRATION` returns `GLUE_AWS_IAM_USER_ARN` and `GLUE_AWS_EXTERNAL_ID`; put those into the trust policy of the Glue role. Until the trust policies carry these values, step 4 fails with an access error.
+
+After every OLake Go sync, run `ALTER ICEBERG TABLE customers REFRESH;` so Snowflake reads the new snapshot. The full walk-through, including the IAM trust policies, is in [Query Iceberg in Snowflake with OLake and AWS Glue](/blog/olake-glue-snowflake/) and Snowflake's [Glue catalog integration guide](https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-catalog-integration-glue).

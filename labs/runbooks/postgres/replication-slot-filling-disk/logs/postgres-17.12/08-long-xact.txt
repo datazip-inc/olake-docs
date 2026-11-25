@@ -1,0 +1,81 @@
+# ./run.sh long-xact    PostgreSQL 17.12    2026-11-16T18:22:55Z
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/2CEBB3A0
+(1 row)
+
+$ pg_recvlogical -d appdb --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null -v  &
+
+## A session opens a transaction, writes one row and then does nothing for 60 seconds.
+$ (echo "BEGIN; INSERT INTO notes (body) VALUES ('left open');"; sleep 60; echo 'COMMIT;') | psql -d appdb &
+
+## Other sessions write 96 MB. The consumer is healthy and reports every 10 seconds.
+CALL write_wal(96);
+CALL
+CHECKPOINT;
+CHECKPOINT
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |       2392 | 0/2CEBB368  | 0/32FBC3D8          | 97 MB        | extended   |               | 
+(1 row)
+
+SELECT s.slot_name, r.pid, r.application_name, r.state, r.sent_lsn, r.flush_lsn, r.reply_time
+FROM pg_replication_slots s LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid ORDER BY s.slot_name;
+ slot_name | pid  | application_name |   state   |  sent_lsn  | flush_lsn  |          reply_time           
+-----------+------+------------------+-----------+------------+------------+-------------------------------
+ cdc_slot  | 2392 | pg_recvlogical   | streaming | 0/32FBC590 | 0/32FBC3D8 | 2026-11-16 18:23:06.939174+00
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         8 | 128 MB
+(1 row)
+
+
+## What holds restart_lsn: the oldest transaction that is still open
+SELECT pid, datname, state, now() - xact_start AS open_for, backend_xid, left(query, 50) AS last_statement
+FROM pg_stat_activity WHERE backend_xid IS NOT NULL ORDER BY xact_start;
+ pid  | datname |        state        |    open_for     | backend_xid |                 last_statement                 
+------+---------+---------------------+-----------------+-------------+------------------------------------------------
+ 2410 | appdb   | idle in transaction | 00:00:16.146548 |        1144 | INSERT INTO notes (body) VALUES ('left open');
+(1 row)
+
+
+## The transaction ends. restart_lsn moves at the consumer's next reports.
+after checkpoint 1: restart_lsn 0/32FBC5F8, retained by the slot 2031 kB, pg_wal 80 MB in 5 files
+SELECT slot_name, slot_type, database, active, active_pid, restart_lsn, confirmed_flush_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal,
+       wal_status, pg_size_pretty(safe_wal_size) AS safe_wal_size, invalidation_reason
+FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | database | active | active_pid | restart_lsn | confirmed_flush_lsn | retained_wal | wal_status | safe_wal_size | invalidation_reason 
+-----------+-----------+----------+--------+------------+-------------+---------------------+--------------+------------+---------------+---------------------
+ cdc_slot  | logical   | appdb    | t      |       2392 | 0/32FBC5F8  | 0/32FBC630          | 2031 kB      | reserved   |               | 
+(1 row)
+
+SELECT count(*) AS wal_files, pg_size_pretty(sum(size)) AS pg_wal_size FROM pg_ls_waldir();
+ wal_files | pg_wal_size 
+-----------+-------------
+         5 | 80 MB
+(1 row)
+
+--- consumer output
+pg_recvlogical: starting log streaming at 0/0 (slot cdc_slot)
+pg_recvlogical: streaming initiated
+pg_recvlogical: confirming write up to 0/0, flush to 0/0 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC3D8, flush to 0/32FBC3D8 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC590, flush to 0/32FBC590 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC590, flush to 0/32FBC590 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC5C8, flush to 0/32FBC5C8 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC5C8, flush to 0/32FBC5C8 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC5C8, flush to 0/32FBC5C8 (slot cdc_slot)
+pg_recvlogical: confirming write up to 0/32FBC630, flush to 0/32FBC630 (slot cdc_slot)
+---
+
+## Stop the consumer.
+$ kill -TERM <pid of pg_recvlogical>

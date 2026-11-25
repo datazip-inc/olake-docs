@@ -53,7 +53,7 @@ const ContributorProgramPage = () => {
     'url': 'https://olake.io/',
     'logo': 'https://olake.io/img/logo/olake-blue.svg',
     'sameAs': [
-      'https://github.com/datazip-inc/olake',
+      'https://github.com/datazip-inc/olake-go',
       'https://x.com/_olake',
       'https://www.linkedin.com/company/datazipio/',
       'https://www.youtube.com/@olakeio'
@@ -72,9 +72,9 @@ const ContributorProgramPage = () => {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     'url': 'https://olake.io/',
-    'name': 'Fastest Open Source Data Replication Tool',
+    'name': 'OLake: Open Source Data Replication to Apache Iceberg',
     'description':
-      'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     'publisher': {
       '@type': 'Organization',
       'name': 'OLake'
@@ -178,14 +178,14 @@ const ContributorProgramPage = () => {
       title: 'Pick an Issue',
       description:
         'Browse open issues labeled "good first issue" or "help wanted" to find your first contribution.',
-      link: 'https://github.com/datazip-inc/olake/issues'
+      link: 'https://github.com/datazip-inc/olake-go/issues'
     },
     {
       number: '04',
       title: 'Start Contributing',
       description:
         'Submit your pull request and earn points. Our maintainers will review and provide feedback.',
-      link: 'https://github.com/datazip-inc/olake/pulls'
+      link: 'https://github.com/datazip-inc/olake-go/pulls'
     }
   ]
 
@@ -319,7 +319,7 @@ const ContributorProgramPage = () => {
           actions={
             <>
               <Button
-                href='https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22'
+                href='https://github.com/datazip-inc/olake-go/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22'
                 size='lg'
                 external
               >
@@ -521,14 +521,14 @@ const ContributorProgramPage = () => {
           </p>
           <div className='mt-[22px] flex flex-wrap gap-[8px] lg:mt-[28px] lg:gap-[12px]'>
             <Button
-              href='https://github.com/datazip-inc/olake/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22'
+              href='https://github.com/datazip-inc/olake-go/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22'
               size='lg'
               external
             >
               <PiHandshake aria-hidden='true' /> Start Now
             </Button>
             <Button
-              href='https://github.com/datazip-inc/olake'
+              href='https://github.com/datazip-inc/olake-go'
               variant='secondary'
               size='lg'
               external

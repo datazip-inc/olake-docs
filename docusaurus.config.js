@@ -51,15 +51,14 @@ const latestOlakeRelease = getLatestOlakeRelease()
 const config = {
   title: 'OLake',
   tagline:
-    'Fastest open-source tool for replicating Databases to Data Lake in Open Table Formats like Apache Iceberg. Efficient, quick and scalable data ingestion for real-time analytics. Supporting Postgres, MongoDB, MySQL, Oracle and Kafka with 5-500x faster than alternatives.',
+    'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
   favicon: 'img/logo/olake-blue.svg',
 
   // Exposed to components via useDocusaurusContext().siteConfig.customFields
   customFields: {
     latestOlakeVersion: latestOlakeRelease.version,
     latestOlakeReleaseLabel: latestOlakeRelease.label,
-    latestOlakeReleasePath: latestOlakeRelease.docPath,
-    askAssistantApiUrl: process.env.ASK_OLAKE_API_URL || 'https://ask-olake-nh7j.onrender.com',
+    latestOlakeReleasePath: latestOlakeRelease.docPath
   },
 
   // Set the production url of your site here
@@ -506,6 +505,10 @@ const config = {
         redirects: [
           // /ai-lake was a client-side redirect page to /contact/; now a real redirect (not in the sitemap)
           { to: '/contact', from: '/ai-lake' },
+          // wal2json is not supported and its page was removed; the page still got search traffic for "wal2json",
+          // and the logical replication runbook covers output plugins. scripts/runbooks/check.mjs fails while the
+          // target is unlisted, so this redirect only ships together with that runbook.
+          { to: '/docs/runbooks/postgres/enable-logical-replication/', from: '/docs/connectors/postgres/wal2json_plugin' },
           // URLs that still get search traffic (Search Console) but had no redirect
           // Author pages removed for authors without posts
           { to: '/blog/authors', from: '/blog/authors/pavan' },
@@ -554,29 +557,29 @@ const config = {
           { to: '/blog/tags/snowflake/', from: '/iceberg/tags/snowflake/' },
           { to: '/blog/tags/trino/', from: '/iceberg/tags/trino/' },
           { to: '/blog/tags/iceberg/', from: '/iceberg/tags/iceberg/page/2/' },
-          // The Iceberg query engine compatibility section (/iceberg/query-engine) was removed: the hub goes to the
-          // compatibility doc, every other page to the closest post
-          { to: '/docs/understanding/compatibility-engines/', from: '/iceberg/query-engine/' },
-          { to: '/blog/olake-iceberg-athena/', from: '/iceberg/query-engine/athena/' },
-          { to: '/blog/olake-iceberg-trino/', from: '/iceberg/query-engine/trino/' },
-          { to: '/blog/databricks-vs-iceberg/', from: '/iceberg/query-engine/databricks/' },
-          { to: '/blog/olake-glue-snowflake/', from: '/iceberg/query-engine/snowflake/' },
+          // The Iceberg query engine section (/iceberg/query-engine) was removed: the hub goes to the Integrations
+          // overview, each engine with an integrations hub goes to that hub, the rest to the closest post
+          { to: '/docs/integrations/', from: '/iceberg/query-engine/' },
+          { to: '/docs/integrations/athena/', from: '/iceberg/query-engine/athena/' },
+          { to: '/docs/integrations/trino/', from: '/iceberg/query-engine/trino/' },
+          { to: '/docs/integrations/databricks/', from: '/iceberg/query-engine/databricks/' },
+          { to: '/docs/integrations/snowflake/', from: '/iceberg/query-engine/snowflake/' },
+          { to: '/docs/integrations/clickhouse/', from: '/iceberg/query-engine/clickhouse/' },
+          { to: '/docs/integrations/doris/', from: '/iceberg/query-engine/doris/' },
+          { to: '/docs/integrations/presto/', from: '/iceberg/query-engine/presto/' },
+          { to: '/docs/integrations/bigquery/', from: '/iceberg/query-engine/bigquery/' },
+          { to: '/docs/integrations/spark/', from: '/iceberg/query-engine/spark/' },
+          { to: '/docs/integrations/duckdb/', from: '/iceberg/query-engine/duckdb/' },
+          { to: '/docs/integrations/starburst/', from: '/iceberg/query-engine/starburst/' },
+          { to: '/docs/integrations/starrocks/', from: '/iceberg/query-engine/starrocks/' },
           { to: '/blog/apache-iceberg-hive-comparison/', from: '/iceberg/query-engine/hive/' },
-          { to: '/blog/build-data-lakehouse-iceberg-clickhouse-olake/', from: '/iceberg/query-engine/clickhouse/' },
-          { to: '/blog/postgres-iceberg-doris-lakehouse-olake/', from: '/iceberg/query-engine/doris/' },
-          { to: '/blog/building-open-data-lakehouse-with-olake-presto/', from: '/iceberg/query-engine/presto/' },
-          { to: '/blog/postgres-cdc-bigquery-iceberg-biglake/', from: '/iceberg/query-engine/bigquery/' },
-          { to: '/blog/iceberg-query-engine-interoperability-spark-databricks/', from: '/iceberg/query-engine/spark/' },
           {
             to: '/blog/iceberg-query-engine-interoperability-spark-databricks/',
             from: [
               '/iceberg/query-engine/flink/',
-              '/iceberg/query-engine/duckdb/',
               '/iceberg/query-engine/impala/',
               '/iceberg/query-engine/dreamio/',
-              '/iceberg/query-engine/dremio/',
-              '/iceberg/query-engine/starburst/',
-              '/iceberg/query-engine/starrocks/'
+              '/iceberg/query-engine/dremio/'
             ]
           },
           // Posts that were published in /blog and moved to /compare and /learn: keep their old URLs working
@@ -1452,6 +1455,10 @@ const config = {
             from: '/docs/connectors'
           },
           {
+            to: '/docs/connectors/kafka/',
+            from: '/docs/connectors/kafka/overview'
+          },
+          {
             to: '/docs/install/docker-cli/#streams-config',
             from: '/iceberg/docs/core/configs/catalog/'
           },
@@ -1540,7 +1547,7 @@ const config = {
             from: '/docs/connectors/getting-started/olake-ui/'
           },
           {
-            to: 'https://github.com/datazip-inc/olake',
+            to: 'https://github.com/datazip-inc/olake-go',
             from: '/github'
           }
         ]
