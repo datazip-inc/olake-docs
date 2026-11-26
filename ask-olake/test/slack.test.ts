@@ -121,7 +121,10 @@ test('answers a mention in a thread under it, with the sources as links', async 
     'Set `wal_level`.\n\nSources: [Postgres > CDC beta](https://olake.io/docs/postgres/#cdc)'
   assert.equal(args.text, text)
   assert.deepEqual(JSON.parse(args.blocks), [{ type: 'markdown', text }])
-  assert.match(sentTo(fetched).messages.at(-1).content, /Question: how do I set up postgres cdc\?$/)
+  assert.match(
+    sentTo(fetched).messages.at(-1).content,
+    /Question: how do I set up postgres cdc\?\n\n---\n/
+  )
 
   const [row] = env.DB.sqlite.prepare('SELECT * FROM questions').all()
   assert.deepEqual(

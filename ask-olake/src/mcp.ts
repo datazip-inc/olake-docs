@@ -3,7 +3,7 @@
 // writes its own answer. The transport is MCP's "streamable HTTP" without sessions: every request
 // is one JSON-RPC message and gets one JSON answer.
 
-import { MAX_QUESTION_CHARS, type Env } from './guard.ts'
+import { MAX_QUESTION_CHARS, parse, readBody, type Env } from './guard.ts'
 import { redactSecrets } from './redact.ts'
 import { search } from './search.ts'
 
@@ -34,7 +34,7 @@ type Message = {
 export async function mcp(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST')
     return new Response(null, { status: 405, headers: { Allow: 'POST' } })
-  const message = (await request.json().catch(() => null)) as Message | null
+  const message = parse((await readBody(request)) ?? '') as Message | null
   const answer = (body: object, status = 200) =>
     Response.json({ jsonrpc: '2.0', id: message?.id ?? null, ...body }, { status })
   const refuse = (code: number, text: string, status = 200) =>

@@ -27,7 +27,7 @@ test('writes an issue as its state and labels, the report, then the replies', ()
     }),
     ['Fixed in v0.12.0.', 'Thanks!']
   )
-  assert.equal(section.pageTitle, 'demo issue #7: CDC stops on MariaDB')
+  assert.equal(section.pageTitle, 'demo issue #7 (closed): CDC stops on MariaDB')
   assert.equal(section.url, 'https://github.com/datazip-inc/demo/issues/7')
   assert.ok(
     section.text.startsWith(
@@ -81,7 +81,7 @@ test('reads every page of issues and replies, without pull requests and bot comm
     sections[0].text,
     'GitHub issue, open.\n\nIt fails.\n\n**Reply:** First reply.\n\n**Reply:** Second reply.'
   )
-  assert.equal(sections[1].pageTitle, 'demo issue #3: Issue 3')
+  assert.equal(sections[1].pageTitle, 'demo issue #3 (open): Issue 3')
   assert.deepEqual(asked.sort(), [
     '/repos/datazip-inc/demo/issues/comments?sort=created&per_page=100&page=1',
     '/repos/datazip-inc/demo/issues?state=all&per_page=100&page=1',

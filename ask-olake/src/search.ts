@@ -18,6 +18,11 @@ export type Options = {
   blogWeight: number
   repoWeight: number
   /**
+   * Score factor for a GitHub issue. An issue is one user's report, often of something long
+   * fixed: it should come up for the error it describes, not for any question on its topic.
+   */
+  issueWeight: number
+  /**
    * Score factor for the "X to Y" integration pages. There is one per source and query engine,
    * built from the same shared blocks, so without it they fill the results of any question
    * about a source and push out the connector's own page.
@@ -30,6 +35,7 @@ export const DEFAULTS: Options = {
   perPage: 3,
   blogWeight: 0.6,
   repoWeight: 0.8,
+  issueWeight: 0.6,
   pairWeight: 0.7
 }
 
@@ -45,10 +51,12 @@ const RANK_OFFSET = 60
 const EMBED_TIMEOUT_MS = 3000
 
 // Words that say nothing about the topic, the product name among them: it is on every page.
+// The second line holds words that ask for a kind of answer ("explain briefly, in one sentence").
 const STOPWORDS = new Set(
-  'a an and are as at be but by can do does for from how i if in is it its my of on or our so that the their then there this to was we what when where which who why will with you your olake'.split(
-    ' '
-  )
+  (
+    'a an and are as at be but by can do does for from how i if in is it its my of on or our so that the their then there this to was we what when where which who why will with you your olake ' +
+    'please tell me give explain answer describe briefly brief short shortly sentence sentences words'
+  ).split(' ')
 )
 
 /** The question as a full-text query: its words joined by OR, so a chunk need not hold them all. */
@@ -116,30 +124,37 @@ async function nearest(
     .map((i) => i + 1)
 }
 
-const pageOf = (url: string) => url.split('#')[0]
-const PAIR_PAGE = /^https:\/\/olake\.io\/docs\/integrations\/[a-z0-9-]+-to-/
+const PAIR_PAGE = /^https:\/\/olake\.io\/docs\/integrations\/[a-z0-9-]+?-to-/
+const ISSUE = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\//
+// The "X to Y" pages of one source count as one page: they repeat each other, and five of them
+// would otherwise stand in the results where the connector's own page should.
+const pageOf = (url: string) => PAIR_PAGE.exec(url)?.[0] ?? url.split('#')[0]
 
 export async function search(
   env: { DB: D1Database; AI?: Ai },
   question: string,
   options: Partial<Options> = {}
 ): Promise<Hit[]> {
-  const { limit, titleWeight, perPage, blogWeight, repoWeight, pairWeight } = {
+  const { limit, titleWeight, perPage, blogWeight, repoWeight, issueWeight, pairWeight } = {
     ...DEFAULTS,
     ...options
   }
+  // A question in another script (Hindi, Chinese) has no words for the keyword search. It is
+  // still searched by meaning.
   const query = toQuery(question)
-  if (!query) return []
+  if (!query && !env.AI) return []
   const pool = limit * 10
   const [keyword, near] = await Promise.all([
-    env.DB.prepare(
-      `SELECT c.id, c.url, c.title, c.text
-       FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid
-       WHERE chunks_fts MATCH ?2 ORDER BY bm25(chunks_fts, ?1, 1.0) LIMIT ?3`
-    )
-      .bind(titleWeight, query, pool)
-      .all<Row>()
-      .then(({ results }) => results),
+    query
+      ? env.DB.prepare(
+          `SELECT c.id, c.url, c.title, c.text
+           FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid
+           WHERE chunks_fts MATCH ?2 ORDER BY bm25(chunks_fts, ?1, 1.0) LIMIT ?3`
+        )
+          .bind(titleWeight, query, pool)
+          .all<Row>()
+          .then(({ results }) => results)
+      : [],
     nearest(env, question, pool).catch((error) => {
       console.error(`meaning search failed: ${error}`)
       return []
@@ -166,13 +181,15 @@ export async function search(
     const row = rows.get(id)
     if (!row) return []
     const { url, title, text } = row
-    const weight = url.startsWith('https://github.com/')
-      ? repoWeight
-      : PAIR_PAGE.test(url)
-        ? pairWeight
-        : url.startsWith('https://olake.io/docs/')
-          ? 1
-          : blogWeight
+    const weight = ISSUE.test(url)
+      ? issueWeight
+      : url.startsWith('https://github.com/')
+        ? repoWeight
+        : PAIR_PAGE.test(url)
+          ? pairWeight
+          : url.startsWith('https://olake.io/docs/')
+            ? 1
+            : blogWeight
     return [{ url, title, text, score: score * weight }]
   })
   hits.sort((a, b) => b.score - a.score)

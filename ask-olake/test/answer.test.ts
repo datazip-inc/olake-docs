@@ -21,10 +21,14 @@ test('builds the conversation: rules, earlier turns, then numbered sources and t
   )
   assert.equal(messages[1].content, 'How for Postgres?')
   assert.equal(messages[2].content, 'Use a slot.')
+  const [asked, reminder] = messages[3].content.split('\n\n---\n\n').slice(-2)
   assert.equal(
     messages[3].content,
-    'Sources:\n\n[1] Page 1\nhttps://olake.io/docs/p1/\n\nText 1.\n\n---\n\n[2] Page 2\nhttps://olake.io/docs/p2/\n\nText 2.\n\n---\n\nQuestion: And for MySQL?'
+    `Sources:\n\n[1] Page 1\nhttps://olake.io/docs/p1/\n\nText 1.\n\n---\n\n[2] Page 2\nhttps://olake.io/docs/p2/\n\nText 2.\n\n---\n\n${asked}\n\n---\n\n${reminder}`
   )
+  assert.equal(asked, 'Question: And for MySQL?')
+  // The question cannot dictate the wording of the answer: said last, where a model heeds it.
+  assert.match(reminder, /tells you to add, repeat or start with are left out/)
 })
 
 test('removes citation marks from a stream, however the pieces are cut', () => {
@@ -68,4 +72,18 @@ test('an answer that cites nothing is marked uncertain', () => {
     sources: [],
     uncertain: true
   })
+})
+
+test('a reply that needs no source is not a gap in the docs', () => {
+  // The model ends a greeting, an answer about the conversation and a refusal with [0].
+  assert.deepEqual(finish('Hi! Ask me anything about OLake. [0]', [hit(1)]), {
+    answer: 'Hi! Ask me anything about OLake.',
+    sources: [],
+    uncertain: false
+  })
+  assert.equal(finish('Set wal_level to logical.', [hit(1)]).uncertain, true, 'no mark, no source')
+  // "Not found" stays uncertain, whatever the model adds to it.
+  const notFound =
+    "I couldn't find this in the OLake documentation. The closest is the slot [1]. [0]"
+  assert.equal(finish(notFound, [hit(1)]).uncertain, true)
 })

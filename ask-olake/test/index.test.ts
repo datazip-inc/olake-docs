@@ -86,7 +86,7 @@ test('streams the answer without citation marks, then the final answer with its 
   assert.deepEqual(sent.reasoning, { effort: 'none' })
   assert.match(
     sent.messages.at(-1).content,
-    /\[1\] Postgres > CDC\n.*\n\nSet wal_level to logical\.[\s\S]*Question: How do I enable CDC on Postgres\?$/
+    /\[1\] Postgres > CDC\n.*\n\nSet wal_level to logical\.[\s\S]*Question: How do I enable CDC on Postgres\?\n\n---\n/
   )
 })
 
@@ -272,7 +272,7 @@ test('searches for what a follow-up means, and answers the follow-up as it was a
   assert.match(answered.messages.at(-1).content, /^Sources:\n\n\[1\] MySQL > CDC\n/)
   assert.match(
     answered.messages.at(-1).content,
-    /Question: and the other database\?\n\(In full: How do I enable the binlog for MySQL\?\)$/
+    /Question: and the other database\?\n\(In full: How do I enable the binlog for MySQL\?\)\n\n---\n/
   )
   assert.deepEqual(events.at(-1)!.data.sources, [
     { url: 'https://olake.io/docs/mysql/#cdc', title: 'MySQL > CDC' }
@@ -304,6 +304,25 @@ test('summarises a long conversation and tells the browser how many turns that c
 test('refuses a request that is too large to be a question', async () => {
   const { response } = await ask({ question: 'postgres' }, { 'Content-Length': '100001' })
   assert.equal(response.status, 413)
+  // Sent in pieces, with no length given: the bytes are counted, and the rest is not read.
+  let pieces = 0
+  const endless = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pieces++
+      controller.enqueue(new TextEncoder().encode('x'.repeat(30_000)))
+    }
+  })
+  const request = new Request('https://api.test/ask', {
+    method: 'POST',
+    headers: { Origin: 'https://olake.io' },
+    body: endless,
+    duplex: 'half'
+  } as RequestInit)
+  const refused = await worker.fetch(request, env, {
+    waitUntil() {}
+  } as unknown as ExecutionContext)
+  assert.equal(refused.status, 413)
+  assert.ok(pieces < 10, `read ${pieces} pieces`)
 })
 
 test('with a captcha set up, answers only a visitor who holds a pass of their own', async () => {

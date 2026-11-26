@@ -158,8 +158,10 @@ export function useAskOlake(apiUrl: string, restore: boolean, captchaSiteKey = '
 
       setError(null)
       setIsLoading(true)
+      // A question that failed without an answer makes way for the next one, which may be the
+      // same question asked again.
       setTurns((all) => [
-        ...all,
+        ...all.filter((turn, i) => i < all.length - 1 || turn.id || turn.stopped || turn.answer),
         {
           question,
           answer: '',

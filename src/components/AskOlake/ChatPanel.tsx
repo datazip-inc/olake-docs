@@ -10,6 +10,7 @@ import { IconContext } from 'react-icons'
 import {
   PiCheck,
   PiCopy,
+  PiArrowClockwise,
   PiPaperPlaneRight,
   PiStopFill,
   PiClockCounterClockwise,
@@ -513,6 +514,8 @@ function Panel({
   if (!isOpen) return null
 
   const isWaitingForFirstWords = isLoading && !turns[turns.length - 1]?.answer
+  const lastTurn = turns[turns.length - 1]
+  const failedQuestion = lastTurn && !lastTurn.id && !lastTurn.stopped ? lastTurn.question : ''
 
   return (
     <div
@@ -772,8 +775,20 @@ function Panel({
           )}
 
           {error && !isLoading && (
-            <div className={clsx(ASSISTANT_BUBBLE, 'text-olake-danger')}>
-              <p className='m-0 leading-[1.5]'>{error}</p>
+            <div className={clsx(ASSISTANT_BUBBLE, 'flex items-start gap-[8px] text-olake-danger')}>
+              <p className='m-0 flex-1 leading-[1.5]'>{error}</p>
+              {/* The question that failed is asked again, without typing it a second time. */}
+              {failedQuestion && (
+                <button
+                  type='button'
+                  aria-label='Try again'
+                  title='Try again'
+                  className={clsx(ANSWER_BUTTON, 'shrink-0 cursor-pointer text-olake-muted')}
+                  onClick={() => sendQuestion(failedQuestion)}
+                >
+                  <PiArrowClockwise size={14} />
+                </button>
+              )}
             </div>
           )}
         </div>

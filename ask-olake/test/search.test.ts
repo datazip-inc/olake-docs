@@ -81,6 +81,38 @@ test('ranks the docs above a blog post that matches better', async () => {
   assert.equal((await search({ DB: db }, 'replication slot', { limit: 1 })).length, 1)
 })
 
+test('counts the "X to Y" pages of one source as one page, and ranks an issue below the docs', async () => {
+  const INTEGRATIONS = `${DOCS}/integrations`
+  const text = (n: number) => `Create the publication and the replication slot, variant ${n}.`
+  const pairs = testDb([
+    ...['iceberg', 'snowflake', 'redshift', 'duckdb'].map((engine, n) => ({
+      url: `${INTEGRATIONS}/postgres-to-${engine}/#prepare`,
+      title: `Postgres to ${engine}`,
+      text: text(n)
+    })),
+    { url: `${INTEGRATIONS}/sql-server-to-iceberg/#prepare`, title: 'SQL Server', text: text(9) },
+    {
+      url: 'https://github.com/datazip-inc/olake-go/issues/7',
+      title: 'olake-go issue #7 (closed): publication and replication slot',
+      text: 'The publication and the replication slot: publication, replication slot.'
+    },
+    {
+      url: `${DOCS}/postgres/#cdc`,
+      title: 'Postgres',
+      text: 'A publication and a replication slot.'
+    }
+  ])
+  const urls = (await search({ DB: pairs }, 'publication replication slot', { perPage: 2 })).map(
+    (hit) => hit.url
+  )
+  assert.equal(urls.filter((url) => url.includes('/postgres-to-')).length, 2)
+  assert.ok(urls.includes(`${INTEGRATIONS}/sql-server-to-iceberg/#prepare`), 'another source')
+  const issue = urls.indexOf('https://github.com/datazip-inc/olake-go/issues/7')
+  assert.ok(issue > urls.indexOf(`${DOCS}/postgres/#cdc`), 'the issue matches better, the docs win')
+  const even = await search({ DB: pairs }, 'publication replication slot', { issueWeight: 2 })
+  assert.equal(even[0].url, 'https://github.com/datazip-inc/olake-go/issues/7')
+})
+
 // A vector that points along one axis, and the AI binding that embeds every question as `axis`.
 const along = (axis: number) => Int8Array.from({ length: DIMS }, (_, k) => (k === axis ? 127 : 0))
 const ai = (axis: number) =>
@@ -108,6 +140,15 @@ test('adds the chunks closest in meaning to the ones that match by keyword', asy
   assert.deepEqual(await urls(ai(2)), [`${DOCS}/mysql/`, `${DOCS}/kafka/`, `${DOCS}/slots/`])
   // Found by both searches: first, however many others there are.
   assert.equal((await urls(ai(0)))[0], `${DOCS}/mysql/`)
+})
+
+test('searches a question that has no words for the keyword search by meaning', async () => {
+  const withVectors = testDb(PAGES, vectorsOf([0, 1, 2]))
+  withVectors.sqlite.exec('UPDATE index_info SET built = 151')
+  const hindi = 'काफ्का टॉपिक कैसे पढ़ें?'
+  assert.equal(toQuery(hindi), '')
+  assert.deepEqual(await search({ DB: withVectors }, hindi), [], 'no meaning search: nothing')
+  assert.equal((await search({ DB: withVectors, AI: ai(2) }, hindi))[0].url, `${DOCS}/kafka/`)
 })
 
 test('reads the vectors again when the index has been replaced', async () => {

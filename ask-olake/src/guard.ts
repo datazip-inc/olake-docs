@@ -24,6 +24,39 @@ export type Env = {
 }
 
 export const MAX_QUESTION_CHARS = 4000
+// A request of the widget at its limits, and an event from Slack, are well under this.
+const MAX_BODY_BYTES = 100_000
+
+/**
+ * The body of a request as text, or null when it is larger than any real request. The bytes are
+ * counted as they arrive: a sender can leave out Content-Length, or lie in it.
+ */
+export async function readBody(request: Request): Promise<string | null> {
+  if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) return null
+  if (!request.body) return ''
+  const reader = request.body.getReader()
+  const decoder = new TextDecoder()
+  let text = ''
+  for (let size = 0; ;) {
+    const { value, done } = await reader.read()
+    if (done) return text + decoder.decode()
+    size += value.byteLength
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel()
+      return null
+    }
+    text += decoder.decode(value, { stream: true })
+  }
+}
+
+/** The text as JSON, or null when it is not JSON. */
+export function parse(text: string): any {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
 
 /**
  * Why this visitor cannot ask right now, or null. `who` is the visitor's address, or the Slack

@@ -39,7 +39,8 @@ export function issueSection(repo: string, issue: Issue, replies: string[]): Sec
   return {
     pageUrl: issue.html_url,
     url: issue.html_url,
-    pageTitle: `${repo} issue #${issue.number}: ${issue.title}`,
+    // The state is in the title, which every part of a long issue carries.
+    pageTitle: `${repo} issue #${issue.number} (${issue.state}): ${issue.title}`,
     heading: '',
     text: parts.filter(Boolean).join('\n\n')
   }

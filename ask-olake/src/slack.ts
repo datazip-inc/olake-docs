@@ -7,7 +7,7 @@
 // groups:history, im:history, reactions:read.
 
 import { answer } from './answer.ts'
-import { MAX_QUESTION_CHARS, whyNot, type Env } from './guard.ts'
+import { MAX_QUESTION_CHARS, readBody, whyNot, type Env } from './guard.ts'
 import { isSignatureOf } from './hmac.ts'
 import { record, saveVote } from './log.ts'
 import { SUMMARISE_ABOVE, type Turn } from './memory.ts'
@@ -135,8 +135,9 @@ export async function slackEvents(
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
-  const body = await request.text()
+  const body = await readBody(request)
   if (
+    body === null ||
     request.method !== 'POST' ||
     !env.SLACK_SIGNING_SECRET ||
     !env.SLACK_BOT_TOKEN ||

@@ -7,7 +7,7 @@
 
 import { answer, withoutMarks } from './answer.ts'
 import { hasPass, passFor } from './captcha.ts'
-import { MAX_QUESTION_CHARS, whyNot, type Env } from './guard.ts'
+import { MAX_QUESTION_CHARS, parse, readBody, whyNot, type Env } from './guard.ts'
 import { record, saveVote } from './log.ts'
 import { mcp } from './mcp.ts'
 import type { Turn } from './memory.ts'
@@ -18,8 +18,6 @@ import { slackEvents } from './slack.ts'
 // What is kept of the earlier turns: enough for a follow-up question to make sense.
 const MAX_HISTORY_TURNS = 8
 const MAX_TURN_CHARS = 2000
-// A request of the widget at its limits is well under this.
-const MAX_BODY_BYTES = 100_000
 
 /** The earlier turns the browser sent, cut to size. Anything that is not a turn is dropped. */
 function readHistory(value: unknown): Turn[] {
@@ -58,9 +56,9 @@ export default {
       return refusal(404, 'Not found.')
     // Only pages of our own sites may use the bot. A browser cannot fake this header.
     if (!allowed) return refusal(403, 'This site may not use AskOlake.')
-    if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES)
-      return refusal(413, 'The request is too large.')
-    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+    const sent = await readBody(request)
+    if (sent === null) return refusal(413, 'The request is too large.')
+    const body = parse(sent) as Record<string, unknown> | null
     // The address Cloudflare saw the request come from. Headers such as X-Forwarded-For are not read.
     const visitor = request.headers.get('CF-Connecting-IP') ?? 'unknown'
 
