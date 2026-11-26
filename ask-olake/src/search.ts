@@ -141,7 +141,7 @@ export async function search(
       .all<Row>()
       .then(({ results }) => results),
     nearest(env, question, pool).catch((error) => {
-      console.error('meaning search failed:', error)
+      console.error(`meaning search failed: ${error}`)
       return []
     })
   ])

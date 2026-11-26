@@ -5,6 +5,7 @@
 //
 // With CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN set, the chunks are also embedded for
 // meaning search. Without them the index is built for keyword search only.
+// With GITHUB_TOKEN set, the issues of the code repositories are read from GitHub and indexed.
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12,6 +13,7 @@ import { DIMS } from '../src/search.ts'
 import { chunkSections, type Chunk } from './chunk.ts'
 import { embedChunks } from './embed.ts'
 import { parsePage } from './html.ts'
+import { readIssues } from './issues.ts'
 import { readRepo } from './repos.ts'
 
 const ASK_OLAKE = join(import.meta.dirname, '..')
@@ -98,7 +100,16 @@ if (import.meta.main) {
   const pages = (chunks: Chunk[]) => new Set(chunks.map((chunk) => chunk.pageUrl)).size
   console.log(`site: ${site.length} chunks from ${pages(site)} pages`)
   console.log(`repositories: ${repos.length} chunks from ${pages(repos)} files`)
-  const chunks = [...site, ...latestReleases(site), ...repos]
+  // Any GitHub token can read the issues of a public repository.
+  const github = process.env.GITHUB_TOKEN
+  const reports = github
+    ? await Promise.all(Object.keys(REPOS).map((name) => readIssues(`datazip-inc/${name}`, github)))
+    : []
+  const issues = chunkSections(reports.flat())
+  console.log(
+    github ? `issues: ${issues.length} chunks from ${pages(issues)} issues` : 'issues: not read'
+  )
+  const chunks = [...site, ...latestReleases(site), ...repos, ...issues]
   const { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token } = process.env
   const out = join(ASK_OLAKE, '.wrangler/ingest')
   mkdirSync(out, { recursive: true })
