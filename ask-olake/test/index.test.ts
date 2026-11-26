@@ -1,20 +1,28 @@
 import assert from 'node:assert/strict'
 import { afterEach, mock, test } from 'node:test'
-import worker, { type Env } from '../src/index.ts'
-import { modelReply, testDb } from './helpers.ts'
+import type { Env } from '../src/guard.ts'
+import worker from '../src/index.ts'
+import { modelReply, sentTo, testDb } from './helpers.ts'
 
-const env: Env = {
-  DB: testDb([
-    {
-      url: 'https://olake.io/docs/postgres/#cdc',
-      title: 'Postgres > CDC',
-      text: 'Set wal_level to logical.'
-    },
-    { url: 'https://olake.io/docs/mysql/#cdc', title: 'MySQL > CDC', text: 'Enable the binlog.' }
-  ]),
+const CHUNKS = [
+  {
+    url: 'https://olake.io/docs/postgres/#cdc',
+    title: 'Postgres > CDC',
+    text: 'Set wal_level to logical.'
+  },
+  { url: 'https://olake.io/docs/mysql/#cdc', title: 'MySQL > CDC', text: 'Enable the binlog.' }
+]
+/** A fresh Worker environment: its own index and log, and a rate limit that lets everything through. */
+const newEnv = (limit = async (_: { key: string }) => ({ success: true })) => ({
+  DB: testDb(CHUNKS),
+  RATE_LIMIT: { limit } as unknown as RateLimit,
   OPENROUTER_API_KEY: 'test-key',
-  ALLOWED_ORIGINS: 'https://olake.io,http://localhost:3000'
-}
+  ALLOWED_ORIGINS: 'https://olake.io,http://localhost:3000',
+  DAILY_BUDGET_USD: '3'
+})
+let env: Env & { DB: ReturnType<typeof testDb> } = newEnv()
+const logged = () =>
+  env.DB.sqlite.prepare('SELECT * FROM questions ORDER BY at').all() as Array<Record<string, any>>
 
 /** Calls the Worker and waits for the work it does after it has started to answer. */
 async function call(request: Request) {
@@ -32,16 +40,20 @@ async function call(request: Request) {
   }))
   return { response, text, events }
 }
-const ask = (body: unknown, origin = 'https://olake.io') =>
+const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
   call(
-    new Request('https://api.test/ask', {
+    new Request(`https://api.test/${path}`, {
       method: 'POST',
-      headers: { Origin: origin },
+      headers: { 'Origin': 'https://olake.io', 'CF-Connecting-IP': '203.0.113.7', ...headers },
       body: JSON.stringify(body)
     })
   )
+const ask = (body: unknown, headers?: Record<string, string>) => post('ask', body, headers)
 
-afterEach(() => mock.restoreAll())
+afterEach(() => {
+  mock.restoreAll()
+  env = newEnv()
+})
 
 test('streams the answer without citation marks, then the final answer with its sources', async () => {
   const fetched = mock.method(globalThis, 'fetch', async () =>
@@ -71,6 +83,7 @@ test('streams the answer without citation marks, then the final answer with its 
   assert.equal((init.headers as Record<string, string>).Authorization, 'Bearer test-key')
   const sent = JSON.parse(init.body as string)
   assert.equal(sent.stream, true)
+  assert.deepEqual(sent.reasoning, { effort: 'none' })
   assert.match(
     sent.messages.at(-1).content,
     /\[1\] Postgres > CDC\n.*\n\nSet wal_level to logical\.[\s\S]*Question: How do I enable CDC on Postgres\?$/
@@ -87,7 +100,7 @@ test('passes the earlier turns to the model, and only well-formed ones', async (
     'junk'
   ]
   await ask({ question: 'And the binlog for MySQL?', history })
-  const sent = JSON.parse((fetched.mock.calls[0].arguments[1] as RequestInit).body as string)
+  const sent = sentTo(fetched, 1)
   assert.deepEqual(sent.messages.slice(1, -1), [
     { role: 'user', content: 'How for Postgres?' },
     { role: 'assistant', content: 'Set wal_level.' }
@@ -138,8 +151,7 @@ test('refuses a request that is not a question', async () => {
   }
   const get = await call(new Request('https://api.test/ask'))
   assert.equal(get.response.status, 404)
-  const other = await call(new Request('https://api.test/other', { method: 'POST', body: '{}' }))
-  assert.equal(other.response.status, 404)
+  assert.equal((await post('other', {})).response.status, 404)
 })
 
 test('answers the preflight request, and allows only the listed sites', async () => {
@@ -157,7 +169,139 @@ test('answers the preflight request, and allows only the listed sites', async ()
     (await preflight('https://evil.example')).headers.get('Access-Control-Allow-Origin'),
     null
   )
-  mock.method(globalThis, 'fetch', async () => modelReply(['Hi [1].']))
-  const { response } = await ask({ question: 'postgres cdc' }, 'https://evil.example')
-  assert.equal(response.headers.get('Access-Control-Allow-Origin'), null)
+})
+
+test('refuses another site, and a request with no Origin, before any work is done', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async () => modelReply(['Hi [1].']))
+  for (const origin of ['https://evil.example', '']) {
+    for (const path of ['ask', 'feedback']) {
+      const { response } = await post(path, { question: 'postgres cdc' }, { Origin: origin })
+      assert.equal(response.status, 403)
+      assert.equal(response.headers.get('Access-Control-Allow-Origin'), null)
+    }
+  }
+  assert.equal(fetched.mock.callCount(), 0)
+  assert.equal(logged().length, 0)
+})
+
+test('limits how fast one visitor asks, by the address Cloudflare reports', async () => {
+  const keys: string[] = []
+  env = newEnv(async ({ key }) => ({ success: keys.push(key) <= 2 }))
+  const fetched = mock.method(globalThis, 'fetch', async () => modelReply(['Hi [1].']))
+  const spoofed = { 'X-Forwarded-For': '198.51.100.1' }
+  assert.equal((await ask({ question: 'postgres cdc' }, spoofed)).response.status, 200)
+  assert.equal((await ask({ question: 'postgres cdc' }, spoofed)).response.status, 200)
+  const third = await ask({ question: 'postgres cdc' }, spoofed)
+  assert.equal(third.response.status, 429)
+  assert.match(JSON.parse(third.text).error.message, /wait a minute/)
+  assert.deepEqual(
+    keys,
+    ['203.0.113.7', '203.0.113.7', '203.0.113.7'],
+    'a forged header is not read'
+  )
+  assert.equal(fetched.mock.callCount(), 2)
+})
+
+test('stops answering when the day has cost its budget, and starts again the next day', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async () => modelReply(['Hi [1].'], 1.6))
+  const spend = (id: string, at: string, cost: number) =>
+    env.DB.sqlite.exec(
+      `INSERT INTO questions (id, at, channel, question, answer, sources, uncertain, cost) VALUES ('${id}', ${at}, 'web', 'q', 'a', '[]', 0, ${cost})`
+    )
+  spend('yesterday', 'unixepoch() - unixepoch() % 86400 - 1', 50)
+  assert.equal((await ask({ question: 'postgres cdc' })).response.status, 200, 'costs 1.6')
+  assert.equal((await ask({ question: 'postgres cdc' })).response.status, 200, 'now 3.2 spent')
+  const refused = await ask({ question: 'postgres cdc' })
+  assert.equal(refused.response.status, 429)
+  assert.match(JSON.parse(refused.text).error.message, /all it can for today/)
+  assert.equal(fetched.mock.callCount(), 2)
+})
+
+test('logs each question with its answer, sources and cost, and saves the vote on it', async () => {
+  mock.method(globalThis, 'fetch', async () => modelReply(['Set it [1].'], 0.002))
+  const { events } = await ask({ question: 'postgres cdc with PASSWORD=hunter22' })
+  const { id } = events.at(-1)!.data
+  const [row] = logged()
+  assert.deepEqual(
+    { ...row, at: 0 },
+    {
+      id,
+      at: 0,
+      channel: 'web',
+      question: 'postgres cdc with PASSWORD=[redacted]',
+      answer: 'Set it.',
+      sources: '["https://olake.io/docs/postgres/#cdc"]',
+      uncertain: 0,
+      cost: 0.002,
+      vote: null,
+      reason: null
+    }
+  )
+  assert.ok(Math.abs(row.at - Date.now() / 1000) < 5)
+
+  const voted = await post('feedback', { id, vote: -1, reason: 'Outdated Info' })
+  assert.equal(voted.response.status, 204)
+  assert.equal(voted.response.headers.get('Access-Control-Allow-Origin'), 'https://olake.io')
+  assert.deepEqual([logged()[0].vote, logged()[0].reason], [-1, 'Outdated Info'])
+  for (const body of [{ id, vote: 5 }, { vote: 1 }, { id: 7, vote: 1 }, 'junk'])
+    assert.equal((await post('feedback', body)).response.status, 400)
+  assert.equal((await post('feedback', { id: 'no-such-answer', vote: 1 })).response.status, 204)
+})
+
+test('masks credentials before the model sees them, in the question and in earlier turns', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async () => modelReply(['Hi [1].']))
+  await ask({
+    question: 'why does postgres://olake:s3cr3t@db:5432/app fail with cdc?',
+    history: [{ question: 'my token=abcdef123456', answer: 'Noted.' }]
+  })
+  const everything = fetched.mock.calls.map((c) => (c.arguments[1] as RequestInit).body).join('\n')
+  assert.ok(!everything.includes('s3cr3t') && !everything.includes('abcdef123456'))
+  assert.ok(everything.includes('postgres://olake:[redacted]@db:5432/app'))
+})
+
+test('searches for what a follow-up means, and answers the follow-up as it was asked', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) =>
+    JSON.parse(init.body as string).messages[0].content.startsWith('You make follow-up')
+      ? modelReply(['How do I enable the binlog for MySQL?'])
+      : modelReply(['Enable it [1].'])
+  )
+  const history = [{ question: 'How do I set up Postgres?', answer: 'Set wal_level.' }]
+  const { events } = await ask({ question: 'and the other database?', history })
+  assert.equal(fetched.mock.callCount(), 2)
+  const answered = sentTo(fetched, 1)
+  assert.match(answered.messages.at(-1).content, /^Sources:\n\n\[1\] MySQL > CDC\n/)
+  assert.match(
+    answered.messages.at(-1).content,
+    /Question: and the other database\?\n\(In full: How do I enable the binlog for MySQL\?\)$/
+  )
+  assert.deepEqual(events.at(-1)!.data.sources, [
+    { url: 'https://olake.io/docs/mysql/#cdc', title: 'MySQL > CDC' }
+  ])
+  assert.equal(logged()[0].cost, 0.002, 'both model calls are counted')
+})
+
+test('summarises a long conversation and tells the browser how many turns that covers', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => {
+    const task: string = JSON.parse(init.body as string).messages[0].content
+    if (task.startsWith('You make follow-up')) return modelReply(['postgres cdc'])
+    if (task.startsWith('Summarise')) return modelReply(['They set up Postgres CDC.'])
+    return modelReply(['Set it [1].'])
+  })
+  const history = Array.from({ length: 7 }, (_, i) => ({ question: `Q${i}`, answer: `A${i}` }))
+  const long = await ask({ question: 'and then?', history, summary: 'Runs on Kubernetes.' })
+  assert.equal(long.events.at(-1)!.data.summary, 'They set up Postgres CDC.')
+  assert.equal(long.events.at(-1)!.data.summarized_turns, 4)
+  const answered = fetched.mock.calls
+    .map((_, n) => sentTo(fetched, n))
+    .find((sent) => sent.messages[0].content.startsWith('You are Ask OLake'))
+  assert.ok(answered.messages[0].content.endsWith('turns below:\nRuns on Kubernetes.'))
+  assert.equal(answered.messages.length, 1 + 7 * 2 + 1)
+
+  const short = await ask({ question: 'and then?', history: history.slice(0, 3) })
+  assert.ok(!('summary' in short.events.at(-1)!.data))
+})
+
+test('refuses a request that is too large to be a question', async () => {
+  const { response } = await ask({ question: 'postgres' }, { 'Content-Length': '100001' })
+  assert.equal(response.status, 413)
 })

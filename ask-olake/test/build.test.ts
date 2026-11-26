@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
 import { siteChunks, toSql } from '../ingest/build.ts'
+import { DIMS } from '../src/search.ts'
 
 const SCHEMA = readFileSync(join(import.meta.dirname, '../schema.sql'), 'utf8')
 const chunk = (title: string, text: string) => ({
@@ -61,4 +62,32 @@ test('the SQL loads into SQLite, keeps quotes and semicolons, and the text is se
   db.exec(toSql([chunks[1]], SCHEMA))
   assert.deepEqual(search('filter'), [], 'loading again replaces the index')
   assert.deepEqual(search('binlog'), [1])
+})
+
+test('stores the vectors a few hundred to a row, and stamps the index', () => {
+  const chunks = Array.from({ length: 151 }, (_, i) => chunk(`T${i}`, `Text ${i}.`))
+  const vectors = Int8Array.from({ length: 151 * DIMS }, (_, i) => (i % 255) - 127)
+  const db = new DatabaseSync(':memory:')
+  db.exec(toSql(chunks, SCHEMA, vectors))
+  const rows = db.prepare('SELECT first_id, data FROM vectors ORDER BY first_id').all()
+  assert.deepEqual(
+    rows.map((row) => row.first_id),
+    [1, 151]
+  )
+  const stored = Buffer.concat(rows.map((row) => Buffer.from(row.data as string, 'base64')))
+  assert.deepEqual(new Int8Array(stored.buffer, stored.byteOffset, stored.length), vectors)
+  for (const row of rows) assert.ok((row.data as string).length < 90_000, 'under the D1 limit')
+  const { built } = db.prepare('SELECT built FROM index_info').get() as { built: number }
+  assert.ok(Math.abs(built - Date.now() / 1000) < 5)
+})
+
+test('replacing the index keeps the log of questions', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec(toSql([chunk('T', 'Text.')], SCHEMA))
+  db.exec(
+    "INSERT INTO questions (id, at, channel, question, answer, sources, uncertain, cost) VALUES ('a', 1, 'web', 'q', 'a', '[]', 0, 0)"
+  )
+  db.exec(toSql([chunk('T2', 'Other.')], SCHEMA))
+  assert.equal(db.prepare('SELECT count(*) AS n FROM questions').get()!.n, 1)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM index_info').get()!.n, 1)
 })
