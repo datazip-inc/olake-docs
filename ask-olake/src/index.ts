@@ -2,10 +2,12 @@
 //
 //   POST /ask, POST /feedback   the widget's API, described in src/components/AskOlake/useAskOlake.ts
 //   POST /slack/events          events from the Slack app, see slack.ts
+//   POST /mcp                   docs search for coding agents, see mcp.ts
 
 import { answer, withoutMarks } from './answer.ts'
 import { MAX_QUESTION_CHARS, whyNot, type Env } from './guard.ts'
 import { record, saveVote } from './log.ts'
+import { mcp } from './mcp.ts'
 import type { Turn } from './memory.ts'
 import { redactSecrets } from './redact.ts'
 import { slackEvents } from './slack.ts'
@@ -32,6 +34,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     if (pathname.endsWith('/slack/events')) return slackEvents(request, env, ctx)
+    if (pathname.endsWith('/mcp')) return mcp(request, env)
 
     const origin = request.headers.get('Origin') ?? ''
     const allowed = env.ALLOWED_ORIGINS.split(',').includes(origin)

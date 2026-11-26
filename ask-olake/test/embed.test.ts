@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, mock, test } from 'node:test'
 import { compact, embedChunks } from '../ingest/embed.ts'
 import { DIMS } from '../src/search.ts'
@@ -37,4 +40,28 @@ test('embeds every chunk with its title, in batches, and keeps the order', async
   assert.match(url, /\/accounts\/account-1\/ai\/run\/@cf\/qwen\/qwen3-embedding-0\.6b$/)
   assert.equal((init.headers as Record<string, string>).Authorization, 'Bearer token-1')
   assert.equal(JSON.parse(init.body as string).text[0], 'Title 0\n\nchunk 0')
+})
+
+test('embeds only new and changed chunks when it has a cache from the last build', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => {
+    const { text } = JSON.parse(init.body as string) as { text: string[] }
+    const data = text.map((t) => {
+      const vector = new Array(1024).fill(0)
+      vector[Number(/chunk (\d+)/.exec(t)![1])] = 1
+      return vector
+    })
+    return Response.json({ success: true, result: { data } })
+  })
+  const sent = (n: number) =>
+    JSON.parse((fetched.mock.calls[n].arguments[1] as RequestInit).body as string).text
+  const chunk = (i: number) => ({ url: 'u', pageUrl: 'u', title: 'T', text: `chunk ${i}` })
+  const cache = join(mkdtempSync(join(tmpdir(), 'embed-')), 'vectors.json')
+  const first = await embedChunks([chunk(1), chunk(2), chunk(1)], 'a', 't', cache)
+  assert.deepEqual(sent(0), ['T\n\nchunk 1', 'T\n\nchunk 2'], 'a repeated text is embedded once')
+  assert.deepEqual([first[1], first[DIMS + 2], first[2 * DIMS + 1]], [127, 127, 127])
+
+  const second = await embedChunks([chunk(2), chunk(3)], 'a', 't', cache)
+  assert.equal(fetched.mock.callCount(), 2)
+  assert.deepEqual(sent(1), ['T\n\nchunk 3'])
+  assert.deepEqual([second[2], second[DIMS + 3]], [127, 127])
 })

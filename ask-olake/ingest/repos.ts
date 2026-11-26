@@ -119,6 +119,19 @@ export function specSections(json: string, pageUrl: string, pageTitle: string): 
   return text ? [{ pageUrl, url: pageUrl, pageTitle, heading: '', text }] : []
 }
 
+/** A licence file: its name, from the first lines of the file. The legal text is not indexed. */
+export function licenceSections(text: string, pageUrl: string, pageTitle: string): Section[] {
+  const name = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(', ')
+  const repo = pageTitle.split(' / ')[0]
+  const section = { pageUrl, url: pageUrl, pageTitle, heading: '' }
+  return name ? [{ ...section, text: `${repo} is released under this licence: ${name}.` }] : []
+}
+
 /**
  * The sections of every documentation file tracked in the repository at `dir`. GitHub templates and
  * notes for coding agents are left out, and so is every path in `exclude`.
@@ -131,13 +144,17 @@ export function readRepo(dir: string, exclude: string[] = []): Section[] {
     .replace(/\.git$/, '')
   const name = repo.slice(repo.lastIndexOf('/') + 1)
   const skip = ['.github', 'CLAUDE.md', ...exclude].map((path) => `:!${path}`)
-  const files = git('ls-files', '--', '*.md', '*values.yaml', '*spec.json', ...skip).split('\n')
+  // LICENSE and LICENCE without a wildcard: only the one at the top of the repository.
+  const kinds = ['*.md', '*values.yaml', '*spec.json', 'LICENSE', 'LICENCE']
+  const files = git('ls-files', '--', ...kinds, ...skip).split('\n')
   return files.filter(Boolean).flatMap((file) => {
     const read = file.endsWith('.md')
       ? markdownSections
       : file.endsWith('.yaml')
         ? yamlSections
-        : specSections
+        : file.endsWith('.json')
+          ? specSections
+          : licenceSections
     // HEAD in a GitHub link is the default branch.
     return read(
       readFileSync(join(dir, file), 'utf8'),

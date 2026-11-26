@@ -144,6 +144,9 @@ test('reads the documentation files of a repository and links them on GitHub', (
     'drivers/pg/resources/spec.json': '{"properties":{"host":{"type":"string"}}}',
     '.github/pull_request_template.md': '# Template',
     'CLAUDE.md': '# Agent notes',
+    'LICENSE':
+      '\n      Apache License\n   Version 2.0, January 2004\n   http://www.apache.org/licenses/\n\n   TERMS',
+    'vendor/LICENSE': 'MIT License',
     'docs/upstream.md': '# Upstream',
     'main.go': 'package main',
     'untracked.md': '# Not committed'
@@ -159,6 +162,7 @@ test('reads the documentation files of a repository and links them on GitHub', (
   assert.deepEqual(
     readRepo(dir, ['docs']).map((s) => [s.pageTitle, s.url]),
     [
+      ['demo / LICENSE', 'https://github.com/datazip-inc/demo/blob/HEAD/LICENSE'],
       ['demo / README.md', 'https://github.com/datazip-inc/demo/blob/HEAD/README.md#demo'],
       [
         'demo / drivers/pg/resources/spec.json',
@@ -166,5 +170,9 @@ test('reads the documentation files of a repository and links them on GitHub', (
       ],
       ['demo / helm/values.yaml', 'https://github.com/datazip-inc/demo/blob/HEAD/helm/values.yaml']
     ]
+  )
+  assert.equal(
+    readRepo(dir)[0].text,
+    'demo is released under this licence: Apache License, Version 2.0, January 2004.'
   )
 })

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
-import { siteChunks, toSql } from '../ingest/build.ts'
+import { latestReleases, siteChunks, toSql } from '../ingest/build.ts'
 import { DIMS } from '../src/search.ts'
 
 const SCHEMA = readFileSync(join(import.meta.dirname, '../schema.sql'), 'utf8')
@@ -90,4 +90,37 @@ test('replacing the index keeps the log of questions', () => {
   db.exec(toSql([chunk('T2', 'Other.')], SCHEMA))
   assert.equal(db.prepare('SELECT count(*) AS n FROM questions').get()!.n, 1)
   assert.equal(db.prepare('SELECT count(*) AS n FROM index_info').get()!.n, 1)
+})
+
+test('names the latest release of each product, from the release-notes pages', () => {
+  const page = (path: string) => ({
+    url: `https://olake.io${path}#fixes`,
+    pageUrl: `https://olake.io${path}`,
+    title: 'T',
+    text: 'x'
+  })
+  const chunks = [
+    '/docs/release/ingestion/v1.2.0/',
+    '/docs/release/ingestion/v1.10.1/',
+    '/docs/release/ingestion/v1.9.3/',
+    '/docs/release/ingestion/v0.1.0-v0.1.1/',
+    '/docs/release/fusion/v0.3.0/',
+    '/docs/release/ingestion/overview/',
+    '/docs/connectors/postgres/'
+  ].map(page)
+  assert.deepEqual(
+    latestReleases(chunks).map((chunk) => [chunk.title, chunk.url, chunk.text]),
+    [
+      [
+        'Release notes / Latest ingestion release',
+        'https://olake.io/docs/release/ingestion/v1.10.1/',
+        'The latest OLake ingestion release with release notes on olake.io is v1.10.1. Its release notes are at https://olake.io/docs/release/ingestion/v1.10.1/'
+      ],
+      [
+        'Release notes / Latest fusion release',
+        'https://olake.io/docs/release/fusion/v0.3.0/',
+        'The latest OLake fusion release with release notes on olake.io is v0.3.0. Its release notes are at https://olake.io/docs/release/fusion/v0.3.0/'
+      ]
+    ]
+  )
 })

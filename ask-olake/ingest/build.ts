@@ -35,6 +35,30 @@ export function siteChunks(buildDir: string): Chunk[] {
   )
 }
 
+/**
+ * One chunk per product that names its latest release, from the release-notes pages
+ * (/docs/release/<product>/v1.2.0/). No page says which release is the latest, so without this
+ * the bot cannot answer that question.
+ */
+export function latestReleases(chunks: Chunk[]): Chunk[] {
+  const latest = new Map<string, { version: number[]; pageUrl: string }>()
+  for (const { pageUrl } of chunks) {
+    const match = /\/docs\/release\/([\w-]+)\/(?:v[\d.]+-)?v(\d+)\.(\d+)\.(\d+)\/$/.exec(pageUrl)
+    if (!match) continue
+    const version = match.slice(2).map(Number)
+    const best = latest.get(match[1])?.version ?? [-1]
+    // The first number that differs decides which version is newer.
+    const at = version.findIndex((n, i) => n !== best[i])
+    if (at >= 0 && version[at] > best[at]) latest.set(match[1], { version, pageUrl })
+  }
+  return [...latest].map(([product, { version, pageUrl }]) => ({
+    url: pageUrl,
+    pageUrl,
+    title: `Release notes / Latest ${product} release`,
+    text: `The latest OLake ${product} release with release notes on olake.io is v${version.join('.')}. Its release notes are at ${pageUrl}`
+  }))
+}
+
 // A SQL statement may be 100 KB long in D1. This many vectors, as base64, stay under that.
 const VECTORS_PER_ROW = 150
 
@@ -74,12 +98,15 @@ if (import.meta.main) {
   const pages = (chunks: Chunk[]) => new Set(chunks.map((chunk) => chunk.pageUrl)).size
   console.log(`site: ${site.length} chunks from ${pages(site)} pages`)
   console.log(`repositories: ${repos.length} chunks from ${pages(repos)} files`)
-  const chunks = [...site, ...repos]
+  const chunks = [...site, ...latestReleases(site), ...repos]
   const { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token } = process.env
-  const vectors = account && token ? await embedChunks(chunks, account, token) : undefined
-  console.log(vectors ? 'embedded for meaning search' : 'not embedded: keyword search only')
   const out = join(ASK_OLAKE, '.wrangler/ingest')
   mkdirSync(out, { recursive: true })
+  const vectors =
+    account && token
+      ? await embedChunks(chunks, account, token, join(out, 'vectors.json'))
+      : undefined
+  console.log(vectors ? 'embedded for meaning search' : 'not embedded: keyword search only')
   writeFileSync(
     join(out, 'index.sql'),
     toSql(chunks, readFileSync(join(ASK_OLAKE, 'schema.sql'), 'utf8'), vectors)
