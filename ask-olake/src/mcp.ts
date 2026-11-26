@@ -1,4 +1,4 @@
-// An MCP server, so that coding agents (Cursor, Claude Code, VS Code) can search the OLake docs.
+// An MCP server, so that coding agents (Cursor, VS Code and others) can search the OLake docs.
 // It has one tool and makes no model call: the agent gets the sections that match its query and
 // writes its own answer. The transport is MCP's "streamable HTTP" without sessions: every request
 // is one JSON-RPC message and gets one JSON answer.
