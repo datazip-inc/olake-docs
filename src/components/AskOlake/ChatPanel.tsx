@@ -12,7 +12,9 @@ import {
   PiCopy,
   PiPaperPlaneRight,
   PiStopFill,
-  PiArrowClockwise,
+  PiClockCounterClockwise,
+  PiPlus,
+  PiTrash,
   PiX,
   PiThumbsUp,
   PiThumbsDown,
@@ -25,6 +27,8 @@ import {
   PiChatCircle
 } from 'react-icons/pi'
 import { useAskOlake, type Source } from './useAskOlake'
+// Shared with the backend, which masks credentials a second time.
+import { redactSecrets } from '../../../ask-olake/src/redact'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -50,44 +54,21 @@ const FEEDBACK_REASONS = [
 
 const MAX_QUESTION_CHARS = 4000
 
+const HEADER_BUTTON =
+  'flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[6px] border-0 ' +
+  'bg-transparent text-olake-muted hover:bg-olake-surface hover:text-olake-ink'
+
+/** When a saved conversation was last used, in a few words. */
+function ago(time: number): string {
+  const minutes = Math.round((Date.now() - time) / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`
+  return new Date(time).toLocaleDateString()
+}
+
 // Every icon in the panel sits next to visible text or inside a labelled button.
 const DECORATIVE_ICONS = { attr: { 'aria-hidden': true } }
-
-// ---------------------------------------------------------------------------
-// Credential masking
-// ---------------------------------------------------------------------------
-
-// People paste connection strings and config files into questions. Obvious credentials are
-// masked in the browser, so they are never sent, logged or kept in the saved conversation.
-const SECRET_KEY =
-  '[\\w.-]*(?:pass(?:word|wd)?|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)[\\w.-]*'
-
-// Values that are safe to leave readable: numbers, booleans and <placeholders>.
-const NOT_A_SECRET = /^(?:\d+|true|false|null|none|<[^>]*>?)$/i
-
-function maskValue(match: string, prefix: string, value: string): string {
-  return NOT_A_SECRET.test(value) ? match : `${prefix}[redacted]`
-}
-
-export function redactSecrets(text: string): string {
-  return (
-    text
-      // user:password@host in a connection string
-      .replace(/(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+):[^\s/]+@(?=[^\s@/])/gi, '$1:[redacted]@')
-      // PASSWORD=value, "aws_secret_key": "value", clientSecret = 'value'
-      .replace(
-        new RegExp(`(${SECRET_KEY}["']?\\s*(?:=\\s*["']?|:\\s*["']))([^\\s"',;]{3,})`, 'gi'),
-        maskValue
-      )
-      // password: value on a line of its own, as in YAML
-      .replace(new RegExp(`^(\\s*${SECRET_KEY}:[ \\t]*)([^\\s"',;]{3,})[ \\t]*$`, 'gim'), maskValue)
-      // AWS access key IDs, GitHub, OpenAI-style and Slack tokens, JSON Web Tokens
-      .replace(
-        /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9_-]{20,}|xox[abpr]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})/g,
-        '[redacted]'
-      )
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Source type, inferred from the source URL
@@ -433,9 +414,12 @@ function Panel({
 }: ChatPanelProps) {
   // Opened with a question from the page: start a new conversation, do not continue the old one.
   const [restore] = useState(!pendingQuestion)
-  const { turns, isLoading, error, ask, stop, reset, vote } = useAskOlake(apiUrl, restore)
+  const { turns, isLoading, error, ask, stop, vote, conversations, newChat, open, remove } =
+    useAskOlake(apiUrl, restore)
 
   const [question, setQuestion] = useState('')
+  // The list of saved conversations, shown in place of the messages.
+  const [showHistory, setShowHistory] = useState(false)
   const [feedbackOpenFor, setFeedbackOpenFor] = useState<string | null>(null)
   const [copiedAnswerId, setCopiedAnswerId] = useState<string | null>(null)
   const copyTimer = useRef<number | undefined>(undefined)
@@ -465,7 +449,7 @@ function Panel({
       el.scrollTop = el.scrollHeight
       stickToBottom.current = true
     }
-  }, [turns, isLoading, error, isOpen])
+  }, [turns, isLoading, error, isOpen, showHistory])
 
   useEffect(() => {
     if (isOpen) inputRef.current?.focus()
@@ -476,6 +460,7 @@ function Panel({
   const sendQuestion = (text: string): boolean => {
     const cleaned = redactSecrets(text.trim()).slice(0, MAX_QUESTION_CHARS)
     if (!cleaned || isLoading) return false
+    setShowHistory(false)
     ask(cleaned)
     return true
   }
@@ -486,8 +471,11 @@ function Panel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingQuestion, isLoading])
 
-  const resetChat = () => {
-    reset()
+  /** Shows a saved conversation, or starts a new one. The one on screen stays saved. */
+  const switchTo = (conversationId?: string) => {
+    if (conversationId) open(conversationId)
+    else newChat()
+    setShowHistory(false)
     setQuestion('')
     setFeedbackOpenFor(null)
     setCopiedAnswerId(null)
@@ -598,17 +586,27 @@ function Panel({
         <div className='flex items-center gap-[4px]'>
           <button
             type='button'
-            onClick={resetChat}
-            className='flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[6px] border-0 bg-transparent text-olake-muted hover:bg-olake-surface hover:text-olake-ink'
-            title='Restart chat'
-            aria-label='Restart chat'
+            onClick={() => switchTo()}
+            className={HEADER_BUTTON}
+            title='New chat'
+            aria-label='New chat'
           >
-            <PiArrowClockwise size={16} />
+            <PiPlus size={16} />
+          </button>
+          <button
+            type='button'
+            onClick={() => setShowHistory(!showHistory)}
+            className={clsx(HEADER_BUTTON, showHistory && 'bg-olake-surface text-olake-ink')}
+            title='Chat history'
+            aria-label='Chat history'
+            aria-pressed={showHistory}
+          >
+            <PiClockCounterClockwise size={16} />
           </button>
           <button
             type='button'
             onClick={onClose}
-            className='flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[6px] border-0 bg-transparent text-olake-muted hover:bg-olake-surface hover:text-olake-ink'
+            className={HEADER_BUTTON}
             title='Close assistant'
             aria-label='Close assistant'
           >
@@ -617,13 +615,52 @@ function Panel({
         </div>
       </div>
 
+      {/* Saved conversations */}
+      {showHistory && (
+        <div className='flex-1 overflow-y-auto px-[16px] py-[14px]'>
+          <p className='m-0 mb-[10px] text-[12px] text-olake-muted'>
+            {conversations.length
+              ? 'Your chats, saved in this browser only.'
+              : 'No saved chats yet. Chats are saved in this browser only.'}
+          </p>
+          <ul className='m-0 flex list-none flex-col gap-[6px] p-0'>
+            {conversations.map(({ id, updated, turns: saved }) => (
+              <li
+                key={id}
+                className='flex items-center gap-[4px] rounded-[8px] border border-solid border-olake-line bg-olake-surface transition-colors hover:border-olake-blue'
+              >
+                <button
+                  type='button'
+                  onClick={() => switchTo(id)}
+                  className='flex min-w-0 flex-1 cursor-pointer flex-col gap-[2px] border-0 bg-transparent px-[10px] py-[7px] text-left'
+                >
+                  <span className='truncate text-[13px] text-olake-ink'>{saved[0].question}</span>
+                  <span className='text-[11px] text-olake-muted'>
+                    {saved.length} {saved.length === 1 ? 'question' : 'questions'} · {ago(updated)}
+                  </span>
+                </button>
+                <button
+                  type='button'
+                  onClick={() => remove(id)}
+                  className='mr-[6px] flex h-[26px] w-[26px] shrink-0 cursor-pointer items-center justify-center rounded-[6px] border-0 bg-transparent text-olake-muted hover:text-olake-danger'
+                  title='Delete chat'
+                  aria-label={`Delete chat: ${saved[0].question}`}
+                >
+                  <PiTrash size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Message log. aria-busy holds screen readers back until an answer is complete. */}
       <div
         ref={scrollRef}
         onScroll={onLogScroll}
         aria-live='polite'
         aria-busy={isLoading}
-        className='flex-1 overflow-y-auto px-[16px] py-[14px]'
+        className={clsx('flex-1 overflow-y-auto px-[16px] py-[14px]', showHistory && 'hidden')}
       >
         <div className='flex flex-col gap-[14px]'>
           {/* Welcome message, with suggested questions until the first one is asked */}
@@ -808,9 +845,6 @@ function Panel({
             </button>
           )}
         </div>
-        <p className='m-0 px-[14px] pb-[8px] text-[10.5px] text-olake-muted'>
-          AI answers can be wrong. Check the sources.
-        </p>
       </form>
     </div>
   )

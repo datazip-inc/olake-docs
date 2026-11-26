@@ -2,7 +2,7 @@
 //
 // The backend is a small HTTP API:
 //
-//   POST {apiUrl}/ask       { question, history, summary, page_url }
+//   POST {apiUrl}/ask       { question, history, summary }
 //     answers with a stream of server-sent events:
 //       event: delta   data: "<next piece of the answer>"
 //       event: final   data: { id, answer, sources, uncertain, summary?, summarized_turns? }
@@ -13,6 +13,7 @@
 //
 // The server keeps nothing between requests. The browser holds the conversation and sends the
 // turns the server has not yet folded into `summary`, so follow-up questions have their context.
+// Conversations are saved in this browser (localStorage), so a reader can go back to an old one.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -34,7 +35,11 @@ export type Turn = {
 type Memory = { summary: string; summarized: number }
 type ServerEvent = { event: string; data: any }
 
-const STORAGE_KEY = 'ask-olake-conversation'
+/** A saved conversation. `updated` is when its last question was asked. */
+export type Conversation = Memory & { id: string; updated: number; turns: Turn[] }
+
+const STORAGE_KEY = 'ask-olake-conversations'
+const MAX_CONVERSATIONS = 20
 const FALLBACK_ERROR = "Couldn't reach AskOlake right now. Please try again in a moment."
 // The most unsummarised turns sent with a question. The server summarises long before this.
 const MAX_HISTORY_TURNS = 8
@@ -57,46 +62,76 @@ export function parseEvents(buffer: string): { events: ServerEvent[]; rest: stri
   return { events, rest }
 }
 
-function loadSaved(): { turns: Turn[]; memory: Memory } | null {
+/** The saved conversations, the latest first. */
+function loadAll(): Conversation[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
-    if (!Array.isArray(saved?.turns) || !saved.turns.length) return null
-    return {
-      turns: saved.turns,
-      memory: { summary: String(saved.summary || ''), summarized: Number(saved.summarized) || 0 }
-    }
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    if (!Array.isArray(saved)) return []
+    return saved
+      .filter((c) => typeof c?.id === 'string' && Array.isArray(c.turns) && c.turns.length)
+      .map((c) => ({
+        id: c.id,
+        updated: Number(c.updated) || 0,
+        turns: c.turns,
+        summary: String(c.summary || ''),
+        summarized: Number(c.summarized) || 0
+      }))
   } catch {
-    return null
+    return []
   }
 }
 
-function save(turns: Turn[], memory: Memory): void {
+function storeAll(conversations: Conversation[]): void {
   try {
-    const finished = turns.filter((turn) => turn.id)
-    if (finished.length) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ turns: finished, ...memory }))
-    } else {
-      localStorage.removeItem(STORAGE_KEY)
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
   } catch {
     // storage is full or switched off: the conversation still works for this page view
   }
 }
 
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+
 /**
- * @param restore bring back the conversation saved in this browser. False when the panel is
- *   opened with a question from elsewhere on the page, which starts a new conversation.
+ * @param restore bring back the latest conversation saved in this browser. False when the panel
+ *   is opened with a question from elsewhere on the page, which starts a new conversation.
  */
 export function useAskOlake(apiUrl: string, restore: boolean) {
-  const [saved] = useState(() => (restore ? loadSaved() : null))
-  const [turns, setTurns] = useState<Turn[]>(saved?.turns ?? [])
+  const [conversations, setConversations] = useState(loadAll)
+  const [latest] = useState(() => (restore ? conversations[0] : undefined))
+  const [turns, setTurns] = useState<Turn[]>(latest?.turns ?? [])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const memory = useRef<Memory>(saved?.memory ?? { summary: '', summarized: 0 })
+  const id = useRef(latest?.id ?? newId())
+  const memory = useRef<Memory>({
+    summary: latest?.summary ?? '',
+    summarized: latest?.summarized ?? 0
+  })
   const request = useRef<AbortController | null>(null)
 
+  // Saves the conversation after every answer and vote. The list is read again first, so a
+  // conversation held in another tab is not lost.
   useEffect(() => {
-    if (!isLoading) save(turns, memory.current)
+    if (isLoading) return
+    const finished = turns.filter((turn) => turn.id)
+    const all = loadAll()
+    const saved = all.find((c) => c.id === id.current)
+    if (!finished.length && !saved) return
+    const others = all.filter((c) => c.id !== id.current)
+    // Only a new answer moves a conversation to the top, not a vote or opening it again.
+    const grew = finished.length !== saved?.turns.length
+    const mine: Conversation = {
+      id: id.current,
+      updated: grew || !saved ? Date.now() : saved.updated,
+      turns: finished,
+      ...memory.current
+    }
+    const list = !finished.length
+      ? others
+      : grew
+        ? [mine, ...others].slice(0, MAX_CONVERSATIONS)
+        : all.map((c) => (c.id === id.current ? mine : c))
+    storeAll(list)
+    setConversations(list)
   }, [turns, isLoading])
 
   const updateLast = useCallback(
@@ -140,8 +175,7 @@ export function useAskOlake(apiUrl: string, restore: boolean) {
           body: JSON.stringify({
             question,
             history,
-            summary: memory.current.summary,
-            page_url: window.location.href.replace(/#.*$/, '')
+            summary: memory.current.summary
           }),
           signal: controller.signal
         })
@@ -207,14 +241,39 @@ export function useAskOlake(apiUrl: string, restore: boolean) {
     updateLast((turn) => (turn.id ? turn : { ...turn, stopped: true }))
   }, [updateLast])
 
-  const reset = useCallback(() => {
+  /** Shows a conversation: a saved one, or a new and empty one. An answer being written is dropped. */
+  const show = useCallback((conversation?: Conversation) => {
     request.current?.abort()
     request.current = null
-    memory.current = { summary: '', summarized: 0 }
+    id.current = conversation?.id ?? newId()
+    memory.current = {
+      summary: conversation?.summary ?? '',
+      summarized: conversation?.summarized ?? 0
+    }
     setIsLoading(false)
     setError(null)
-    setTurns([])
+    setTurns(conversation?.turns ?? [])
   }, [])
+
+  const newChat = useCallback(() => show(), [show])
+
+  const open = useCallback(
+    (conversationId: string) => {
+      const saved = loadAll().find((c) => c.id === conversationId)
+      if (saved) show(saved)
+    },
+    [show]
+  )
+
+  const remove = useCallback(
+    (conversationId: string) => {
+      const list = loadAll().filter((c) => c.id !== conversationId)
+      storeAll(list)
+      setConversations(list)
+      if (conversationId === id.current) show()
+    },
+    [show]
+  )
 
   const vote = useCallback(
     (id: string, value: 1 | -1, reason = '') => {
@@ -230,5 +289,5 @@ export function useAskOlake(apiUrl: string, restore: boolean) {
     [apiUrl]
   )
 
-  return { turns, isLoading, error, ask, stop, reset, vote }
+  return { turns, isLoading, error, ask, stop, vote, conversations, newChat, open, remove }
 }
