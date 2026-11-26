@@ -16,6 +16,8 @@ export type Env = {
   OPENROUTER_API_KEY: string
   /** The secret key of the Turnstile captcha. Without it the website bot asks for no captcha. */
   TURNSTILE_SECRET?: string
+  /** The password of the team's page of questions (/admin). Without it there is no such page. */
+  ADMIN_TOKEN?: string
   /** The two Slack secrets are set only once the Slack app exists. */
   SLACK_SIGNING_SECRET?: string
   SLACK_BOT_TOKEN?: string

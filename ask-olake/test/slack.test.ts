@@ -75,7 +75,9 @@ function fakeServices(thread: unknown[] = []) {
       token: (init.headers as Record<string, string>).Authorization
     })
     return Response.json(
-      method === 'conversations.replies' ? { ok: true, messages: thread } : { ok: true }
+      method === 'conversations.replies'
+        ? { ok: true, messages: thread }
+        : { ok: true, ts: '200.5' }
     )
   })
   return { slack, fetched }
@@ -123,8 +125,8 @@ test('answers a mention in a thread under it, with the sources as links', async 
 
   const [row] = env.DB.sqlite.prepare('SELECT * FROM questions').all()
   assert.deepEqual(
-    [row.channel, row.question, row.answer, row.cost],
-    ['slack', 'how do I set up postgres cdc?', 'Set `wal_level`.', 0.002]
+    [row.id, row.channel, row.question, row.answer, row.cost],
+    ['slack:C1:200.5', 'slack', 'how do I set up postgres cdc?', 'Set `wal_level`.', 0.002]
   )
 })
 
@@ -238,4 +240,32 @@ test('turns a thread into turns: what people wrote, then what the bot answered',
     ),
     [{ question: 'first\nwith token=[redacted]', answer: 'answer one' }]
   )
+})
+
+test('saves a thumbs reaction on an answer as a vote on it', async () => {
+  fakeServices()
+  await deliver(event({ text: '<@UBOT> postgres cdc' }))
+  const row = () => env.DB.sqlite.prepare('SELECT id, vote FROM questions').get()!
+  assert.deepEqual({ ...row() }, { id: 'slack:C1:200.5', vote: null })
+  const react = (reaction: string, fields: object = {}) =>
+    deliver({
+      type: 'event_callback',
+      authorizations: [{ user_id: BOT }],
+      event: {
+        type: 'reaction_added',
+        user: 'U1',
+        reaction,
+        item_user: BOT,
+        item: { type: 'message', channel: 'C1', ts: '200.5' },
+        ...fields
+      }
+    })
+  await react('eyes')
+  await react('-1', { item_user: 'U2' })
+  await react('+1', { item: { type: 'message', channel: 'C1', ts: '999.9' } })
+  assert.equal(row().vote, null, 'not a thumb, not on the bot, not on this answer')
+  await react('+1::skin-tone-3')
+  assert.equal(row().vote, 1)
+  await react('thumbsdown')
+  assert.equal(row().vote, -1, 'a later thumb replaces the earlier one')
 })

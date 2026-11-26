@@ -3,6 +3,7 @@
 //   POST /ask, /feedback, /verify   the widget's API, described in src/components/AskOlake/useAskOlake.ts
 //   POST /slack/events          events from the Slack app, see slack.ts
 //   POST /mcp                   docs search for coding agents, see mcp.ts
+//   GET  /admin                 the team's page of questions, see report.ts
 
 import { answer, withoutMarks } from './answer.ts'
 import { hasPass, passFor } from './captcha.ts'
@@ -11,6 +12,7 @@ import { record, saveVote } from './log.ts'
 import { mcp } from './mcp.ts'
 import type { Turn } from './memory.ts'
 import { redactSecrets } from './redact.ts'
+import { report } from './report.ts'
 import { slackEvents } from './slack.ts'
 
 // What is kept of the earlier turns: enough for a follow-up question to make sense.
@@ -36,6 +38,7 @@ export default {
     const { pathname } = new URL(request.url)
     if (pathname.endsWith('/slack/events')) return slackEvents(request, env, ctx)
     if (pathname.endsWith('/mcp')) return mcp(request, env)
+    if (pathname.endsWith('/admin')) return report(request, env)
 
     const origin = request.headers.get('Origin') ?? ''
     const allowed = env.ALLOWED_ORIGINS.split(',').includes(origin)

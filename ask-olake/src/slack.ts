@@ -1,18 +1,31 @@
 // The Slack bot. It answers when it is mentioned in a channel and when it gets a direct message,
 // always in a thread, and a follow-up in that thread is answered with the thread as its context.
+// A thumbs up or thumbs down reaction on an answer is saved as a vote on it.
 //
-// Slack app setup: bot events `app_mention` and `message.im`, sent to {this Worker}/slack/events,
-// and the bot scopes app_mentions:read, chat:write, channels:history, groups:history, im:history.
+// Slack app setup: bot events `app_mention`, `message.im` and `reaction_added`, sent to
+// {this Worker}/slack/events, and the bot scopes app_mentions:read, chat:write, channels:history,
+// groups:history, im:history, reactions:read.
 
 import { answer } from './answer.ts'
 import { MAX_QUESTION_CHARS, whyNot, type Env } from './guard.ts'
 import { isSignatureOf } from './hmac.ts'
-import { record } from './log.ts'
+import { record, saveVote } from './log.ts'
 import { SUMMARISE_ABOVE, type Turn } from './memory.ts'
 import { redactSecrets } from './redact.ts'
 
 type Message = { user?: string; bot_id?: string; subtype?: string; text?: string; ts: string }
 type Event = Message & { type: string; channel: string; channel_type?: string; thread_ts?: string }
+type Reaction = {
+  type: string
+  reaction: string
+  item_user?: string
+  item: { type: string; channel: string; ts: string }
+}
+
+// The names Slack gives the two thumbs, with any skin tone ("+1::skin-tone-3").
+const VOTES: Record<string, 1 | -1> = { '+1': 1, 'thumbsup': 1, '-1': -1, 'thumbsdown': -1 }
+/** An answer in the log is found again by where Slack put it. */
+const answerId = (channel: string, ts: string) => `slack:${channel}:${ts}`
 
 const MAX_TURN_CHARS = 2000
 
@@ -75,7 +88,7 @@ export function threadTurns(messages: Message[], bot: string): Turn[] {
 async function reply(env: Env, event: Event, bot: string): Promise<void> {
   const token = env.SLACK_BOT_TOKEN!
   const thread_ts = event.thread_ts ?? event.ts
-  const say = (text: string) =>
+  const say = (text: string): Promise<{ ts: string }> =>
     slack(token, 'chat.postMessage', {
       channel: event.channel,
       thread_ts,
@@ -85,9 +98,9 @@ async function reply(env: Env, event: Event, bot: string): Promise<void> {
     })
   try {
     const question = redactSecrets(plain(event.text)).slice(0, MAX_QUESTION_CHARS)
-    if (!question) return await say('Ask me a question about OLake.')
+    if (!question) return void (await say('Ask me a question about OLake.'))
     const blocked = await whyNot(env, `slack:${event.user}`)
-    if (blocked) return await say(blocked)
+    if (blocked) return void (await say(blocked))
     const earlier: Message[] = event.thread_ts
       ? (
           await slack(token, 'conversations.replies', {
@@ -105,10 +118,12 @@ async function reply(env: Env, event: Event, bot: string): Promise<void> {
       { question, history: threadTurns(earlier, bot).slice(-SUMMARISE_ABOVE), summary: '' },
       { apiKey: env.OPENROUTER_API_KEY, spent }
     )
-    const id = crypto.randomUUID()
-    await record(env.DB, { id, channel: 'slack', question, cost: spent.cost, ...result })
     const links = result.sources.map(({ url, title }) => `[${title.replace(/[[\]]/g, '')}](${url})`)
-    await say(links.length ? `${result.answer}\n\nSources: ${links.join(' · ')}` : result.answer)
+    const { ts } = await say(
+      links.length ? `${result.answer}\n\nSources: ${links.join(' · ')}` : result.answer
+    )
+    const id = answerId(event.channel, ts)
+    await record(env.DB, { id, channel: 'slack', question, cost: spent.cost, ...result })
   } catch (error) {
     console.error('slack reply failed:', error)
     await say("Couldn't write an answer right now. Please try again in a moment.").catch(() => {})
@@ -132,8 +147,12 @@ export async function slackEvents(
   // Slack sends this once, when the URL is entered in the app's settings.
   if (payload.type === 'url_verification') return Response.json({ challenge: payload.challenge })
 
-  const event: Event | undefined = payload.event
+  const event: (Event & Reaction) | undefined = payload.event
   const bot: string = payload.authorizations?.[0]?.user_id ?? ''
+  // A thumb on one of the bot's messages. On any other message it matches no answer.
+  const vote = event?.type === 'reaction_added' && VOTES[String(event.reaction).split(':')[0]]
+  if (event && vote && event.item_user === bot && event.item?.type === 'message')
+    ctx.waitUntil(saveVote(env.DB, answerId(event.item.channel, event.item.ts), vote, ''))
   const isQuestion =
     event?.type === 'app_mention' || (event?.type === 'message' && event.channel_type === 'im')
   // Not answered: the bot's own messages, edits and joins (they have a subtype), and a retry,
