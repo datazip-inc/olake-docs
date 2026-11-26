@@ -2,7 +2,9 @@
 //
 // The backend is a small HTTP API:
 //
-//   POST {apiUrl}/ask       { question, history, summary }
+//   POST {apiUrl}/ask       { question, history, summary, pass? }
+//     `pass` is what POST {apiUrl}/verify { token } gave for a solved captcha, on a site that
+//     has one (see captcha.ts). The backend answers 401 when it wants a new one.
 //     answers with a stream of server-sent events:
 //       event: delta   data: "<next piece of the answer>"
 //       event: final   data: { id, answer, sources, uncertain, summary?, summarized_turns? }
@@ -16,6 +18,7 @@
 // Conversations are saved in this browser (localStorage), so a reader can go back to an old one.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { forgetPass, getPass } from './captcha'
 
 export type Source = { url: string; title: string }
 
@@ -95,7 +98,7 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
  * @param restore bring back the latest conversation saved in this browser. False when the panel
  *   is opened with a question from elsewhere on the page, which starts a new conversation.
  */
-export function useAskOlake(apiUrl: string, restore: boolean) {
+export function useAskOlake(apiUrl: string, restore: boolean, captchaSiteKey = '') {
   const [conversations, setConversations] = useState(loadAll)
   const [latest] = useState(() => (restore ? conversations[0] : undefined))
   const [turns, setTurns] = useState<Turn[]>(latest?.turns ?? [])
@@ -169,16 +172,24 @@ export function useAskOlake(apiUrl: string, restore: boolean) {
       ])
 
       try {
-        const response = await fetch(`${apiUrl}/ask`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question,
-            history,
-            summary: memory.current.summary
-          }),
-          signal: controller.signal
-        })
+        const send = async () =>
+          fetch(`${apiUrl}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              question,
+              history,
+              summary: memory.current.summary,
+              pass: await getPass(apiUrl, captchaSiteKey)
+            }),
+            signal: controller.signal
+          })
+        let response = await send()
+        // The pass has run out, or the visitor's address changed: one new captcha check.
+        if (response.status === 401 && captchaSiteKey) {
+          forgetPass()
+          response = await send()
+        }
         if (!response.ok || !response.body) {
           const body = await response.json().catch(() => null)
           throw new Error(body?.error?.message || FALLBACK_ERROR)
@@ -230,7 +241,7 @@ export function useAskOlake(apiUrl: string, restore: boolean) {
         }
       }
     },
-    [apiUrl, turns, updateLast]
+    [apiUrl, captchaSiteKey, turns, updateLast]
   )
 
   const stop = useCallback(() => {

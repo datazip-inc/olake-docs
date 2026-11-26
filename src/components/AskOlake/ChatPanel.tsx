@@ -371,6 +371,8 @@ function EscalationLinks({ question }: { question: string }) {
 
 type ChatPanelProps = {
   apiUrl: string
+  /** The site key of the Turnstile captcha. Empty when the site has none. */
+  captchaSiteKey: string
   isOpen: boolean
   isMobile: boolean
   onClose: () => void
@@ -381,6 +383,7 @@ type ChatPanelProps = {
 
 function Panel({
   apiUrl,
+  captchaSiteKey,
   isOpen,
   isMobile,
   onClose,
@@ -390,7 +393,7 @@ function Panel({
   // Opened with a question from the page: start a new conversation, do not continue the old one.
   const [restore] = useState(!pendingQuestion)
   const { turns, isLoading, error, ask, stop, vote, conversations, newChat, open, remove } =
-    useAskOlake(apiUrl, restore)
+    useAskOlake(apiUrl, restore, captchaSiteKey)
 
   const [question, setQuestion] = useState('')
   // The list of saved conversations, shown in place of the messages.

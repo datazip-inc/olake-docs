@@ -1,10 +1,11 @@
 // Ask OLake, the backend of the chat widget and of the Slack bot.
 //
-//   POST /ask, POST /feedback   the widget's API, described in src/components/AskOlake/useAskOlake.ts
+//   POST /ask, /feedback, /verify   the widget's API, described in src/components/AskOlake/useAskOlake.ts
 //   POST /slack/events          events from the Slack app, see slack.ts
 //   POST /mcp                   docs search for coding agents, see mcp.ts
 
 import { answer, withoutMarks } from './answer.ts'
+import { hasPass, passFor } from './captcha.ts'
 import { MAX_QUESTION_CHARS, whyNot, type Env } from './guard.ts'
 import { record, saveVote } from './log.ts'
 import { mcp } from './mcp.ts'
@@ -50,7 +51,8 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
     const route = request.method === 'POST' ? pathname.split('/').pop() : ''
-    if (route !== 'ask' && route !== 'feedback') return refusal(404, 'Not found.')
+    if (route !== 'ask' && route !== 'feedback' && route !== 'verify')
+      return refusal(404, 'Not found.')
     // Only pages of our own sites may use the bot. A browser cannot fake this header.
     if (!allowed) return refusal(403, 'This site may not use AskOlake.')
     if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES)
@@ -58,6 +60,16 @@ export default {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
     // The address Cloudflare saw the request come from. Headers such as X-Forwarded-For are not read.
     const visitor = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+
+    // The widget trades its captcha token for a pass, once per visit.
+    if (route === 'verify') {
+      if (!(await env.RATE_LIMIT.limit({ key: `verify:${visitor}` })).success)
+        return refusal(429, 'Too many tries. Please wait a minute.')
+      const pass = await passFor(env, body?.token, visitor)
+      return pass
+        ? Response.json({ pass }, { headers: cors })
+        : refusal(403, 'The captcha check did not pass.')
+    }
 
     if (route === 'feedback') {
       const { id, vote, reason } = body ?? {}
@@ -77,6 +89,9 @@ export default {
     if (!question) return refusal(400, 'Ask a question.')
     if (question.length > MAX_QUESTION_CHARS)
       return refusal(400, `Keep the question under ${MAX_QUESTION_CHARS} characters.`)
+    // 401 tells the widget to run the captcha (again) and repeat the question.
+    if (!(await hasPass(env, body?.pass, visitor)))
+      return refusal(401, 'Please confirm that you are not a robot.')
     const blocked = await whyNot(env, visitor)
     if (blocked) return refusal(429, blocked)
     const conversation = {

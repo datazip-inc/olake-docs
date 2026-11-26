@@ -305,3 +305,41 @@ test('refuses a request that is too large to be a question', async () => {
   const { response } = await ask({ question: 'postgres' }, { 'Content-Length': '100001' })
   assert.equal(response.status, 413)
 })
+
+test('with a captcha set up, answers only a visitor who holds a pass of their own', async () => {
+  env.TURNSTILE_SECRET = 'turnstile-secret'
+  const siteverify: string[] = []
+  mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    if (!url.includes('/turnstile/')) return modelReply(['Set it [1].'])
+    siteverify.push(String(init.body))
+    return Response.json({
+      success: (init.body as URLSearchParams).get('response') === 'good-token'
+    })
+  })
+  const refused = await ask({ question: 'postgres cdc' })
+  assert.equal(refused.response.status, 401)
+  assert.equal(logged().length, 0)
+
+  assert.equal((await post('verify', { token: 'bad-token' })).response.status, 403)
+  assert.equal((await post('verify', {})).response.status, 403)
+  const verified = await post('verify', { token: 'good-token' })
+  const { pass } = JSON.parse(verified.text)
+  assert.match(pass, /^\d+\.[0-9a-f]{64}$/)
+  assert.equal(siteverify[1], 'secret=turnstile-secret&response=good-token&remoteip=203.0.113.7')
+
+  assert.equal((await ask({ question: 'postgres cdc', pass })).response.status, 200)
+  // The pass of one address is no use from another, nor is a changed or a run-out one.
+  const elsewhere = await ask(
+    { question: 'postgres cdc', pass },
+    { 'CF-Connecting-IP': '198.51.100.9' }
+  )
+  assert.equal(elsewhere.response.status, 401)
+  const [expires, signature] = pass.split('.')
+  for (const forged of [
+    `${Number(expires) + 60}.${signature}`,
+    `${expires}.${'0'.repeat(64)}`,
+    `1.${signature}`,
+    7
+  ])
+    assert.equal((await ask({ question: 'postgres cdc', pass: forged })).response.status, 401)
+})

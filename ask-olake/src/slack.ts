@@ -6,6 +6,7 @@
 
 import { answer } from './answer.ts'
 import { MAX_QUESTION_CHARS, whyNot, type Env } from './guard.ts'
+import { isSignatureOf } from './hmac.ts'
 import { record } from './log.ts'
 import { SUMMARISE_ABOVE, type Turn } from './memory.ts'
 import { redactSecrets } from './redact.ts'
@@ -14,7 +15,6 @@ type Message = { user?: string; bot_id?: string; subtype?: string; text?: string
 type Event = Message & { type: string; channel: string; channel_type?: string; thread_ts?: string }
 
 const MAX_TURN_CHARS = 2000
-const bytes = (text: string) => new TextEncoder().encode(text)
 
 /** Whether the request carries Slack's signature of its body, made with our signing secret. */
 async function isFromSlack(request: Request, body: string, secret: string): Promise<boolean> {
@@ -22,21 +22,9 @@ async function isFromSlack(request: Request, body: string, secret: string): Prom
   const signature = request.headers.get('X-Slack-Signature') ?? ''
   // An old request may be a recorded one that is sent again.
   if (!(Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300)) return false
-  const hex = /^v0=((?:[0-9a-f]{2})+)$/.exec(signature)?.[1].match(/../g)
-  if (!hex) return false
-  const key = await crypto.subtle.importKey(
-    'raw',
-    bytes(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify']
-  )
-  // `verify` compares in constant time.
-  return crypto.subtle.verify(
-    'HMAC',
-    key,
-    Uint8Array.from(hex, (pair) => parseInt(pair, 16)),
-    bytes(`v0:${timestamp}:${body}`)
+  return (
+    signature.startsWith('v0=') &&
+    isSignatureOf(secret, `v0:${timestamp}:${body}`, signature.slice(3))
   )
 }
 

@@ -62,7 +62,9 @@ const config = {
     // Base URL of the Ask OLake backend (the Worker in /ask-olake), for example
     // http://localhost:8787/api during development. While it is empty the assistant
     // (src/components/AskOlake) is not rendered.
-    askOlakeApiUrl: process.env.ASK_OLAKE_API_URL || ''
+    askOlakeApiUrl: process.env.ASK_OLAKE_API_URL || '',
+    // Site key of the bot's Cloudflare Turnstile captcha. While it is empty there is no captcha.
+    askOlakeCaptchaSiteKey: process.env.ASK_OLAKE_CAPTCHA_SITE_KEY || ''
   },
 
   // Set the production url of your site here
@@ -124,7 +126,18 @@ const config = {
         theme: {
           // fonts.css: self-hosted @font-face rules. tokens.css: design tokens and the Infima/shadcn bridges.
           // Both must load before custom.css.
-          customCss: ['./src/css/fonts.css', './src/css/tokens.css', './src/css/custom.css', './src/css/docs-content.css', './src/css/blog.css', './src/css/content-elements.css', './src/css/code-search.css', './src/css/motion.css', './src/css/typography.css', './src/css/print.css']
+          customCss: [
+            './src/css/fonts.css',
+            './src/css/tokens.css',
+            './src/css/custom.css',
+            './src/css/docs-content.css',
+            './src/css/blog.css',
+            './src/css/content-elements.css',
+            './src/css/code-search.css',
+            './src/css/motion.css',
+            './src/css/typography.css',
+            './src/css/print.css'
+          ]
         },
         blog: false,
 
@@ -512,29 +525,56 @@ const config = {
           // wal2json is not supported and its page was removed; the page still got search traffic for "wal2json",
           // and the logical replication runbook covers output plugins. scripts/runbooks/check.mjs fails while the
           // target is unlisted, so this redirect only ships together with that runbook.
-          { to: '/docs/runbooks/postgres/enable-logical-replication/', from: '/docs/connectors/postgres/wal2json_plugin' },
+          {
+            to: '/docs/runbooks/postgres/enable-logical-replication/',
+            from: '/docs/connectors/postgres/wal2json_plugin'
+          },
           // URLs that still get search traffic (Search Console) but had no redirect
           // Author pages removed for authors without posts
           { to: '/blog/authors', from: '/blog/authors/pavan' },
           { to: '/blog/authors', from: '/blog/authors/arsham' },
           // The per-engine MySQL to Iceberg posts were merged into one post with an engine tab each
-          { to: '/blog/mysql-to-iceberg-query-engines/?engine=clickhouse', from: '/blog/mysql-to-iceberg-clickhouse' },
-          { to: '/blog/mysql-to-iceberg-query-engines/?engine=presto', from: '/blog/mysql-to-apache-iceberg-presto' },
-          { to: '/blog/mysql-to-iceberg-query-engines/?engine=spark', from: '/blog/mysql-to-iceberg-spark' },
-          { to: '/blog/mysql-to-iceberg-query-engines/?engine=trino', from: '/blog/mysql-to-apache-iceberg-trino' },
-          { to: '/blog/mysql-to-iceberg-query-engines/?engine=duckdb', from: '/blog/mysql-to-apache-iceberg-query-duckdb' },
+          {
+            to: '/blog/mysql-to-iceberg-query-engines/?engine=clickhouse',
+            from: '/blog/mysql-to-iceberg-clickhouse'
+          },
+          {
+            to: '/blog/mysql-to-iceberg-query-engines/?engine=presto',
+            from: '/blog/mysql-to-apache-iceberg-presto'
+          },
+          {
+            to: '/blog/mysql-to-iceberg-query-engines/?engine=spark',
+            from: '/blog/mysql-to-iceberg-spark'
+          },
+          {
+            to: '/blog/mysql-to-iceberg-query-engines/?engine=trino',
+            from: '/blog/mysql-to-apache-iceberg-trino'
+          },
+          {
+            to: '/blog/mysql-to-iceberg-query-engines/?engine=duckdb',
+            from: '/blog/mysql-to-apache-iceberg-query-duckdb'
+          },
           // The separate Iceberg blog (/iceberg) was merged into the main blog: posts keep their slugs
           { to: '/blog/data-partitioning-in-s3/', from: '/iceberg/data-partitioning-in-s3/' },
           { to: '/blog/mor-vs-cow/', from: '/iceberg/mor-vs-cow/' },
           { to: '/blog/why-iceberg/', from: '/iceberg/why-iceberg/' },
           { to: '/blog/move-to-iceberg/', from: '/iceberg/move-to-iceberg/' },
           { to: '/blog/paimon-vs-iceberg/', from: '/iceberg/paimon-vs-iceberg/' },
-          { to: '/blog/postgres-to-iceberg-using-glue/', from: '/iceberg/postgres-to-iceberg-using-glue/' },
+          {
+            to: '/blog/postgres-to-iceberg-using-glue/',
+            from: '/iceberg/postgres-to-iceberg-using-glue/'
+          },
           { to: '/blog/olake-iceberg-athena/', from: '/iceberg/olake-iceberg-athena/' },
           { to: '/blog/olake-iceberg-trino/', from: '/iceberg/olake-iceberg-trino/' },
-          { to: '/blog/hive-partitioning-vs-iceberg-partitioning/', from: '/iceberg/hive-partitioning-vs-iceberg-partitioning/' },
+          {
+            to: '/blog/hive-partitioning-vs-iceberg-partitioning/',
+            from: '/iceberg/hive-partitioning-vs-iceberg-partitioning/'
+          },
           { to: '/blog/olake-glue-snowflake/', from: '/iceberg/olake-glue-snowflake/' },
-          { to: '/blog/iceberg-partitioning-and-writing-strategies/', from: '/iceberg/iceberg-partitioning-and-writing-strategies/' },
+          {
+            to: '/blog/iceberg-partitioning-and-writing-strategies/',
+            from: '/iceberg/iceberg-partitioning-and-writing-strategies/'
+          },
           { to: '/blog/databricks-vs-iceberg/', from: '/iceberg/databricks-vs-iceberg/' },
           { to: '/blog/tags/iceberg/', from: '/iceberg/' },
           { to: '/blog/', from: '/iceberg/page/2/' },
@@ -589,7 +629,10 @@ const config = {
           // Posts that were published in /blog and moved to /compare and /learn: keep their old URLs working
           { to: '/compare/what-is-fivetran', from: '/blog/what-is-fivetran' },
           { to: '/compare/data-migration-tools', from: '/blog/data-migration-tools' },
-          { to: '/compare/database-to-iceberg-without-kafka', from: '/blog/database-to-iceberg-without-kafka' },
+          {
+            to: '/compare/database-to-iceberg-without-kafka',
+            from: '/blog/database-to-iceberg-without-kafka'
+          },
           { to: '/compare/mysql-to-iceberg-tools', from: '/blog/mysql-to-iceberg-tools' },
           { to: '/learn/etl-pipelines', from: '/blog/etl-pipelines' },
           // Duplicate blog tags merged into one each (apache-iceberg -> iceberg, data-lake -> lake)

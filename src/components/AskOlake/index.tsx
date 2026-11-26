@@ -55,6 +55,7 @@ function useIsMobile() {
 export default function AskOlake() {
   const { siteConfig } = useDocusaurusContext()
   const apiUrl = (siteConfig.customFields?.askOlakeApiUrl as string) || ''
+  const captchaSiteKey = (siteConfig.customFields?.askOlakeCaptchaSiteKey as string) || ''
 
   const [isOpen, setIsOpen] = useState(false)
   // The panel is mounted on first open and then kept, so a conversation survives closing it.
@@ -123,6 +124,7 @@ export default function AskOlake() {
           <Suspense fallback={null}>
             <ChatPanel
               apiUrl={apiUrl}
+              captchaSiteKey={captchaSiteKey}
               isOpen={isOpen}
               isMobile={isMobile}
               onClose={close}

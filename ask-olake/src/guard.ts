@@ -14,6 +14,8 @@ export type Env = {
   DAILY_BUDGET_USD: string
   // Secrets: in .env.local for `wrangler dev`, set with `wrangler secret put` when deployed.
   OPENROUTER_API_KEY: string
+  /** The secret key of the Turnstile captcha. Without it the website bot asks for no captcha. */
+  TURNSTILE_SECRET?: string
   /** The two Slack secrets are set only once the Slack app exists. */
   SLACK_SIGNING_SECRET?: string
   SLACK_BOT_TOKEN?: string
