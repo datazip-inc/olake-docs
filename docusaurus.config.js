@@ -58,7 +58,13 @@ const config = {
   customFields: {
     latestOlakeVersion: latestOlakeRelease.version,
     latestOlakeReleaseLabel: latestOlakeRelease.label,
-    latestOlakeReleasePath: latestOlakeRelease.docPath
+    latestOlakeReleasePath: latestOlakeRelease.docPath,
+    // Base URL of the Ask OLake backend (the Worker in /ask-olake), for example
+    // http://localhost:8787 during development. While it is empty the assistant
+    // (src/components/AskOlake) is not rendered.
+    askOlakeApiUrl: process.env.ASK_OLAKE_API_URL || '',
+    // Site key of the bot's Cloudflare Turnstile captcha. While it is empty there is no captcha.
+    askOlakeCaptchaSiteKey: process.env.ASK_OLAKE_CAPTCHA_SITE_KEY || ''
   },
 
   // Set the production url of your site here
