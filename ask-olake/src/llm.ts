@@ -28,7 +28,7 @@ export async function* streamChat(messages: Message[], call: Call): AsyncGenerat
       models: MODELS,
       messages,
       stream: true,
-      max_tokens: call.maxTokens ?? 800,
+      max_tokens: call.maxTokens ?? 1200,
       temperature: 0.2,
       // The answer is read from the sources, not worked out. Hidden reasoning would only add
       // seconds and cost, and it counts against max_tokens.

@@ -17,7 +17,9 @@ import {
   PiTrash,
   PiX,
   PiThumbsUp,
+  PiThumbsUpFill,
   PiThumbsDown,
+  PiThumbsDownFill,
   PiSparkle,
   PiSlackLogo,
   PiGithubLogo,
@@ -35,14 +37,12 @@ import { redactSecrets } from '../../../ask-olake/src/redact'
 // ---------------------------------------------------------------------------
 
 const SUGGESTIONS = [
-  'How do I set up CDC for Postgres on RDS?',
-  'Which Iceberg catalogs does OLake support?',
-  'What does OLake Fusion compaction do?'
+  'How do I set up Postgres CDC on Amazon RDS?',
+  'How does OLake handle schema changes?',
+  'Which compaction types does OLake Fusion offer?'
 ]
 
-const WELCOME =
-  "Hi! I'm **AskOlake**. Ask me anything about database CDC, Iceberg replication, connectors, " +
-  'or OLake Fusion table maintenance — I answer from the official documentation and cite my sources.'
+const WELCOME = "Hi! I'm **AskOlake**. Ask me anything about OLake."
 
 const FEEDBACK_REASONS = [
   'Wrong Answer',
@@ -53,6 +53,11 @@ const FEEDBACK_REASONS = [
 ]
 
 const MAX_QUESTION_CHARS = 4000
+
+// The icons under an answer: copy, helpful, not helpful.
+const ANSWER_BUTTON =
+  'flex h-[24px] w-[24px] items-center justify-center rounded-[5px] border-0 bg-transparent ' +
+  'hover:bg-olake-surface'
 
 const HEADER_BUTTON =
   'flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[6px] border-0 ' +
@@ -273,7 +278,7 @@ function MarkdownContent({ text }: { text: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Sizing and page context
+// Sizing
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SIZE = { w: 400, h: 560 }
@@ -287,36 +292,6 @@ function clampSize(w: number, h: number) {
     w: Math.round(Math.min(maxW, Math.max(MIN_SIZE.w, w))),
     h: Math.round(Math.min(maxH, Math.max(MIN_SIZE.h, h)))
   }
-}
-
-// Title of the docs, blog, compare or learn page being read, for the "Ask about this page" chip.
-function usePageTitle(): string {
-  const [pageTitle, setPageTitle] = useState('')
-
-  useEffect(() => {
-    const update = () => {
-      const path = window.location.pathname
-      const onContentPage = ['/docs', '/blog', '/compare', '/learn'].some((p) => path.startsWith(p))
-      setPageTitle(
-        onContentPage
-          ? (document.title || '').replace(/\s*[|·—]\s*(?:olake\.io|olake).*$/i, '').trim()
-          : ''
-      )
-    }
-    update()
-    // Docusaurus navigates with pushState, which fires no popstate. The <title> changes on
-    // every route change, so it is observed as well.
-    window.addEventListener('popstate', update)
-    const titleEl = document.querySelector('title')
-    const observer = titleEl ? new MutationObserver(update) : undefined
-    if (titleEl) observer?.observe(titleEl, { childList: true, characterData: true, subtree: true })
-    return () => {
-      window.removeEventListener('popstate', update)
-      observer?.disconnect()
-    }
-  }, [])
-
-  return pageTitle
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +405,6 @@ function Panel({
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const pageTitle = usePageTitle()
 
   // Follow new text only while the reader is at the bottom, so scrolling up to read is not undone
   // by the next streamed words. A new question always jumps to the bottom.
@@ -667,24 +641,16 @@ function Panel({
           <div className={clsx(ASSISTANT_BUBBLE, 'text-olake-text')}>
             <MarkdownContent text={WELCOME} />
             {turns.length === 0 && (
-              <div className='mt-[6px] flex flex-col gap-[6px]'>
-                <p className='m-0 text-[12px] font-medium text-olake-muted'>Suggested questions:</p>
-                {pageTitle && (
-                  <button
-                    type='button'
-                    onClick={() => sendQuestion(`What does the "${pageTitle}" page cover?`)}
-                    className='flex cursor-pointer items-center gap-[6px] rounded-[8px] border border-solid border-olake-blue bg-olake-surface px-[10px] py-[6px] text-left text-[12.5px] text-olake-blue transition-colors hover:bg-olake-blue hover:text-olake-on-blue'
-                  >
-                    <PiSparkle size={13} />
-                    <span>Ask about this page: {pageTitle}</span>
-                  </button>
-                )}
+              <div className='mt-[4px] flex flex-col gap-[5px]'>
+                <p className='m-0 text-[11.5px] font-medium text-olake-muted'>
+                  Suggested questions:
+                </p>
                 {SUGGESTIONS.map((suggestion) => (
                   <button
                     key={suggestion}
                     type='button'
                     onClick={() => sendQuestion(suggestion)}
-                    className='cursor-pointer rounded-[8px] border border-solid border-olake-line bg-olake-surface px-[10px] py-[6px] text-left text-[12.5px] text-olake-ink transition-colors hover:border-olake-blue hover:text-olake-blue'
+                    className='cursor-pointer rounded-[7px] border border-solid border-olake-line bg-olake-surface px-[9px] py-[4px] text-left text-[12px] text-olake-ink transition-colors hover:border-olake-blue hover:text-olake-blue'
                   >
                     {suggestion}
                   </button>
@@ -710,52 +676,59 @@ function Panel({
                     <EscalationLinks question={turn.question} />
                   )}
 
+                  {/* Copy and vote, as icons. A vote stays lit and cannot be changed. */}
                   {turn.id && (
-                    <div className='mt-[4px] flex items-center justify-between border-0 border-t border-solid border-olake-line pt-[6px] text-[11.5px] text-olake-muted'>
-                      {turn.vote ? (
-                        <span className='text-olake-blue'>Thanks for your feedback!</span>
-                      ) : (
-                        <div className='flex items-center gap-[6px]'>
-                          <span>Helpful?</span>
-                          <button
-                            type='button'
-                            onClick={() => vote(turn.id!, 1)}
-                            className='flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-[4px] border-0 bg-transparent text-olake-muted hover:bg-olake-surface hover:text-olake-blue'
-                            title='Helpful'
-                            aria-label='Helpful'
-                          >
-                            <PiThumbsUp size={13} />
-                          </button>
-                          <button
-                            type='button'
-                            onClick={() =>
-                              setFeedbackOpenFor(feedbackOpenFor === turn.id ? null : turn.id)
-                            }
-                            className='flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-[4px] border-0 bg-transparent text-olake-muted hover:bg-olake-surface hover:text-olake-danger'
-                            title='Not helpful'
-                            aria-label='Not helpful'
-                          >
-                            <PiThumbsDown size={13} />
-                          </button>
-                        </div>
-                      )}
+                    <div className='-mb-[2px] -ml-[4px] flex items-center gap-[2px]'>
                       <button
                         type='button'
                         onClick={() => copyAnswer(turn.answer, turn.id!)}
-                        className='flex cursor-pointer items-center gap-[3px] rounded-[4px] border-0 bg-transparent px-[4px] py-[2px] text-[11px] text-olake-muted hover:text-olake-ink'
-                        title='Copy answer'
+                        className={clsx(
+                          ANSWER_BUTTON,
+                          'cursor-pointer text-olake-muted hover:text-olake-ink'
+                        )}
+                        title={copiedAnswerId === turn.id ? 'Copied' : 'Copy answer'}
                         aria-label='Copy answer'
                       >
                         {copiedAnswerId === turn.id ? (
-                          <>
-                            <PiCheck size={12} className='text-olake-blue' />
-                            <span className='text-olake-blue'>Copied</span>
-                          </>
+                          <PiCheck size={14} className='text-olake-blue' />
                         ) : (
-                          <>
-                            <PiCopy size={12} />
-                            <span>Copy</span>
-                          </>
+                          <PiCopy size={14} />
+                        )}
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => vote(turn.id!, 1)}
+                        disabled={turn.vote !== null}
+                        className={clsx(
+                          ANSWER_BUTTON,
+                          turn.vote === 1 ? 'text-olake-blue' : 'text-olake-muted',
+                          turn.vote === null && 'cursor-pointer hover:text-olake-blue'
+                        )}
+                        title='Helpful'
+                        aria-label='Helpful'
+                        aria-pressed={turn.vote === 1}
+                      >
+                        {turn.vote === 1 ? <PiThumbsUpFill size={14} /> : <PiThumbsUp size={14} />}
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() =>
+                          setFeedbackOpenFor(feedbackOpenFor === turn.id ? null : turn.id)
+                        }
+                        disabled={turn.vote !== null}
+                        className={clsx(
+                          ANSWER_BUTTON,
+                          turn.vote === -1 ? 'text-olake-danger' : 'text-olake-muted',
+                          turn.vote === null && 'cursor-pointer hover:text-olake-danger'
+                        )}
+                        title='Not helpful'
+                        aria-label='Not helpful'
+                        aria-pressed={turn.vote === -1}
+                      >
+                        {turn.vote === -1 ? (
+                          <PiThumbsDownFill size={14} />
+                        ) : (
+                          <PiThumbsDown size={14} />
                         )}
                       </button>
                     </div>
