@@ -1,8 +1,8 @@
 ---
 slug: deploying-olake-on-kubernetes-helm
-title: "Deploy OLake on Kubernetes Helm - Fast, Scalable Data Pipelines"
-seo_title: "Deploy OLake on Kubernetes with Helm in 5 Minutes"
-description: "Quickly deploy OLake on Kubernetes with Helm for scalable, reliable data replication and pipeline orchestration in minutes."
+title: "Deploy OLake Go on Kubernetes with Helm"
+seo_title: "Deploy OLake on Kubernetes with Helm (2026 Guide)"
+description: "Install OLake Go on Kubernetes with the Helm chart, run a first Postgres to Iceberg sync, and set up S3 log storage, job profiles and production values."
 image: /img/blog/cover/olake-on-kubernetes.webp
 authors: [schitiz]
 tags: [kubernetes, helm, cdc, data-lakehouse, olake, how-to]
@@ -10,282 +10,403 @@ tags: [kubernetes, helm, cdc, data-lakehouse, olake, how-to]
 
 import CodeBlock from '@theme/CodeBlock';
 
-## Deploying OLake on Kubernetes with Helm
-
 ![Deploying OLake on Kubernetes using Helm chart, with OLake and Helm logos](/img/blog/cover/olake-on-kubernetes.webp)
 
-It is often said that setting up a robust data replication pipeline can be a headache. Custom deployment scripts are often wrestled with, disparate components must be managed, and concerns arise about what happens when failures inevitably occur. Data teams are kept waiting while time is spent on plumbing instead of enabling.
+The official OLake Helm chart installs the OLake UI, the OLake Go workers, Temporal and PostgreSQL in one `helm install`. Every connection test, schema discovery and sync then runs in its own short-lived Kubernetes pod. This guide installs the chart, runs a first Postgres to Apache Iceberg sync, defines the same kind of pipeline from Git with GitOps, and covers the values that matter before production.
 
-What if a complete, production-ready data replication platform could be deployed on Kubernetes with a single command? What if it was built from the ground up to be scalable, observable, and secure?
+**Updated 27 November 2026.** Everything below was run on that date with Helm chart `olake` 0.0.37 (app version 0.3.11) and OLake Go v1.2.2 connectors, on a local [kind](https://kind.sigs.k8s.io/) cluster running Kubernetes 1.27.3. The numbers in this post come from that run.
 
-That’s exactly why the new official Helm chart for OLake was built. It is more than just an installer; it is a fast track to a powerful data pipeline, where data is moved from database sources to a data lakehouse in Apache Iceberg or Parquet.
+<TLDR title='Key takeaways'>
 
-This is not just a guide. It is a journey. A process to achieve a fully operational pipeline will now be demonstrated.
+- One command installs the whole stack. On kind it took 1 minute 42 seconds, image pulls included, and the first 10,000-row sync into Iceberg ran in 10 seconds.
+- Each test, discovery and sync runs as its own pod with the connector image, so a heavy sync never shares a container with the UI or the scheduler.
+- Job profiles send any job to the nodes, tolerations and CPU and memory you choose, and the workers pick up a change without a restart.
 
-## The OLake Helm Chart Architecture
+</TLDR>
 
-To ensure every data pipeline runs like a well-oiled machine, a complete and observable replication stack is deployed by the Helm chart. The architecture was designed around the core principles of resilience and a clean separation of duties. By this modular design, a stable foundation is provided, where each part knows its job and does it well.
+## What the chart deploys
 
-![OLake Kubernetes platform architecture: UI, workflow orchestrator, worker, activity pods, shared storage, and integration with external databases and data lake storage](/img/blog/2025/10/dataflow.webp)
+With S3 log storage switched on (recommended, see below), the default install runs these workloads:
 
-## What You Get with the Helm Chart
+| Workload | What it does |
+|---|---|
+| `olake-ui` | Web UI and API on port 8000, where you create sources, destinations and jobs |
+| `olake-workers` | Picks up work from Temporal and starts a pod for every test, discovery and sync |
+| `temporal` | Workflow orchestrator: schedules jobs, retries failed runs, keeps run history |
+| `postgresql` | Stores OLake's job metadata and Temporal's data, including workflow visibility |
+| `olake-minio` | In-cluster S3-compatible storage for job config, state and log files (S3 mode only) |
+| `olake-signup-init` | One-time job that creates the first admin user |
 
-Six key services are deployed by the chart, which work in concert:
+Two components from earlier versions of this guide are no longer part of a default install:
 
-- **OLake UI**: The central command center. It's the web interface and backend API for setting up connectors, managing data pipelines, and monitoring sync progress.
-- **OLake Worker**: The engine of the platform. This Kubernetes-native worker listens for tasks from the orchestrator and dynamically creates Kubernetes pods to execute data synchronization, schema discovery, and connection testing.
-- **Temporal**: The heart of the operation. Temporal is a powerful workflow orchestrator that manages the entire data pipeline lifecycle, guaranteeing reliable execution with built-in retries and state management.
-- **PostgreSQL**: The persistence layer. It stores all OLake application data (sync state, job configurations, etc.) and the state of Temporal workflows, ensuring no data is lost.
-- **Elasticsearch**: The visibility layer. It's integrated with Temporal to provide advanced search and observability into workflow executions, making it easy to debug and monitor your jobs.
-- **Shared Storage**: A persistent volume is required for coordination between the UI and the dynamic worker pods. For a quickstart, a development-grade NFS server can be deployed by the chart. For production, a custom ReadWriteMany storage solution can be easily integrated.
+- **Elasticsearch** has been off by default since chart 0.0.11. Temporal keeps its visibility data in PostgreSQL instead. Existing installs that relied on it can keep it with `elasticsearch.enabled=true` (see [Upgrading](#upgrading-an-older-install)).
+- **The NFS server** is still the default storage mode, but it is deprecated and will be removed at the end of 2026. Use S3 mode for new installs.
 
-## The Mission: A Live Pipeline in 5 Minutes
+```mermaid
+flowchart TB
+  user([You]) -->|port 8000| ui[olake-ui]
+  ui --> temporal[temporal]
+  ui --- pg[(postgresql)]
+  temporal --- pg
+  temporal --> workers[olake-workers]
+  workers -->|starts one pod per task| pods[test, discover and sync pods]
+  workers -->|config, state, logs| s3[(olake-minio or your S3 bucket)]
+  pods --> s3
+  pods -->|reads| src[(Source database)]
+  pods -->|writes Iceberg or Parquet| lake[(Catalog and object storage)]
+```
 
-First, the power of OLake Go can be demonstrated with a quick development setup. The goal is for the entire platform to be running in the cluster in the next few minutes.
+## Prerequisites
 
-### Prerequisites
+- Kubernetes 1.19 or later and Helm 3.2.0 or later, per the [chart README](https://github.com/datazip-inc/olake-helm/blob/master/helm/olake/README.md)
+- `kubectl` pointed at the cluster
+- A default StorageClass for the PostgreSQL and MinIO volumes (`kubectl get storageclass`)
 
-- Kubernetes 1.19+ & Helm 3.2.0+
-- `kubectl` configured to the cluster
-- A default `StorageClass` defined in the cluster
+A laptop cluster is enough to try it. For real workloads, the [Kubernetes install guide](/docs/install/kubernetes/) lists sizing per component, starting at 4 GB of memory and 2 vCPUs each for the UI, workers, Temporal and PostgreSQL, and 8 GB and 4 vCPUs for a sync pod.
 
-### Step 1: Add the OLake Helm Repo
+## Step 1: Install the chart
 
-The Helm client must be informed of where the chart can be found:
+Add the repository and install with S3 log storage:
 
 ```bash
 helm repo add olake https://datazip-inc.github.io/olake-helm
 helm repo update
+helm install olake olake/olake --set global.logFileStorageMode=s3
 ```
 
-### Step 2: Deploy OLake Helm Chart!
+`global.logFileStorageMode=s3` stores job config, state and logs in an in-cluster MinIO bucket named `olake`. Without the flag, the chart still uses the deprecated NFS mode.
 
-Now for the magic, this one command should be run:
+On our kind cluster, `helm install --wait` returned after 1 minute 42 seconds. This is what `kubectl get pods` showed:
+
+```text
+NAME                             READY   STATUS      RESTARTS   AGE
+olake-minio-0                    1/1     Running     0          105s
+olake-signup-init-zqwrw          0/1     Completed   0          105s
+olake-ui-5b8b8684fd-cxrkm        1/1     Running     0          105s
+olake-workers-7c6996d645-dvsxt   1/1     Running     0          105s
+postgresql-0                     1/1     Running     0          105s
+temporal-c6f6c455c-ljcw7         1/1     Running     0          105s
+```
+
+On Amazon EKS, also pass `--set global.storageClass="gp2"` (or your StorageClass) if the cluster has no default.
+
+## Step 2: Log in
+
+Forward the UI port and open `http://localhost:8000`:
 
 ```bash
-helm install olake olake/olake 
+kubectl port-forward svc/olake-ui 8000:8000
 ```
 
-With this command, the entire OLake stack is deployed: the UI, the Temporal orchestrator, the OLake workers, and the necessary PostgreSQL and Elasticsearch databases. For this quick start, even a simple NFS server for shared storage is provisioned.
+The default login is `admin` / `password`. Change it before anyone else can reach the UI: create a Secret and point `olakeUI.initUser.existingSecret` at it, as shown in the [install guide](/docs/install/kubernetes/#initial-user-setup). With `olakeUI.ingress.enabled=true` you can reach the UI through your ingress controller instead of a port-forward.
 
-The components can be watched as they come to life:
+## Step 3: Run a first sync
 
-```bash
-kubectl get pods 
-NAME                                  READY   STATUS    RESTARTS   AGE
-elasticsearch-efgh                    1/1     Running   0          2m
-olake-nfs-server-mnop                 1/1     Running   0          2m
-postgresql-pqrst                      1/1     Running   0          2m
-temporal-7b7c8f9f68-abcde             1/1     Running   0          2m
-olake-ui-5f5d6b7b89-fghij             1/1     Running   0          2m
-olake-worker-6c6b7d8d90-klmno         1/1     Running   0          2m
-```
+For the test we created a PostgreSQL 16 pod inside the cluster with a 10,000-row `customers` table. The destination was Iceberg with a JDBC catalog in a second Postgres database and data files in a MinIO bucket. Any [source](/docs/connectors/overview/) and [catalog](/docs/writers/iceberg/catalog/jdbc/) OLake Go supports works the same way.
 
-### Step 3: Log Into the System
+When you click **Test connection** on a source, the worker starts a pod for it. Ours was named `test-connection-123-b48fe701...` and ran the image `olakego/source-postgres:v1.2.2`. It reported `Connected to Postgres server_version_num=160016` and was removed once the test finished. Schema discovery for the job works the same way.
 
-The platform is now running. To access the OLake UI, the port can be forwarded from the service to a local machine or accessed via domain in case setup using Ingress:
+The job used **Full Refresh + Incremental** with `updated_at` as the cursor and Upsert as the ingestion mode. Check the cursor field: the UI proposed `city` for our table, which would miss updates.
 
-```bash
-kubectl port-forward svc/olake-ui 8080:8080 8000:8000
-```
+![OLake UI Create Job page with a Postgres source, an Apache Iceberg destination and a daily schedule](/img/blog/2026/11/olake-helm-create-job.webp)
 
-A browser can be opened to `http://localhost:8000`, and login with `admin` / `password` to create a job. In just a few minutes, a complete data replication platform has been deployed.
+![OLake UI stream selection showing the customers table with Full Refresh plus Incremental, updated_at as cursor and Upsert mode](/img/blog/2026/11/olake-helm-streams.webp)
 
-![OLake jobs dashboard UI showing first job setup, job status tabs, tutorial prompt, and new UI announcement](/img/blog/2025/10/olakeuik8s.webp)
+Each run starts a pod named `sync-<project>-<job ID>-<timestamp>`. These are the results of two runs:
 
-## Under the Hood: The Design Philosophy by Which OLake is Powered
+| Run | What changed in Postgres | Runtime | Iceberg snapshot |
+|---|---|---|---|
+| 1, full load | 10,000 rows | 10 s | `append`: 1 data file, 10,000 records, 47,495 bytes |
+| 2, incremental | 100 rows updated, 50 inserted | 10 s | `overwrite`: 150 records plus 150 equality deletes |
 
-Now that the platform has been seen in action, some of the key design decisions that make OLake both easy to use and powerful enough for production will be explored.
+The table landed as `postgres_to_iceberg_demo_shop_public.customers` in Iceberg format version 2, with OLake's `_olake_id`, `_op_type` and `_olake_timestamp` columns next to the source columns. After the second run it holds 10,050 live rows, the same as the source.
 
-### More Than Just Storage: The Role of the Shared Volume in Pipeline Coordination
+![OLake UI Jobs page listing the postgres_to_iceberg_demo job with a Completed last run](/img/blog/2026/11/olake-helm-jobs.webp)
 
-When OLake Go was first deployed, an NFS server was automatically provisioned. This is not just about storage—it's the coordination backbone by which the entire pipeline is made to work seamlessly.
+Logs for every run are under **Job Logs & History**. In S3 mode the sync pod uploads its state and stream files to the `olake` bucket, then the worker cleans up the pod:
 
-It can be thought of in this way: job configurations need to be handed off from the OLake UI to workers, discovered schemas must be passed from workers to sync processes, and state needs to be coordinated by everyone. Without shared storage, these components would be like orchestra musicians attempting to play together while situated in different buildings.
+![OLake UI sync logs showing state.json uploaded to s3://olake and the sync pod completed and cleaned up](/img/blog/2026/11/olake-helm-sync-logs.webp)
 
-The deployed NFS volume acts as this coordination layer. When a new data source is configured in the UI, that configuration is written to the shared volume. When a worker pod is spun up to discover the database schema, that same location is read from, and what is found is written back. It is a simple but powerful pattern by which everything is kept in sync.
+## How the work is spread across pods
 
-For a quick start, this has been made invisible—the built-in NFS server just works. But a key point must be understood: while the self-managed NFS is perfect for development and testing, production workloads deserve better.
+The workers never run a sync inside their own container. For each task they create a pod with the connector image for that source, and remove it when the task ends. That keeps the long-running pods small: the chart's defaults request 512Mi for the UI and 256Mi for the workers.
 
-In production, the cloud provider's managed storage services should be leveraged. The durability, performance, and availability guarantees that are depended on by data pipelines are provided by these services. AWS EFS, Azure Files, and Google Cloud Filestore are all battle-tested, managed solutions that scale with needs and come with built-in redundancy.
+If no profile applies, a sync pod gets the built-in default of 100m CPU and 256Mi memory requests with no limits. Our run logged exactly that: `requests cpu=100m mem=256Mi, limits cpu=none mem=none`. Real tables need more, which is what job profiles are for.
 
-The way OLake Go would be configured to use AWS EFS in production is shown here:
+## Route jobs to the right nodes with job profiles
+
+`global.jobProfiles` maps a job ID to a node selector, tolerations, affinity and resources. The job ID is shown in the Jobs list. Profile `0` is the default for every unmapped sync and for all test, discovery and spec pods.
 
 ```yaml
 # values.yaml
-nfsServer:
-  enabled: false  # Disable our built-in NFS server
-
-  # Use your existing EFS persistent volume claim instead
-  external:
-    name: "my-efs-pvc"
+global:
+  jobProfiles:
+    0:                      # default for unmapped jobs, tests and discovery
+      nodeSelector:
+        olake.io/workload-type: "general"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          memory: "2Gi"
+    123:                    # a heavy job, pinned to memory-optimized nodes
+      nodeSelector:
+        olake.io/workload-type: "memory-optimized"
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "olake"
+          effect: "NoSchedule"
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          memory: "8Gi"
 ```
 
-The same pattern works for Azure Files or Google Cloud Filestore—the managed storage is pointed to, and the rest is handled by OLake Go. Enterprise-grade storage reliability is thus provided to the pipelines while the same simple operational model is kept.
+We applied profile `0` above with `helm upgrade olake olake/olake -f values.yaml`. The next sync pod came up with the `olake.io/workload-type: general` node selector, `500m` and `1Gi` requests and a `2Gi` memory limit, with no restart of the workers.
 
-This shared storage design doesn't just solve coordination—powerful operational capabilities are also enabled. If a failed pipeline needs to be debugged, the logs and state files are located right there in the shared volume. If a migration of the OLake Go deployment to a new cluster is desired, the entire pipeline state is moved with the storage. It is resilience through simplicity.
+A few rules from the chart's values file:
 
-## Escaping the 'Noisy Neighbor' Problem in Your Data Pipelines
+- A job's own profile wins, then profile `0`, then the built-in default. Resources are replaced as a whole, not merged field by field.
+- `global.jobMapping`, the older setting that only took node labels, is deprecated. Move its entries to `jobProfiles`.
+- The workers do not spread sync pods across nodes by themselves. To keep two heavy jobs apart, give them profiles that point at different node pools, or add your own affinity rules.
 
-This scenario has been lived through by every data engineer: multiple heavy data sync operations are run simultaneously, and all are found on the same Kubernetes node, where CPU, memory, and I/O are fought for. The result is slower performance across the board and unpredictable completion times.
+## Storage for job config and logs
 
-This is known as the "noisy neighbor" problem, where resource-intensive workloads are impacted by each other when forced to share the same infrastructure. In traditional data pipeline setups, performance bottlenecks and unreliable sync times are the result, especially when large datasets are being processed.
-
-This problem is solved intelligently by OLake Go for the operations that matter most: heavy data sync workloads.
-
-When pods are created by OLake Go for sync operations, `podAntiAffinity` rules are automatically applied, by which these resource-intensive tasks are spread across different nodes in the cluster. It can be thought of as an intelligent traffic controller by which the heaviest data processing jobs are ensured not to interfere with each other.
-
-**What this means in practice:**
-
-- Consistent Sync Performance: Dedicated node resources are given to large table syncs, so completion is achieved in predictable timeframes without competition for CPU and memory with other sync operations.
-- Improved Reliability: A single node is prevented from becoming a bottleneck, so the risk of memory pressure or CPU saturation that could cause sync operations to fail or timeout is reduced.
-
-For lightweight operations like discovery and testing, a different approach is taken by OLake Go—these quick, low-resource operations can be run anywhere without the need for special scheduling constraints. The system is thus kept efficient while the sophisticated scheduling logic is focused where the most value is provided.
-
-The result is a data pipeline architecture by which performance is automatically optimized, ensuring the most critical sync operations are given the resources needed to succeed.
-
-## Precision Scheduling: A Guide to JobID-Based Node Mapping
-
-Now that the handling of resource isolation by OLake Go is understood, the topic of precision can be addressed. Not all data operations are created equal—some require massive memory for processing large datasets, others benefit from high-CPU nodes for complex normalizations, and some can be run perfectly fine on cost-effective general-purpose instances.
-
-In traditional Kubernetes scheduling, all pods are treated in the same way, being spread randomly across available nodes. But what if a strategic approach could be taken regarding where different types of data work are actually run?
-
-That is exactly what is delivered by OLake Go's JobID-based node mapping: the power for specific sync operations to be routed to the exact infrastructure that is needed for them to perform at their best.
-
-### How It Works
-
-The concept is elegantly simple. A JobID is given to every data job in OLake Go—it can be thought of as a unique fingerprint for that particular operation. Through the Helm configuration, a mapping is created that tells OLake Go: "When JobID X is seen, it should be scheduled on nodes with these specific labels."
+OLake needs one shared place for each job's config, state and log files. In S3 mode the in-cluster MinIO is fine for trying it out. For anything longer-lived, use your own bucket:
 
 ```yaml
-# values-production.yaml
+# values.yaml
 global:
-  jobMapping:
-    # Heavy PostgreSQL sync is routed to memory-optimized nodes
-    123:
-      olake.io/workload-type: "memory-optimized"
-    456:
-      olake.io/workload-type: "general-purpose"
-    # Default scheduling behaviour
-    789: {}
+  logFileStorageMode: s3
+s3LogFileStorage:
+  bucket: "my-olake-logs"
+  region: "us-east-1"
+  minio:
+    enabled: false
+  external:
+    role:
+      enabled: true          # use an IAM role (EKS IRSA) instead of keys
+      annotations:
+        eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/olake-log-storage"
 ```
 
-### Real-World Impact
+For keys instead of a role, set `s3LogFileStorage.external.existingSecret`. For Google Cloud Storage or another S3-compatible store, also set `external.endpoint`; Google Cloud Storage needs HMAC keys. The full option list is in the [S3 log file storage section](/docs/install/kubernetes/#s3-log-file-storage-configuration) of the install guide.
 
-A typical enterprise scenario can be considered: a massive customer transactions table (JobID 123) that needs 32GB of memory to be processed efficiently is being synced, while another lightweight sync is simultaneously being run across dozens of smaller tables (JobID 456).
+If you still run NFS mode, two things to know before the end-of-2026 removal:
 
-Without node mapping, both operations might be scheduled on the same node by Kubernetes, causing memory contention. Or worse, the memory-hungry sync job might be put on a small node where an out-of-memory error would cause it to fail.
+- The NFS components are created once and are not deleted by `helm uninstall` or changed by `helm upgrade`.
+- The built-in NFS server does not work on Bottlerocket nodes on EKS; those clusters need Amazon EFS with `nfsServer.enabled=false`.
 
-With JobID-based mapping, the heavy sync is necessarily landed on a node with label `olake.io/workload-type: "memory-optimized"` where completion is achieved in 30 minutes instead of timing out. The other sync job are run happily on smaller, cheaper nodes, finishing without waste.
+## Manage pipelines from Git with GitOps
 
-### The Progressive Advantage
+Every source, destination, job and stream selection can also live in Git as a labelled Kubernetes ConfigMap. A GitOps tool such as Argo CD or Flux applies the manifests, and the OLake UI creates or updates the matching objects. Changes then go through a pull request instead of the UI.
 
-What makes this approach brilliant is that it is completely optional and grows with needs. A simple start can be made—everything can be run anywhere using default Kubernetes scheduling. As data volumes grow and performance patterns are identified, mappings can be added only for the jobs that benefit.
+Turn it on with one value, at install time or in a later upgrade. It needs chart 0.0.34, OLake UI 0.9.0 and OLake Go 1.0.0 or later ([GitOps prerequisites](/docs/install/gitops/kubernetes/#prerequisites)):
 
-For new systems, no mappings are required. For growing enterprises with complex workloads, the heaviest jobs can be mapped to dedicated node pools.
+```yaml
+# values.yaml
+gitops:
+  enabled: true
+```
 
-### Configuration That Just Works
+The chart then sets `OLAKE_GITOPS_MODE=kubernetes` on the UI and creates a Role, `olake-gitops`, that can read and update only ConfigMaps, Secrets and Events in the release's namespace. The UI never gets cluster-wide access.
 
-The beauty lies in the simplicity. A few lines are added to the Helm values, a redeployment is done, and jobs are automatically started to be routed by OLake Go according to the rules. No code changes, no complex rewrites, no architectural overhauls are needed. The intelligence is built into the platform.
+A pipeline is four manifests. Each one carries two labels, `olake.io/managed: "true"` and `olake.io/kind`, plus `projectId` (`123` in a default install) and, except for streams, `userId`. This is the source from our test run; the password comes from a Kubernetes Secret instead of Git:
 
-This is precision scheduling in action: the right job, on the right infrastructure, at the right time.
+```yaml
+# source.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-postgres
+  labels:
+    olake.io/managed: "true"
+    olake.io/kind: source
+data:
+  projectId: "123"
+  userId: "1"
+  config: |
+    {
+      "name": "demo_postgres",
+      "type": "postgres",
+      "version": "v1.2.2",
+      "config": {
+        "host": "demo-pg.demo.svc.cluster.local",
+        "port": 5432,
+        "database": "shop",
+        "username": "postgres",
+        "password": "${secrets:demo-pg-creds#password}",
+        "ssl": { "mode": "disable" }
+      }
+    }
+```
 
-## The Engine of Scale: Reliably Orchestrating Dozens of Concurrent Data Pipelines
+The destination has the same shape, with `"type": "iceberg"` and the writer settings under `config`. The job and its streams connect them:
 
-It is Monday morning, and 20 different sync jobs have been scheduled to be run simultaneously. Customer data from PostgreSQL, product catalogs from MongoDB, transaction logs from MySQL—all are flowing into the data lake at the same time. In a traditional setup, this would be a recipe for chaos. Jobs would interfere with each other, failed workflows would disappear into the void, and everything would be restarted manually while coffee gets cold.
+```yaml
+# job.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customers-sync
+  labels:
+    olake.io/managed: "true"
+    olake.io/kind: job
+data:
+  projectId: "123"
+  userId: "1"
+  config: |
+    {
+      "name": "customers_sync",
+      "source": "demo_postgres",
+      "destination": "lake",
+      "frequency": "*/5 * * * *",
+      "activate": true
+    }
+---
+# streams.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customers-sync-streams
+  labels:
+    olake.io/managed: "true"
+    olake.io/kind: streams
+data:
+  projectId: "123"
+  job: customers-sync
+  config: |
+    {
+      "selected_streams": {
+        "public": [
+          { "stream_name": "customers", "sync_mode": "incremental", "cursor_field": "updated_at", "normalization": true }
+        ]
+      }
+    }
+```
 
-This complexity is handled by OLake Go through two powerful components working in perfect harmony: Temporal for rock-solid orchestration and OLake Workers for intelligent concurrency management.
+Two references trip people up:
 
-### Temporal: The Reliability Safety Net
+- The job's `source` and `destination` use the `name` inside each config (`demo_postgres`, `lake`), not the ConfigMap name.
+- The streams object's `job` uses the job's ConfigMap name (`customers-sync`), not `customers_sync`. With the wrong one, the job waits forever with `waiting for Streams referencing job`.
 
-When a data sync is kicked off in OLake Go, it is not just "run" by Temporal—a durable, recoverable workflow is created that persists through failure. If a sync crashes, it is remembered by Temporal where each job was, and a resumption from that exact point is performed on the next schedule of the job.
+A `${secrets:...}` reference only reads Secrets labelled `olake.io/managed=true`, so label the Secret after creating it. AWS Secrets Manager, GCP Secret Manager and Azure Key Vault references work too, through the same cloud identity as `global.jobServiceAccount` ([secret references](/docs/install/gitops/kubernetes/#1-secret-references)).
 
-But what makes Temporal truly powerful for data pipelines is that complete visibility is provided into what is happening. Every step, every retry, every decision point is tracked. If it is needed to know why a sync job failed three days ago, the full execution history is right there on the OLake UI.
+### What happened in our run
 
-### The Magic of Dynamic Pod Creation
+We applied the four manifests with `kubectl apply`, which is what a GitOps tool does after a push. OLake writes its progress back onto each ConfigMap as annotations:
 
-The architecture is made particularly smart at this point. When a data operation needs to be executed by a workflow—say, for schema discovery from a PostgreSQL database—that operation is not run within the OLake Worker itself. Instead, a dedicated Kubernetes pod is created specifically for that task.
+```bash
+kubectl get cm -l olake.io/managed=true \
+  -o custom-columns='NAME:.metadata.name,PHASE:.metadata.annotations.olake\.io/phase,MESSAGE:.metadata.annotations.olake\.io/message'
+```
 
-This means dozens of operations can be coordinated simultaneously by the worker while each actual data processing task is run in its own isolated environment with dedicated resources. It is like a smart dispatcher managing a fleet of specialized vehicles, with each one being optimized for its specific job.
+- The job first showed `Pending` with `waiting for source "demo_postgres"` while the UI ran the source and destination connection tests in their own pods.
+- All four objects were `Ready` 67 seconds after the apply, and the job appeared in the UI with its five-minute schedule.
+- The first scheduled run read all 10,000 rows into Iceberg in 15 seconds.
 
-## Data, Handled Your Way, Without Excuses
+To check the failure path, we applied a second source with a wrong password. It went to `Failed` with the database error in `olake.io/message` (`password authentication failed for user "postgres" (SQLSTATE 28P01)`).
 
-The OLake Helm chart is more than a tool; it's a statement. It is believed that enterprise-grade data replication should be accessible to everyone. It should be easy to deploy, secure by default, and powerful enough for growth. By handling the deployment complexity, focus can be placed on what truly matters: the data.
+The worker also started a pod named `olake-failed-source-bad-postgres`, labelled `olake.io/indicator=true`, so an existing alert on failed pods catches it. Fixing the password in the manifest turned the source `Ready`, and OLake deleted the indicator pod by itself.
 
-**Happy replicating!**
+Before you rely on it, know three rules from the [GitOps guide](/docs/install/gitops/kubernetes/#important-behavior):
+
+- Deleting a manifest from Git does not delete the object in OLake.
+- Renaming a source, destination or job creates a new one.
+- Changing a stream's sync mode or settings clears that stream's data in the destination and syncs it again.
+
+## Before production
+
+- **Change the admin login** with `olakeUI.initUser.existingSecret`.
+- **Encrypt job metadata** by setting `global.env.OLAKE_SECRET_KEY` to a random string or an AWS KMS key ARN. It is empty, meaning no encryption, by default.
+- **Use managed services where you have them.** `postgresql.enabled=false` and `temporal.enabled=false` switch to an external PostgreSQL or Temporal through a Kubernetes Secret, and `s3LogFileStorage.minio.enabled=false` moves logs to your own bucket.
+- **Give sync pods a cloud identity** instead of keys. `global.jobServiceAccount.annotations` takes the AWS IRSA role, the GCP Workload Identity account or the Azure Workload Identity client ID.
+- **Size the sync pods** with job profiles, and keep the UI, workers, Temporal and PostgreSQL on on-demand nodes rather than spot nodes.
+- **Plan index volumes** if you write Iceberg positional deletes or deletion vectors. Each such job gets its own `olake-index-<JobID>` volume, 20Gi by default, set under `jobIndexes`. It must be block storage, never NFS or EFS.
+
+The [install guide](/docs/install/kubernetes/) has the exact values for each of these.
+
+## Add table maintenance with OLake Fusion
+
+The default install covers ingestion only. [OLake Fusion](/docs/fusion/install/kubernetes-compaction/) adds compaction and other Iceberg table maintenance in the same release:
+
+```bash
+helm upgrade olake olake/olake --reuse-values --set fusion.enabled=true
+```
+
+Fusion uses the same admin login as the OLake UI and follows the same `global.logFileStorageMode`.
+
+## Upgrading an older install
+
+```bash
+helm repo update
+helm upgrade olake olake/olake -f values.yaml
+```
+
+If your install predates chart 0.0.11 and used Elasticsearch, an upgrade without changes keeps working but loses the task history stored there. To keep it, upgrade with `--set elasticsearch.enabled=true`, then run `kubectl rollout restart deployment/olake-workers`. To pull newer UI and worker images on the same chart version, restart `deployment/olake-ui` and `deployment/olake-workers`.
+
+## Uninstall
+
+```bash
+helm uninstall olake
+```
+
+This keeps every resource marked `helm.sh/resource-policy: keep`, so an accidental uninstall does not lose data. After ours, the PostgreSQL and MinIO PersistentVolumeClaims were still there; in NFS mode the NFS server and its StorageClass stay too.
+
+To remove everything, run `uninstall.sh` from `helm/olake` in the [olake-helm repository](https://github.com/datazip-inc/olake-helm). Add `--keep-pvcs` to keep the data volumes, and `-n` with your namespace, since the script defaults to `olake`. The [uninstall guide](https://github.com/datazip-inc/olake-helm/blob/master/helm/olake/UNINSTALL_GUIDE.md) lists every option.
 
 ## FAQs
 <Faq showHeading={false} data={[
   {
     question: "Q1. How do I deploy OLake Go on Kubernetes using Helm?",
     answer: <div>
-      <p>Add the OLake Helm repository and run <code>helm install</code> to deploy the complete OLake stack to your Kubernetes cluster:</p>
+      <p>Add the OLake Helm repository and install the chart with S3 log storage:</p>
       <CodeBlock language="bash">{`helm repo add olake https://datazip-inc.github.io/olake-helm
 helm repo update
-helm install olake olake/olake`}</CodeBlock>
-      <p>The chart deploys all six required services: OLake UI, OLake Worker, Temporal workflow orchestrator, PostgreSQL for state storage, Elasticsearch for observability, and a shared NFS persistent volume for coordination between the UI and worker pods.</p>
-      <p>Once deployed, verify all pods are running:</p>
-      <CodeBlock language="bash">{`kubectl get pods`}</CodeBlock>
-      <p>You should see <code>elasticsearch</code>, <code>olake-nfs-server</code>, <code>postgresql</code>, <code>temporal</code>, <code>olake-ui</code>, and <code>olake-worker</code> all in <code>Running</code> state.</p>
-      <p>To access the OLake UI, forward the port:</p>
-      <CodeBlock language="bash">{`kubectl port-forward svc/olake-ui 8080:8080 8000:8000`}</CodeBlock>
-      <p>Then open <code>http://localhost:8000</code> and log in with <code>admin / password</code> to create your first pipeline.</p>
+helm install olake olake/olake --set global.logFileStorageMode=s3`}</CodeBlock>
+      <p>Then forward the UI port with <code>kubectl port-forward svc/olake-ui 8000:8000</code>, open <code>http://localhost:8000</code> and log in with <code>admin</code> / <code>password</code>. Change that login before production.</p>
     </div>
   },
   {
-    question: "Q2. What services does the OLake Helm chart deploy and what does each do?",
+    question: "Q2. What does the OLake Helm chart deploy?",
     answer: <div>
-      <p>The OLake Helm chart deploys six services:</p>
-      <ol>
-        <li><strong>OLake UI</strong> - Web interface and backend API for managing pipelines, viewing sync status, and browsing execution history</li>
-        <li><strong>OLake Worker</strong> - Kubernetes-native engine that creates dedicated pods for each sync job rather than running jobs within itself</li>
-        <li><strong>Temporal</strong> - Workflow orchestrator that guarantees reliable execution with retries, state persistence, and full execution history</li>
-        <li><strong>PostgreSQL</strong> - Stores all OLake application state and Temporal workflow state</li>
-        <li><strong>Elasticsearch</strong> - Provides search and observability into workflow executions, integrated with Temporal's visibility layer</li>
-        <li><strong>Shared Storage (NFS server)</strong> - Persistent volume for coordination between the UI and worker pods. The chart bundles a development-grade NFS server for quickstart - replace with a ReadWriteMany-capable solution for production</li>
-      </ol>
+      <p>The OLake UI, the OLake workers, Temporal, PostgreSQL and a one-time job that creates the admin user. In S3 mode it also runs an in-cluster MinIO for job config, state and logs. The workers start a separate pod for every connection test, schema discovery and sync. Elasticsearch is off by default since chart 0.0.11, and the NFS server is only used in the deprecated NFS mode.</p>
     </div>
   },
   {
-    question: "Q3. What are the minimum requirements for deploying OLake Go on Kubernetes?",
+    question: "Q3. Do I still need NFS or Elasticsearch?",
+    answer: <div>
+      <p>No. Set <code>global.logFileStorageMode: s3</code> and OLake stores job files in MinIO or your own S3-compatible bucket. NFS mode is deprecated and will be removed at the end of 2026. Temporal keeps its visibility data in PostgreSQL; turn Elasticsearch on only to keep task history from an older install that used it.</p>
+    </div>
+  },
+  {
+    question: "Q4. How do I give a large sync more memory or its own nodes?",
+    answer: <div>
+      <p>Add a job profile under <code>global.jobProfiles</code> with the job ID as the key. A profile can set a node selector, tolerations, affinity and CPU and memory requests and limits. Profile <code>0</code> is the default for all other jobs. The workers pick up changes after <code>helm upgrade</code> without a restart. The older <code>global.jobMapping</code> setting is deprecated.</p>
+    </div>
+  },
+  {
+    question: "Q5. What should change before running the chart in production?",
     answer: <div>
       <ul>
-        <li><strong>Kubernetes</strong> 1.19 or later</li>
-        <li><strong>Helm</strong> 3.2.0 or later</li>
-        <li><strong>kubectl</strong> configured and connected to your target cluster</li>
-        <li><strong>Default StorageClass</strong> defined in the cluster</li>
-      </ul>
-      <p>For production deployments, a ReadWriteMany-capable storage solution (such as NFS, EFS, or Azure Files) is recommended to replace the development-grade NFS server bundled with the chart.</p>
-      <p><strong>Temporal production note:</strong> Temporal's own team recommends using the Helm chart for templating and generating manifests rather than direct production deployment management. The bundled Elasticsearch, Cassandra, Prometheus, and Grafana in the chart are minimal development configurations. For production, replace the bundled Elasticsearch with an external managed instance and manage Temporal Server configuration separately.</p>
-    </div>
-  },
-  {
-    question: "Q4. How does OLake Go's Kubernetes deployment handle pipeline failures and retries?",
-    answer: <div>
-      <p>OLake Go uses Temporal as its workflow orchestrator, which provides built-in retry logic, state persistence, and guaranteed execution. When a data sync is kicked off in OLake Go, a durable, recoverable workflow is created that persists through failure:</p>
-      <ul>
-        <li>If a sync job fails mid-way, Temporal records the failure and automatically retries based on configurable retry policies</li>
-        <li>OLake Go uses checkpointing to remember progress within a sync, so retries resume from the last successful checkpoint rather than restarting the entire data load</li>
-        <li>Every step, retry, and decision point is tracked and visible in the OLake UI - full execution history is available for debugging failed jobs</li>
+        <li>Replace the default admin login with an existing Secret</li>
+        <li>Set <code>OLAKE_SECRET_KEY</code> to encrypt job metadata</li>
+        <li>Store job files in your own S3 bucket instead of the in-cluster MinIO</li>
+        <li>Consider an external PostgreSQL and Temporal</li>
+        <li>Size sync pods with job profiles and use cloud identities for them instead of keys</li>
       </ul>
     </div>
   },
   {
-    question: "Q5. Can the OLake Helm chart be used in production or only for development?",
+    question: "Q6. Can I manage OLake pipelines from Git instead of the UI?",
     answer: <div>
-      <p>The chart is production-ready when configured correctly, with the following requirements for production hardening:</p>
-      <ul>
-        <li><strong>Replace the bundled NFS server</strong> with an external ReadWriteMany-capable storage solution (EFS, Azure Files, or a managed NFS)</li>
-        <li><strong>Replace the bundled Elasticsearch</strong> with an external managed Elasticsearch instance - the chart's bundled Elasticsearch is explicitly a development-grade component and must be replaced, not merely configured, for production use</li>
-        <li><strong>Use external managed PostgreSQL</strong> rather than the bundled instance for durable persistence</li>
-        <li><strong>Set resource requests and limits</strong> on all pods to prevent noisy-neighbour issues</li>
-        <li><strong>Configure Temporal Server separately</strong> - Temporal's own team recommends using the Helm chart for manifest generation only; the bundled databases and observability components are not production-grade</li>
-      </ul>
-      <p>The Helm values file exposes all these configuration options for production hardening.</p>
+      <p>Yes. Set <code>gitops.enabled: true</code> in the Helm values, then keep each source, destination, job and stream selection in Git as a ConfigMap labelled <code>olake.io/managed: "true"</code> and <code>olake.io/kind</code>. Argo CD, Flux or a plain <code>kubectl apply</code> puts them in the cluster, and the OLake UI creates the pipeline. In our run all four objects were ready 67 seconds after the apply. Progress shows in the <code>olake.io/phase</code> annotation, and a failed object also gets an <code>olake-failed-*</code> pod for alerting. See <a href="/docs/install/gitops/kubernetes/">GitOps with Kubernetes</a>.</p>
     </div>
   }
 ]} />
 
-
-
-<BlogCTA/> 
-
+<BlogCTA/>
