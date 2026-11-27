@@ -479,6 +479,7 @@ const runbooksSidebar = {
       items: [
         { type: 'doc', id: 'runbooks/iceberg/schema-evolution-errors', label: 'Schema evolution errors' },
         { type: 'doc', id: 'runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing', label: 'Compaction rewrites nothing' },
+        { type: 'doc', id: 'runbooks/iceberg/expire-snapshots-remove-orphan-files', label: 'Storage not reclaimed' },
         { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' }
       ]
     }
