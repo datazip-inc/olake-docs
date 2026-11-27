@@ -20,7 +20,7 @@ When building an autonomous security framework, agents rely on the Model Context
 If your Change Data Capture (CDC) pipeline only overwrites historical state in the operational database, the agent lacks the context it needs to reconstruct the attack vector. It needs to be able to ask, "What was the exact topology of this DNS route 5 minutes ago?"
 Apache Iceberg’s Time Travel feature serves this purpose. However, running sub-second-latency queries on a fast-streaming Lakehouse is challenging due to metadata bloat and commit contention. 
 
-This guide looks at the mechanics of high-frequency streaming CDC. It describes an architecture that uses OLake's thread-coordinated ingestion and background compaction, OLake Fusion. This method transforms a Lakehouse into a low-latency temporal memory layer for autonomous threat detection, threat pattern prediction, correlation and monitoring.
+This guide looks at the mechanics of high-frequency streaming CDC. It describes an architecture that uses OLake Go's thread-coordinated ingestion and background compaction, OLake Fusion. This method transforms a Lakehouse into a low-latency temporal memory layer for autonomous threat detection, threat pattern prediction, correlation and monitoring.
 
 ## Architectural Primitives: Iceberg Time Travel
 
@@ -54,15 +54,15 @@ updated_at TIMESTAMP
 )
 PARTITIONED BY (days(updated_at));
 ```
-As threat vectors evolve, this schema will also change. Since Apache Iceberg tracks columns by fixed IDs instead of names, OLake can easily pass upstream PostgreSQL ALTER TABLE events, such as adding a tls_cipher_suite column, directly to the Lakehouse. This process does not need pipeline downtime or rewriting old Parquet files.
+As threat vectors evolve, this schema will also change. Since Apache Iceberg tracks columns by fixed IDs instead of names, OLake Go can easily pass upstream PostgreSQL ALTER TABLE events, such as adding a tls_cipher_suite column, directly to the Lakehouse. This process does not need pipeline downtime or rewriting old Parquet files.
 
 ### 2. The Direct-to-Storage Ingestion Path
 
-To use the Agentic Firewall, data is ingested using native CDC. While massive enterprise architectures often utilise an event bus like Kafka to fan out telemetry to multiple distinct consumers, OLake’s architecture allows us to bypass this intermediary on the Lakehouse path.  By removing the message bus, we strip out a layer of latency and operational overhead:
+To use the Agentic Firewall, data is ingested using native CDC. While massive enterprise architectures often utilise an event bus like Kafka to fan out telemetry to multiple distinct consumers, OLake Go's architecture allows us to bypass this intermediary on the Lakehouse path.  By removing the message bus, we strip out a layer of latency and operational overhead:
 
 * **Data Source:** PostgreSQL logical replication slot.
 
-* **Ingestion Engine:** OLake reads directly from the Postgres replication slot and writes directly to an Apache Iceberg table on Google Cloud Storage (GCS), managing the upserts and state natively.
+* **Ingestion Engine:** OLake Go reads directly from the Postgres replication slot and writes directly to an Apache Iceberg table on Google Cloud Storage (GCS), managing the upserts and state natively.
 
 ### 3. Managing Read Amplification: The Physics of Merge-On-Read
 In a high-throughput environment (e.g., enterprise /data center networks handling 10,000 state changes per second), we collide with the fundamental limits of object storage and columnar formats. Traditional data lake architectures default to Copy-On-Write (COW), which fails catastrophically under continuous mutation.
@@ -71,48 +71,52 @@ In a high-throughput environment (e.g., enterprise /data center networks handlin
 Think of COW like rewriting an entire 500-page textbook just to fix a single typo. Under the hood, a single 1KB row mutation forces the execution engine to deserialise an entire 500MB Parquet block, apply the state change in memory, re-encode the columnar structures, and execute a massive PUT request back to Google Cloud Storage. At 10,000 updates a second, this creates a catastrophic Write Amplification Factor (WAF). It saturates network bandwidth, exhausts cloud API quotas, and instantly grinds the ingestion pipeline to a halt.
 
 #### The Shift to Merge-On-Read (MOR): 
-To survive this streaming firehose and meet strict ingestion SLAs, the Iceberg table must be configured for Merge-On-Read. Think of MOR like slapping a sticky note with a correction onto the textbook's cover. MOR shifts the compute penalty from write time to read time. During a micro-batch commit, OLake doesn't touch the massive base files. Instead, it converts random database updates into pure sequential APPEND operations—writing new data files (INSERTs) alongside small Equality Delete files (the sticky notes, e.g., "Consider any row where source_ip = '10.0.4.55' as deleted").
+To survive this streaming firehose and meet strict ingestion SLAs, the Iceberg table must be configured for Merge-On-Read. Think of MOR like slapping a sticky note with a correction onto the textbook's cover. MOR shifts the compute penalty from write time to read time. During a micro-batch commit, OLake Go doesn't touch the massive base files. In its equality delete mode, it converts random database updates into pure sequential APPEND operations: writing new data files (INSERTs) alongside small Equality Delete files (the sticky notes, e.g., "Consider any row where source_ip = '10.0.4.55' as deleted").
+
+Equality deletes are one of three formats OLake Go writes. It can also write positional deletes (since [v0.10.0](/docs/release/ingestion/v0.10.0)) or deletion vectors (since [v0.11.0](/docs/release/ingestion/v0.11.0)), and it picks the format from the target query engines you set ([Upsert](/docs/understanding/terminologies/olake/#upsert)).
 
 #### The Read Amplification Wall: 
 While appending "sticky notes" takes microseconds and saves the write path, it pushes a massive computational burden down to the query execution layer. When a vectorized engine (like BigQuery or chDB or DuckDB) queries the lake, it must broadcast all active Equality Deletes across its worker nodes and maintain them in a RAM-resident hash set. During the scan, the engine must perform a dynamic anti-join against the base data on the fly. As delete files accumulate, evaluating these row-level predicates destroys CPU cache locality and breaks SIMD vectorization efficiency. Left unmanaged, a temporal query SLA that should be 50ms spikes to 15 seconds as the engine exhausts its memory footprint, filtering obsolete rows. This creates the exact read amplification wall that OLake's architecture is engineered to bypass.
 
-### Architecting the Solution: The Mechanics of an OLake Commit
+### Architecting the Solution: The Mechanics of an OLake Go Commit
 
 ![End to End Agentic Data Architecture](/img/blog/2026/6/agentic-data-architecture.webp)
 
-**Figure 2. The end-to-end Agentic Data Architecture.** Notice how the ingestion tier bypasses traditional message brokers like Kafka to minimise latency. On the left, OLake worker threads ingest CDC data directly from the PostgreSQL replication slot, using internal RAM buffers to fold noisy events before writing Parquet files directly to Google Cloud Storage. While OLake Fusion quietly compacts these files in the background, the Master Process handles the lightweight Iceberg catalog commits. On the right, this clean metadata allows the Vertex AI Control Plane to execute sub-second temporal reasoning via a vectorised execution engine.
+**Figure 2. The end-to-end Agentic Data Architecture.** Notice how the ingestion tier bypasses traditional message brokers like Kafka to minimise latency. On the left, OLake Go worker threads ingest CDC data directly from the PostgreSQL replication slot, using internal RAM buffers to fold noisy events before writing Parquet files directly to Google Cloud Storage. While OLake Fusion quietly compacts these files in the background, the Master Process handles the lightweight Iceberg catalog commits. On the right, this clean metadata allows the Vertex AI Control Plane to execute sub-second temporal reasoning via a vectorised execution engine.
 
-To enable sub-second Time Travel, the ingestion layer must rigorously manage metadata hygiene. OLake achieves this through a highly concurrent, conflict-free architecture.
+To enable sub-second Time Travel, the ingestion layer must rigorously manage metadata hygiene. OLake Go achieves this through a highly concurrent, conflict-free architecture.
 
 #### Phase 1: Lock-Free I/O via Logical Decoding
 
-Before tailing the WAL for real-time deltas, OLake natively executes a lock-free historical snapshot of the Postgres table to establish the baseline state in Iceberg. Once the baseline is synced, it transitions to Logical Decoding for streaming updates.
-During this streaming phase, when OLake processes a batch of UPDATE events, it does not check the Iceberg Catalog to find existing data. Because the Postgres Write-Ahead Log (WAL) records not only the new state but also streams a complete change event containing the pre-update primary key (edge_id), OLake holds the exact unique identifier needed to generate the Equality Delete condition entirely in RAM.
-It writes the new state as data-*.parquet files and simultaneously writes the eq-delete-*.parquet files without ever polling the Iceberg catalog. Unlike traditional ETL, which maintains a local lookup table to find record locations, OLake uses the pre-update primary key from the WAL, allowing it to issue a "delete" command blindly. This is what makes it truly horizontally scalable. Workers do not need to coordinate or share state to know what to delete. By completely bypassing the "read-before-write" penalty (the computational tax of locating and loading existing data into memory before applying an update), OLake maintains a decentralized, lock-free I/O phase.
+Before tailing the WAL for real-time deltas, OLake Go natively executes a lock-free historical snapshot of the Postgres table to establish the baseline state in Iceberg. Once the baseline is synced, it transitions to Logical Decoding for streaming updates.
+In equality delete mode, when OLake Go processes a batch of UPDATE events during this streaming phase, it does not check the Iceberg Catalog to find existing data. Because the Postgres Write-Ahead Log (WAL) records not only the new state but also streams a complete change event containing the pre-update primary key (edge_id), OLake Go holds the exact unique identifier needed to generate the Equality Delete condition entirely in RAM.
+It writes the new state as data-*.parquet files and simultaneously writes the eq-delete-*.parquet files without ever polling the Iceberg catalog. Unlike traditional ETL, which maintains a local lookup table to find record locations, OLake Go uses the pre-update primary key from the WAL, allowing it to issue a "delete" command blindly. This is what makes it truly horizontally scalable. Workers do not need to coordinate or share state to know what to delete. By completely bypassing the "read-before-write" penalty (the computational tax of locating and loading existing data into memory before applying an update), OLake Go maintains a decentralized, lock-free I/O phase.
+
+This blind delete belongs to the equality delete mode. In the positional delete and deletion vector modes, OLake Go looks each row up in a per-stream row index before it writes the delete, so engines that cannot read equality deletes, such as Snowflake and Databricks, can still read the table.
 
 #### Phase 2: Hybrid Execution & GC Mitigation (Arrow/Java)
 
-OLake achieves high-throughput ingestion through a pragmatic hybrid execution model, offering two modes for Iceberg writes:
+OLake Go achieves high-throughput ingestion through a pragmatic hybrid execution model, offering two modes for Iceberg writes:
 
-*  **Arrow-Based Mode:** OLake generates Parquet files in Go using Apache Arrow, then submits them to iceberg-java to register them into the table. The manifest and min/max stats are generated efficiently at the Java level.
+*  **Arrow-Based Mode:** OLake Go generates Parquet files in Go using Apache Arrow, then submits them to iceberg-java to register them into the table. The manifest and min/max stats are generated efficiently at the Java level.
 
-*  **Java Insert Mode:** OLake pulls data in Golang and submits the rows via a gRPC call to iceberg-java, which builds the Parquet files and the full ingestion, managing conflict-free schema evolution.
+*  **Java Insert Mode:** OLake Go pulls data in Golang and submits the rows via a gRPC call to iceberg-java, which builds the Parquet files and the full ingestion, managing conflict-free schema evolution.
 While the Arrow-based mode already minimizes Garbage Collection (GC) overhead by delegating Parquet generation to Go, a fully Go-based structure is on the roadmap as iceberg-go matures.
 
 #### Phase 3: Thread Coordination and the Master Process Lock
 
 In standard distributed ingestion pipelines, multiple workers often attempt to commit to the catalog simultaneously, resulting in a CommitFailedException (and the "thundering herd" problem).
-OLake avoids this catalog contention entirely by utilizing a central Master Process. Because OLake streams directly from the Postgres replication slot, it pulls these high-velocity changes into an internal RAM buffer to form a micro-batch. No matter how many edge changes happen, OLake keeps buffering in memory till the point it reaches a significant file size, so preventing small file problems. 
-Crucially, the heavy I/O operations—generating the Parquet files and flushing them to Google Cloud Storage or S3—are executed entirely in parallel by the worker threads without any locking. It is only after these parallel flushes succeed that the Master Process takes a lightning-fast internal lock (under 200ms) solely to perform the atomic metadata swap (snapshot) in the Iceberg catalog. This decoupled design sequences the commit cleanly while keeping the data generation path completely unblocked. By coordinating the threads internally, OLake eliminates the CommitFailedException loop and maintains maximum ingestion throughput.
+OLake Go avoids this catalog contention entirely by utilizing a central Master Process. Because OLake Go streams directly from the Postgres replication slot, it pulls these high-velocity changes into an internal RAM buffer to form a micro-batch. No matter how many edge changes happen, OLake Go keeps buffering in memory till the point it reaches a significant file size, so preventing small file problems. 
+Crucially, the heavy I/O operations (generating the Parquet files and flushing them to Google Cloud Storage or S3) are executed entirely in parallel by the worker threads without any locking. It is only after these parallel flushes succeed that the Master Process takes a lightning-fast internal lock (under 200ms) solely to perform the atomic metadata swap (snapshot) in the Iceberg catalog. This decoupled design sequences the commit cleanly while keeping the data generation path completely unblocked. By coordinating the threads internally, OLake Go eliminates the CommitFailedException loop and maintains maximum ingestion throughput.
 
 
 ![Resolving Catalog Contention](/img/blog/2026/6/resolving-catalog-contention.webp)
 
-**Figure 3.Resolving catalog contention through Master Process thread coordination.** Instead of multiple worker threads crashing into the Iceberg catalog and causing a "thundering herd" problem, OLake centralizes the commit phase. As shown, individual worker threads process the PostgreSQL WAL stream concurrently, writing the heavy physical Parquet files directly to Cloud Storage. However, the catalog update is strictly sequenced: the Master Process acquires a lightning-fast internal lock (under 200ms) to perform the atomic swap in the Iceberg Catalog, ensuring conflict-free ingestion even under massive throughput.
+**Figure 3.Resolving catalog contention through Master Process thread coordination.** Instead of multiple worker threads crashing into the Iceberg catalog and causing a "thundering herd" problem, OLake Go centralizes the commit phase. As shown, individual worker threads process the PostgreSQL WAL stream concurrently, writing the heavy physical Parquet files directly to Cloud Storage. However, the catalog update is strictly sequenced: the Master Process acquires a lightning-fast internal lock (under 200ms) to perform the atomic swap in the Iceberg Catalog, ensuring conflict-free ingestion even under massive throughput.
 
 #### Phase 4: Repaying Compaction Debt via OLake Fusion
 
-To address the read amplification caused by Equality Deletes, OLake Fusion runs asynchronously in the background to sanitise the storage layer. It is important to note the architectural boundary here: OLake manages the compaction, ensuring the data is optimally structured for the downstream execution engines (like Trino, DuckDB, or BigQuery) that power the agentic reasoning tier.
+To address the read amplification caused by Equality Deletes, OLake Fusion runs asynchronously in the background to sanitise the storage layer. It is important to note the architectural boundary here: OLake Fusion manages the compaction, ensuring the data is optimally structured for the downstream execution engines (like Trino, DuckDB, or BigQuery) that power the agentic reasoning tier.
 
 **Lite Compaction (Logical to Physical):**
 Resolving broad Equality Deletes on the fly requires the query engine to execute expensive dynamic anti-joins in memory. Fusion converts these logical rules into specific Position Deletes, specifying the exact file paths and row offsets to skip for the query engine. Additionally, it repairs fragmentation by rolling small micro-batches into larger segments (typically close to 1/8th of the target 256MB or 512MB file size).
@@ -121,7 +125,7 @@ Resolving broad Equality Deletes on the fly requires the query engine to execute
 A separate bin-packing process reduces these segments to nearly the final target file size. It does not guarantee that after compaction data file will be of target file size.. Crucially, it physically removes the deleted rows from the Parquet blocks entirely. This restores contiguous memory layouts, allowing the query engine to scan only active data and maintain its SIMD vectorization efficiency.
 
 **Full Compaction (Global Reorganization):**
-While Medium compaction handles localized cleanup, Full Compaction is the heavyweight background process that completely resets a partition's technical debt. Rather than relying on advanced metadata-level pruning or complex clustering, OLake focuses on raw structural efficiency. It comprehensively rewrites all base data and delete files into perfectly sized, pristine Parquet blocks. This eliminates all read-time reconciliation overhead, allowing the downstream execution engines to query pure, unfragmented data.
+While Medium compaction handles localized cleanup, Full Compaction is the heavyweight background process that completely resets a partition's technical debt. Rather than relying on advanced metadata-level pruning or complex clustering, OLake Fusion focuses on raw structural efficiency. It comprehensively rewrites all base data and delete files into perfectly sized, pristine Parquet blocks. This eliminates all read-time reconciliation overhead, allowing the downstream execution engines to query pure, unfragmented data.
 
 Architectural Warning: Merge-On-Read acts like a “computational” loan, and OLake Fusion is the repayment. If the background compaction tier lacks resources and can't keep pace with data ingestion, "delete file bloat" will accumulate. As these uncompacted files grow, the read amplification problem will resurface, leading to Time Travel queries missing their sub-second service-level agreements (SLAs). SRE teams must closely monitor the compaction queue depth to ensure the reasoning tier remains efficient.
 
@@ -185,7 +189,7 @@ This requirement aligns perfectly with the architectural evolution of the Google
 Cloud Storage (GCS) provides the scalable substrate, BigQuery acts as the massively parallel execution engine to crunch the historical metadata, and Vertex AI serves as the autonomous control plane reasoning over the results.
 However, this sophisticated cross-cloud Agentic vision is physically impossible without the right ingestion plumbing. OLake serves as critical infrastructure in this stack. By utilizing Master Process thread coordination for conflict-free snapshot generation and Fusion for asynchronous compaction, OLake shields the downstream query engines from the complexities of streaming CDC.
 
-Stateless agents are important for heuristic blocking, whereas historical threat analysis and incident tracking require agents with stateful temporal memory. By combining OLake's accurate CDC with Apache Iceberg's built-in Time Travel, data teams will help transform object storage into a solid foundation for the next generation of autonomous enterprise defense.
+Stateless agents are important for heuristic blocking, whereas historical threat analysis and incident tracking require agents with stateful temporal memory. By combining OLake Go's accurate CDC with Apache Iceberg's built-in Time Travel, data teams will help transform object storage into a solid foundation for the next generation of autonomous enterprise defense.
 
 #### Disclaimer
 

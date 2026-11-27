@@ -1,7 +1,7 @@
 ---
 slug: olake-mor-cow-databricks
-title: "Making OLake's MOR Iceberg Tables Work in Databricks"
-description: "Make OLake's Merge-on-Read Iceberg tables work in Databricks with an automated MOR to Copy-on-Write script that gives accurate analytics queries."
+title: "Making OLake Go's MOR Iceberg Tables Work in Databricks and Snowflake"
+description: "Set the target query engine so OLake Go writes deletion vectors or positional deletes that Databricks and Snowflake read, with a MOR to COW fallback script."
 tags: [iceberg, olake, databricks, product-updates]
 authors: [nayan]
 image: /img/blog/cover/snowflake_cow.webp
@@ -12,19 +12,51 @@ import TabItem from '@theme/TabItem';
 
 ![Snowflake COW cover image](/img/blog/cover/snowflake_cow.webp)
 
-If you're using OLake Go to replicate database changes to Apache Iceberg and Databricks for analytics, you've probably hit a frustrating roadblock: Databricks doesn't support equality delete files. OLake Go writes data efficiently using Merge-on-Read (MOR) with equality deletes for CDC operations, but when you try to query those tables in Databricks, the deletions, updates and inserts simply aren't honored. Your query results become incorrect, missing critical data changes.
+**Updated 27 November 2026** for OLake Go v1.2.2. When this post first ran, OLake Go wrote upserts only as equality delete files, which Databricks and Snowflake do not read. That has changed, so the post now starts with the job setting that fixes it and keeps the MOR to COW script for the cases where it still helps.
 
-This isn't just a Databricks limitation—several major query engines including Snowflake face the same challenge. While these platforms are incredibly powerful for analytics, their Iceberg implementations only support Copy-on-Write (COW) tables or position deletes at best.
+If you're using OLake Go to replicate database changes to Apache Iceberg and query them in Databricks or Snowflake, the delete files OLake Go writes decide whether your updates and deletes show up. Neither engine supports equality delete files, so a table that relies on them does not give correct results there.
 
-In this blog, I'll walk you through the problem and show you how we've solved it with a simple yet powerful MOR to COW write script that transforms OLake Go's MOR tables into COW-compatible tables that Databricks and other query engines can read correctly.
+OLake Go now writes three delete formats: equality deletes, positional deletes (since v0.10.0) and deletion vectors (since v0.11.0). Since v0.11.0 it picks the format from the target query engine you set on the job. For Databricks and Snowflake, that one setting is usually all you need.
+
+## Set the Target Query Engine First
+
+In OLake UI, open the job's **Advanced Settings** and choose **Databricks** or **Snowflake** under **Target Query Engine**. The Streams page then offers only the upsert types that engine can read. OLake Go selects the first readable one in the order equality deletes, positional deletes, deletion vectors ([Target Query Engines](/docs/getting-started/job-level-properties/#target-query-engines)).
+
+With the command-line interface (CLI), pass the engine to discover with [`--target-query-engines`](/docs/community/commands-and-flags#16-target-query-engines), for example `--target-query-engines snowflake`, together with `--destination`. The flag is not saved, so pass it on every discover run.
+
+| Query engine | Delete formats it reads | What OLake Go writes by default |
+|---|---|---|
+| Databricks | Deletion vectors on Iceberg v3 tables. No v2 positional or equality deletes. | Deletion vectors |
+| Snowflake | Positional deletes on Iceberg v2 tables, deletion vectors on v3 tables. No equality deletes. | Positional deletes |
+
+Sources: [Databricks: Apache Iceberg on Databricks, Limitations](https://docs.databricks.com/aws/en/iceberg/#limitations) (checked Nov 2026), [Snowflake: Apache Iceberg tables, Considerations and limitations](https://docs.snowflake.com/en/user-guide/tables-iceberg) (checked Nov 2026).
+
+A few things to know before the first sync:
+
+- **Leave the setting empty and you usually get equality deletes.** With no target query engine, OLake Go defaults to equality deletes unless the destination catalog rules them out, and neither engine reads them.
+- **Databricks needs deletion vectors from the first sync.** With Unity Catalog as the destination catalog, OLake Go offers only deletion vectors.
+- **Snowflake Horizon Catalog cannot upgrade a table.** Snowflake does not let an external engine upgrade an Iceberg table from v2 to v3. A Horizon table that starts on positional deletes stays on Iceberg v2, so pick deletion vectors before the first sync if you want them.
+- **Version requirements.** Delete format options need OLake Go v0.11.0 or later and OLake UI v0.6.0 or later. The format follows the target query engine since OLake Go v0.11.0, and also the destination catalog since v1.1.2.
+
+For every other engine, see [Delete Format Support by Query Engine](/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine).
+
+### Existing Jobs That Still Write Equality Deletes
+
+- **Switching forward is supported.** You can move a stream from equality deletes to positional deletes or deletion vectors, except to deletion vectors on Horizon Catalog. Later syncs use the new format, and OLake Go builds indexes to migrate the existing equality delete files ([Upsert](/docs/understanding/terminologies/olake/#upsert)).
+- **Discover moves equality streams for you.** If a stream is still on equality deletes when you set Databricks or Snowflake as the target, discover switches it to the first format the engine reads.
+- **Switching back clears the table.** Moving a stream from deletion vectors to equality or positional deletes triggers a clear destination, because it is an Iceberg v3 to v2 downgrade.
+
+Snowflake also recommends regular compaction to remove old delete files, for the best read performance. [OLake Fusion](/docs/fusion/getting-started/overview/) runs that compaction on the same tables.
 
 ## The Problem: MOR vs COW in the Real World
 
-Let's understand what's happening under the hood. When you use OLake Go for Change Data Capture (CDC), it writes data to Iceberg using a strategy called Merge-on-Read (MOR) with equality delete files. This approach is optimized for high-throughput writes:
+Let's understand what's happening under the hood. When you use OLake Go for Change Data Capture (CDC) with upserts, it writes data to Iceberg using a strategy called Merge-on-Read (MOR). Updates and deletes go into delete files next to new data files. This approach is optimized for high-throughput writes:
 
 > **Note:** For a deeper understanding of MOR vs COW strategies in Apache Iceberg, refer to our detailed guide on [Merge-on-Read vs Copy-on-Write in Apache Iceberg](/blog/mor-vs-cow).
 
 ### How OLake Go Writes Data (MOR with Equality Deletes):
+
+This is what happens when a stream uses equality deletes, the default on most catalogs when no target query engine is set:
 
 **1. Initial Full Refresh:** OLake Go performs a complete historical load of your table to Iceberg. This creates append only data files (No MOR).
 
@@ -34,9 +66,19 @@ Let's understand what's happening under the hood. When you use OLake Go for Chan
 - Multiple data files with your records
 - Multiple equality delete files tracking which records should be ignored
 
-## The Solution: Automated MOR to COW Write
+Databricks and Snowflake do not support those equality delete files, so they cannot give correct results for this table. Positional deletes and deletion vectors avoid this, as shown above.
 
-The solution is to periodically compact your MOR tables into COW format—essentially creating a clean mirror table where all deletes and updates are fully applied by rewriting the data files. Think of it as "resolving" all the pending changes into a single, clean table state.
+## When a MOR to COW Mirror Still Helps
+
+A Copy-on-Write (COW) mirror is a second table where every update and delete is already applied, so it has no delete files at all. It is still worth running in these cases:
+
+- **Your engines share no delete format.** Databricks reads only deletion vectors, while Athena, Presto, Hive and StarRocks do not read them ([compatibility table](/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine)). Selecting such a mix as target engines fails with "No common delete file (upsert type) is supported by the selected query engines."
+- **You run an older OLake Go.** Versions before v0.11.0 cannot write deletion vectors, and versions before v0.10.0 write only equality deletes.
+- **You keep an equality-delete table as it is.** For example, a table you do not want to migrate while other engines still read it.
+
+## The Fallback: Automated MOR to COW Write
+
+For those cases, the solution is to periodically compact your MOR tables into COW format, creating a clean mirror table where all deletes and updates are fully applied by rewriting the data files. Think of it as "resolving" all the pending changes into a single, clean table state.
 
 :::tip[Storage Optimization]
 Once the COW table is created and verified, you can expire the MOR table data. To manage storage efficiently, run Iceberg's snapshot expiry job to expire snapshots older than 5-7 days, given that the compaction job runs daily. This eliminates data duplication and reduces storage costs.
@@ -1253,10 +1295,10 @@ To understand how the MOR to COW write script works and see it in action, you ca
    ```
    Once the containers are up and running, you can run the the below command to spin up the OLake UI:
    ```bash
-   curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - up -d
+   curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - up -d
    ```
 
-   Nowt he OLake UI can be accessed at http://localhost:8000.
+   Now the OLake UI can be accessed at http://localhost:8000.
 
 2. Set up the configuration:
 
@@ -1279,7 +1321,7 @@ To understand how the MOR to COW write script works and see it in action, you ca
 
     ![streams configuration](/img/blog/2025/12/streams_cow.webp)
 
-    You can refer to the [Streams Configuration](https://olake.io/docs/getting-started/creating-first-pipeline/#5-configure-streams) for more details about the streams configuration and how to start the sync.
+    You can refer to the [Streams Configuration](/docs/getting-started/creating-first-pipeline/#7-configure-streams) for more details about the streams configuration and how to start the sync.
 
 4. The data can be queried from Iceberg using the Spark Iceberg service available at [`localhost:8888`](http://localhost:8888).
 
@@ -1372,23 +1414,25 @@ To understand how the MOR to COW write script works and see it in action, you ca
 
 ## Conclusion
 
-By implementing this automated MOR to COW write solution, you can now enjoy the best of both worlds: OLake Go's high-performance Merge-on-Read (MOR) writes for efficient CDC ingestion, combined with Databricks-compatible Copy-on-Write (COW) tables for accurate analytics queries. 
+For Databricks and Snowflake, start with the target query engine on the job. OLake Go then writes deletion vectors or positional deletes that the engine reads, and you keep Merge-on-Read (MOR) writes for CDC ingestion without a second table.
+
+Keep the MOR to COW write script for the cases it still covers: engine mixes that share no delete format, older OLake Go versions, and equality-delete tables you have not migrated. There it gives every engine a Copy-on-Write (COW) table with all updates and deletes applied.
 
 ## FAQs
 
 <Faq showHeading={false} data={[
   {
-    question: "Q1. Why can't Databricks query OLake Go's Iceberg tables directly without conversion?",
+    question: "Q1. Can Databricks query OLake Go's Iceberg tables directly, without conversion?",
     answer: <div>
-      <p>Databricks' Iceberg support has historically had limited or evolving support for <strong>equality delete files</strong>, which are commonly used in Merge-on-Read (MOR) tables for CDC workloads.</p>
-      <p>When an engine does not correctly apply equality deletes, query results may include rows that should have been deleted or updated, leading to inconsistent or incorrect results.</p>
-      <p>Because OLake Go uses equality deletes for efficient CDC ingestion, a conversion step is often required to ensure compatibility with engines that expect fully materialized data.</p>
+      <p>Yes, when the job writes <strong>deletion vectors</strong>. Databricks does not read Iceberg v2 positional or equality delete files, but it reads Iceberg v3 deletion vectors (<a href="https://docs.databricks.com/aws/en/iceberg/#limitations">Databricks Iceberg limitations</a>, checked Nov 2026).</p>
+      <p>Set <strong>Databricks</strong> as the Target Query Engine in the job's Advanced Settings, and OLake Go offers only deletion vectors for its upsert streams. This needs OLake Go v0.11.0 or later.</p>
+      <p>A conversion step is only needed when the same table must also serve engines that cannot read deletion vectors, or when the table still holds equality deletes.</p>
     </div>
   },
   {
     question: "Q2. What is the difference between MOR and COW in Apache Iceberg?",
     answer: <div>
-      <p><strong>Merge-on-Read (MOR):</strong> Data and delete files are written separately. Deletes are recorded as equality or positional delete files and merged with data at query time.</p>
+      <p><strong>Merge-on-Read (MOR):</strong> Data and delete files are written separately. Deletes are recorded as equality delete files, positional delete files or deletion vectors, and merged with data at query time.</p>
       <ul>
         <li>Fast and efficient writes</li>
         <li>Additional read overhead due to merge operations</li>
@@ -1417,10 +1461,11 @@ By implementing this automated MOR to COW write solution, you can now enjoy the 
     answer: <div>
       <p>Support for equality delete files varies across engines:</p>
       <ul>
-        <li><strong>Snowflake:</strong> support has historically been limited or evolving depending on configuration and version</li>
-        <li><strong>Other engines:</strong> some may have partial or version-dependent support for equality deletes</li>
+        <li><strong>Snowflake:</strong> does not read equality deletes. It reads positional deletes on v2 tables and deletion vectors on v3 tables (<a href="https://docs.snowflake.com/en/user-guide/tables-iceberg">Snowflake Iceberg tables</a>, checked Nov 2026), so set Snowflake as the Target Query Engine.</li>
+        <li><strong>Dremio:</strong> skips global equality deletes on unpartitioned tables, so OLake Go offers only positional deletes for it.</li>
+        <li><strong>Other engines:</strong> see <a href="/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine">Delete Format Support by Query Engine</a>.</li>
       </ul>
-      <p>Because of this variability, MOR-to-COW conversion is a practical strategy for ensuring compatibility with engines that expect fully materialized (COW-style) tables.</p>
+      <p>MOR-to-COW conversion is still useful when the engines that read one table share no delete format.</p>
     </div>
   },
   {

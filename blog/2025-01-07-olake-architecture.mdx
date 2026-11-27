@@ -1,40 +1,38 @@
 ---
 slug: olake-architecture
-title: "OLake Architecture - Fast, Modular & Scalable Data Pipeline"
-seo_title: "OLake Architecture: Drivers, Core and Destinations"
-description: "Explore OLake's architecture for real-time MongoDB to Iceberg replication. Learn about snapshotting, CDC, parallel processing, and open data formats."
+title: "OLake Go Architecture - Fast, Modular & Scalable Data Pipeline"
+seo_title: "OLake Go Architecture: Drivers, Core and Destinations"
+description: "How OLake Go moves data from databases, Kafka and S3 into Apache Iceberg and Parquet: source drivers, chunked full loads, CDC, writers, state and OLake UI."
 image: /img/blog/cover/olake-architecture-cover.webp
 authors: [priyansh]
 tags: [olake, thought-leadership]
 ---
 
-## OLake Architecture, How did we do it?
+## OLake Go Architecture, How did we do it?
 
 ![Diagram showing database sync flow: snapshot/CDC extraction, chunking, transform, Amazon S3, and writing to lakehouse](/img/blog/cover/olake-architecture-cover.webp)
 
-update: [18.02.2025]
-1. We support S3 data partitioning - refer docs [here](/docs/writers/parquet/partitioning)
-2. Support of Iceberg coming next week.
+**Updated 27 November 2026** to match OLake Go v1.2.2.
 
 When building [OLake Go](/), our goal was simple: *Fastest DB to Data LakeHouse (Apache Iceberg to start) data pipeline.*
 
-Checkout GtiHub repository for OLake - [https://github.com/datazip-inc/olake-go](https://github.com/datazip-inc/olake-go)
+Check out the GitHub repository for OLake Go - [https://github.com/datazip-inc/olake-go](https://github.com/datazip-inc/olake-go)
 
 Over time, many of us who’ve worked with data pipelines have dealt with the toil of building one-off ETL scripts, battling performance bottlenecks, or worrying about vendor lock-in.
 
 With OLake Go, we wanted a clean, open-source solution that solves these problems in a straightforward, high-performing manner.
 
-In this blog, I’m going to walk you through the architecture of OLake Go—how we capture data from MongoDB, push it into S3 in Apache Iceberg format or other data Lakehouse formats, and handle everything from schema evolution to high-volume parallel loads.
+In this blog, I'm going to walk you through the architecture of OLake Go: how we capture data from databases, Apache Kafka and Amazon S3, write it to object storage as Apache Iceberg tables or plain Parquet files, and handle everything from schema evolution to high-volume parallel loads.
 
 ## Architectural Overview
 
-At a high level, OLake Go reads from source systems (currently focused on MongoDB) and writes directly to configurable destinations such as local Parquet, S3 Iceberg Parquet. Our architecture is built around four main components:
+At a high level, OLake Go reads from eight source systems and writes directly to Apache Iceberg tables or plain Parquet files. The files can live on local disk, Amazon S3 (or an S3-compatible store), Google Cloud Storage (GCS) or Azure storage. Our architecture is built around these components:
 
 **Components**
 
-* **CLI (*Command Line Interface, v0*), *full fledged UI in progress***
+* **CLI (*Command Line Interface*) and [OLake UI](/docs/install/olake-ui)**, a web user interface (UI) that runs the same commands through Temporal
     
-* **Framework (CDK)**
+* **Framework (Core sync engine)**
     
 * **Connectors (Drivers)**
     
@@ -52,8 +50,6 @@ At a high level, OLake Go reads from source systems (currently focused on MongoD
             
 * **Monitoring & Alerting**
     
-* **SDK**
-    
 
 We wanted to keep these components as modular as possible so each one can excel at its responsibilities. Here’s a simplified conceptual diagram showing how data flows through OLake Go.
 
@@ -61,17 +57,17 @@ We wanted to keep these components as modular as possible so each one can excel 
 
 Here’s how it all ties together:
 
-1. **Initial Snapshot**: We run a full collection read from MongoDB. That happens via query firing.
+1. **Initial Snapshot (full load)**: The driver splits each table or collection into chunks and reads them in parallel. Each chunk is a bounded query, such as a `ctid` range in PostgreSQL or an `_id` range in MongoDB.
     
-2. **Change Data Capture (CDC)**: After completing the snapshot, OLake Go sets up MongoDB change streams (built on oplogs,a way for change data capture, CDC) for near real-time updates. For any record changes that occurred during the snapshot process, CDC reflects those changes as well just as initial snapshot finishes and from then on it continues to capture any other changes that occur in your source database (depending on your scheduled time).
+2. **Change Data Capture (CDC)**: After completing the snapshot, OLake Go reads the source's change log for near real-time updates: MongoDB change streams (built on the oplog), the PostgreSQL write-ahead log (WAL), the MySQL binlog or SQL Server CDC tables. For any record changes that occurred during the snapshot process, CDC reflects those changes as well just as initial snapshot finishes and from then on it continues to capture any other changes that occur in your source database (depending on your scheduled time).
     
-3. The users have an option to set the number of parallel running threads so you can decide what’s the optimal configuration for you in terms of **speed vs load** on your mongodb cluster.
+3. The users have an option to set the number of parallel running threads (`max_threads` in the source config) so you can decide what's the optimal configuration for you in terms of **speed vs load** on your source database.
     
-4. **Transformation & Normalization**: We flatten or extrapolate complex, semi-structured fields into relational streams. Level 0 flattening support in OLake Go and nested level 2,3,4 flattening of JSON coming soon.
+4. **Transformation & Normalization**: With normalization on, top-level fields become columns and nested objects are stored as JSON (JavaScript Object Notation) strings. With it off, each record is stored as JSON in a single `data` column. Normalization is set per stream in `selected_streams.json`.
     
 5. **Integrated Writes**: We write the transformed data into destinations with minimal overhead.
     
-6. **Monitoring & Alerts**: We keep a close watch on schema changes, raising alerts to help you address transformation logic issues or potential data loss early.
+6. **Monitoring & Alerts**: Each sync reports its progress (records synced, speed, estimated time remaining) in a `stats.json` file. OLake UI sends webhook alerts to Slack, Microsoft Teams or any other webhook endpoint when a job fails.
     
 7. **Logs:** View logs to exactly know what the processes are doing under the hood.
     
@@ -82,104 +78,144 @@ Here’s how it all ties together:
 
 ## Drivers (Connectors)
 
-In OLake, each Driver (also called a Connector) embeds the logic necessary to interact with a particular source system. We started with MongoDB, but we’re planning connectors for Kafka, Postgres, Mysql and DynamoDB. The Driver’s job is to:
+In OLake Go, each Driver (also called a Connector) embeds the logic necessary to interact with a particular source system. We started with MongoDB, and there are now eight drivers: PostgreSQL, MySQL, MongoDB, Oracle, SQL Server, IBM Db2, Apache Kafka and Amazon S3 ([all sources](/docs/connectors/overview)).
 
-* **Perform Full Load**: Issue queries to fetch an entire collection efficiently. We divide a collection into multiple chunks and process them parallel for faster replication.
+Each driver ships as its own Docker image, `olakego/source-<type>`, with its own dependencies. The Driver's job is to:
+
+* **Perform Full Load**: Issue queries to fetch an entire table or collection efficiently. We divide it into multiple chunks and process them in parallel for faster replication. How a driver picks chunk boundaries depends on what the source exposes:
     
-* **Manage CDC**: Set up streaming on the source system.
+    * MongoDB: `splitVector` by default, `$bucketAuto` when `splitVector` is not allowed or the `_id` values are not all ObjectIDs, and an opt-in timestamp strategy.
+        
+    * PostgreSQL: `ctid` (physical row location) ranges, or ranges on a primary-key column you choose.
+        
+    * MySQL, SQL Server and Db2: primary-key ranges, with a fallback for tables that have no primary key.
+        
+    * Oracle: ROWID ranges.
+        
+    * S3: groups of files.
+        
+* **Manage CDC**: Read changes from the source's own log.
     
-    * For MongoDB, that’s a matter of configuring change streams to read from the oplog.
+    * PostgreSQL: a logical replication slot with the `pgoutput` plugin.
+        
+    * MySQL and MariaDB: the binlog, with Global Transaction Identifier (GTID) checkpoints on MySQL since v1.1.2.
+        
+    * MongoDB: change streams, which read from the oplog.
+        
+    * SQL Server: CDC change tables.
+        
+    * Kafka: topics are read continuously through consumer groups, with JSON and Avro messages and an optional upsert mode.
         
     * We let the initial snapshot finish and then capture incremental changes so we never miss any updates that happen while the snapshot is in progress.
         
+* **Run Incremental Syncs**: Read only the rows whose cursor column (for example `updated_at`) moved past the last saved value. Oracle and Db2 keep up this way after the full load, since they have no CDC in OLake Go today. S3 uses each file's last-modified time as the cursor.
+    
 
-If someone adds a new collection after months of running the pipeline, we’ll do a fresh snapshot of that collection without stopping or disrupting the ongoing CDC for the existing ones.
+If someone adds a new table or collection after months of running the pipeline, OLake Go runs a full load for that stream only. The saved CDC position of the existing streams is kept, so they are not loaded again.
+
+For a closer look at how each driver chunks, see [What makes OLake Go fast](/blog/what-makes-olake-fast) and the [OLake Go architecture deep dive](/blog/olake-architecture-deep-dive).
 
 ## Destinations
 
-Our Destinations are tightly integrated so data can flow directly from the Driver into the destination, eliminating unnecessary read-and-write cycles to local disk. We plan on adding several Writers:
+Our Destinations are tightly integrated so data can flow directly from the Driver into the destination, eliminating unnecessary read-and-write cycles to local disk. Two Writers ship today:
 
-* Local Parquet
+* **Apache Iceberg**: tables on S3 or an S3-compatible store such as MinIO, on GCS, or on Azure Data Lake Storage. Tables are registered in AWS Glue, a REST catalog (Polaris, Lakekeeper, Nessie, Unity Catalog, BigLake, S3 Tables or Snowflake Horizon), Hive Metastore or a Java Database Connectivity (JDBC) catalog. See the [catalog setup docs](/docs/writers/iceberg/catalog/rest).
     
-* S3 Simple Parquet
+* **Parquet**: plain Parquet files on local disk, S3, GCS or Azure Blob Storage (Azure since v1.1.0), with [partitioning](/docs/writers/parquet/partitioning) by column values.
     
-* S3 Iceberg Parquet
-    
+
+The Iceberg writer works in two parts. The Go process starts a Java sidecar that uses the Apache Iceberg Java library, and talks to it over gRPC, a remote procedure call framework. By default Go sends batches of records and the Java side writes the files.
+
+With `arrow_writes` enabled in the destination config, Go builds the Parquet files itself with Apache Arrow and the Java side only registers them. Either way, each commit is one Iceberg transaction, so data files, delete files and metadata become visible together.
 
 ### Avoiding Bottlenecks with Integrated Destinations
 
 By embedding Destinations inside each Driver, we cut down latencies significantly. Instead of collecting data in a queue or intermediary store, the Driver pushes records as soon as they’re extracted. This approach also avoids “blocking” reads while the Destinations are happening.
 
+Each reader gets its own writer thread. The thread buffers records (10,000 by default, set with `--destination-buffer-size`) and hands a full buffer to a background flush while the reader keeps going.
+
 ## Core
 
-The Core is the foundation on which OLake Drivers and Destinations rest. It gives us:
+The Core is the foundation on which OLake Go Drivers and Destinations rest. It gives us:
 
-1. **CLI & Commands**:
+1. **CLI & Commands**: every source image exposes the same five commands.
     
     * `spec`: Returns a JSON Schema for the frontend to render form-based configurations.
         
-    * `check`: Validates config, streams, state files, and credentials.
+    * `check`: Validates the source or destination config and tests the connection, including the CDC prerequisite checks (server settings and permissions) added in v0.12.0.
         
-    * `discover`: Lists all streams and their schemas for a given source.
+    * `discover`: Lists all streams and their schemas for a given source, and writes `available_streams.json` and `selected_streams.json`.
         
     * `sync`: Orchestrates the extract, and load (ETL) process.
         
-    * Flags
+    * `clear-destination`: Clears the destination data and resets the state for the selected streams.
         
-        1. `--batch_size` → To push data into Destinations
+    * Flags (full list in [Commands and Flags](/docs/community/commands-and-flags))
+        
+        1. `--config`, `--destination`, `--available-streams`, `--selected-streams` and `--state` → the JSON files that describe a sync
             
-        2. `--thread_count` → Stream level concurrency i.e. how many parallel table execution
+        2. `--destination-buffer-size` → records buffered per writer thread before a flush (default 10000)
             
-2. **State Management**: Ensures that the CDC streams can be **resumed** if they get interrupted.
-    
-3. **Configuration**: We store details about concurrency levels, connection credentials, and Destination configurations.
-    
-4. **Logging & Monitoring**: Through an `HTTP` server, we can track:
-    
-    * How many processes are running concurrently.
+        3. `--target-query-engines` → the query engines that will read the tables, which narrows the delete formats offered per stream (`--available-query-engines` lists them)
+            
+        4. `--discover-schema` → re-discovers the source schema during sync (opt-in since v0.10.1)
+            
+        5. `--max-discover-threads` → parallel threads for discovery (default 50)
+            
+        6. `--encryption-key`, `--destination-database-prefix`, `--timeout` and `--no-save` → config decryption, naming, timeouts and log files
+            
+    * Concurrency is not a flag. Set `max_threads` in the source config to control how many chunks or streams are read in parallel.
         
-    * The estimated finish time for the snapshot.
+2. **State Management**: `state.json` stores what each run learned: the chunks still to read during a full load, the cursor value for incremental streams, and the CDC position (a PostgreSQL Log Sequence Number (LSN), a MySQL binlog position or GTID set, or a MongoDB resume token). A sync loads the file, does its work, writes it back and exits, so an interrupted full load or CDC run resumes from where it stopped.
+    
+3. **Configuration**: Connection details, credentials and `max_threads` live in `source.json`, the writer settings in `destination.json`, and per-stream choices (sync mode, partitioning, filters, normalization, delete format) in `selected_streams.json`.
+    
+4. **Logging & Monitoring**: Each sync writes a `stats.json` file that tracks:
+    
+    * How many writer threads are running.
         
-    * Live record counts and overall throughput.
+    * The estimated remaining time.
         
+    * Synced records, throughput, memory use and processor use.
+        
+    Logs are also saved to a file unless you pass `--no-save`.
+
+## OLake UI and Temporal
+
+The CLI runs one command and exits. [OLake UI](/docs/install/olake-ui) adds the always-on part: a web app where you create sources, destinations and jobs, set schedules and read logs. It does not reimplement the pipeline; it runs the same `check`, `discover` and `sync` commands for you.
+
+Behind the UI, [Temporal](https://temporal.io/) orchestrates the jobs. The OLake UI backend starts a Temporal workflow for each operation, and a Temporal worker runs the matching `olakego/source-<type>` image as a Docker container (Docker Compose install) or a pod ([Kubernetes install with Helm](/docs/install/kubernetes)). PostgreSQL stores job data, configs, sync state and Temporal's workflow data.
+
+The whole stack starts with one command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - up -d
+```
 
 ### Handling Schema Evolution & Error Recovery
 
-When working with a schema-less store like MongoDB, we often encounter evolving document structures. OLake Go detects such changes in the source schema and raises alerts. We take care of new column creation or any non-breaking data type changes.
+When working with a schema-less store like MongoDB, we often encounter evolving document structures. When a batch brings a new column or a wider type (for example `int` to `long`), the writer evolves the Iceberg table schema before it writes. By default `sync` skips schema discovery for faster runs, and `--discover-schema` (since v0.10.1) re-discovers the source schema and validates the configured streams on each sync.
+
+Failed reads are retried a configurable number of times, and a failed run resumes from `state.json` on the next sync.
 
 ## OLake Go’s Role in a Lakehouse Ecosystem
 
-We emphasised early on that we wanted to avoid vendor lock-in. Hence, OLake Go stores data in open formats—like `parquet`—using a table format like *Apache Iceberg*.
+We emphasised early on that we wanted to avoid vendor lock-in. Hence, OLake Go stores data in open formats, like `parquet`, using a table format like *Apache Iceberg*.
 
-This opens up the possibility for various query engines, including *Spark*, *Trino*, *Flink*, or even Snowflake external tables. By decoupling how data is written and how it’s consumed, we make sure you can leverage the best analytical tools without rewriting or re-ingesting the data.
+This opens up the possibility for various query engines, including *Spark*, *Trino*, *Flink* or Snowflake (see [query engine compatibility](/docs/understanding/compatibility-engines)). By decoupling how data is written and how it's consumed, we make sure you can leverage the best analytical tools without rewriting or re-ingesting the data.
 
 **Key Benefits**:
 
-* **Real-Time Replication**: MongoDB’s oplogs feed near real-time changes, ensuring the lakehouse is promptly updated.
+* **Real-Time Replication**: Source change logs (the MongoDB oplog, the PostgreSQL WAL, the MySQL binlog) feed near real-time changes, ensuring the lakehouse is promptly updated.
     
-* **Equality deletes (Apache Iceberg)** : We use this method to upsert the data which gives us the ability to go near real time when it comes to writing to a data lake.
+* **Upserts with the right delete files (Apache Iceberg)**: CDC and incremental rows are upserted by default. OLake Go writes equality deletes, positional deletes (since v0.10.0) or deletion vectors (since v0.11.0), and since v0.11.0 it picks the format from the target query engines you set. See [delete format support by query engine](/docs/understanding/compatibility-engines#delete-format-support-by-query-engine).
     
 
 ## Performance Benchmarks
 
-We designed OLake Go from the ground up to focus on throughput, especially for high-volume data. We tested OLake Go on a `Standard_D64as_v5` machine (64 `vCPUs`, 256 GiB RAM, 250 GB shared storage) connected to a three-node MongoDB replica set. Here’s a summary of the results:
+We designed OLake Go from the ground up to focus on throughput, especially for high-volume data. The figures in the first version of this post came from an early MongoDB-only test and are out of date.
 
-1. **Full Load**
-    
-    * **230 million rows** (~664.81 GB) of Twitter data.
-        
-    * OLake Go completed this full load in **46 minutes**, compared to several hours or more with other tools.
-        
-2. **Incremental Sync**
-    
-    * We measured ~50 million rows per month in ongoing incremental loads.
-        
-    * OLake Go handled this in **28.3 seconds**, roughly **35,694 records/second**, which was multiple times faster than the competition.
-        
-
-These results prove that with chunk-based parallel loading and direct Writer integration, we can handle hefty datasets much more efficiently than many existing solutions.
-
-[Detailed benchmark](/docs/benchmarks/ingestion/?tab=mongodb).
+Current results for each source, with the machine, dataset and versions used, are on the [ingestion benchmarks page](/docs/benchmarks/ingestion).
 
 ## Detailed Data Flow
 
@@ -187,17 +223,17 @@ To illustrate how concurrency is handled, here’s a more extended ASCII diagram
 
 ![Diagram showing database sync flow: snapshot/CDC extraction, chunking, transform, Amazon S3, and writing to lakehouse](/img/blog/cover/olake-architecture-cover.webp)
 
-Each driver/writer pair can independently read chunks from MongoDB and write them directly to the target, while the Core monitors everything centrally.
+Each driver/writer pair can independently read chunks from the source and write them directly to the target, while the Core monitors everything centrally.
 
 ## Key Architectural Highlights
 
-1. **Native BSON Extraction**: We pull data in its raw BSON form from MongoDB, decoding it on the ETL side. This approach maintains fidelity and boosts speed.
+1. **Native BSON Extraction**: For MongoDB, we pull data in its raw BSON form, decoding it on the ETL side. This approach maintains fidelity and boosts speed.
     
 2. **Parallel Chunking**: Instead of serial reads, we split big collections into smaller virtual chunks to parallelize the process.
     
-3. **CDC Cursor Preservation**: We never lose track of CDC offsets; even if a new large collection is added later, we do a full snapshot for it without interrupting ongoing incremental sync.
+3. **CDC Cursor Preservation**: We never lose track of CDC offsets. Even if a large table or collection is added later, we run a full load for it alone and keep the saved log position of the others.
     
-4. **Custom Alerts**: Configurable alerts for schema changes let you address issues quickly, preventing data corruptions or silent failures.
+4. **Job Failure Alerts**: OLake UI sends a webhook alert when a job fails, so issues surface early instead of as silent failures ([alerts setup](/docs/getting-started/alerts-and-notifications)).
     
 5. **Open Format for Freedom**: By embracing Parquet and Iceberg, we side-step vendor lock-in and enable multi-engine querying.
     
@@ -208,29 +244,29 @@ Each driver/writer pair can independently read chunks from MongoDB and write the
 
 ## Concluding Remarks
 
-In the future iterations we plan to:
+When this post first went out, we listed what we planned next. Here is where each item stands in OLake Go v1.2.2:
 
-1. **Handle Nested JSON** data (nested objects and nested arrays) flattening into either separate tables for arrays or horizontally exploding columns in case of object types.
+1. **Handle Nested JSON** flattening into separate tables or exploded columns: not available. Normalization flattens top-level fields, and nested objects are stored as JSON strings.
     
-2. Effortless deployment and maintenance with a single self-contained binary that simplifies setup, updates, and operational complexity
+2. **Effortless deployment**: OLake Go ships as one Docker image per source, and OLake UI starts with one Docker Compose command. [Kubernetes with Helm](/docs/install/kubernetes) and [GitOps](/docs/install/gitops) installs are also available.
     
-3. **Flexible BYOC** (Bring Your Own Cloud) support for both Cloud and On-Prem deployments to maintain complete data control and compliance
+3. **Flexible BYOC** (Bring Your Own Cloud): OLake Go is self-hosted, so it runs in your own cloud account or on-premises.
     
-4. **Enterprise-grade security** ensuring no information leaves your infrastructure and seamless integration with existing security protocols
+4. **Security**: Config files can be encrypted and decrypted at run time with `--encryption-key`, which takes an AWS Key Management Service (KMS) key, a universally unique identifier (UUID) or a custom string.
     
-5. **Instant transactional consistency** providing sub-second accuracy for critical business operations and decision-making.
+5. **Transactional consistency**: Each Iceberg commit is a single transaction, so the data files, delete files and metadata of one commit become visible together.
     
-6. **Resumable full loads** capable of continuing even if the oplog expires, eliminating downtime and ensuring fault tolerance
+6. **Resumable full loads**: shipped. Chunk progress is saved in `state.json`, so an interrupted full load continues with the chunks still pending.
     
-7. **Kafka integration** as a destination and future connector framework for Kafka-like systems, protecting individual streams from cross-impact
+7. **Kafka integration**: shipped as a [source](/docs/connectors/kafka), with consumer groups, JSON and Avro messages, and an upsert mode. Kafka is not a destination.
     
-8. **Server and unified UI** to manage all features in a user-friendly interface over the CLI
+8. **Server and unified UI**: shipped as [OLake UI](/docs/install/olake-ui), with Temporal running the jobs.
     
-9. **Horizontal scalability** to handle increased throughput or growing data volumes as needed
+9. **Horizontal scalability**: On Kubernetes, each sync runs in its own pod, and [JobID-based scheduling](/docs/install/kubernetes#jobid-based-scheduling) maps jobs to nodes with enough capacity.
     
-10. **Lake-based optimization** and smart compaction using metadata tracking to determine optimal compaction times and maintain performance
+10. **Lake-based optimization** and compaction: shipped as a separate product, [OLake Fusion](/docs/fusion/getting-started/overview), which schedules compaction for Iceberg tables.
     
-11. **Multiple cloud support** including GCP and Azure, with multiple catalog support for enhanced flexibility and organization
+11. **Multiple cloud support**: shipped. Iceberg and Parquet both write to GCS and Azure, and the catalogs include AWS Glue, Polaris, Lakekeeper, Nessie, Unity Catalog, BigLake, S3 Tables, Snowflake Horizon, Hive Metastore and JDBC.
     
 
 ## FAQs
@@ -240,10 +276,10 @@ In the future iterations we plan to:
     answer: <div>
       <p>OLake Go is built around four modular components:</p>
       <ul>
-        <li><strong>CLI and UI</strong>: Two distinct interfaces (command-line and web UI) that share the same underlying core framework</li>
+        <li><strong>CLI and UI</strong>: Two interfaces (the command line and the OLake UI web app) that run the same commands. OLake UI schedules and runs them through Temporal.</li>
         <li><strong>Core Framework</strong> : Orchestrates the entire data flow pipeline, handling state management, configuration validation, logging, and type detection</li>
-        <li><strong>Connectors / Drivers</strong> : Source-specific plugins for MongoDB, PostgreSQL, MySQL, and other supported databases</li>
-        <li><strong>Writers</strong> : Destination plugins for Apache Iceberg on S3 and local Parquet files</li>
+        <li><strong>Connectors / Drivers</strong> : Source-specific plugins for PostgreSQL, MySQL, MongoDB, Oracle, SQL Server, Db2, Kafka and S3</li>
+        <li><strong>Writers</strong> : Destination plugins for Apache Iceberg and plain Parquet files (local disk, S3, GCS or Azure Blob Storage)</li>
       </ul>
       <p>Each component has a single responsibility and is independently extensible. Adding a new source or destination does not require changes to the core framework. Each connector is also autonomous, with its own dependencies kept separate to minimize binary size.</p>
     </div>
@@ -253,8 +289,9 @@ In the future iterations we plan to:
     answer: <div>
       <p>OLake Go splits large tables into parallel chunks and processes them concurrently across multiple worker threads. Chunking strategies vary by source:</p>
       <ul>
-        <li><strong>MongoDB</strong> : Uses a split-vector strategy (via MongoDB's <code>splitVector</code> command) by default, falling back to a timestamp-based strategy that generates chunk boundaries from the <code>_id</code> field's embedded timestamp when split-vector isn't available</li>
-        <li><strong>PostgreSQL</strong> : Uses CTID ranges, batch-size splits, and next-query paging</li>
+        <li><strong>MongoDB</strong> : Uses MongoDB's <code>splitVector</code> command by default. It switches to <code>$bucketAuto</code> when <code>splitVector</code> is not allowed or the <code>_id</code> values are not all ObjectIDs, and a timestamp-based strategy is available as an option.</li>
+        <li><strong>PostgreSQL</strong> : Uses CTID ranges by default, or ranges on a primary-key chunk column you set</li>
+        <li><strong>MySQL, SQL Server and Db2</strong> : Use primary-key ranges, with a fallback for tables without a primary key. Oracle uses ROWID ranges.</li>
       </ul>
       <p>Each chunk is independently processed by a dedicated thread, enabling concurrent extraction that can be configured via the <code>max_threads</code> setting in the source configuration. OLake Go also uses checkpointing to track chunk-level progress so a failed sync resumes from the last completed chunk rather than restarting the entire load.</p>
     </div>
@@ -265,9 +302,9 @@ In the future iterations we plan to:
       <p>OLake Go supports:</p>
       <ul>
         <li><strong>Apache Iceberg</strong> on S3-compatible object storage (AWS S3, MinIO, GCS, Azure Blob) as its primary lakehouse destination</li>
-        <li><strong>Local Parquet files</strong> for development and testing, writing to a local directory or uploading directly to an S3 bucket</li>
+        <li><strong>Plain Parquet files</strong> on local disk, S3, GCS or Azure Blob Storage</li>
       </ul>
-      <p>When writing to Iceberg, OLake Go registers tables with any supported Iceberg catalog including REST catalogs (Lakekeeper), AWS Glue, Hive Metastore, Nessie, Polaris, and Unity Catalog.</p>
+      <p>When writing to Iceberg, OLake Go registers tables with any supported Iceberg catalog: AWS Glue, REST catalogs (Polaris, Lakekeeper, Nessie, Unity Catalog, BigLake, S3 Tables and Snowflake Horizon), Hive Metastore and JDBC.</p>
     </div>
   },
   {
@@ -289,7 +326,7 @@ In the future iterations we plan to:
       <ul>
         <li><strong>Parallel chunking</strong> : Multiple table segments are processed concurrently rather than sequentially</li>
         <li><strong>Direct Parquet writes</strong> : Data flows directly from the driver into the destination, eliminating unnecessary read-and-write cycles to local disk and intermediate formats</li>
-        <li><strong>Apache Arrow as the columnar memory format</strong> : Arrow data is already in columnar layout, so writing to Parquet requires only encoding and compression with no restructuring cost and no memory copying</li>
+        <li><strong>Apache Arrow as the columnar memory format</strong> : With <code>arrow_writes</code> enabled, Arrow data is already in columnar layout, so writing to Parquet requires only encoding and compression with no restructuring cost and no memory copying</li>
         <li><strong>CDC for ongoing replication</strong> : Only changed rows are read after the initial load, dramatically reducing ongoing data transfer</li>
       </ul>
     </div>
@@ -298,7 +335,11 @@ In the future iterations we plan to:
 
 **Further Reading & References**
 
-* [OLake MongoDB Benchmark](/docs/benchmarks/ingestion/?tab=mongodb)
+* [OLake Go ingestion benchmarks](/docs/benchmarks/ingestion)
+    
+* [Deep dive into OLake Go architecture](/blog/olake-architecture-deep-dive)
+    
+* [OLake Go commands and flags](/docs/community/commands-and-flags)
     
 
 Feel free to explore the official OLake documentation or check out our open-source repository to see how you can incorporate it into your own data pipelines.

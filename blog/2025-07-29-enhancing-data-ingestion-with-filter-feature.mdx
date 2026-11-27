@@ -2,7 +2,7 @@
 slug:   olake-ingestion-filters-explained
 title: "OLake Go Ingestion Filters: Smart SQL-Style Data Filtering Guide"
 seo_title: "OLake Go Ingestion Filters: SQL-Style Filtering"
-description: "Learn how OLake Go's ingestion filters optimize data pipelines with SQL-style WHERE clauses for Postgres, MySQL, and MongoDB for efficient ingestion."
+description: "Learn how OLake Go's ingestion filters optimize data pipelines with SQL-style WHERE clauses for Postgres, MySQL, Oracle, SQL Server, Db2 and MongoDB."
 image: /img/blog/cover/filter-ingestion-cover.webp
 authors: [duke]
 tags: [olake, data-ingestion, product-updates]
@@ -29,27 +29,33 @@ With filtering, you'd be avoiding the ingestion of irrelevant data and optimizin
 
 ## How Our Filter Feature Works Under the Hood
 
-Now, here's where things get interesting technically. The filter feature is seamlessly integrated into the data ingestion process across multiple database drivers: Postgres, MySQL, and MongoDB. It begins with a user-defined filter string specified in `selected_streams.json`, which is then parsed and applied by each driver.
+Now, here's where things get interesting technically. The filter feature is seamlessly integrated into the data ingestion process across multiple database drivers: Postgres, MySQL, Oracle, SQL Server, IBM Db2 and MongoDB. It begins with a user-defined `filter_config` specified per stream in `selected_streams.json`, which is then applied by each driver.
 
 ### Filter Parsing - The Foundation of Everything
 
-The filter string is parsed by the GetFilter method, and this is where the magic happens. It supports conditions in the format "column operator value", with optional logical operators (and or or) for combining multiple conditions. Here are some examples that show how flexible this system is:
+A `filter_config` holds a list of `conditions`, each with a `column`, an `operator` and a JSON `value`, plus a `logical_operator` (`and` or `or`) that joins them. The GetFilter method hands this structure to the driver, and this is where the magic happens. Here is `age > 18 and country = "USA"` written as a `filter_config`:
 
-```text
-age > 18
-country = "USA"
-age > 18 and country = "USA"
+```json
+{
+  "logical_operator": "and",
+  "conditions": [
+    { "column": "age", "operator": ">", "value": 18 },
+    { "column": "country", "operator": "=", "value": "USA" }
+  ]
+}
 ```
 
-The method uses a regular expression (given below) to parse the string into a Filter struct:
+A single condition such as `age > 18` is the same object with one entry in `conditions`. Older configs used a single `filter` string instead, such as `age > 18 and country = "USA"`. OLake Go still reads that legacy string, and `filter_config` takes precedence when both are set.
+
+For the legacy string, the method uses a regular expression (given below) to parse it into the same structure. It accepts quoted column names such as `"user-name"`, negative and decimal numbers, and `and` or `or` in any letter case:
 
 ```text
-(^(\w+)\s*(>=|<=|!=|>|<|=)\s*(\"[^\"]*\"|\d*\.?\d+|\w+)\s*(?:(and|or)\s*(\w+)\s*(>=|<=|!=|>|<|=)\s*(\"[^\"]*\"|\d*\.?\d+|\w+))?\s*$)
+^(?:"([^"]*)"|(\w+))\s*(>=|<=|!=|>|<|=)\s*((?:"[^"]*"|-?\d+\.\d+|-?\d+|\.\d+|\w+))\s*(?:((?i:and|or))\s*(?:"([^"]*)"|(\w+))\s*(>=|<=|!=|>|<|=)\s*((?:"[^"]*"|-?\d+\.\d+|-?\d+|\.\d+|\w+)))?\s*$
 ```
 
-This parsed structure contains:
+Either way, the parsed structure contains:
 
-- **Conditions**: A list of Condition structs, each with Column, Operator, and Value.
+- **Conditions**: A list of FilterCondition structs, each with Column, Operator, and Value.
 - **LogicalOperator**: The operator (and or or) if multiple conditions exist.
 
 This parsed filter is then passed to database-specific functions to generate the appropriate query filters, which is pretty neat when you see it in action.
@@ -58,16 +64,16 @@ This parsed filter is then passed to database-specific functions to generate the
 
 ## Database-Specific Implementation: Where the Real Work Happens
 
-### SQL Databases: Postgres and MySQL
+### SQL Databases: Postgres, MySQL, Oracle, SQL Server and Db2
 
-For SQL databases, the filter is converted into a SQL WHERE clause using the SQLFilter function in jdbc.go. This function handles various operators (`>`, `<`, `=`, `!=`, `>=`, `<=`) and value types (strings, numbers, nulls), ensuring proper quoting and escaping. Strings need to be provided in format `""`.
+For SQL databases (Postgres, MySQL, Oracle, SQL Server and IBM Db2), the filter is converted into a SQL WHERE clause using the SQLFilter function in jdbc.go. This function handles various operators (`>`, `<`, `=`, `!=`, `>=`, `<=`) and value types (strings, numbers, booleans, nulls), ensuring proper quoting and escaping. In `filter_config` a string value is a JSON string such as `"USA"`, while the legacy `filter` string needs double quotes around it.
 
 <img src="/img/blog/2025/09/where-clause2.webp" loading="lazy" decoding="async" alt="WHERE Clause Filter Process" style={{width: '400px', height: 'auto', display: 'block', margin: '0 auto'}} />
 
 Here's a practical example that shows exactly how this works in your `selected_streams.json`:
 
 :::info
-The commands and examples below use OLake's current streams config: `selected_streams.json` + `available_streams.json`, in place of the older single `streams.json` file. Still on `streams.json`? See the [migration guide](/docs/core/configs/streams-migration) to switch, or the [Streams v1 reference](/docs/core/configs/streams-legacy) for the old format.
+The commands and examples below use OLake Go's current streams config: `selected_streams.json` + `available_streams.json`, in place of the older single `streams.json` file. Still on `streams.json`? See the [migration guide](/docs/core/configs/streams-migration) to switch, or the [Streams v1 reference](/docs/core/configs/streams-legacy) for the old format.
 :::
 
 ```json title="selected_streams.json"
@@ -78,7 +84,13 @@ The commands and examples below use OLake's current streams config: `selected_st
                 "partition_regex": "",
                 "stream_name": "postgres_test",
                 "normalization": true,
-                "filter": "age > 18 and country = \"USA\""
+                "filter_config": {
+                    "logical_operator": "and",
+                    "conditions": [
+                        { "column": "age", "operator": ">", "value": 18 },
+                        { "column": "country", "operator": "=", "value": "USA" }
+                    ]
+                }
             }
         ]
     }
@@ -96,7 +108,7 @@ Pretty straightforward, right? Same logic, different quote styles - we handle al
 
 In the Postgres driver, things get a bit more sophisticated:
 
-**Chunk Generation**: The filter is incorporated into the MinMaxQuery and PostgresNextChunkEndQuery to determine chunk boundaries based on filtered data. For instance, splitTableIntoChunks uses the filter in minMaxRowCountQuery to fetch min/max values of the chunk column only for rows satisfying the filter.
+**Chunk Generation**: Chunk boundaries come from the whole table: CTID ranges by default, or the minimum and maximum of the chunk column from MinMaxQuery and PostgresNextChunkEndQuery. The filter is not part of these queries.
 
 **Chunk Processing**: The PostgresChunkScanQuery includes the filter in the WHERE clause alongside chunk conditions (e.g., `ctid >= '(0,0)' AND ctid < '(1000,0)' AND "age" > 18`).
 
@@ -106,7 +118,7 @@ For more details on setting up PostgreSQL for production workloads and understan
 
 In the MySQL driver, we follow a similar approach:
 
-**Chunk Generation**: When using primary keys or a specified chunk column, splitViaPrimaryKey applies the filter in MinMaxQueryMySQL and Next InitiativeEndQuery to generate chunks based on filtered data ranges.
+**Chunk Generation**: When using primary keys or a specified chunk column, splitViaPrimaryKey computes chunk boundaries over the whole table with MinMaxQueryMySQL and NextChunkEndQuery. The filter is not part of these queries.
 
 **Chunk Processing**: The MysqlChunkScanQuery or MysqlLimitOffsetScanQuery includes the filter in the WHERE clause (e.g., `SELECT * FROM db.table WHERE (id >= '1' AND id < '1000') AND age > 18`).
 
@@ -118,7 +130,7 @@ For MongoDB, the approach is completely different since it doesn't use SQL. We c
 
 #### Example Filter Conversion
 
-For `age > 18 and country = "USA"`, the BSON document becomes:
+For the same `filter_config` (`age > 18` and `country = "USA"`), the BSON document becomes:
 
 ```json
 {
@@ -133,15 +145,15 @@ For `age > 18 and country = "USA"`, the BSON document becomes:
 
 #### Implementation:
 
-**Chunk Generation**: In splitChunks, the filter is applied in the [split vector strategy](/blog/what-makes-olake-fast#1-split-vector-strategy) (via the splitVector command) and bucketAutoStrategy (via the $match stage in the aggregation pipeline) to generate chunks containing only filtered data.
+**Chunk Generation**: In splitChunks, the [split vector strategy](/blog/what-makes-olake-fast#1-split-vector-strategy) (via the splitVector command), bucketAutoStrategy and the timestamp strategy compute chunk boundaries over the whole collection. The filter is not applied here.
 
 **Chunk Processing**: The generatePipeline function in ChunkIterator includes the filter in the $match stage of the aggregation pipeline, ensuring only relevant documents are processed within each chunk.
 
 MongoDB CDC presents unique challenges and opportunities - dive deeper into [MongoDB CDC using Debezium and Kafka](/blog/mongodb-cdc-using-debezium-and-kafka) to understand how filtering works in streaming scenarios.
 
-## The Art and Science of Chunking: Why We Filter Twice
+## The Art and Science of Chunking: Where the Filter Applies
 
-Now, you might wonder why we apply filters during both chunk generation and processing. It's not because we don't trust our code - it's because chunking is complex, and different strategies require different approaches.
+Now, you might wonder at which stage the filter applies. In OLake Go it applies during chunk processing, for every source, and chunk boundaries are computed without it.
 
 ### Understanding Chunking in Data Ingestion
 
@@ -151,37 +163,27 @@ In data ingestion, large datasets are split into smaller chunks for efficient pr
 2. **Chunk Processing**: Fetching and processing the data within each chunk.
 
 
-For a comprehensive understanding of how OLake Go's chunking strategies work across different databases, read our detailed explanation  [here](/blog/what-makes-olake-fast/#types-of-chunking-strategies-supported-by-olake-go). This section covers all the various chunking approaches we use for MongoDB, MySQL, and PostgreSQL.
+For a comprehensive understanding of how OLake Go's chunking strategies work across different databases, read our detailed explanation  [here](/blog/what-makes-olake-fast/#types-of-chunking-strategies-supported-by-olake-go). It covers MongoDB, MySQL and PostgreSQL in depth, plus Oracle, SQL Server and Db2.
 
-### Why Apply Filters in Both Stages?
+### Why the Filter Applies During Chunk Processing
 
-#### During Chunk Generation:
+Chunk boundaries are computed over the whole table or collection, from physical locators, key ranges or timestamps. Each chunk's scan query then adds the filter, so only matching rows are returned and written. Planning chunks this way means:
 
-Applying the filter during chunk generation ensures that chunks are created based on the filtered dataset, which gives you several advantages:
+- **Consistency**: Rows that change between planning and reading are still checked against the filter when they are read.
+- **One Rule for Every Strategy**: Physical locators (CTID, ROWID, RID or `%%physloc%%`) and timestamps do not reflect data values, so applying the filter at read time works the same way for every chunking strategy.
 
-- **Smaller Chunks**: Only data meeting the filter criteria is included, reducing chunk size.
-- **Fewer Chunks**: Irrelevant data is excluded, potentially decreasing the total number of chunks.
-- **Efficiency**: Smaller, relevant chunks lead to faster processing and reduced resource usage.
-
-For example, in Postgres with a primary key id and filter age > 18, the MinMaxQuery might return id ranges only for rows where age > 18, resulting in fewer and smaller chunks.
-
-#### During Chunk Processing:
-
-Reapplying the filter during chunk processing ensures accuracy and consistency:
-
-- **Edge Cases**: Chunk boundaries might include data not fully aligned with the filter due to data types or boundary conditions.
-- **Consistency**: In distributed systems, data might change between generation and processing, requiring the filter to be reapplied.
-- **Fallback**: For chunking strategies where filtering during generation isn't feasible, it ensures the filter is still enforced.
+The trade-off is that a selective filter does not shrink the chunk plan. Some chunks can return few or no rows.
 
 #### Implementation Details:
 
-- **Postgres**: Filter in minMaxRowCountQuery (generation) and PostgresChunkScanQuery (processing).
-- **MySQL**: Filter in MinMaxQueryMySQL (generation) and MysqlChunkScanQuery (processing).
-- **MongoDB**: Filter in splitVector/bucketAuto commands (generation) and generatePipeline (processing).
+- **Postgres**: PostgresChunkScanQuery.
+- **MySQL**: MysqlChunkScanQuery or MysqlLimitOffsetScanQuery.
+- **MongoDB**: the $match stage built by generatePipeline.
+- **Oracle, SQL Server and Db2**: OracleChunkScanQuery, MSSQLChunkScanQuery or MSSQLPhysLocChunkScanQuery, and DB2PKChunkScanQuery or DB2RidChunkScanQuery.
 
 ## When Filtering During Generation Isn't Feasible
 
-While the filter enhances efficiency in many cases, certain chunking strategies make it impractical to apply during chunk generation due to their reliance on non-data-value-based boundaries.
+For the strategies below, filtering during chunk generation is not even possible, because their boundaries do not come from data values. OLake Go applies the filter during processing for them, as it does for every strategy.
 
 ### Postgres: CTID-Based Chunking
 
@@ -205,7 +207,7 @@ For more details on how PostgreSQL's CTID system works, see our explanation of [
 
 **Strategy**: The timestampStrategy generates chunks based on time ranges derived from the _id field's timestamp.
 
-**Limitation**: Chunks are predefined by time intervals (e.g., 6-hour blocks), and the filter (e.g., age > 18) isn't directly applied during boundary calculation.
+**Limitation**: Chunks are predefined time intervals (10 seconds wide for every 6 hours between the first and last `_id`), and the filter (e.g., age > 18) isn't directly applied during boundary calculation.
 
 **Solution**: The filter is applied in the generatePipeline during processing, ensuring only relevant documents are fetched within each time-based chunk.
 
@@ -232,10 +234,10 @@ Let's talk about what you can actually do with our current implementation, becau
 
 The current implementation supports:
 
-- **Single Conditions**: column operator value (e.g., age > 18, country = "USA", id != "null").
-- **Combined Conditions**: Two conditions with and or or (e.g., age > 18 and country = "USA"). As of now, only 2 filter conditions are handled followed by logical and / or.
+- **Single Conditions**: one entry in `conditions` (e.g., age > 18, country = "USA", id != null).
+- **Combined Conditions**: Two conditions joined by `logical_operator` `and` or `or` (e.g., age > 18 and country = "USA"). A stream whose filter has more than two conditions is skipped at sync with a warning.
 - **Operators**: `>`, `<`, `=`, `!=`, `>=`, `<=`.
-- **Values**: Numbers, quoted strings (e.g., "USA"), unquoted strings, null.
+- **Values**: JSON numbers, strings (e.g., "USA", or a timestamp), booleans and `null`. The legacy `filter` string also takes unquoted words.
 
 ### Edge Cases We Handle
 
@@ -284,7 +286,7 @@ Whether you're working with **batch processing** for historical analysis or **re
 
 The reality is that data volumes will continue to grow, and the cost of processing irrelevant data will only increase. By implementing intelligent filtering at the ingestion layer, you're setting your team up for success both now and in the future.
 
-Our filter feature significantly enhances our data ingestion system by enabling selective data processing, improving efficiency, and optimizing resource use. Its robust implementation across Postgres, MySQL, and MongoDB ensures flexibility while addressing edge cases through strategic application during both chunk generation and processing. Although limitations exist in certain chunking strategies, the system gracefully adapts by applying filters during processing, ensuring data relevance and pipeline performance.
+Our filter feature significantly enhances our data ingestion system by enabling selective data processing, improving efficiency, and optimizing resource use. It works across Postgres, MySQL, Oracle, SQL Server, IBM Db2 and MongoDB. Because the filter is part of each chunk's scan query, it behaves the same way for every chunking strategy.
 
 
 Whether you're just starting your career in data engineering or you're a seasoned professional optimizing complex pipelines, effective filtering is one of those foundational skills that pays dividends across every project you work on. 
@@ -308,7 +310,7 @@ Whether you're just starting your career in data engineering or you're a seasone
   {
     question: "Q2. What SQL-style filter syntax does OLake Go support?",
     answer: <div>
-      <p>OLake Go supports filter strings in the format <code>column operator value</code> with standard comparison operators:</p>
+      <p>OLake Go takes each stream's filter as <code>filter_config</code> in <code>selected_streams.json</code>: a list of <code>conditions</code>, each with a <code>column</code>, an <code>operator</code> and a JSON <code>value</code>, joined by a <code>logical_operator</code> (<code>and</code> or <code>or</code>). The standard comparison operators are supported:</p>
       <table>
         <thead>
           <tr>
@@ -332,34 +334,34 @@ Whether you're just starting your career in data engineering or you're a seasone
         <li>Single string condition: <code>country = "USA"</code></li>
         <li>Two conditions combined: <code>age &gt; 18 and country = "USA"</code></li>
       </ul>
-      <p><strong>String quoting:</strong> String values in OLake Go filter expressions must use <strong>double quotes</strong> (e.g. <code>country = "USA"</code>), not single quotes. The driver automatically translates these to the correct quote style for each target database: single quotes for PostgreSQL, backtick-quoted columns for MySQL.</p>
+      <p><strong>String values:</strong> In <code>filter_config</code> a string value is a JSON string, such as <code>"USA"</code>. The driver translates it to the correct literal for each target database, with single-quoted strings, double-quoted columns for PostgreSQL and backtick-quoted columns for MySQL. The legacy <code>filter</code> string, such as <code>country = "USA"</code>, still works and needs <strong>double quotes</strong> around string values.</p>
       <p>The filter is specified per stream in the <code>selected_streams.json</code> configuration, alongside <code>"normalization": true</code>, which must be enabled for the filter to take effect.</p>
     </div>
   },
   {
     question: "Q3. How are OLake Go filters applied differently for SQL databases versus MongoDB?",
     answer: <div>
-      <p><strong>PostgreSQL and MySQL</strong> - OLake Go translates the filter string into a SQL WHERE clause appended to the SELECT query, letting the database engine apply the filter efficiently using its indexes:</p>
+      <p><strong>PostgreSQL, MySQL, Oracle, SQL Server and IBM Db2</strong> - OLake Go translates the filter into a SQL WHERE clause appended to the SELECT query, letting the database engine apply the filter efficiently using its indexes:</p>
       <ul>
         <li>PostgreSQL: <code>"age" &gt; 18 AND "country" = 'USA'</code></li>
         <li>MySQL: <code>`age` &gt; 18 AND `country` = 'USA'</code></li>
       </ul>
-      <p><strong>MongoDB</strong> - The filter is converted into a MongoDB query document (BSON filter) passed to the <code>find()</code> operation, allowing MongoDB to use its indexes for efficient filtering.</p>
+      <p><strong>MongoDB</strong> - The filter is converted into a MongoDB query document (BSON filter) and added to the <code>$match</code> stage of the aggregation pipeline that reads each chunk, allowing MongoDB to use its indexes for efficient filtering.</p>
       <p>Both approaches push filtering to the source engine for maximum efficiency, and both require <code>"normalization": true</code> on the stream for the filter to be applied.</p>
-      <p><strong>Oracle exception:</strong> Oracle uses <code>DBMS_PARALLEL_EXECUTE.CREATE_CHUNKS_BY_ROWID</code> for chunking, which does not accept user-defined filters. As a result, filter conditions cannot influence chunk boundary generation for Oracle - filters are applied only during chunk processing, not chunk generation. This makes Oracle filtering less efficient than PostgreSQL, MySQL, or MongoDB filtering.</p>
+      <p><strong>Chunk boundaries:</strong> For every source, OLake Go computes chunk boundaries without the filter and applies the filter when each chunk is read. Oracle is no different here, and its <code>DBMS_PARALLEL_EXECUTE.CREATE_CHUNKS_BY_ROWID</code> chunking does not accept user-defined filters anyway.</p>
     </div>
   },
   {
     question: "Q4. Can I combine multiple filter conditions using AND and OR in OLake Go?",
     answer: <div>
-      <p>Yes, with one important limit: <strong>OLake Go currently supports a maximum of two conditions per filter string</strong>, combined with a single logical operator (<code>AND</code> or <code>OR</code>).</p>
+      <p>Yes, with one important limit: <strong>OLake Go currently supports a maximum of two conditions per filter</strong>, combined with a single logical operator (<code>AND</code> or <code>OR</code>).</p>
       <p>Valid examples:</p>
       <ul>
         <li><code>age &gt; 18 AND country = "USA"</code></li>
         <li><code>status = "active" OR country = "USA"</code></li>
       </ul>
-      <p>Three-condition expressions (e.g. <code>age &gt; 18 AND country = "USA" OR status = "active"</code>) are <strong>not valid</strong> OLake Go filter syntax - the parser accepts exactly one logical operator joining exactly two conditions. Expressions with more than two conditions will be rejected or produce undefined behavior.</p>
-      <p>The filter parser uses a regular expression to extract both conditions and the logical operator, then generates the appropriate SQL WHERE clause or MongoDB query filter for the target database. As with all filtering, <code>"normalization": true</code> must be set on the stream for this to run.</p>
+      <p>Three-condition expressions (e.g. <code>age &gt; 18 AND country = "USA" OR status = "active"</code>) are <strong>not valid</strong>. A <code>filter_config</code> with more than two conditions, or a legacy <code>filter</code> string the parser cannot read, makes OLake Go log a warning and skip that stream at sync.</p>
+      <p>OLake Go generates the appropriate SQL WHERE clause or MongoDB query filter for the target database from the conditions and the logical operator. As with all filtering, <code>"normalization": true</code> must be set on the stream for this to run.</p>
     </div>
   },
   {
@@ -367,7 +369,7 @@ Whether you're just starting your career in data engineering or you're a seasone
     answer: <div>
       <p>Yes. Filters are applied during both sync modes, provided <code>"normalization": true</code> is set on the stream, filtering does not run otherwise:</p>
       <ul>
-        <li><strong>Full refresh</strong> - Only rows matching the filter are read from the source during the initial historical snapshot. The filter is applied at both chunk generation and chunk processing stages, so non-matching rows are never read.</li>
+        <li><strong>Full refresh</strong> - Only rows matching the filter are read from the source during the initial historical snapshot. The filter is part of each chunk's scan query, so only matching rows are returned and written.</li>
         <li><strong>CDC incremental sync</strong> - OLake Go reads change events from the database log (WAL for PostgreSQL, binlog for MySQL, oplog for MongoDB) and applies the filter before writing to the destination. Change events for filtered-out rows are discarded without consuming storage or processing resources.</li>
       </ul>
       <p>This means the filter is consistently enforced end-to-end across both the initial load and all ongoing incremental updates.</p>

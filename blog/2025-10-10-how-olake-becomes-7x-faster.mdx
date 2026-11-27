@@ -142,12 +142,12 @@ While registering them, we take a table level lock on the Go side and commit all
 
 You might be wondering: "Why not take a lock while writing files? Won't that cause conflicts?" Great question! Here's the key insight: each writer maintains its own data file, and we create writers equal to the number of threads we've opened. So there's no write happening in the same file with two different writers, each thread has its own file, eliminating the need for file level locking during writes.
 
-Below is the commit logic which is on the Java side:
+Below is the commit logic on the Java side, as it stood when this post was published in October 2025. The current `IcebergTableOperator` also takes a `DeleteMode`, so upserts can write positional deletes or deletion vectors as well as equality deletes.
 <details>
 <summary>IcebergTableOperator.java</summary>
 
 ```java title="IcebergTableOperator.java"
-// destination/iceberg/olake-iceberg-java-writer/src/main/java/io/debezium/server/iceberg/tableoperator/IcebergTableOperator.java
+// destination/iceberg/olake-iceberg-java-writer/src/main/java/io/olake/iceberg/tableoperator/IcebergTableOperator.java
 public void commitThread(String threadId, Table table) {
   if (table == null) {
     LOGGER.warn("No table found for thread: {}", threadId);
@@ -202,7 +202,7 @@ public void commitThread(String threadId, Table table) {
 
 The commit process handles two scenarios:
 - **Append mode**: For pure inserts (like backfill operations or initial data loads), we use `AppendFiles` which simply adds new data files to the table. This is the simplest and fastest mode.
-- **Upsert mode**: For CDC operations with updates/deletes, we use `RowDelta` (Equality delete MOR Iceberg) which atomically adds both data files and delete files, enabling Iceberg's native upsert semantics. For example, if a record is updated, we write the new version to a data file and mark the old version for deletion in a delete file—all in a single atomic operation.
+- **Upsert mode**: For CDC operations with updates/deletes, we use `RowDelta` (Merge-on-Read with equality deletes, positional deletes or deletion vectors, set by the stream's `update_type`) which atomically adds both data files and delete files, enabling Iceberg's native upsert semantics. For example, if a record is updated, we write the new version to a data file and mark the old version for deletion in a delete file, all in a single atomic operation.
 
 #### 2. Atomic Schema Evolution
 
@@ -396,7 +396,7 @@ for _, field := range protoSchema {
 
 </details>
 
-Here's the gRPC contract definition:
+Here's the gRPC contract definition, as it stood when this post was published:
 
 <details>
 <summary>record_ingest.proto</summary>
@@ -405,7 +405,7 @@ Here's the gRPC contract definition:
 // destination/iceberg/olake-iceberg-java-writer/src/main/resources/record_ingest.proto
 syntax = "proto3";
 
-package io.debezium.server.iceberg.rpc;
+package io.olake.iceberg.rpc;
 
 service RecordIngestService {
   rpc SendRecords(IcebergPayload) returns (RecordIngestResponse);
@@ -526,6 +526,8 @@ Now if you have seen our headline about 7x or 700% improvement, here is the proo
 | **Memory usage** | 80GB+ | 40GB+ | **50% reduction** |
 | **File size consistency** | 30MB - 50MB range | 300-400MB target | **Consistent sizing** |
 
+These numbers are from the refactor described here, published on 10 October 2025. For current figures, see the [ingestion benchmarks](/docs/benchmarks/ingestion/), where the Postgres full load ran at 580,113 rows per second as of 30 January 2026.
+
 **Test Environment:**
 - **Hardware**: 64-core CPU, 128GB RAM, NVMe SSD storage
 - **Workload**: NYC taxi data with insert operations only
@@ -587,7 +589,7 @@ The result is a system that is not only faster but also more reliable, maintaina
     question: "Q2. How does OLake Go guarantee atomic commits when writing to Apache Iceberg?",
     answer: <div>
       <p>Each writer thread writes to its own data files, then registration into the Iceberg table happens under a single table-level lock. Either the entire batch becomes visible or none of it does, so readers never see partial state, even during concurrent writes or if a commit fails midway.</p>
-      <p>The commit path depends on the operation. Pure inserts use <code>AppendFiles</code> to add new data files. CDC updates and deletes use <code>RowDelta</code> (equality-delete Merge-on-Read), which atomically adds both the data files and the delete files in one operation.</p>
+      <p>The commit path depends on the operation. Pure inserts use <code>AppendFiles</code> to add new data files. CDC updates and deletes use <code>RowDelta</code> (Merge-on-Read with equality deletes, positional deletes or deletion vectors, set by <code>update_type</code>), which atomically adds both the data files and the delete files in one operation.</p>
     </div>
   },
   {

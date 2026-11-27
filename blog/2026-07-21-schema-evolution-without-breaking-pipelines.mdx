@@ -14,7 +14,7 @@ import BlogCTA from '@site/src/components/BlogCTA';
 
 <TLDR>
 
-Source databases are constantly evolving. Columns are added, renamed, and dropped. Data types are widened. Usually without warning. When that happens, most replication pipelines break or lose data silently. OLake Go is built to absorb these changes: it runs schema discovery at the start of every sync, adds new columns automatically, retains dropped columns so downstream consumers are never broken, applies safe type promotions on the fly, and fails loudly only on the small set of changes that would genuinely corrupt data. It can do all of this cheaply because it writes to Apache Iceberg, which tracks columns by unique field IDs instead of names or positions, making structural changes pure metadata operations with no file rewrites. This post walks through exactly what OLake Go does with each type of change, and where the type mapping rules live so you can check them yourself.
+Source databases are constantly evolving. Columns are added, renamed, and dropped. Data types are widened. Usually without warning. When that happens, most replication pipelines break or lose data silently. OLake Go is built to absorb these changes: it evolves the Iceberg schema at write time from the records it reads, adds new columns automatically, retains dropped columns so downstream consumers are never broken, applies safe type promotions on the fly, and fails loudly only on the small set of changes that would genuinely corrupt data. It can do all of this cheaply because it writes to Apache Iceberg, which tracks columns by unique field IDs instead of names or positions, making structural changes pure metadata operations with no file rewrites. This post walks through exactly what OLake Go does with each type of change, and where the type mapping rules live so you can check them yourself.
 
 </TLDR>
 
@@ -61,7 +61,9 @@ These field IDs live inside the Iceberg table. They protect how Iceberg reads it
 
 ## How OLake Go Handles Schema Evolution
 
-This section covers what OLake Go does when the source schema changes, using Iceberg's operations as the building blocks. When a sync runs, OLake Go compares incoming record fields and types against the current destination schema. If a compatible change is detected, OLake Go decides what to do based on what kind of change it is. The exact behavior for every case below is documented in the [OLake schema evolution doc](/docs/features/schema).
+This section covers what OLake Go does when the source schema changes, using Iceberg's operations as the building blocks. When a sync runs, OLake Go compares incoming record fields and types against the current destination schema and evolves the Iceberg table at write time. Since v0.10.1, a sync skips the schema discovery step by default, and the `--discover-schema` flag turns it back on to re-check the configured streams against the source.
+
+If a compatible change is detected, OLake Go decides what to do based on what kind of change it is. The exact behavior for every case below is documented in the [OLake schema evolution doc](/docs/features/schema).
 
 ### Column-Level Changes
 
@@ -93,6 +95,8 @@ OLake Go follows Iceberg's type promotion rules directly. These widening changes
 | --- | --- |
 | INT → BIGINT | Column type widened automatically |
 | FLOAT → DOUBLE | Column type widened automatically |
+| DECIMAL(P, S) → DECIMAL(P', S) where P' > P | Precision widened in place, for jobs created on v1.2.0 and above; a new scale fails the stream |
+| DATE → TIMESTAMP | No destination change, because OLake Go already lands DATE columns as an Iceberg timestamp |
 
 ### Handled Without Failing: Compatible Conversions
 
@@ -119,6 +123,8 @@ This table covers some of the data type changes OLake Go handles, grouped by out
 | --- | --- | --- | --- |
 | INT | BIGINT (LONG) | Applied automatically | Widening promotion; destination expands to the larger range, no data affected |
 | FLOAT | DOUBLE | Applied automatically | Widening promotion to higher precision, no data loss |
+| DECIMAL(P, S) | DECIMAL(P', S), P' > P | Applied automatically | Precision widening with the same scale, for jobs created on v1.2.0 and above (native decimals) |
+| DATE | TIMESTAMP | No change needed | OLake Go maps DATE columns to an Iceberg timestamp, so both land in the same column type |
 | BIGINT | INT | Handled without failing | Value-fits narrowing: OLake Go validates each value fits the destination range, then stores it |
 
 ## Conclusion
@@ -166,7 +172,7 @@ OLake Go is built for a constantly changing source schema. Safe changes apply on
   {
     question: "Q7. What happens when a new table appears at the source?",
     answer: <div>
-      <p>It is detected on the next scheduled run and listed in the OLake UI, but nothing syncs until you explicitly enable it for the job. Once enabled, OLake Go creates the destination table and starts syncing under your configured sync mode, with the initial full load running in parallel.</p>
+      <p>It is listed in the OLake UI the next time the job's streams are discovered, for example when you edit the job's streams, but nothing syncs until you explicitly enable it for the job. Scheduled syncs skip discovery by default since v0.10.1. Once enabled, OLake Go creates the destination table and starts syncing under your configured sync mode, with the initial full load running in parallel.</p>
     </div>
   }
 ]} />

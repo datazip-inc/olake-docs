@@ -110,8 +110,8 @@ Postgres and MySQL represent all change events from a single, ordered stream, th
 
 A writer thread is created per selected stream at the start of CDC. As the replication stream is consumed, change records are routed to the appropriate writer. When the sync window closes:
 
-- **Commit Step:** Each stream's writer sends a `COMMIT` to the Iceberg Java server. The commit payload carries the final WAL LSN (Postgres) or binlog file-and-position (MySQL) as the `MetadataState`. The Java server atomically writes data files and embeds this position in the stream's `olake_2pc` table property.
-- **Checkpoint Step:** For Postgres, PostCDC first acknowledges the replication slot to inform the server it can reclaim WAL space, then saves the final LSN to `state.json`. For MySQL, PostCDC saves the final binlog position to `state.json`.
+- **Commit Step:** Each stream's writer sends a `COMMIT` to the Iceberg Java server. The commit payload carries the final WAL LSN (Postgres) or the binlog file-and-position (MySQL) as the `MetadataState`, and MySQL with GTID (global transaction identifier) mode on carries the GTID set instead. The Java server atomically writes data files and embeds this position in the stream's `olake_2pc` table property.
+- **Checkpoint Step:** For Postgres, PostCDC first acknowledges the replication slot to inform the server it can reclaim WAL space, then saves the final LSN to `state.json`. For MySQL, PostCDC saves the final binlog position, or the GTID set, to `state.json`.
 
 #### What Happens on Failure
 
@@ -196,7 +196,10 @@ Because there is no shared global position, recovery is handled per-stream. At t
     {
       "stream": "orders",
       "namespace": "mydb",
-      "state": { "_cdc_resume_token": "826A7B3C..." }
+      "state": {
+        "_data": "826A7B3C...",
+        "_resume_token": { "_data": "826A7B3C..." }
+      }
     }
   ]
 }
@@ -208,11 +211,13 @@ CDC runs. `mydb.orders` commits to Iceberg (Commit Step succeeds). Process crash
 
 ```json
 {
-  "state": "826B8C4D..."
+  "state": "{\"_data\":\"826B8C4D...\",\"_resume_token\":{\"_data\":\"826B8C4D...\"}}"
 }
 ```
 
-On the next run, OLake Go compares state token `826A7B3C...` against metadata token `826B8C4D...`. Metadata is ahead, Commit Step committed but Checkpoint Step did not. The stream returns immediately without reading any change events. PostCDC writes the metadata token to `state.json`.
+Since v1.2.2, both `state.json` and the metadata keep the resume token's `_data` and, under `_resume_token`, the whole token the server issued. Metadata written by an earlier version holds the bare `_data` string.
+
+On the next run, OLake Go compares the `_data` of the state token, `826A7B3C...`, against the metadata token's `826B8C4D...`. Metadata is ahead, Commit Step committed but Checkpoint Step did not. The stream returns immediately without reading any change events. PostCDC writes the metadata token to `state.json`.
 
 `state.json` after recovery (Checkpoint Step):
 
@@ -223,7 +228,10 @@ On the next run, OLake Go compares state token `826A7B3C...` against metadata to
     {
       "stream": "orders",
       "namespace": "mydb",
-      "state": { "_cdc_resume_token": "826B8C4D..." }
+      "state": {
+        "_data": "826B8C4D...",
+        "_resume_token": { "_data": "826B8C4D..." }
+      }
     }
   ]
 }

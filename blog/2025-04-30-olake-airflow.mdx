@@ -1,18 +1,18 @@
 ---
 slug: olake-airflow
-title: "Run OLake Sync on Kubernetes Using Apache Airflow | Guide"
-seo_title: "Run OLake Sync on Kubernetes with Apache Airflow"
-description: "Automate OLake data sync on Kubernetes with Apache Airflow DAGs. Includes setup for ConfigMaps, StorageClass, PVC, and Airflow configuration tips."
+title: "Run OLake Go Sync on Kubernetes Using Apache Airflow | Guide"
+seo_title: "Run OLake Go Sync on Kubernetes with Apache Airflow"
+description: "Automate OLake Go data sync on Kubernetes with Apache Airflow DAGs. Includes setup for ConfigMaps, StorageClass, PVC, and Airflow configuration tips."
 image: /img/blog/cover/olake-airflow-cover.webp
 authors: [schitiz]
 tags: [olake, how-to]
 ---
 
-## Running OLake on Kubernetes with Your Existing Airflow, Sync Your Data Effortlessly
+## Running OLake Go on Kubernetes with Your Existing Airflow, Sync Your Data Effortlessly
 
 ![Apache Airflow logo with OLake logo, illustrating Airflow and OLake integration](/img/blog/cover/olake-airflow-cover.webp)
 
-At OLake Go, we're building tools to make data integration seamless. Today, we're excited to show you how to leverage your existing Apache Airflow setup to automate OLake Go data synchronization tasks directly on your Kubernetes cluster!
+At OLake, we're building tools to make data integration seamless. Today, we're excited to show you how to leverage your existing Apache Airflow setup to automate OLake Go data synchronization tasks directly on your Kubernetes cluster!
 
 OLake Go is designed to efficiently sync data from various sources to your chosen destinations. This guide provides an Airflow DAG (Directed Acyclic Graph) that orchestrates the OLake Go sync command, handling dependencies like persistent storage and configuration management within Kubernetes.
 
@@ -25,10 +25,12 @@ This post assumes you already have:
 
 ```bash
 # Activate your Airflow virtual environment first
-pip install apache-airflow-providers-cncf-kubernetes
+pip install apache-airflow-providers-cncf-kubernetes apache-airflow-providers-standard
 
-# Restart Airflow scheduler and webserver after installation
+# Restart the Airflow scheduler and webserver (the api-server on Airflow 3) after installation
 ```
+
+The DAG file uses the Airflow 3 import paths (`airflow.sdk`). On Airflow 2, change the two imports listed in the comment at the top of the file.
 
 
 2. Access to a Kubernetes cluster.
@@ -45,16 +47,16 @@ Before deploying the DAG, ensure the following are in place:
 ### Airflow with LocalExecutor:
 
 :::info
-Crucially, your Airflow instance must be configured to use the `LocalExecutor` or `SequentialExecutor`. 
+Crucially, your Airflow instance must be configured to use the `LocalExecutor`. Airflow 2 setups can also use the `SequentialExecutor`, but [Airflow 3.0 removed it](https://airflow.apache.org/docs/apache-airflow/stable/release_notes.html#sequentialexecutor-has-been-removed) and points users to the `LocalExecutor`.
 :::
 
 Our DAG utilizes Airflow's `PythonOperator` to dynamically check for and create Kubernetes resources (like PersistentVolumeClaims) before running the main OLake Go task. 
 
-This Python code runs directly on the machine where the Airflow scheduler is running, which is how `LocalExecutor` and `SequentialExecutor` operate. 
+This Python code runs directly on the machine where the Airflow scheduler is running, which is how the `LocalExecutor` operates. 
 
 It will not work correctly out-of-the-box with the `CeleryExecutor` or `KubernetesExecutor` without modification.
 
-You can verify this by checking the `executor` setting under the `[core]` section in your `$AIRFLOW_HOME/airflow/airflow.cfg` file. It should be set to either  `executor = LocalExecutor` or `executor = SequentialExecutor`.
+You can verify this by checking the `executor` setting under the `[core]` section in your `$AIRFLOW_HOME/airflow.cfg` file. It should be set to `executor = LocalExecutor`.
 
 ## Kubernetes Connection in Airflow
 
@@ -79,7 +81,7 @@ Note down the `Connection Id` - you'll need it for the DAG configuration.
 
 ## Kubernetes Namespace
 
-Choose or create a namespace in your Kubernetes cluster where OLake pods and related resources (like the PVC) will reside. You'll need the name of this namespace.
+Choose or create a namespace in your Kubernetes cluster where OLake Go pods and related resources (like the PVC) will reside. You'll need the name of this namespace.
 
 ### Kubernetes ConfigMaps
 
@@ -101,7 +103,7 @@ curl -Lo cm_olake-source-config.yaml https://raw.githubusercontent.com/datazip-i
 curl -Lo cm_olake-destination-config.yaml https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-destination-config.yaml
 ```
 
-3. `olake-streams-config`: Containing your OLake streams configuration in two keys named `selected_streams.json` and `available_streams.json`
+3. `olake-streams-config`: Containing your OLake Go streams configuration in two keys named `selected_streams.json` and `available_streams.json`
 
     Download [cm_olake-streams-config.yaml](https://raw.githubusercontent.com/datazip-inc/olake-docs/refs/heads/master/kubernetes/cm_olake-streams-config.yaml)
 
@@ -110,7 +112,7 @@ curl -Lo cm_olake-streams-config.yaml https://raw.githubusercontent.com/datazip-
 ```
 
 :::info
-The commands and examples below use OLake's current streams config: `selected_streams.json` + `available_streams.json`, in place of the older single `streams.json` file. Still on `streams.json`? See the [migration guide](/docs/core/configs/streams-migration) to switch, or the [Streams v1 reference](/docs/core/configs/streams-legacy) for the old format.
+The commands and examples below use OLake Go's current streams config: `selected_streams.json` + `available_streams.json`, in place of the older single `streams.json` file. Still on `streams.json`? See the [migration guide](/docs/core/configs/streams-migration) to switch, or the [Streams v1 reference](/docs/core/configs/streams-legacy) for the old format.
 :::
 
 :::info
@@ -125,7 +127,7 @@ This setup requires `selected_streams.json` and `available_streams.json` generat
 OLake Go uses a state file to keep track of sync progress. To persist this state between runs, the DAG creates a `PersistentVolumeClaim` (PVC). You need a `StorageClass` in your Kubernetes cluster that supports `ReadWriteMany` (RWX) access mode.
 
 :::note
-At start of the sync, the state file just contains `{}`. OLake Go will update this file as it processes data.
+There is no state file before the first run. OLake Go writes `state.json` to the PVC when a sync finishes, and the DAG passes it back with `--state` on later runs. The first run starts without `--state`, so a new pipeline gets the current state version.
 :::
 
 **Examples**: `azurefile` on AKS, Google Cloud Filestore provisioner on GKE, AWS EFS provisioner on EKS, or an NFS provisioner.
@@ -153,8 +155,8 @@ TARGET_NAMESPACE = "olake" # <-- EDIT THIS LINE
 
 # !!! IMPORTANT: Set this to the correct OLake image for your source database !!!
 # Find images at: https://hub.docker.com/u/olakego
-# Examples: "olakego/source-mongodb:latest", "olakego/source-mysql:latest", "olakego/source-postgres:latest"
-OLAKE_IMAGE = "olakego/source-db:latest" # <-- EDIT THIS LINE
+# Examples: "olakego/source-mongodb:v1.2.2", "olakego/source-mysql:v1.2.2", "olakego/source-postgres:v1.2.2"
+OLAKE_IMAGE = "olakego/source-postgres:v1.2.2" # <-- EDIT THIS LINE (image and version for your source)
 
 # !!! IMPORTANT: Set this to the name of a StorageClass in your K8s cluster !!!
 # This StorageClass MUST support ReadWriteMany (RWX) access mode.
@@ -181,9 +183,9 @@ STREAMS_CONFIG_MAP_NAME = "olake-streams-config"
 
 - `KUBERNETES_CONN_ID`: Set this to the exact "Connection Id" of your Kubernetes connection in Airflow.
 
-- `TARGET_NAMESPACE`: Set this to the Kubernetes namespace where you created the ConfigMaps and where the OLake pod/PVC should run.
+- `TARGET_NAMESPACE`: Set this to the Kubernetes namespace where you created the ConfigMaps and where the OLake Go pod/PVC should run.
 
-- `OLAKE_IMAGE`: **Crucially**, change this to the specific OLake Docker image corresponding to your data source (e.g., `olakego/source-postgres:latest`, `olakego/source-mongodb:latest`, etc). Check the OLake Docker Hub page for available images and tags.
+- `OLAKE_IMAGE`: **Crucially**, change this to the specific OLake Go Docker image corresponding to your data source (e.g., `olakego/source-postgres:latest`, `olakego/source-mongodb:latest`, etc). Check the OLake Go Docker Hub page for available images and tags.
 
 - `STORAGE_CLASS_NAME`: Set this to the name of an available `ReadWriteMany` (RWX) StorageClass in your cluster.
 
@@ -213,7 +215,7 @@ STREAMS_CONFIG_MAP_NAME = "olake-streams-config"
 
 5. The first task (`create_pvc`) will run, checking for and creating the `olake-shared-data` PVC if needed.
 
-6. Once that succeeds, the `sync_data` task will start. This task launches the actual OLake pod on your Kubernetes cluster.
+6. Once that succeeds, the `sync_data` task will start. This task launches the actual OLake Go pod on your Kubernetes cluster.
 
 7. You can click on the `sync_data` task instance and view its logs to see the output from the OLake Go process itself.
 
@@ -221,7 +223,7 @@ STREAMS_CONFIG_MAP_NAME = "olake-streams-config"
 
 ## How to set up OLake Go cron job scheduler
 
-Modify the line #52 from the `olake_sync_from_source.py` DAG file (`schedule=None`) with the frequency you wish to setup.
+Modify the line #54 from the `olake_sync_from_source.py` DAG file (`schedule=None`) with the frequency you wish to setup.
 
 ```py
 with DAG(
@@ -247,15 +249,15 @@ Happy Syncing!
         <li>Mounts OLake Go configuration from a <strong>ConfigMap</strong></li>
         <li>Uses a <strong>PersistentVolumeClaim</strong> for sync state storage across runs</li>
       </ul>
-      <p>Airflow's scheduler triggers the DAG on your defined schedule, dynamically creating OLake pods in the cluster for each sync run and cleaning them up on completion.</p>
+      <p>Airflow's scheduler triggers the DAG on your defined schedule, dynamically creating OLake Go pods in the cluster for each sync run and cleaning them up on completion.</p>
     </div>
   },
   {
   question: "Q2. What Airflow executor is required to run OLake Go's Kubernetes integration?",
   answer: <div>
-    <p>This DAG requires the <strong>LocalExecutor</strong> or <strong>SequentialExecutor</strong>.</p>
-    <p>The reason is the DAG's first task, <code>create_pvc</code>, which uses Airflow's <code>PythonOperator</code> to check for and create Kubernetes resources (such as the PersistentVolumeClaim) before the sync runs. That Python code executes directly on the machine running the Airflow scheduler, which is how the LocalExecutor and SequentialExecutor operate. It will not work correctly out of the box with the CeleryExecutor or KubernetesExecutor without modification.</p>
-    <p>You can verify your setting under the <code>[core]</code> section of <code>$AIRFLOW_HOME/airflow/airflow.cfg</code>: it should read <code>executor = LocalExecutor</code> or <code>executor = SequentialExecutor</code>.</p>
+    <p>This DAG requires the <strong>LocalExecutor</strong>. Airflow 2 setups can also use the SequentialExecutor, which Airflow 3.0 removed in favor of the LocalExecutor.</p>
+    <p>The reason is the DAG's first task, <code>create_pvc</code>, which uses Airflow's <code>PythonOperator</code> to check for and create Kubernetes resources (such as the PersistentVolumeClaim) before the sync runs. That Python code executes directly on the machine running the Airflow scheduler, which is how the LocalExecutor operates. It will not work correctly out of the box with the CeleryExecutor or KubernetesExecutor without modification.</p>
+    <p>You can verify your setting under the <code>[core]</code> section of <code>$AIRFLOW_HOME/airflow.cfg</code>: it should read <code>executor = LocalExecutor</code>.</p>
     <p>Note that this constraint comes from the DAG's <code>PythonOperator</code> step, not from the <code>KubernetesPodOperator</code> itself, which launches pods via the Kubernetes API regardless of executor.</p>
   </div>
 },
@@ -269,11 +271,11 @@ Happy Syncing!
   {
     question: "Q4. What Kubernetes resources does the OLake Go Airflow DAG create and manage?",
     answer: <div>
-      <p>The DAG manages three types of Kubernetes resources:</p>
+      <p>The DAG creates and manages two types of Kubernetes resources, and reads a third that you create:</p>
       <ol>
-        <li><strong>ConfigMap</strong> - Contains OLake Go's source and destination configuration files, mounted into the pod as a volume</li>
-        <li><strong>PersistentVolumeClaim</strong> - Provides durable state storage for sync progress, created once and reused across runs</li>
-        <li><strong>OLake worker pods</strong> - Dynamically created by <code>KubernetesPodOperator</code> for each sync execution. The operator passes config via volume mounts, runs the OLake Go sync command, and cleans up the pod on completion (<code>is_delete_operator_pod=True</code>), keeping the cluster tidy between runs</li>
+        <li><strong>ConfigMaps (you create them)</strong> - Three ConfigMaps hold the source, destination and streams files. You create them in the target namespace before the first run. An init container copies them onto the PVC</li>
+        <li><strong>PersistentVolumeClaim</strong> - Provides durable state storage for sync progress, created once by the <code>create_pvc</code> task and reused across runs</li>
+        <li><strong>OLake Go worker pods</strong> - Dynamically created by <code>KubernetesPodOperator</code> for each sync execution. The operator mounts the PVC, runs the OLake Go sync command, and deletes the pod when it finishes. On cncf-kubernetes provider 10.0.0 and later, set this with <code>on_finish_action="delete_pod"</code>, because the provider removed <code>is_delete_operator_pod</code></li>
       </ol>
     </div>
   },
@@ -287,7 +289,7 @@ Happy Syncing!
       <pre><code>{`pip install apache-airflow-providers-cncf-kubernetes`}</code></pre>
       <ul>
         <li><strong>Kubernetes cluster access</strong> with <code>kubectl</code> configured and pointing to your target cluster</li>
-        <li><strong>Airflow Kubernetes Connection</strong> - Create a connection of type <code>Kubernetes Cluster Connection</code> in Airflow's connection management UI, providing your kubeconfig in JSON format with the connection ID <code>k8s_conn</code></li>
+        <li><strong>Airflow Kubernetes Connection</strong> - Create a connection of type <code>Kubernetes Cluster Connection</code> in Airflow's connection management UI, providing your kubeconfig in JSON format. Set <code>KUBERNETES_CONN_ID</code> in the DAG to that connection ID (the DAG default is <code>kubernetes_default</code>)</li>
         <li><strong>StorageClass that supports PersistentVolumeClaims</strong> - Required for OLake Go state persistence between sync runs</li>
         <li><strong>OLake Go configuration files</strong> for your source database and destination (Iceberg catalog, S3 credentials, etc.)</li>
       </ul>

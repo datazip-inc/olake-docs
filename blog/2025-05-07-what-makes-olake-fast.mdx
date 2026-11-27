@@ -1,8 +1,8 @@
 ---
 slug: what-makes-olake-fast
-title: "What Makes OLake Fast? | High-Throughput Data Replication"
-seo_title: "What Makes OLake Fast: Chunking and Parallel Reads"
-description: "Discover OLake's data ingestion speed secrets-adaptive chunking, parallel execution, and CDC strategies for scalable, low-latency replication performance."
+title: "What Makes OLake Go Fast? | High-Throughput Data Replication"
+seo_title: "What Makes OLake Go Fast: Chunking and Parallel Reads"
+description: "Discover OLake Go's data ingestion speed secrets: adaptive chunking, parallel execution, and CDC strategies for scalable, low-latency replication performance."
 image: /img/blog/cover/what-makes-olake-fast-cover.webp
 authors: [vaibhav, vikash]
 tags: [olake, benchmarks]
@@ -10,6 +10,7 @@ tags: [olake, benchmarks]
 
 ![What makes OLake fast? Chunking strategies deep dive title with OLake logo on white background](/img/blog/cover/what-makes-olake-fast-cover.webp)
 
+**Updated 27 November 2026** to match the chunking code in OLake Go v1.2.2.
 
 OLake Go is engineered for high-throughput ELT workloads, leveraging a combination of adaptive chunking strategies & parallelized execution for historical load, and change data capture (CDC) techniques to optimize data ingestion performance. 
 
@@ -22,18 +23,30 @@ To prevent overwhelming the source database, the maximum number of concurrent th
 
 To maximize parallelism and throughput for full/historical load of tables, OLake Go splits table into manageable fragments called chunks. Each chunk can be processed independently by a dedicated worker thread, enabling concurrent extraction and transformation. Chunking is central to OLake Go's performance model and is tailored per source system to align with its data distribution patterns and indexing structures.
 
-OLake Go supports multiple chunking strategies, each optimized for a particular database engine. The strategy selection is dynamic and driver-aware—for example:
+OLake Go supports multiple chunking strategies, each optimized for a particular database engine. The strategy selection is dynamic and driver-aware, for example:
 
 ![Database splitting strategies by type: MongoDB (Split Vector, Bucket Auto, Timestamp), MySQL (Split via next query), Postgres (CTID Ranges, Split via batch size or next query)](/img/blog/2025/05/what-makes-olake-fast-1.webp)
 
+The diagram dates from the first version of this post (May 2025). MySQL has since gained even integer and string splits, and Oracle, SQL Server and Db2 chunk too, as the sections below describe.
+
+### How big is a chunk?
+
+Most strategies size their chunks from one constant in the OLake Go code, `EffectiveParquetSize`. It is 2 GiB of source data: a 256 MiB target Parquet file multiplied by an assumed compression ratio of 8 ([`constants/constants.go`](https://github.com/datazip-inc/olake-go/blob/master/constants/constants.go)). Each driver turns that byte budget into rows, pages or key ranges in its own way.
+
 ## MongoDB
+
+OLake Go picks the MongoDB strategy for each collection:
+
+1. It reads the smallest and largest `_id`. BSON (Binary JSON) sorts values by type first, so if both ends are ObjectIDs, every `_id` in between is one too. If either end is another type, OLake Go uses **Bucket Auto**.
+2. If every `_id` is an ObjectID and `chunking_strategy` in `source.json` is `timestamp`, it uses the **Timestamp** strategy.
+3. Otherwise it uses **Split Vector**, and falls back to Bucket Auto on its own if MongoDB refuses the `splitVector` command.
 
 ### 1. Split Vector Strategy
 
 The Split Vector Strategy utilizes MongoDB's internal `splitVector` command to derive optimal chunk boundaries based on collection size and document distribution. This command is originally designed for MongoDB sharding, where it calculates split points to balance chunk sizes across shards. OLake Go repurposes this capability to partition data for parallel ingestion.
 
 
-In this strategy, chunks are generated such that each contains approximately a fixed amount of data by default, `1024` MB per chunk. The process determines the minimum and maximum _id values in the collection and then uses `splitVector` to compute intermediate `_id` boundaries that divide the collection into chunks of roughly equal size (in MB), while ensuring no document is split across chunks.
+OLake Go first finds the smallest and largest ObjectID `_id` in the collection. It then runs `splitVector` with a `maxChunkSize` of `1024` MB, which returns `_id` split points about 1 GB of data apart, and no document is split across two ranges. OLake Go then groups every 8 of those ranges into one chunk of about 8 GB, which the code describes as keeping it consistent with the other chunking strategies.
 
 
 ```bash
@@ -49,7 +62,7 @@ db.adminCommand({
 A key benefit of this approach is that chunking is driven by the actual data distribution, not just timestamp or primary key ranges. This improves balance across threads and avoids skewed workloads, especially in collections with irregular insert patterns.
 
 :::note
-The `splitVector` command is a privileged internal operation and is not permitted on MongoDB Atlas or other managed environments with restricted permissions. In such cases, OLake Go gracefully falls back to the `bucketAutoStrategy`, ensuring compatibility without user intervention
+The `splitVector` command is a privileged internal operation. MongoDB Atlas and other managed services with restricted permissions refuse it, and `mongos` rejects it on sharded collections. In those cases, OLake Go falls back to the `bucketAutoStrategy` on its own, so no user action is needed.
 :::
 
 
@@ -62,7 +75,7 @@ The [Bucket Auto Strategy](https://www.mongodb.com/docs/manual/reference/operato
 
 
 
-OLake Go constructs an aggregation pipeline using `$sort` and `$bucketAuto`, where the number of buckets is set to `4` times the configured maximum number of threads. Each bucket returned by MongoDB contains a range (`min`, `max`) of `_id` values and a document count. These ranges are then used for parallel processing.
+OLake Go builds an aggregation pipeline with `$sort` and `$bucketAuto`. The number of buckets is the collection's `storageSize` from `collStats`, divided by `EffectiveParquetSize` (2 GiB) and rounded up. Each bucket returned by MongoDB contains a range (`min`, `max`) of `_id` values and a document count, and these ranges are then used for parallel processing.
 
 
 
@@ -71,26 +84,32 @@ db.<collection>.aggregate([
   { $sort: { _id: 1 } },
   { $bucketAuto: {
       groupBy: "$_id",
-      buckets: <MaxThreads> * 4
+      buckets: Math.ceil(<storageSize> / <EffectiveParquetSize>)
   }}
-])
+], { allowDiskUse: true })
 ```
+
+Bucket Auto also handles collections that mix `_id` types, such as numbers, strings and ObjectIDs. Buckets follow BSON sort order across types, so one bucket can start with a number and end with a string. Since v1.2.1, OLake Go reads such a range with one filter clause per type and syncs every document, including when it resumes from saved state.
 
 
 ### 3. Timestamp strategy
 
 The Timestamp Strategy leverages the time-encoded nature of MongoDB’s `ObjectId` to partition data chronologically. This is particularly effective when documents follow a time-based insertion pattern, as is common in event logs or time-series datasets.
 
+OLake Go uses it only when every `_id` is an ObjectID and `chunking_strategy` is set to `timestamp`.
+
 #### How It Works
 
 #### 1. Determine Temporal Bounds:
 The strategy begins by identifying the earliest and latest timestamps in the collection using the `_id` field’s embedded timestamp. Specifically, the first 4 bytes of an `ObjectId` represent the Unix time (in seconds) at which the document was created. This structure makes ObjectIds naturally increase over time, allowing them to be used as proxies for document creation time. By extracting the timestamp from the smallest and largest ObjectIds in the collection, OLake Go determines the temporal range of the dataset.
 
+OLake Go then widens this range by 10 minutes on each side.
+
 
 ![OLake batching and compression pipeline diagram reducing network and storage overhead](/img/blog/2025/05/what-makes-olake-fast-2.webp)
 
 #### 2. Define Time Granularity (Density):
-OLake Go divides the total time range between the first and last record into 6 segments to estimate how data is distributed over time. Based on this, it calculates a dynamic chunk interval (`density`) by multiplying each segment by 10 seconds. This creates finer chunks if data is dense, and coarser chunks if it’s sparse — with a minimum granularity of 10 seconds per chunk. This approach helps balance the number of records in each chunk, even if the data insertion pattern is uneven.
+OLake Go counts the 6-hour blocks in the time range, rounding down, with a minimum of 1. The chunk interval (`density`) is 10 seconds per block, so a range under 12 hours gets 10-second chunks and a 60-hour range gets 100-second chunks. A longer time range gets wider chunks rather than more of them, and the interval does not depend on how many documents fall in it.
 
 ```py
 timeDiff := last.Sub(first).Hours() / 6
@@ -140,91 +159,102 @@ func generate_min_object_id(timestamp){
 The algorithm slides the window forward by the density until it spans the entire time range. The final chunk is open-ended (`Max = nil`) to account for any documents inserted after the last observed timestamp.
 
 
-## MySql
+## MySQL
 
-In MySQL, OLake Go chunks data based on the primary key of the source table.
+In MySQL, OLake Go chunks data on the primary key, or on the `chunk_column` set for the stream in `selected_streams.json`.
+
+### Chunk size
+
+OLake Go reads the table statistics from `INFORMATION_SCHEMA.TABLES` and works out the average row size. The chunk size in rows is `EffectiveParquetSize` divided by that average, rounded up. If the statistics report zero rows for a table that has data, the sync stops and asks you to run `ANALYZE TABLE`.
 
 ```sql
-SELECT MIN(id) AS min_value, MAX(id) AS max_value 
-FROM <schema_name>.<table_name>;
+SELECT TABLE_ROWS,
+       CEIL(DATA_LENGTH / NULLIF(TABLE_ROWS, 0)) AS avg_row_bytes,
+       DATA_LENGTH
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = '<table_name>';
 ```
-
-
-To begin, OLake Go queries the minimum and maximum primary key values in the table. It then estimates the optimal chunk size by dividing the total row count by 8 times the number of threads configured in `source.json`. This `8×` multiplier ensures there are more chunks than threads, allowing for better parallelism and dynamic load balancing—especially useful in cases of uneven record sizes or skewed key distributions.
 
 ```py
-func calculate_chunk_size(table_name, max_threads){
-    """
-    Estimate an optimal chunk size for a MySQL table to allow parallel ingestion.
-
-    Args:
-        table_name (str): Name of the source table.
-        max_threads (int): Number of parallel threads configured.
-
-    Returns:
-        int: Suggested number of rows per chunk.
-    """
-
-    # Step 1: Get estimated number of rows in the table
-    query = `
-        SELECT TABLE_ROWS
-        FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = '{table_name}';
-    `
-    total_rows = execute_query_and_fetch_single_value(query)
-
-    # Step 2: Divide total rows by (threads * 8) for better concurrency
-    chunk_size = total_rows / (max_threads * 8)
-
-    return chunk_size
-}
+# EffectiveParquetSize = 2 GiB
+chunk_size = ceil(EffectiveParquetSize / avg_row_bytes)  # rows per chunk
 ```
 
-:::note
-The `8×` multiplier used to calculate the chunk size is a design decision aimed at ensuring optimal parallelism and load balancing.
-
-While this multiplier is based on previous performance benchmarks, it is adjustable and may be fine-tuned through further testing to match specific workloads, optimizing throughput across different environments.
-:::
-
-Using this chunk size, OLake Go repeatedly executes a query to fetch the next chunk boundary using a sliding window over the primary key. 
+OLake Go then reads the smallest and largest key values.
 
 ```sql
-SELECT MAX(id)
+SELECT
+  (SELECT id FROM <schema_name>.<table_name> ORDER BY id LIMIT 1) AS min_value,
+  (SELECT id FROM <schema_name>.<table_name> ORDER BY id DESC LIMIT 1) AS max_value;
+```
+
+### Choosing the split
+
+For a single-column key, OLake Go tries an even split first, because neither even split needs a query per chunk boundary:
+
+1. **Even integer split.** The key must map to a 32-bit or 64-bit integer, and the key range must be evenly filled. OLake Go checks this with the ratio `(max - min + 1) / rows`, which must be between 0.05 and 1000. The step between boundaries is that ratio times the chunk size.
+2. **Even string split.** For `CHAR` and `VARCHAR` keys, OLake Go maps the smallest and largest strings to numbers and splits that range into `ceil(DATA_LENGTH / EffectiveParquetSize)` parts. It aligns each boundary to a real key value with a collation-aware `DISTINCT` query, and retries with more candidate boundaries if too few come back. It needs at least 80% of the expected boundaries, or it falls back to the next method.
+3. **Split via next query.** Composite keys, other key types and failed even splits walk the key with the query shown below.
+
+Tables with no primary key and no `chunk_column` are read in `LIMIT` and `OFFSET` ranges of the chunk size.
+
+```py
+# Even integer split
+# Inputs: min_value, max_value (integer key extremes), approx_rows, chunk_size
+distribution = (max_value - min_value + 1) / approx_rows   # must be between 0.05 and 1000
+step = ceil(max(distribution * chunk_size, 1))
+
+chunks = [(None, min_value)]
+prev = min_value
+next_value = min_value + step
+while next_value <= max_value:
+    chunks.append((prev, next_value))
+    prev = next_value
+    next_value += step
+chunks.append((prev, None))   # open-ended last chunk
+```
+
+### Split via next query
+
+When no even split applies, OLake Go walks the key. Each query returns the key value that sits `chunk_size` rows after the current boundary, and that value becomes the next boundary.
+
+```sql
+SELECT CONCAT_WS(',', id) AS key_str
 FROM (
   SELECT id
   FROM <schema_name>.<table_name>
-  WHERE id > start_id
-  ORDER BY id ASC
-  LIMIT chunkSize
-) AS T;
+  WHERE id > ?
+  ORDER BY id
+  LIMIT 1 OFFSET <chunk_size>
+) AS subquery;
 ```
 
-Each chunk is defined by a `Min` and `Max` primary key value, forming a disjoint range. This range is used to split the data so each ingestion thread can process a distinct slice of the table in parallel.
+Each chunk is defined by a `Min` and `Max` primary key value, forming a disjoint range. This range is used to split the data so each ingestion thread can process a distinct slice of the table in parallel. For a composite key, the `WHERE` clause compares the columns in order, so `(a, b)` is past `(a1, b1)` when `a > a1`, or when `a = a1 AND b > b1`.
 
 
 ```py
 # Initialize starting value
 current_value = <min_value>
-chunks = []
+chunks = [(None, current_value)]
 
-for{
-    # Step 1: Build a query to find the upper bound of the current chunk
+while True:
+    # Step 1: Find the key that sits chunk_size rows after the current boundary
     query = `
-        SELECT MAX(<split_column>) FROM (
-            SELECT <split_column>
+        SELECT CONCAT_WS(',', <key_columns>) FROM (
+            SELECT <key_columns>
             FROM <schema_name>.<table_name>
-            WHERE <split_column> > '{<current_value>}'
-            ORDER BY <split_column> ASC
-            LIMIT <chunk_size>
+            WHERE <key_columns> > <current_value>
+            ORDER BY <key_columns>
+            LIMIT 1 OFFSET <chunk_size>
         ) AS subquery;
     `
 
     # Step 2: Execute the query to get the next boundary value
     next_value = execute_query_and_fetch_single_value(query)
 
-    # Step 3: Exit loop if no more data or boundary hasn't advanced
-    if next_value is None or next_value == current_value:
+    # Step 3: Exit loop when fewer than chunk_size rows remain
+    if next_value is None:
         break
 
     # Step 4: Store this chunk range
@@ -232,11 +262,12 @@ for{
 
     # Step 5: Slide the window forward
     current_value = next_value
-  }
-# chunks now contains all (min, max) ranges for parallel ingestion
+
+# Step 6: The last chunk is open-ended
+chunks.append((current_value, None))
 ```
 
-## Postgresql
+## PostgreSQL
 
 ### 1. CTID Ranges
 
@@ -244,55 +275,68 @@ The `CTID` Ranges strategy is employed when a specific column for splitting the 
 
 Here’s how it works:
 
-#### 1. Calculate the Number of Pages: 
-OLake Go starts by querying the total number of pages in the table (using PostgreSQL's `relPages`), which essentially represents blocks of rows stored in the table. This is done through a specialized query that counts the number of pages.
+#### 1. Measure the Table: 
+OLake Go reads the page size with `SHOW block_size`. It then reads the table's size with `pg_relation_size` (the heap only) and `pg_table_size` (the heap plus TOAST, The Oversized-Attribute Storage Technique, where PostgreSQL keeps large values). The page count is the heap size divided by the page size, rounded up.
 
 
 ```sql
-SELECT relpages 
-FROM pg_class 
-WHERE relname = '<table_name>' 
+SHOW block_size;
+
+SELECT pg_relation_size(oid), pg_table_size(oid)
+FROM pg_class
+WHERE relname = '<table_name>'
   AND relnamespace = (
-    SELECT oid 
-    FROM pg_namespace 
+    SELECT oid
+    FROM pg_namespace
     WHERE nspname = '<schema_name>'
 );
 ```
 
 #### 2. Chunk Creation: 
-Once the total number of pages is known, the table is divided into chunks based on the batch size specified in the `source.json` file. Each chunk represents a set of contiguous pages, where the size of each chunk corresponds to the batch size defined by the user. For example, if the batch size is set to 100, each chunk will encompass 100 pages.
+Each chunk spans enough pages to hold about `EffectiveParquetSize` (2 GiB) of table data. OLake Go counts the TOAST data behind each heap page, so a table with large `TEXT` or `JSONB` values gets shorter page ranges (since v0.12.1). On PostgreSQL 14 and later, which read only a chunk's own pages with a TID (tuple identifier) range scan, the page count per chunk is `EffectiveParquetSize` divided by the bytes behind one heap page.
+
+Before PostgreSQL 14, every chunk query scans the whole heap. There, a chunk holds at least as much table data as the heap it scans, so the repeated scans add at most one extra pass over the table. A chunk never spans more pages than it would for a table without TOAST data.
 
 ```py
 # Inputs:
-# - total_pages: Total number of pages in the table (from PostgreSQL)
-# - batch_size: Number of pages per chunk (from config)
+# - heap_bytes, table_bytes: pg_relation_size and pg_table_size of the table
+# - block_size: from SHOW block_size
+# - EffectiveParquetSize: 2 GiB
 
-for start_page := uint32(0); start_page < total_pages; start_page += batch_size {
-	end_page := start_page + batchSize
-	
-	# If this is the last chunk, make it open-ended using a very large value
-	if end_page >= total_pages {
-		end_page = MAX_UINT32  # acts as "infinity" for CTID comparison
-	}
-	
+total_pages = ceil(heap_bytes / block_size)
+# table data (heap + TOAST) behind one heap page
+bytes_per_page = block_size * table_bytes / heap_bytes if table_bytes > heap_bytes else block_size
+pages_per_chunk = ceil(EffectiveParquetSize / bytes_per_page)   # PostgreSQL 14 and later
+
+for start_page in range(0, total_pages, pages_per_chunk):
+    end_page = start_page + pages_per_chunk
+
+    # If this is the last chunk, make it open-ended using a very large value
+    if end_page >= total_pages:
+        end_page = MAX_UINT32  # acts as "infinity" for CTID comparison
+
     # Format the CTID boundaries as strings
     min_ctid = f"'({start_page},0)'"
     max_ctid = f"'({end_page},0)'"
 
     # Append the chunk (min, max) range
     chunks.append((min_ctid, max_ctid))
-  }
 ```
 
 #### 3. Handling the Last Chunk: 
-The last chunk might not always contain a full batch of pages. To handle this, the end of the last chunk is set to the maximum possible value (`^uint32(0)`, which is the maximum value for `uint32`), ensuring that the final chunk captures any remaining rows.
+The last chunk might not always contain a full chunk of pages. To handle this, the end of the last chunk is set to the maximum possible value (`^uint32(0)`, which is the maximum value for `uint32`), ensuring that the final chunk captures any remaining rows.
 
 #### 4. Chunk Ranges: 
 Each chunk is represented by a Min and Max `CTID`, where the CTID corresponds to the relational page range of the chunk. This allows each chunk to represent a specific section of the table based on page boundaries.
 
+#### 5. Partitioned Tables: 
+If the table has partitions, found through `pg_inherits`, OLake Go reads the heap and table size of each partition, with `pg_partition_tree` on PostgreSQL 12 and later. The page ranges run up to the largest partition's page count, and each chunk reads the same page range from every partition. Each chunk is sized from the partitions that still have pages at its start.
+
 
 
 ### Postgres -  If split column is defined 
+
+If `chunk_column` is set for the stream in `selected_streams.json`, OLake Go splits on that column instead of `CTID`. The column must be part of the primary key, or the sync fails with `provided split column is not a primary key`. If the column's smallest and largest values are equal, the whole table is one chunk.
 
 ### 2. Split via batch size
 
@@ -302,7 +346,7 @@ The Split via Batch Size strategy is employed when the split column contains num
 
 The minimum and maximum values of the split column are retrieved from the dataset.
 
-The chunk size is based on the batch size configured in the system. Each chunk represents a range of values determined by the batch size.
+The step between boundaries is fixed at 10000 in the code. It is a step in the column's values, not a row count: with a smallest `id` of 1, the chunks are `[1, 10001)`, `[10001, 20001)` and so on.
 
 #### 2. Chunk Boundaries:
 
@@ -313,20 +357,22 @@ Starting from the min value, the function repeatedly adds the batch size to dete
 # Inputs:
 # - min_value: Starting point of the first chunk
 # - max_value: Upper limit of the split column
-# - dynamic_chunk_size: Range size for each chunk (from config)
+# - dynamic_chunk_size: Range size for each chunk (fixed at 10000)
 
 splits = []
 chunk_start = min_value
 chunk_end = chunk_start + dynamic_chunk_size
 
-for CompareValues(chunkEnd, max) <= 0 {
-	# Create the current chunk with range (chunk_start, chunk_end)
+while chunk_end <= max_value:
+    # Create the current chunk with range (chunk_start, chunk_end)
     splits.append((chunk_start, chunk_end))
-    
-	# Slide the window forward
+
+    # Slide the window forward
     chunk_start = chunk_end
-	chunk_end = chunk_start + dynamic_chunk_size
-}
+    chunk_end = chunk_start + dynamic_chunk_size
+
+# The last chunk is open-ended
+splits.append((chunk_start, None))
 ```
 
 The final chunk is adjusted to include any remaining data after the last full chunk, with the max value set to nil for the last chunk.
@@ -339,7 +385,7 @@ The Split via Next Query strategy is used when the specified split column does n
 
 #### 1. Chunk Calculation:
 
-The column is sorted in ascending order, and boundaries for the chunks are determined through successive queries.
+The column is sorted in ascending order, and boundaries for the chunks are determined through successive queries. The `LIMIT` is fixed at 10000 rows in the code.
 ```sql
 SELECT MAX(<column>) 
 FROM (
@@ -347,20 +393,20 @@ FROM (
   FROM "<schema_name>"."<table_name>" 
   WHERE <column_name> > '<last_seen_value>' 
   ORDER BY <column_name> ASC 
-  LIMIT <batch_size>
+  LIMIT 10000
 ) AS T;
 ```
 
-For example, if splitting on a uuid column in table users under schema public, and the last seen value was `uuid-001` with a batch size of `25`, the query would look like:
+For example, if splitting on a `username` column in table `users` under schema `public`, and the last seen value was `user-001`, the query would look like:
 
 ```sql
-SELECT MAX(uuid) 
+SELECT MAX(username) 
 FROM (
-  SELECT uuid 
+  SELECT username 
   FROM "public"."users" 
-  WHERE uuid > 'uuid-001' 
-  ORDER BY uuid ASC 
-  LIMIT 25
+  WHERE username > 'user-001' 
+  ORDER BY username ASC 
+  LIMIT 10000
 ) AS T;
 ```
 
@@ -369,14 +415,14 @@ For each iteration, the starting point (minimum) of the current chunk is used to
 
 #### 2. Chunk Boundaries:
 
-Each chunk is defined by its start value (current chunk start) and end value (determined by the query). The process is repeated, progressively moving through the data set and partitioning it into appropriately sized chunks based on the batch size.
+Each chunk is defined by its start value (current chunk start) and end value (determined by the query). The process is repeated, progressively moving through the data set and partitioning it into chunks of 10000 rows.
 
 ```py
 # Inputs:
 # - split_column: The column used to split (e.g. UUID, string, etc.)
 # - table_name: Name of the source table
 # - schema_name: Schema in which the table resides
-# - chunk_size: Number of records per chunk
+# - chunk_size: Number of records per chunk (fixed at 10000)
 # - min_value: The minimum value to start from (first row’s value)
 
 splits = []
@@ -408,6 +454,14 @@ for {
     current_value = next_value
 }
 ```
+
+## Oracle, SQL Server and Db2
+
+OLake Go also chunks full loads from Oracle, Microsoft SQL Server and IBM Db2. Each driver sizes its chunks from `EffectiveParquetSize` and the table's statistics, and falls back to a slower method when the fast one is not available.
+
+- **Oracle.** OLake Go first asks the database to split the table into ROWID ranges with `DBMS_PARALLEL_EXECUTE.CREATE_CHUNKS_BY_ROWID`, using `EffectiveParquetSize` divided by the block size as the blocks per chunk. If that fails, for example on a read-only database or without the needed permissions, it samples ROWIDs with `SAMPLE BLOCK` and picks evenly spaced boundaries. As a last resort, it walks the ROWIDs one chunk at a time, sizing chunks from the average row length in the table statistics, or 300 bytes when that is missing.
+- **SQL Server.** With a primary key or `chunk_column`, OLake Go samples key values with `TABLESAMPLE` to place evenly spaced boundaries, and walks the key one chunk at a time if sampling fails. The chunk size in rows is `EffectiveParquetSize` divided by the average row size. Tables without a key are split on `%%physloc%%`, the physical row locator, by walking the table's IAM (Index Allocation Map) pages where the server allows it, or with an iterative `%%physloc%%` split.
+- **Db2.** With a primary key or `chunk_column`, OLake Go walks the key with a next-chunk query, using `EffectiveParquetSize` divided by the average row size as the rows per chunk. Tables without a key are split into even ranges of `RID()`, the row identifier. The number of ranges is the table's page count divided by the pages that fit in `EffectiveParquetSize`.
 ## FAQs
 <Faq showHeading={false} data={[
   {
@@ -417,13 +471,14 @@ for {
       <ul>
         <li><strong>MongoDB:</strong> Three strategies are available:
           <ul>
-            <li><strong>Split Vector:</strong> Calls MongoDB's internal <code>splitVector</code> command to compute chunk boundaries based on actual <code>_id</code> data distribution. Only works when all <code>_id</code> fields are ObjectIDs - collections with mixed or non-ObjectID <code>_id</code> types (UUIDs, integers, strings) will cause this strategy to fail and should use Bucket Auto instead</li>
-            <li><strong>Bucket Auto:</strong> Uses MongoDB's <code>$bucketAuto</code> aggregation stage to divide a collection into balanced buckets. Used as a fallback when <code>splitVector</code> is unavailable (e.g. MongoDB Atlas) or when <code>_id</code> fields are non-ObjectID types</li>
-            <li><strong>Timestamp-based:</strong> Generates chunk boundaries from time ranges derived from the <code>_id</code> field's embedded timestamp</li>
+            <li><strong>Split Vector:</strong> Calls MongoDB's internal <code>splitVector</code> command to compute chunk boundaries based on actual <code>_id</code> data distribution. It is the default, and runs only when every <code>_id</code> is an ObjectID</li>
+            <li><strong>Bucket Auto:</strong> Uses MongoDB's <code>$bucketAuto</code> aggregation stage to divide a collection into balanced buckets, one per 2 GiB of storage size. OLake Go switches to it on its own when <code>splitVector</code> is refused (for example on MongoDB Atlas or a sharded collection) or when the collection has <code>_id</code> values that are not ObjectIDs</li>
+            <li><strong>Timestamp-based:</strong> Generates chunk boundaries from time ranges derived from the <code>_id</code> field's embedded timestamp, when <code>chunking_strategy</code> is <code>timestamp</code></li>
           </ul>
         </li>
-        <li><strong>PostgreSQL</strong> - Uses CTID range chunking based on physical storage page ranges, plus batch-size splits and next-query paging</li>
-        <li><strong>MySQL</strong> - Uses primary key range splitting</li>
+        <li><strong>PostgreSQL</strong> - Uses CTID range chunking based on physical storage page ranges, sized from the table's heap and TOAST data, plus fixed-step splits and next-query paging on a primary key <code>chunk_column</code></li>
+        <li><strong>MySQL</strong> - Uses even integer or string splits on the primary key, a next-query walk of the key, or <code>LIMIT</code> and <code>OFFSET</code> ranges for tables without a key</li>
+        <li><strong>Oracle, SQL Server and Db2</strong> - Use ROWID, primary key, <code>%%physloc%%</code> or <code>RID()</code> ranges, sized from the table's statistics</li>
       </ul>
       <p>Each strategy ensures chunks are balanced to avoid skewed workloads across threads.</p>
     </div>
@@ -431,25 +486,25 @@ for {
   {
     question: "Q2. How does OLake Go's Split Vector strategy work for MongoDB parallel loading?",
     answer: <div>
-      <p>The Split Vector strategy calls MongoDB's internal <code>splitVector</code> command on the target collection, specifying a maximum chunk size (default 1024MB):</p>
+      <p>The Split Vector strategy calls MongoDB's internal <code>splitVector</code> command on the target collection, with a maximum chunk size of 1024 MB:</p>
       <pre><code>{`db.adminCommand({
-  splitVector: "your_collection",
+  splitVector: "<database>.<collection>",
   keyPattern: { "_id": 1 },
   maxChunkSize: 1024
 })`}</code></pre>
-      <p>MongoDB calculates split points based on the collection's actual data distribution and <code>_id</code> values, returning balanced chunk boundaries. OLake Go uses these boundaries to create independent read ranges, each processed by a separate worker thread simultaneously.</p>
+      <p>MongoDB calculates split points based on the collection's actual data distribution and <code>_id</code> values, returning balanced chunk boundaries. OLake Go groups every 8 of these ranges into one chunk, and each chunk is processed by a separate worker thread simultaneously.</p>
       <p>This data-distribution-aware approach avoids the skew that occurs with simple range or time-based splitting.</p>
-      <p><strong>Limitation:</strong> Split Vector assumes all documents have ObjectID <code>_id</code> fields. Collections where <code>_id</code> fields are strings, integers, or UUIDs will cause this strategy to fail - use Bucket Auto for those collections instead.</p>
+      <p><strong>Limitation:</strong> Split Vector runs only when every <code>_id</code> is an ObjectID. For collections with string, integer or UUID <code>_id</code> values, OLake Go uses Bucket Auto automatically, so no setting is needed.</p>
     </div>
   },
   {
     question: "Q3. What is the Bucket Auto chunking strategy in OLake Go and when is it used?",
     answer: <div>
-      <p>Bucket Auto uses MongoDB's <code>$bucketAuto</code> aggregation stage to automatically divide a collection into a specified number of equal-sized buckets based on document distribution.</p>
-      <p>OLake Go uses Bucket Auto in two scenarios:</p>
+      <p>Bucket Auto uses MongoDB's <code>$bucketAuto</code> aggregation stage to automatically divide a collection into a specified number of equal-sized buckets based on document distribution. OLake Go asks for one bucket per 2 GiB of the collection's storage size, rounded up.</p>
+      <p>OLake Go switches to Bucket Auto on its own in two scenarios:</p>
       <ol>
-        <li><strong>When <code>splitVector</code> is unavailable:</strong> for example, on MongoDB Atlas, which restricts the <code>splitVector</code> command due to its privileged admin access requirement</li>
-        <li><strong>When <code>_id</code> fields are non-ObjectID types:</strong> collections with UUID, integer, or string <code>_id</code> fields are incompatible with Split Vector and should use Bucket Auto instead</li>
+        <li><strong>When <code>splitVector</code> is refused:</strong> for example, on MongoDB Atlas, which restricts the <code>splitVector</code> command due to its privileged admin access requirement, or on a sharded collection, where <code>mongos</code> rejects it</li>
+        <li><strong>When <code>_id</code> values are not all ObjectIDs:</strong> collections with UUID, integer, string or mixed <code>_id</code> values always use Bucket Auto. Since v1.2.1, a collection that mixes <code>_id</code> types syncs every document</li>
       </ol>
       <p>Bucket Auto provides similar balanced chunking without requiring privileged admin access, using the standard aggregation framework.</p>
     </div>
