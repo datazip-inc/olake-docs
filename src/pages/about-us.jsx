@@ -69,7 +69,7 @@ const AboutTeam = () => {
     url: primaryUrl,
     name: 'OLake: Open Source Data Replication to Apache Iceberg',
     description:
-      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
+      'Open-source tool for replicating databases, Kafka and S3 to Apache Iceberg and Parquet, with change data capture (CDC) from Postgres, MySQL/MariaDB, MongoDB and SQL Server, streaming from Kafka, and full or incremental sync from Oracle, Db2 and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     publisher: {
       '@type': 'Organization',
       name: 'OLake'
@@ -87,7 +87,7 @@ const AboutTeam = () => {
     url: 'https://olake.io/about-us/',
     name: 'About Us',
     description:
-      'OLake is an open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make database → Apache Iceberg simple, fast, and observable, with a published benchmark of 580,113 rows per second on a 4-billion-row Postgres full load.',
+      'OLake builds two open-source products for Apache Iceberg: OLake Go, an Iceberg-first extract-and-load (EL) engine that replicates databases, Kafka and S3 into Iceberg (published benchmark: 580,113 rows per second on a 4-billion-row Postgres full load), and OLake Fusion, which keeps those tables compacted and fast.',
     publisher: {
       '@type': 'Organization',
       name: 'OLake',
@@ -98,7 +98,7 @@ const AboutTeam = () => {
       name: 'OLake',
       url: primaryUrl,
       description:
-        'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.'
+        'Open-source tool for replicating databases, Kafka and S3 to Apache Iceberg and Parquet, with change data capture (CDC) from Postgres, MySQL/MariaDB, MongoDB and SQL Server, streaming from Kafka, and full or incremental sync from Oracle, Db2 and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.'
     }
   }
 
@@ -161,12 +161,12 @@ const AboutTeam = () => {
       description="Meet the OLake team behind the open-source data replication tool for Apache Iceberg. Learn about our mission to simplify database to Apache Iceberg workflows."
       activePath='/about-us'
       heroBackground={
-        <PageHero title='About OLake - Open Source Data Replication to Apache Iceberg'>
+        <PageHero title='About OLake: Open Source Ingestion and Maintenance for Apache Iceberg'>
           <p>
-            OLake is an open-source, Iceberg-first EL engine that removes the pain of brittle scripts and one-off pipelines. We make "database → Apache Iceberg" simple, fast, and observable (our published benchmark loads 4 billion Postgres rows at 580,113 rows per second), so your team can stop handling connectors and start focusing on models, products, and impact.
+            OLake builds two open-source products for Apache Iceberg. OLake Go is an Iceberg-first extract-and-load (EL) engine that replicates databases, Kafka and S3 into Iceberg (our published benchmark loads 4 billion Postgres rows at 580,113 rows per second). OLake Fusion keeps those tables compacted and fast, so your team can stop handling connectors and table maintenance and focus on models, products, and impact.
           </p>
           <p>
-            Born from real-world issues with slow, fragile ingestion, OLake gives you a clean UI/CLI, resilient CDC, and a path that keeps getting faster with every release—and we're actively pushing those benchmarks even further. No vendor lock-in, no plumbing issues—just a reliable way to move data into Iceberg for your modern analytics.
+            Born from real-world issues with slow, fragile ingestion, OLake Go gives you a clean UI and CLI, resilient CDC, and a path that keeps getting faster with every release, and we're actively pushing those benchmarks even further. No vendor lock-in, no plumbing issues: just a reliable way to move data into Iceberg for your modern analytics.
           </p>
         </PageHero>
       }

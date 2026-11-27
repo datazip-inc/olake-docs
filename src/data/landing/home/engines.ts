@@ -26,10 +26,11 @@ export const ENGINES: EngineCard[] = [
     art: '/img/landing/lakeside/engine-go.png',
     brand: 'OLake',
     name: 'Go',
-    body: 'Replicate your databases fast, into Apache Iceberg & Parquet on S3.',
+    body: 'Replicate your databases fast, into Apache Iceberg & Parquet on object storage.',
     stats: [
-      { value: '12.5X', label: 'Faster than traditional tools' },
-      { value: '90%', label: 'Cost Savings with OSS' }
+      // docs/benchmarks/ingestion.mdx, Postgres tab: 580,113 vs 46,395 rows/s, and < $ 6 for 4.01 B rows.
+      { value: '12.5X', label: 'Faster than Fivetran (Postgres full load)' },
+      { value: '< $6', label: 'To load 4 billion Postgres rows' }
     ],
     href: '/olake-go',
     linkLabel: 'Know more'

@@ -18,12 +18,13 @@ export const GO_FAQS: ProductFaqItem[] = [
   },
   {
     q: 'Is OLake Go really open source?',
-    a: 'Yes. OLake Go is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 1K+ developers) and use it freely without hidden costs.',
+    a: 'Yes. OLake Go is fully open source under the Apache 2.0 license. You can explore the GitHub repository (already starred by 2,300+ developers) and use it freely without hidden costs.',
     links: [{ text: 'GitHub repository', href: GITHUB_REPO_URL }]
   },
   {
     q: 'Is there any enterprise plan?',
-    a: "We're actively working on providing enterprise support, from professional assistance and pilot programs to helping teams scale OLake Go in production. You can reach out at hello@olake.io to learn more."
+    a: 'Yes. We offer enterprise support based on your governance, risk and compliance (GRC) requirements, from professional assistance and pilot programs to helping teams scale OLake Go in production. You can reach out at hello@olake.io or request a callback to learn more.',
+    links: [{ text: 'request a callback', href: '/contact/' }]
   },
   {
     q: 'How can I contribute?',
@@ -32,10 +33,10 @@ export const GO_FAQS: ProductFaqItem[] = [
   },
   {
     q: 'Why should I use OLake Go?',
-    a: 'OLake Go makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, full and incremental syncs, and compaction, all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics.'
+    a: 'OLake Go makes data replication into Apache Iceberg seamless, faster, and cost-efficient. It handles real-time CDC, schema and partition evolution, and full and incremental syncs, all without vendor lock-in, so your Iceberg tables stay open, scalable, and ready for analytics. Pair it with OLake Fusion for compaction and table maintenance.'
   },
   {
     q: 'What data platforms and tools does OLake Go integrate with?',
-    a: 'As of now, we integrate with Apache Iceberg and S3 as destinations. You can query it using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery.'
+    a: 'OLake Go writes Apache Iceberg tables (on S3, GCS, Azure ADLS Gen2 or MinIO) or plain Parquet (on S3, GCS, Azure Blob Storage or a local filesystem). You can query the Iceberg tables using popular query engines like Spark, AWS Athena, Snowflake, Databricks, and BigQuery.'
   }
 ]

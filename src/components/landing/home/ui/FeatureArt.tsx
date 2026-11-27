@@ -81,7 +81,7 @@ const Vpc = () => (
     <div className='mt-[12px] rounded-[6px] border border-dashed border-[#d6d6d6] bg-[rgba(236,236,236,0.2)] px-[14px] py-[12px]'>
       <div className='flex items-center gap-[8px] text-[10px] text-olake-ink'>
         <span className='inline-block h-[8px] w-[8px] rounded-full bg-[#1e3ae0]' />
-        Postgress
+        Postgres
       </div>
       <p className='ml-[3px] border-0 border-l border-solid border-[#d6d6d6] pl-[14px] font-mono text-[9px] text-olake-blue'>
         res

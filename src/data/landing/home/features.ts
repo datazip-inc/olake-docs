@@ -17,13 +17,13 @@ export const FEATURES: FeatureCard[] = [
     art: 'ingestion',
     kicker: 'Fast',
     title: 'Replicate databases at scale, instantly',
-    body: 'Sync MySQL, Postgres, MongoDB, Oracle, and more to Apache Iceberg with parallelised chunking, incremental sync, and change data capture, so your lakehouse tables stay fresh with minimal overhead.'
+    body: 'Sync Postgres, MySQL, MongoDB, SQL Server, Oracle, and more to Apache Iceberg with parallelised chunking, incremental sync, and change data capture (CDC on Postgres, MySQL, MongoDB and SQL Server), so your lakehouse tables stay fresh with minimal overhead.'
   },
   {
     art: 'lakehouse',
     kicker: 'Open',
     title: 'Built on open standards, no lock-in',
-    body: 'Write directly to Apache Iceberg or Parquet with support for multiple catalogs including AWS Glue, Apache Hive Metastore, and REST catalogs like Nessie, Polaris, and Unity Catalog — your data stays queryable by any engine you choose.'
+    body: 'Write directly to Apache Iceberg or Parquet with support for multiple catalogs including AWS Glue, Apache Polaris, Lakekeeper, Unity Catalog, Hive Metastore and other REST catalogs, so your data stays queryable by any engine you choose.'
   },
   {
     art: 'vpc',

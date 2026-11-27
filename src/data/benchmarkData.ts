@@ -62,19 +62,18 @@ export type BenchmarkMode = 'full_load' | 'cdc'
 export interface ConnectorConfig {
   id: ConnectorId
   name: string
-  icon?: string // Optional path to connector icon
 }
 
 // List of connectors in display order
 export const CONNECTORS: ConnectorConfig[] = [
-  { id: 'postgres', name: 'Postgres', icon: '/img/site/connectors/postgres.svg' },
-  { id: 'mysql', name: 'MySQL', icon: '/img/site/connectors/mysql.svg' },
-  { id: 'kafka', name: 'Kafka', icon: '/img/site/connectors/kafka.svg' },
-  { id: 'mongodb', name: 'MongoDB', icon: '/img/site/connectors/mongodb.svg' },
-  { id: 'oracle', name: 'Oracle', icon: '/img/site/connectors/oracle.svg' },
-  { id: 's3', name: 'S3', icon: '/img/site/connectors/s3.svg' },
-  { id: 'mssql', name: 'MSSQL', icon: '/img/site/connectors/mssql.svg' },
-  { id: 'db2', name: 'DB2', icon: '/img/site/connectors/db2.svg' }
+  { id: 'postgres', name: 'Postgres' },
+  { id: 'mysql', name: 'MySQL' },
+  { id: 'kafka', name: 'Kafka' },
+  { id: 'mongodb', name: 'MongoDB' },
+  { id: 'oracle', name: 'Oracle' },
+  { id: 's3', name: 'S3' },
+  { id: 'mssql', name: 'MSSQL' },
+  { id: 'db2', name: 'DB2' }
 ]
 
 // Benchmark metric structure for each connector
@@ -140,9 +139,9 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
   mongodb: {
     hasData: true,
     rowsSynced: {
-      olake: '230 Million',
+      olake: '233 Million',
       airbyte: '-',
-      fivetran: '230 Million',
+      fivetran: '233 Million',
       debezium: '-',
       estuary: '-'
     },
@@ -179,28 +178,28 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
   kafka: {
     hasData: true,
     rowsSynced: {
-      olake: '1.0 Billion',
+      olake: '1.01 Billion',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
       estuary: '-',
-      flink: '-'
+      flink: '1.01 Billion'
     },
     elapsedTime: {
-      olake: '1.8 hours',
+      olake: '1.34 hours',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
       estuary: '-',
-      flink: '3.25 hours'
+      flink: '1.08 hours'
     },
     speed: {
-      olake: '1,54,320 MPS',
+      olake: '2,09,065 MPS',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
       estuary: '-',
-      flink: '85,470 MPS'
+      flink: '2,56,410 MPS'
     },
     comparison: {
       olake: '-',
@@ -208,15 +207,15 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
       fivetran: '-',
       debezium: '-',
       estuary: '-',
-      flink: '1.8x slower'
+      flink: '1.23x faster'
     },
     cost: {
-      olake: '$ 14.08',
+      olake: '$ 10.77',
       airbyte: '-',
       fivetran: '-',
       debezium: '-',
       estuary: '-',
-      flink: '$ 26.13'
+      flink: '$ 8.67'
     }
   },
 
@@ -332,7 +331,7 @@ export const CONNECTOR_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> = {
       olake: '< $ 6',
       airbyte: '$ 5,560',
       fivetran: '$ 0 (free full load)',
-      debezium: '$ 75',
+      debezium: '-',
       estuary: '$ 1,668'
     }
   },
@@ -471,7 +470,7 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
       estuary: '-'
     },
     elapsedTime: {
-      olake: '38.97 mins',
+      olake: '38.96 mins',
       airbyte: '-',
       fivetran: '1.2 hours',
       debezium: '-',
@@ -614,9 +613,9 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
       estuary: '-'
     },
     cost: {
-      olake: '$ 1',
+      olake: '< $ 22',
       airbyte: '-',
-      fivetran: '$ 2, 375.80',
+      fivetran: '$ 2,375.80',
       debezium: '-',
       estuary: '-'
     }
@@ -653,10 +652,10 @@ export const CONNECTOR_CDC_BENCHMARKS: Record<ConnectorId, ConnectorBenchmark> =
       estuary: '18x slower'
     },
     cost: {
-      olake: '$ 1',
+      olake: '< $ 6',
       airbyte: '$ 148.95',
-      fivetran: '$ 2,257.80',
-      debezium: '$ 2.02',
+      fivetran: '$ 2,375.80',
+      debezium: '-',
       estuary: '$ 17.63'
     }
   },

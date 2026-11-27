@@ -49,7 +49,7 @@ const WebinarPage = () => {
 
         <div className='flex items-center justify-center rounded-[16px] border border-solid border-olake-line bg-olake-surface-alt p-[24px] lg:p-[40px]'>
           <CTAButton
-            title='Join Our Upcoming Event'
+            title='Past event: December 21, 2024'
             buttonText='Registrations Over'
             icon={PiCalendarBlank}
             href='https://lu.ma/z80xycc7'

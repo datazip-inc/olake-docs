@@ -26,24 +26,28 @@ export const ARCHITECTURE_GROUPS: ChipGroup[] = [
   },
   {
     // Everything under docs/writers/iceberg/catalog: the four catalog types,
-    // plus the REST implementations that page documents as its own tabs.
+    // plus the REST implementations that page documents as its own tabs and the
+    // AIStor Tables page (docs/integrations/catalogs/aistor.mdx). Listed in the
+    // site-wide catalog order (`rank` in src/data/integrations/catalogs.ts).
     title: 'Catalogs',
     chips: [
       'AWS Glue',
+      'Apache Polaris',
+      'Lakekeeper',
+      'Snowflake Horizon',
+      'Unity',
+      'BigLake',
+      'S3 Tables',
+      'MinIO AIStor Tables',
+      'Nessie',
       'Hive',
       'JDBC',
-      'REST',
-      'Lakekeeper',
-      'Nessie',
-      'S3 Tables',
-      'Unity',
-      'Apache Polaris',
-      'BigLake'
+      'REST'
     ]
   },
   {
     title: 'Destinations',
-    chips: ['Apache Iceberg', 'Parquet on S3']
+    chips: ['Apache Iceberg', 'Parquet (S3, GCS, Azure, local)']
   },
   {
     // The engines docs/understanding/compatibility-engines.mdx certifies
@@ -66,7 +70,7 @@ export const ARCHITECTURE_GROUPS: ChipGroup[] = [
       'BigQuery',
       'Snowflake',
       'Databricks',
-      'AWS Redshift',
+      'Amazon Redshift',
       'Azure Synapse'
     ]
   }

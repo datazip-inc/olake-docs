@@ -91,7 +91,7 @@ const WebinarPage = () => {
         </section>
 
         <WebinarOverview
-          date='June 17, 2023 (PDT) | June 18, 2023 (IST)'
+          date='June 17, 2025 (PDT) | June 18, 2025 (IST)'
           time='02:00PM - 05:00 PM PDT | 02:30 AM - 05:30AM IST'
           duration='3 hours'
           summary={webinarData.summary}

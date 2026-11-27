@@ -83,23 +83,25 @@ const useDynamicIframeHeight = (src) => {
   return { height, iframeRef }
 }
 
+interface ActiveEvent {
+  title: string
+  description: string
+  date: string
+  time: string
+  location: string
+  img: string
+  alt: string
+  registerUrl: string
+  registerLabel: string
+  /** ISO timestamp; the event drops off the list after it, client-side only. */
+  endsAt: string
+}
+
 // Events we register people for outside Livestorm. Each one shows under "Active Events" until
 // `endsAt` passes; when none is left, the Livestorm upcoming-events embed shows instead.
-const activeEvents = [
-  {
-    title: 'Hacktoberfest Hack Day Bengaluru x OLake',
-    description:
-      'A one-day, in-person hackathon at the OLake office in HSR Layout, focused on open-source AI. Pick one of two paths at check-in and build it solo: Ask OLake, a chat assistant for the OLake docs, or OLake MCP, an MCP server that lets an AI agent operate OLake. Open to working professionals and university students.',
-    date: 'Sunday, 18 October 2026',
-    time: '10:00 AM – 9:00 PM IST',
-    location: 'OLake office, HSR Layout, Bengaluru',
-    img: '/img/events/hacktoberfest-hack-day-bengaluru-2026.webp',
-    alt: 'Hacktoberfest 2026 Hack Day: Ask OLake, build an open-source AI assistant for OLake',
-    registerUrl: 'https://events.mlh.com/events/15468-hacktoberfest-hack-day-bengaluru-x-olake',
-    registerLabel: 'Register on MLH',
-    endsAt: '2026-10-18T21:00:00+05:30'
-  }
-]
+// The static HTML renders every entry here (the date filter runs after mount), so remove an
+// entry once its event is over.
+const activeEvents: ActiveEvent[] = []
 
 const WebinarsPage = () => {
   const { siteConfig } = useDocusaurusContext()
@@ -147,7 +149,7 @@ const WebinarsPage = () => {
     'url': 'https://olake.io/',
     'name': 'OLake: Open Source Data Replication to Apache Iceberg',
     'description':
-      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
+      'Open-source tool for replicating databases, Kafka and S3 to Apache Iceberg and Parquet, with change data capture (CDC) from Postgres, MySQL/MariaDB, MongoDB and SQL Server, streaming from Kafka, and full or incremental sync from Oracle, Db2 and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     'publisher': {
       '@type': 'Organization',
       'name': 'OLake'
@@ -240,7 +242,7 @@ const WebinarsPage = () => {
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
-      date: '8 January 2025'
+      date: '8 January 2026'
     },
     {
       title: 'Fireside Chat: Apache Iceberg in Production',
@@ -276,7 +278,7 @@ const WebinarsPage = () => {
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
-      date: '15 January 2025'
+      date: 'September 2025'
     },
     {
       title: 'Deep Dive on Catalogs: Apache Iceberg Catalog Landscape & Performance Analysis',
@@ -476,7 +478,7 @@ const WebinarsPage = () => {
           items={[
             { value: '25+', label: 'Technical Sessions' },
             { value: '500+', label: 'Community Members' },
-            { value: '12+', label: 'Months Running' }
+            { value: '2+', label: 'Years Running' }
           ]}
         />
       </Section>
