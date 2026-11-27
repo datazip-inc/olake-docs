@@ -1,7 +1,7 @@
 ---
-title: "Deploy OLake on Kubernetes | CronJob Setup & Management Guide"
+title: "Deploy OLake on Kubernetes with Helm"
 seo_title: "Deploy OLake UI on Kubernetes with Helm"
-description: Learn to deploy OLake sync tasks as Kubernetes CronJobs with ConfigMaps, PVC, and manual control for automated, recurring data pipelines.
+description: "Install OLake UI on Kubernetes with the Helm chart: S3 log storage, job profiles, external Postgres and Temporal, private registries and uninstall."
 sidebar_position: 2
 ---
 
@@ -35,7 +35,7 @@ Ensure the following requirements are met before proceeding:
 - **Kubernetes 1.19+**: Administrative access to a Kubernetes cluster
 - **Helm 3.2.0+**: Helm client installed and configured. [Installation Guide](https://helm.sh/docs/intro/install/)
 - **kubectl**: Configured `kubectl` command-line tool. [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL, Elasticsearch and (when using NFS mode) the shared storage volume. For S3 log file storage mode, a StorageClass with ReadWriteMany is not required.
+- **StorageClass**: A StorageClass is required by the chart to provision persistent volumes for PostgreSQL, the built-in MinIO (S3 mode) or the NFS shared volume (NFS mode), and Elasticsearch only if you enable it. For S3 log file storage mode, a StorageClass with ReadWriteMany is not required.
     ```bash
     # List available StorageClass
     kubectl get storageclass
@@ -82,7 +82,8 @@ helm repo update
 
 **Basic Installation:**
 ```bash
-helm install olake olake/olake --set global.storageClass="gp2"
+helm install olake olake/olake -n olake --create-namespace \
+  --set global.storageClass="gp2" --set global.logFileStorageMode=s3
 ```
 
 </TabItem>
@@ -91,12 +92,19 @@ helm install olake olake/olake --set global.storageClass="gp2"
 
 **Basic Installation:**
 ```bash
-helm install olake olake/olake
+helm install olake olake/olake -n olake --create-namespace \
+  --set global.logFileStorageMode=s3
 ```
 
 </TabItem>
 
 </Tabs>
+
+:::note
+- `global.logFileStorageMode=s3` stores job configs and logs in the built-in MinIO, which is meant for development. For production, use external S3; see [S3 Log File Storage Configuration](#s3-log-file-storage-configuration). The chart default is still the deprecated NFS mode.
+- Keep your settings in one values file (for example `global.logFileStorageMode: "s3"` in `values.yaml`) and pass it to every `helm upgrade`. An upgrade that passes `-f` or `--set` does not keep values set earlier with `--set`, unless you also pass `--reuse-values`.
+- Every command on this page uses the `olake` namespace. Change `-n olake` everywhere if you install elsewhere.
+:::
 
 :::note
 The install above does not include **Maintenance** ( Fusion ) module. To add it, run a Helm upgrade with `fusion.enabled=true`. See [Maintenance on Kubernetes](/docs/fusion/install/kubernetes-compaction/#upgrading-chart-version) for the command.
@@ -107,7 +115,7 @@ The install above does not include **Maintenance** ( Fusion ) module. To add it,
 Forward the UI service port to local machine:
 
 ```bash
-kubectl port-forward svc/olake-ui 8000:8000
+kubectl port-forward -n olake svc/olake-ui 8000:8000
 ```
 
 Open browser and navigate to: `http://localhost:8000`
@@ -129,13 +137,13 @@ If OLake Go is installed with **Ingress enabled**, port-forwarding is not necess
 
 ```bash
 helm repo update
-helm upgrade olake olake/olake
+helm upgrade olake olake/olake -n olake
 ```
 
 ### Upgrade with New Configuration
 
 ```bash
-helm upgrade olake olake/olake -f new-values.yaml
+helm upgrade olake olake/olake -n olake -f new-values.yaml
 ```
 
 </TabItem>
@@ -156,7 +164,7 @@ To keep the existing job task logs or recover the logs if upgraded to `v0.0.11` 
 
 ```bash
 helm repo update
-helm upgrade olake olake/olake --set elasticsearch.enabled=true
+helm upgrade olake olake/olake -n olake --set elasticsearch.enabled=true
 ```
 
 OR, set enabled to true in the `values.yaml` for elasticsearch like:
@@ -170,7 +178,7 @@ elasticsearch:
 After upgrading, perform a rollout restart of the olake-workers:
 
 ```bash
-kubectl rollout restart deployment/olake-workers
+kubectl rollout restart -n olake deployment/olake-workers
 ```
 
 </TabItem>
@@ -184,8 +192,7 @@ Pull the latest images and restart the deployments without downtime:
 
 ```bash
 # Restart OLake components
-kubectl rollout restart deployment/olake-ui
-kubectl rollout restart deployment/olake-workers
+kubectl rollout restart -n olake deployment/olake-ui deployment/olake-workers
 ```
 
 ### Initial User Setup
@@ -193,7 +200,7 @@ kubectl rollout restart deployment/olake-workers
 Create a Kubernetes secret to replace default credentials:
 
 ```bash
-kubectl create secret generic olake-admin-credentials \
+kubectl create secret generic olake-admin-credentials -n olake \
   --from-literal=username='superadmin' \
   --from-literal=password='a-very-secure-password' \
   --from-literal=email='admin@mycompany.com'
@@ -214,7 +221,7 @@ olakeUI:
 Apply the configuration:
 
 ```bash
-helm upgrade olake olake/olake -f values.yaml
+helm upgrade olake olake/olake -n olake -f values.yaml
 ```
 
 ### Ingress Configuration
@@ -273,9 +280,31 @@ global:
         olake.io/workload-type: "general"
 ```
 :::note
-- If `"0"` (Default) is configured, it is used for all unmapped jobs and other activities (Fetch, Test, Discover).
+- If `"0"` (Default) is configured, it is used for all unmapped jobs and other activities (test, discover, spec).
 - If `"0"` is NOT configured, unmapped jobs are scheduled by the standard Kubernetes scheduler on any available node.
 :::
+
+#### Sync Pod Resources
+
+Each profile can also set CPU and memory for the pods it applies to:
+
+```yaml
+global:
+  jobProfiles:
+    0:
+      resources:
+        requests: { cpu: "500m", memory: "1Gi" }
+        limits: { memory: "2Gi" }
+    123:
+      resources:
+        requests: { cpu: "2", memory: "8Gi" }
+        limits: { memory: "8Gi" }
+```
+
+- Sync and clear-destination pods use the job's profile, then profile `0`, then the built-in default (requests of 256Mi memory and 100m CPU, no limits).
+- Test, discover and spec pods always use profile `0`, then the built-in default.
+- A profile's `resources` replaces the fallback as a whole. Fields are not merged.
+- Requires Helm chart 0.0.31 or later and OLake worker 0.4.1 or later.
 
 :::warning
 **Deprecation Notice:** The legacy `global.jobMapping` configuration (which only supported `nodeSelector`) is deprecated and will be removed in a future release. Users are strongly advised to migrate to `global.jobProfiles`, which provides feature-rich scheduling capabilities including tolerations and affinity rules. If a jobID is defined in both `global.jobProfiles` and `global.jobMapping`, the `jobProfiles` configuration takes precedence.
@@ -297,7 +326,7 @@ jobIndexes:
     accessModes: [ReadWriteOnce]     # Access mode for the Index PVC which is supported by the specified storage class
     mountPath: /var/lib/olake/index  # Where the connector opens the index.
     cacheSizeMB: 512                 # Pebble block cache size per stream.
-    maxOpenFiles: 1000               # Meximum number of SSTable file descriptors that pebble db keeps open per stream.
+    maxOpenFiles: 1000               # Maximum number of SSTable file descriptors that pebble db keeps open per stream.
     labels: {}                       # Custom labels for the Index PVC.
     annotations: {}                  # Custom annotations for the Index PVC.
   jobs:
@@ -313,7 +342,7 @@ jobIndexes:
 | `accessModes` | `[ReadWriteOnce]` |  Access mode for the Index PVC which is supported by the specified storage class |
 | `mountPath` | `/var/lib/olake/index` | Where the connector opens the index. |
 | `cacheSizeMB` | `512` | Pebble block cache size per stream. |
-| `maxOpenFiles` | `1000` | Meximum number of SSTable file descriptors that pebble db keeps open per stream. |
+| `maxOpenFiles` | `1000` | Maximum number of SSTable file descriptors that pebble db keeps open per stream. |
 | `labels` | `{}` | Custom labels for the Index PVC. |
 | `annotations` | `{}` | Custom annotations for the Index PVC. |
 | `existingClaim` | `""` | Mount a PVC you created instead of provisioning one. |
@@ -330,7 +359,7 @@ An alternate to this is to set node affinity using job profiles so the job pod d
 
 :::warning
 Per-job index storage (for positional delete or deletion vector writes) requires the versions below. Upgrade every component, missing an update on single component can cause job failures:
-- OLake Version **0.11.0 and above**.
+- OLake Go **0.11.0 and above**.
 - OLake UI **0.6.0 and above**.
 - Helm chart **0.0.28 and above**.
 - OLake worker **0.3.11 and above**.
@@ -382,19 +411,19 @@ The `azure.workload.identity/client-id` annotation is optional if you enter the 
 
 ### Encryption Configuration
 
-Configure encryption of job metadata stored in Postgres database by setting the OLAKE_SECRET_KEY environment variable in the OLake Worker:
+Configure encryption of job metadata stored in Postgres database by setting the `OLAKE_SECRET_KEY` environment variable for OLake UI and the OLake Worker (`global.env`). Set the key once and pick one of the three forms:
 
 ```yaml
 global:
   env:
-    # 1. For AWS KMS (starts with 'arn:aws:kms:'):
+    # AWS KMS (starts with 'arn:aws:kms:'):
     OLAKE_SECRET_KEY: "arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012"
-    
-    # 2. For local AES-256 (any other non-empty string):
-    OLAKE_SECRET_KEY: "your-secret-encryption-key"  # Auto-hashed to 256-bit key
-    
-    # 3. For no encryption (default, not recommended for production):
-    OLAKE_SECRET_KEY: ""  # Empty = no encryption
+
+    # Local AES-256 (any other non-empty string, auto-hashed to a 256-bit key):
+    # OLAKE_SECRET_KEY: "your-secret-encryption-key"
+
+    # No encryption (default, not recommended for production):
+    # OLAKE_SECRET_KEY: ""
 ```
 
 ### S3 Log File Storage Configuration
@@ -479,7 +508,7 @@ s3LogFileStorage:
 **Configuration Notes:**
 - Create the s3 credentials secret (required when using `existingSecret` above for external S3):
   ```bash
-  kubectl create secret generic my-s3-credentials \
+  kubectl create secret generic my-s3-credentials -n olake \
     --from-literal=OLAKE_S3_ACCESS_KEY_ID=<access-key-id> \
     --from-literal=OLAKE_S3_SECRET_ACCESS_KEY=<secret-access-key>
   ```
@@ -554,12 +583,12 @@ Alternatively, you can delete objects with **S3 bucket lifecycle rules** (for ex
 
 </details>
 
-:::warning NFS Deprecation and Version Requirements
+:::warning[NFS Deprecation and Version Requirements]
 - NFS storage is currently the default storage mode (`logFileStorageMode: "nfs"`), but it is **marked as deprecated** and will be removed at the end of 2026 and **S3 will become the default storage mode**. **For new deployments**, S3 storage is recommended.
 - Switching an existing install from NFS to S3 does not migrate data. Logs from earlier runs stay on the NFS volume and do not show in the UI.
 - Fusion is supported with S3 log file storage. See [Fusion S3 Log File Storage Configuration](/docs/fusion/install/kubernetes-compaction/#s3-log-file-storage-configuration) for the version requirements.
 - For using S3 storage, the following versions are required:
-  - OLake Version **0.12.0 and above**.
+  - OLake Go **0.12.0 and above**.
   - OLake UI **0.7.0 and above**.
   - Helm chart **0.0.30 and above**.
   - OLake worker **0.4.0 and above**.
@@ -588,7 +617,7 @@ For development and quick starts, a simple NFS server is included and enabled by
 **Bottlerocket OS on AWS EKS:** The built-in NFS server is incompatible with Bottlerocket OS worker nodes. For such AWS EKS configurations, AWS EFS must be used as an alternative, which requires setting `nfsServer.enabled: false` and configuring the EFS CSI driver as shown above.
 :::
 
-:::warning NFS Deprecation
+:::warning[NFS Deprecation]
 NFS storage (`logFileStorageMode: "nfs"`) is **deprecated** and will be removed at the end of 2026. After removal, S3 will become the default storage mode.
 :::
 
@@ -610,11 +639,12 @@ Reference a pre-existing Kubernetes Secret containing the database credentials. 
 
 **1. Create the database secret:**
 ```bash
-kubectl create secret generic external-postgres-secret \
+kubectl create secret generic external-postgres-secret -n olake \
   --from-literal=host="postgres-host" \
   --from-literal=port="5432" \
   --from-literal=olake_database="olakeDB" \
   --from-literal=temporal_database="temporalDB" \
+  --from-literal=fusion_database="fusionDB" \
   --from-literal=username="username" \
   --from-literal=password="password" \
   --from-literal=ssl_mode="require"
@@ -643,8 +673,11 @@ postgresql:
       password: "password"
       olake_database: "olakeDB"
       temporal_database: "temporalDB"
+      fusion_database: "fusionDB"   # only when fusion.enabled: true
       ssl_mode: "require"
 ```
+
+`fusion_database` is needed only when OLake Fusion is enabled (`fusion.enabled: true`). See the [OLake Fusion Kubernetes installation guide](/docs/fusion/install/kubernetes-compaction/) for its setup.
 
 ### External Temporal Configuration
 
@@ -656,7 +689,7 @@ Reference a pre-existing Kubernetes Secret containing the Temporal credentials. 
 
 **1. Create the secret:**
 ```bash
-kubectl create secret generic external-temporal-secret \
+kubectl create secret generic external-temporal-secret -n olake \
   --from-literal=TEMPORAL_ADDRESS=<region>.<cloud>.api.temporal.io:7233 \
   --from-literal=TEMPORAL_API_KEY=<temporal-api-key> \
   --from-literal=TEMPORAL_ENABLE_TLS=true \
@@ -726,25 +759,30 @@ global:
     CONTAINER_REGISTRY_BASE: "registry.example.com/myproject"
 ```
 
-The following images must be mirrored to the registry before deploying:
+The following images must be mirrored to the registry before deploying. The list is what Helm chart 0.0.37 renders, plus the connector images that the OLake Worker starts:
 
-| Image | Source |
+| Image | Needed when |
 |---|---|
-| `library/busybox:latest` | Docker Hub |
-| `curlimages/curl:8.1.2` | Docker Hub |
-| `olakego/ui:latest`, `olakego/ui-worker:latest` | Docker Hub |
-| `olakego/source-*` (e.g. `olakego/source-mongodb:v0.7.0`) | Docker Hub |
-| `temporalio/auto-setup:1.22.3`, `temporalio/ui:2.16.2` | Docker Hub |
-| `library/postgres:14-alpine` | Docker Hub |
-| `olakego/fusion:latest`, `olakego/fusion-spark:latest` | Docker Hub |
-| `sig-storage/nfs-provisioner:v4.0.8` | `registry.k8s.io` (built-in NFS only) |
+| `library/busybox:latest` | Always |
+| `curlimages/curl:latest`, `curlimages/curl:8.1.2` | Always (signup and post-install Jobs) |
+| `olakego/ui:latest`, `olakego/ui-worker:latest` | Always |
+| `olakego/source-*` (e.g. `olakego/source-postgres:v1.2.2`) | Each connector and version you use |
+| `temporalio/server:1.32.0`, `temporalio/admin-tools:1.32.0` | Built-in Temporal (`temporal.enabled: true`, the default) |
+| `library/postgres:14-alpine` | Built-in PostgreSQL (`postgresql.enabled: true`, the default) |
+| `olakego/minio:RELEASE.2025-04-03T14-56-28Z` | `global.logFileStorageMode: s3` with the built-in MinIO (`s3LogFileStorage.minio.enabled: true`, the default) |
+| `sig-storage/nfs-provisioner:v4.0.8` | NFS mode with the built-in NFS server. Pulled from `registry.k8s.io` unless `CONTAINER_REGISTRY_BASE` is set |
+| `olakego/fusion:latest`, `olakego/fusion-spark:latest` | `fusion.enabled: true` |
+| `temporalio/ui:2.16.2` | `temporal.ui.enabled: true` |
+| `elasticsearch:7.17.10` | `elasticsearch.enabled: true` (legacy) |
+
+All images except `sig-storage/nfs-provisioner` come from Docker Hub.
 
 #### Step 2 — Authenticate with the registry
 
 If the registry requires credentials, a Kubernetes docker-registry secret must be created:
 
 ```bash
-kubectl create secret docker-registry my-registry-secret \
+kubectl create secret docker-registry my-registry-secret -n olake \
   --docker-server=registry.example.com \
   --docker-username=<username> \
   --docker-password=<password>
@@ -770,7 +808,7 @@ global:
 OLake Go supports configuring `securityContext` for all its components to comply with restricted Kubernetes environments.
 
 #### General Component Configuration
-The `securityContext` can be set for `olakeUI`, `olakeWorker`, `elasticsearch`, `postgresql` and `temporal` in `values.yaml`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
+The `securityContext` can be set in `values.yaml` under `olakeUI.securityContext`, `olakeWorker.securityContext`, `postgresql.securityContext`, `temporal.server.securityContext`, `elasticsearch.securityContext`, `s3LogFileStorage.minio.securityContext` and `fusion.securityContext`. All the pods created by `olakeWorker`, for example sync pods inherit the same securityContext. 
 For eg,
 
 ```yaml
@@ -863,6 +901,29 @@ If test connection fails with file not found, check the worker logs.
 - If `extraJobVolumes` or `extraJobVolumeMounts` is invalid, OLake worker logs a warning and applies no extra mounts until the values are fixed. Check the OLake worker logs for details.
 - A mount that uses `subPath` does not pick up later ConfigMap/Secret updates. Restart the pod, or run a new job, to get the new content.
 
+### Extra Volumes for OLake UI and OLake Worker
+
+:::info
+Requires Helm chart 0.0.36 or later.
+:::
+
+Use `olakeUI.extraVolumes` and `olakeUI.extraVolumeMounts` to mount ConfigMaps or Secrets into the OLake UI pod. A common case is a custom CA for a TLS-inspecting proxy. Mount the single file into `/etc/ssl/certs` with `subPath`, because mounting over the directory hides the default CAs:
+
+```yaml
+olakeUI:
+  extraVolumes:
+    - name: custom-ca
+      configMap:
+        name: custom-ca   # ConfigMap with the key ca.crt
+  extraVolumeMounts:
+    - name: custom-ca
+      mountPath: /etc/ssl/certs/custom-ca.crt
+      subPath: ca.crt
+      readOnly: true
+```
+
+`olakeWorker.extraVolumes` and `olakeWorker.extraVolumeMounts` work the same way for the OLake Worker pod. They do not reach connector job pods; use [Extra Job Volumes](#extra-job-volumes-for-connector-pods) for those. Referenced ConfigMaps and Secrets must exist in the release namespace, or the pod stays in `ContainerCreating`.
+
 ### Prometheus Metrics Configuration
 
 To expose OLake Go's Prometheus compatible `/metrics` endpoint, enable it in your `values.yaml` under `olakeUI.env`:
@@ -891,11 +952,14 @@ For OLake Fusion related configuration options that are not covered in this page
 ### Check Pod Logs
 
 ```bash
-# OLake UI logs  
-kubectl logs -l app.kubernetes.io/name=olake-ui -f
+# OLake UI logs
+kubectl logs -n olake -l app.kubernetes.io/name=olake-ui -f
+
+# OLake Worker logs
+kubectl logs -n olake -l app.kubernetes.io/name=olake-workers -f
 
 # Temporal server logs
-kubectl logs -l app.kubernetes.io/name=temporal-server -f
+kubectl logs -n olake -l app.kubernetes.io/name=temporal -f
 ```
 
 ### Common Issues
@@ -911,7 +975,7 @@ kubectl logs -l app.kubernetes.io/name=temporal-server -f
 - If pod events show error like `failed to mount volume`, check if the nfs-server pod is up and running
 
 **Database Connection Issues:**
-- Verify PostgreSQL pod is running: `kubectl get pods -l app.kubernetes.io/name=postgresql`
+- Verify PostgreSQL pod is running: `kubectl get pods -n olake -l app.kubernetes.io/name=postgresql`
 - In case, setup is done with External PostgreSQL Configuration, check the following:
   - Check if the host is pointing to Writer instance and not a Reader of the database
   - Check if password contains special characters like `@` or `#` etc. If yes, use a different password
@@ -928,7 +992,7 @@ When upgrading from a previous version, the `olake-signup-init` Job must be dele
 
 ```bash
 kubectl delete job olake-signup-init -n olake
-helm upgrade olake olake/olake
+helm upgrade olake olake/olake -n olake
 ```
 </details>
 
@@ -970,7 +1034,7 @@ kubectl annotate secret olake-workers-secret meta.helm.sh/release-name=olake met
 kubectl label secret olake-workers-secret app.kubernetes.io/managed-by=Helm -n olake --overwrite
 
 # 5. Perform the upgrade
-helm upgrade olake olake/olake
+helm upgrade olake olake/olake -n olake
 ```
 </details>
 
@@ -979,12 +1043,16 @@ helm upgrade olake olake/olake
 ### Remove OLake Go Installation
 
 ```bash
-helm uninstall olake
+helm uninstall olake -n olake
 ```
 :::warning
 Some resources are intentionally preserved after helm uninstall to prevent accidental data loss:
 
-- PersistentVolumeClaims (PVCs): olake-shared-storage and database PVCs are retained to preserve job data, configurations, and historical information
+- PersistentVolumeClaims (PVCs): these are retained to preserve job data, configurations, and historical information
+    - `olake-shared-storage` (NFS mode)
+    - The PostgreSQL PVC (`postgresql-storage-postgresql-0`)
+    - The MinIO PVC (`minio-data-olake-minio-0`, S3 mode with the built-in MinIO)
+    - The per-job index PVCs (`olake-index-<JobID>`)
 - NFS Server Resources: If installed using the built-in NFS server, the following resources persist:
     - Service/olake-nfs-server
     - StatefulSet/olake-nfs-server
@@ -993,3 +1061,16 @@ Some resources are intentionally preserved after helm uninstall to prevent accid
     - StorageClass/nfs-server
     - ServiceAccount/olake-nfs-server
 :::
+
+### Complete Removal with the Uninstall Script
+
+The chart ships `uninstall.sh`, which also deletes the resources that `helm uninstall` keeps. It deletes every pod, PVC, ConfigMap, Secret, Service, Deployment, StatefulSet and Job in the namespace, then the namespace itself. Run it only on a namespace that holds nothing but OLake.
+
+```bash
+helm pull olake/olake --untar && cd olake
+bash uninstall.sh -n olake              # removes everything, including PVCs and the namespace
+bash uninstall.sh -n olake --keep-pvcs  # keeps the data volumes
+bash uninstall.sh --help                # also -r/--release, --force, --keep-namespace
+```
+
+`-n` and `-r` both default to `olake`.

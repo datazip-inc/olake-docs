@@ -1,3 +1,7 @@
+# Written for Airflow 3 with the apache-airflow-providers-amazon, apache-airflow-providers-ssh
+# and apache-airflow-providers-standard packages. On Airflow 2, import DAG from `airflow`,
+# PythonOperator from `airflow.operators.python`, TriggerRule from `airflow.utils.trigger_rule`
+# and AirflowSkipException from `airflow.exceptions` instead.
 from __future__ import annotations
 
 import pendulum
@@ -6,16 +10,15 @@ from datetime import timedelta
 import logging
 import time
 
-from airflow.models.dag import DAG
+from airflow.sdk import DAG, TriggerRule
+from airflow.sdk.exceptions import AirflowSkipException
 from airflow.providers.amazon.aws.operators.ec2 import (
     EC2CreateInstanceOperator,
     EC2TerminateInstanceOperator,
 )
 from airflow.providers.amazon.aws.hooks.ec2 import EC2Hook
 from airflow.providers.ssh.hooks.ssh import SSHHook
-from airflow.operators.python import PythonOperator
-from airflow.utils.trigger_rule import TriggerRule
-from airflow.exceptions import AirflowSkipException
+from airflow.providers.standard.operators.python import PythonOperator
 
 # --- Global Configuration ---
 AWS_CONN_ID = "AWS_CONNECTION_ID"   # Connection ID for AWS
@@ -199,20 +202,30 @@ echo "Creating directories if they don't exist..."
 sudo mkdir -p $EC2_CONFIG_DIR
 
 echo "Fetching configuration files from object storage..."
-sudo aws s3 sync --region {AWS_REGION_NAME} s3://{S3_BUCKET}/{S3_PREFIX} $EC2_CONFIG_DIR --delete
-if [ $? -ne 0 ]; then echo "ERROR: Failed to download configuration files."; exit 1; fi
-
-echo "Fetching state file from object storage..."
-sudo aws s3 cp --region {AWS_REGION_NAME} s3://{S3_BUCKET}/{S3_STATE_KEY_PATH} $EC2_STATE_FILE || {{
-  echo "INFO: State file not found. Creating empty state file."
-  sudo bash -c "echo '{{}}' > $EC2_STATE_FILE"
+sudo aws s3 sync --region {AWS_REGION_NAME} s3://{S3_BUCKET}/{S3_PREFIX} $EC2_CONFIG_DIR --delete || {{
+  echo "ERROR: Failed to download configuration files."; exit 1;
 }}
 
+# Pass --state only when a saved state exists. A first run without --state starts with the
+# current state version, and OLake Go writes state.json next to source.json when it finishes.
+# An empty {{}} state file would pin a new pipeline to the legacy state version 0.
+STATE_FLAG=""
+echo "Fetching state file from object storage..."
+if sudo aws s3 cp --region {AWS_REGION_NAME} s3://{S3_BUCKET}/{S3_STATE_KEY_PATH} $EC2_STATE_FILE && [ -s $EC2_STATE_FILE ]; then
+  STATE_FLAG="--state /mnt/config/state.json"
+else
+  echo "INFO: No saved state found. This run starts a new sync without --state."
+  sudo rm -f $EC2_STATE_FILE
+fi
+
 echo "Pulling container image: {OLAKE_IMAGE}..."
-sudo ctr image pull docker.io/{OLAKE_IMAGE}
-if [ $? -ne 0 ]; then echo "ERROR: Failed to pull container image."; exit 101; fi
+sudo ctr image pull docker.io/{OLAKE_IMAGE} || {{
+  echo "ERROR: Failed to pull container image."; exit 101;
+}}
 
 echo "Running data sync process..."
+# Turn off exit-on-error for the sync, so the state upload below still runs when it fails
+set +e
 sudo ctr run --rm \
     --mount type=bind,src=$EC2_CONFIG_DIR,dst=/mnt/config,options=rbind:rw \
     --net-host \
@@ -224,19 +237,23 @@ sudo ctr run --rm \
     --available-streams /mnt/config/available_streams.json \
     --selected-streams /mnt/config/selected_streams.json \
     --destination /mnt/config/destination.json \
-    --state /mnt/config/state.json
+    $STATE_FLAG
 OLAKE_EXIT_CODE=$?
+set -e
 echo "INFO: ETL process finished with exit code: $OLAKE_EXIT_CODE"
 
-# Always upload state file, regardless of exit code
-echo "Uploading state file to storage..."
-sudo aws s3 cp --region {AWS_REGION_NAME} $EC2_STATE_FILE s3://{S3_BUCKET}/{S3_STATE_KEY_PATH}
-UPLOAD_STATE_EXIT_CODE=$?
-if [ $UPLOAD_STATE_EXIT_CODE -ne 0 ]; then
+# Upload the state file whenever the sync wrote one, regardless of exit code
+if [ -f $EC2_STATE_FILE ]; then
+  echo "Uploading state file to storage..."
+  sudo aws s3 cp --region {AWS_REGION_NAME} $EC2_STATE_FILE s3://{S3_BUCKET}/{S3_STATE_KEY_PATH} || {{
+    UPLOAD_STATE_EXIT_CODE=$?
     echo "ERROR: Failed to upload state file. Exit code: $UPLOAD_STATE_EXIT_CODE"
     exit $UPLOAD_STATE_EXIT_CODE
+  }}
+  echo "INFO: State file uploaded successfully."
+else
+  echo "WARNING: The sync wrote no state file, so there is nothing to upload."
 fi
-echo "INFO: State file uploaded successfully."
 
 # Now check the Olake exit code
 if [ $OLAKE_EXIT_CODE -ne 0 ]; then
@@ -253,7 +270,7 @@ exit 0
 
 # --- DAG Definition ---
 with DAG(
-    dag_id="olake_sync_from_source",
+    dag_id="olake_sync_from_source_ec2",
     start_date=pendulum.datetime(2023, 10, 26, tz="UTC"),
     schedule=None,
     catchup=False,

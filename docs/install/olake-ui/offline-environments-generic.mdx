@@ -22,7 +22,7 @@ The following requirements must be satisfied prior to initiating the update proc
 - **Local Machine (or Laptop)**: A local machine (or Laptop) with active internet access and a functional Docker installation is required.
 - **SSH Access**: SSH connectivity from the local machine to the Offline Node (On-prem/Cloud) must be established.
 - **Offline Node Setup**: Docker and Docker Compose must be installed and operational on the Offline Node.
-- **Architecture Compatibility**: The CPU architecture (ARM or x86) of the local machine must match that of the Offline Node.
+- **Architecture Compatibility**: The CPU architecture (ARM or x86) of the local machine must match that of the Offline Node. The `olakego/source-db2` image is published for linux/amd64 only.
 - **Operational Stack**: An OLake Go Docker Compose stack is assumed to be currently running on the Offline Node (On-prem/Cloud).
 
 ## 1. Image Acquisition (Local Machine)
@@ -31,23 +31,43 @@ The required Docker images are retrieved on the internet-connected local machine
 
 ### Pulling Images
 
-The latest versions of the OLake Go core components and the specific versions of the required connectors are pulled from the public registry.
+The latest versions of the OLake Go core components, the other images used by the compose file, and the specific versions of the required connectors are pulled from the public registry. Download the compose file too, because the Offline Node cannot reach GitHub.
 
 ```bash
+# Compose file
+curl -sSLo docker-compose-v1.yml https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml
+
 # Pull Core Components
-docker pull registry-1.docker.io/olakego/ui:latest
-docker pull registry-1.docker.io/olakego/ui-worker:latest
+docker pull olakego/ui:latest
+docker pull olakego/ui-worker:latest
+
+# Pull the other images used by docker-compose-v1.yml
+docker pull temporalio/server:1.32.0
+docker pull temporalio/admin-tools:1.32.0
+docker pull curlimages/curl:8.21.0
+docker pull postgres:13
+# Optional: Temporal UI for `--profile debug`
+# docker pull temporalio/ui:2.54.1
 
 # Pull Connector Images
 docker pull olakego/source-mysql:<version>
 docker pull olakego/source-postgres:<version>
 docker pull olakego/source-mongodb:<version>
 docker pull olakego/source-oracle:<version>
+docker pull olakego/source-mssql:<version>
+docker pull olakego/source-db2:<version>
 docker pull olakego/source-kafka:<version>
+docker pull olakego/source-s3:<version>
 ```
 
 :::warning
-Replace `<version>` in the commands above with the specific tag number required for the update (e.g., `v0.3.4`).
+Replace `<version>` in the commands above with the specific tag number required for the update (e.g., `v1.2.2`).
+:::
+
+:::note
+Pull the images by these short names (`olakego/ui:latest`, not `registry-1.docker.io/olakego/ui:latest`). The compose file asks for `docker.io/olakego/ui:latest`, which is the same image as `olakego/ui:latest`, while Docker treats a `registry-1.docker.io/...` name as a different repository.
+
+In September 2026 the compose file replaced `temporalio/auto-setup:1.22.3` with `temporalio/server:1.32.0` and `temporalio/admin-tools:1.32.0`. A node set up before that has none of these images, so transfer them even if only the core components changed.
 :::
 
 ![Docker image pull](/img/docs/install/offline-env-generic/01_docker-image-pull.png)
@@ -58,15 +78,21 @@ Once the images are present locally, they are to be exported into separate tarba
 
 ```bash
 # Core Components
-docker save -o olake-ui.tar registry-1.docker.io/olakego/ui:latest
-docker save -o olake-ui-worker.tar registry-1.docker.io/olakego/ui-worker:latest
+docker save -o olake-ui.tar olakego/ui:latest
+docker save -o olake-ui-worker.tar olakego/ui-worker:latest
+
+# Other images used by docker-compose-v1.yml
+docker save -o olake-stack-images.tar temporalio/server:1.32.0 temporalio/admin-tools:1.32.0 curlimages/curl:8.21.0 postgres:13
 
 # Connector Images
 docker save -o source-mysql_<version>.tar olakego/source-mysql:<version>
 docker save -o source-postgres_<version>.tar olakego/source-postgres:<version>
 docker save -o source-mongodb_<version>.tar olakego/source-mongodb:<version>
 docker save -o source-oracle_<version>.tar olakego/source-oracle:<version>
+docker save -o source-mssql_<version>.tar olakego/source-mssql:<version>
+docker save -o source-db2_<version>.tar olakego/source-db2:<version>
 docker save -o source-kafka_<version>.tar olakego/source-kafka:<version>
+docker save -o source-s3_<version>.tar olakego/source-s3:<version>
 ```
 
 <Figure src='/img/docs/install/offline-env-generic/02_docker-image-save.png' alt='Docker image save' width='715px' />
@@ -76,17 +102,24 @@ docker save -o source-kafka_<version>.tar olakego/source-kafka:<version>
 The generated archive files are transferred to the Offline Node using the Secure Copy Protocol (SCP).
 
 ```bash
-# Transfer Core Components
+# Transfer the compose file
+scp -i <key-pair>.pem docker-compose-v1.yml user@offline-node-ip:/home/user/olake/
+
+# Transfer Core Components and the other stack images
 # Syntax: scp <filename>.tar <remote_user>@<remote_ip>:<destination_path>
 scp -i <key-pair>.pem olake-ui.tar user@offline-node-ip:/home/user/olake/
 scp -i <key-pair>.pem olake-ui-worker.tar user@offline-node-ip:/home/user/olake/
+scp -i <key-pair>.pem olake-stack-images.tar user@offline-node-ip:/home/user/olake/
 
 # Transfer Connector Images
 scp -i <key-pair>.pem source-mysql_<version>.tar user@offline-node-ip:/home/user/olake/
 scp -i <key-pair>.pem source-postgres_<version>.tar user@offline-node-ip:/home/user/olake/
 scp -i <key-pair>.pem source-mongodb_<version>.tar user@offline-node-ip:/home/user/olake/
 scp -i <key-pair>.pem  source-oracle_<version>.tar user@offline-node-ip:/home/user/olake/
+scp -i <key-pair>.pem source-mssql_<version>.tar user@offline-node-ip:/home/user/olake/
+scp -i <key-pair>.pem source-db2_<version>.tar user@offline-node-ip:/home/user/olake/
 scp -i <key-pair>.pem source-kafka_<version>.tar user@offline-node-ip:/home/user/olake/
+scp -i <key-pair>.pem source-s3_<version>.tar user@offline-node-ip:/home/user/olake/
 
 # To transfer all generated tarballs at once
 # Syntax: scp *.tar <remote_user>@<remote_ip>:<destination_path>
@@ -104,16 +137,20 @@ The following operations are performed on the Offline Node to ingest the new ima
 The Docker images are imported from the transferred archives into the Offline Node's local Docker registry.
 
 ```bash
-# Load Core Components
+# Load Core Components and the other stack images
 docker load -i olake-ui.tar
 docker load -i olake-ui-worker.tar
+docker load -i olake-stack-images.tar
 
 # Load Connector Images
 docker load -i source-mysql_<version>.tar
 docker load -i source-postgres_<version>.tar
 docker load -i source-mongodb_<version>.tar
 docker load -i source-oracle_<version>.tar
+docker load -i source-mssql_<version>.tar
+docker load -i source-db2_<version>.tar
 docker load -i source-kafka_<version>.tar
+docker load -i source-s3_<version>.tar
 ```
 
 <Figure src='/img/docs/install/offline-env-generic/05_docker-image-load.png' alt='Docker image load' width='569px' />
@@ -122,25 +159,29 @@ docker load -i source-kafka_<version>.tar
 
 ### Applying Service Updates
 
-If the core components (`olake-ui` and `olake-worker`) were included in the update, the Docker Compose stack must be refreshed to utilize the new `latest` images.
+If the core components (`olake-ui` and `temporal-worker`) were included in the update, the Docker Compose stack must be refreshed to utilize the new `latest` images. Run the commands from the folder that holds the transferred compose file. If you edited your previous compose file, apply the same edits to the new one first.
+
+The `olake-ui` and `temporal-worker` services set `pull_policy: always`, so a plain `up` tries to reach the registry and fails on an offline node. `--pull never` makes Docker Compose use the loaded images.
 
 <Tabs>
   <TabItem value="new" label="New (after 30th Jan, 2026)" default>
     ```bash
-    curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - down && \
-    curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - up -d
+    docker compose -f docker-compose-v1.yml down
+    docker compose -f docker-compose-v1.yml up -d --pull never
     ```
   </TabItem>
   <TabItem value="legacy" label="Legacy (with ES)">
+    Copy the legacy `docker-compose.yml` from `https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml` to the node instead, then run:
+
     ```bash
-    curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - down && \
-    curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose.yml | docker compose -f - up -d
+    docker compose -f docker-compose.yml down
+    docker compose -f docker-compose.yml up -d --pull never
     ```
   </TabItem>
 </Tabs>
 
 :::note
-If only connector images (`source-mysql`, `source-postgres`, etc.) were updated, the step above (starting and stopping the containers) is not required. The `olake-worker` service automatically scans the local registry and will display the newly loaded connector versions in the Source Create/Edit page immediately.
+If only connector images (`source-mysql`, `source-postgres`, etc.) were updated, the step above (starting and stopping the containers) is not required. The `temporal-worker` service automatically scans the local registry and will display the newly loaded connector versions in the Source Create/Edit page immediately.
 :::
 
 ## Troubleshooting

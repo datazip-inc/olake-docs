@@ -1,11 +1,14 @@
+# Written for Airflow 3 with the apache-airflow-providers-cncf-kubernetes and
+# apache-airflow-providers-standard packages. On Airflow 2, import DAG from `airflow`
+# and PythonOperator from `airflow.operators.python` instead.
 from __future__ import annotations
 
 import pendulum
 
-from airflow.models.dag import DAG
+from airflow.sdk import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from kubernetes.client import models as k8s
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
 from kubernetes import client
 
@@ -20,8 +23,8 @@ TARGET_NAMESPACE = "olake" # <-- EDIT THIS LINE
 
 # !!! IMPORTANT: Set this to the correct Olake image for your source database !!!
 # Find images at: https://hub.docker.com/u/olakego
-# Examples: "olakego/source-mongodb:latest", "olakego/source-mysql:latest", "olakego/source-postgres:latest"
-OLAKE_IMAGE = "olakego/source-db:latest" # <-- EDIT THIS LINE
+# Examples: "olakego/source-mongodb:v1.2.2", "olakego/source-mysql:v1.2.2", "olakego/source-postgres:v1.2.2"
+OLAKE_IMAGE = "olakego/source-postgres:v1.2.2" # <-- EDIT THIS LINE (image and version for your source)
 
 # !!! IMPORTANT: Set this to the name of a StorageClass in your K8s cluster !!!
 # This StorageClass MUST support ReadWriteMany (RWX) access mode.
@@ -43,8 +46,7 @@ DESTINATION_CONFIG_MAP_NAME = "olake-destination-config"
 STREAMS_CONFIG_MAP_NAME = "olake-streams-config"
 
 # --- DAG Definition ---
-# Set the start date to the current time in the Asia/Kolkata timezone
-dag_start_date = pendulum.now("UTC")
+dag_start_date = pendulum.datetime(2025, 1, 1, tz="UTC")
 
 with DAG(
     dag_id="olake_sync_from_source",
@@ -160,15 +162,19 @@ with DAG(
     )
     
     # --- Init Container for Sync Task ---
-    # Copies source, destination, AND both streams files from ConfigMaps to the shared PVC
-    # Also ensures an empty state.json exists if one is not already present.
-    # Define a security context that will be used by both containers
-    security_context = k8s.V1SecurityContext(
+    # Copies source, destination, AND both streams files from ConfigMaps to the shared PVC.
+    # It does not create or touch state.json: OLake Go writes that file itself after the first run.
+    # Container-level security context for the init container
+    container_security_context = k8s.V1SecurityContext(
+        run_as_user=0,         # Choose a user ID
+        run_as_group=0,        # Choose a group ID
+    )
+    # Pod-level security context for the sync pod
+    pod_security_context = k8s.V1PodSecurityContext(
         run_as_user=0,         # Choose a user ID
         run_as_group=0,        # Choose a group ID
     )
 
-    # Updated command to copy all four files and conditionally create state.json
     init_container_sync = k8s.V1Container(
         name="init-config",
         image="busybox", # Standard utility image
@@ -178,9 +184,6 @@ with DAG(
             cp /etc/destination-config/destination.json /mnt/workspace/ && \
             cp /etc/streams-config/available_streams.json /mnt/workspace/ && \
             cp /etc/streams-config/selected_streams.json /mnt/workspace/ && \
-            if [ ! -f /mnt/workspace/state.json ]; then \
-            echo '{}' > /mnt/workspace/state.json; \
-            fi && \
             ls -la /mnt/workspace"
         ],
         volume_mounts=[
@@ -188,10 +191,10 @@ with DAG(
             k8s.V1VolumeMount(name="source-config-volume", mount_path="/etc/source-config", read_only=True),
             k8s.V1VolumeMount(name="destination-config-volume", mount_path="/etc/destination-config", read_only=True),
             k8s.V1VolumeMount(name="streams-config-volume", mount_path="/etc/streams-config", read_only=True),
-            # Mount the shared PVC writable to copy into and potentially create state.json
+            # Mount the shared PVC writable to copy into
             k8s.V1VolumeMount(name="shared-data", mount_path="/mnt/workspace", read_only=False)
         ],
-        security_context=security_context
+        security_context=container_security_context
     )
     
     # --- Node Affinity Definition (Conditional) ---
@@ -253,33 +256,34 @@ with DAG(
             ),
         ],
 
-        # Use the container's default entrypoint (should be the Olake binary)
-        cmds=None,
-        # Pass arguments for the 'sync' command
+        # Run the OLake Go binary through a shell so --state is passed only when a saved
+        # state exists. OLake Go writes state.json next to source.json on the PVC after each
+        # run. A first run without --state starts with the current state version; passing an
+        # empty {} state would pin the pipeline to the legacy state version 0.
+        cmds=["/bin/sh", "-c"],
         arguments=[
-            "sync",
-            "--config", "/mnt/config/source.json",     # Path within the mounted volume
-            "--destination", "/mnt/config/destination.json", # Path within the mounted volume
-            "--available-streams", "/mnt/config/available_streams.json", # Path within the mounted volume
-            "--selected-streams", "/mnt/config/selected_streams.json",   # Path within the mounted volume
-            "--state", "/mnt/config/state.json"
+            'STATE=""; [ -s /mnt/config/state.json ] && STATE="--state /mnt/config/state.json"; '
+            'exec /home/olake sync --config /mnt/config/source.json '
+            '--destination /mnt/config/destination.json '
+            '--available-streams /mnt/config/available_streams.json '
+            '--selected-streams /mnt/config/selected_streams.json $STATE'
         ],
 
         # Operator settings
         get_logs=True,             # Stream pod logs to Airflow task logs
         log_events_on_failure=True,# Log K8s events if the pod fails
         do_xcom_push=False,        # We aren't expecting XCom results
-        is_delete_operator_pod=True,# Clean up pod upon task completion/failure
+        on_finish_action="delete_pod",  # Delete the pod when the task finishes (success or failure)
         startup_timeout_seconds=300,# Max time to wait for pod to start
         # Add resource requests/limits if needed, e.g.:
-        # resources=k8s.V1ResourceRequirements(
+        # container_resources=k8s.V1ResourceRequirements(
         #     requests={"cpu": "1", "memory": "2Gi"},
         #     limits={"cpu": "2", "memory": "4Gi"}
         # )
 
         # Add the affinity specification here
         affinity=affinity_spec, # Assign the constructed affinity object (or None)
-        security_context=security_context,
+        security_context=pod_security_context,
     )
     
     # --- Define Task Dependencies ---

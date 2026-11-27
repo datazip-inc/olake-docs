@@ -15,42 +15,45 @@ spec:
       backoffLimit: 5
       template:
         spec:
-          # Add node affinity to target nodes with label {LABEL:Key}={LABEL:Value}
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: ${LABEL:Key}
-                        operator: In
-                        values:
-                          - ${LABEL:Value}
+          # Optional: pin the sync to nodes with a label. Uncomment and set the key and value.
+          # affinity:
+          #   nodeAffinity:
+          #     requiredDuringSchedulingIgnoredDuringExecution:
+          #       nodeSelectorTerms:
+          #         - matchExpressions:
+          #             - key: <label-key>
+          #               operator: In
+          #               values:
+          #                 - <label-value>
           containers:
             - name: olake
-              image: ${IMAGE} # TODO: Change this to the database image
+              image: olakego/source-mongodb:v1.2.2 # TODO: set the image and version for your source
               imagePullPolicy: Always
+              command: ['/bin/sh', '-c']
+              # OLake Go writes state.json next to source.json on the PVC after each run.
+              # Pass --state only once that file exists: a fresh pipeline then starts with the
+              # current state version, and later runs resume from the saved state.
               args:
-                - 'sync'
-                - '--config'
-                - '/mnt/config/source.json'
-                - '--selected-streams'
-                - '/mnt/config/selected_streams.json'
-                - '--available-streams'
-                - '/mnt/config/available_streams.json'
-                - '--destination'
-                - '/mnt/config/destination.json'
+                - |
+                  STATE=""
+                  [ -s /mnt/config/state.json ] && STATE="--state /mnt/config/state.json"
+                  exec /home/olake sync \
+                    --config /mnt/config/source.json \
+                    --selected-streams /mnt/config/selected_streams.json \
+                    --available-streams /mnt/config/available_streams.json \
+                    --destination /mnt/config/destination.json $STATE
               volumeMounts:
                 - name: config-volume
                   mountPath: /mnt/config
-              resources:
+              resources: # Size these to your source and the max_threads in source.json
                 requests:
-                  cpu: '20'
-                  memory: '80Gi'
-                limits: # Set limits higher than the max_threads and server_ram in source.json
-                  cpu: '30'
-                  memory: '122Gi'
+                  cpu: '4'
+                  memory: '8Gi'
+                limits:
+                  memory: '16Gi'
 
-          # initContainer to prepare config files from ConfigMaps
+          # initContainer to copy the config files from the ConfigMaps to the PVC.
+          # It does not touch state.json, so the saved state survives between runs.
           initContainers:
             - name: init-config
               image: busybox
@@ -111,7 +114,8 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  # For AKS, use Azure Files storage class for ReadWriteMany ## https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/filestore-csi-driver#storage-class
-  # For GKE, use gke-filestore-csi storage class for ReadWriteMany ## https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/filestore-csi-driver#storage-class
-  # For EKS, use azure-file-csi storage class for ReadWriteMany ## https://github.com/kubernetes-sigs/aws-efs-csi-driver/blob/master/docs/efs-create-filesystem.md
-  storageClassName: ${STORAGE_CLASS}
+  # TODO: set a StorageClass that supports ReadWriteMany (list them with `kubectl get storageclass`):
+  #   AKS: azurefile-csi (Azure Files)
+  #   GKE: a Filestore CSI class such as standard-rwx
+  #   EKS: an EFS CSI class (provisioner efs.csi.aws.com)
+  storageClassName: change-me-rwx-storage-class
