@@ -8,14 +8,14 @@ sidebar_position: 2
 
 A Stream in OLake Go represents a unit of data (such as a table or collection) discovered from a source. This panel lets you choose which streams to sync, how the data is synced (i.e. you can choose from different sync modes), what schemas they use, and also allows the user to do partitioning on data before loading it into the destination.
 
-Stream settings live in `selected_streams.json` when you use the OLake CLI. See [Streams configuration](/docs/install/docker-cli/#streams-config) for the full field list.
+Stream settings live in `selected_streams.json` when you use the OLake Go CLI. See [Streams configuration](/docs/install/docker-cli/#streams-config) for the full field list.
 
 ### Streams Properties
 
 ### 1. Normalization
 
 Normalization in OLake Go is the transformation step that does Level-1 flattening of data in nested JSON format, mapping fields to proper columns, thus making data ready to be written into Iceberg/Parquet format tables. 
-- Detects schema evolution (adds, drops, type promotions) and writes according to Iceberg v2 spec.
+- Detects schema evolution (adds, drops, type promotions) and writes according to the Iceberg v2 or v3 spec (v3 when deletion vectors are used).
 - Flattens nested structures so records become query-friendly.
 - Focuses on mapping source types to Iceberg/Parquet types.
 
@@ -38,7 +38,7 @@ Normalization must be enabled at the schema configuration step per table or stre
 
 **Advantages:**
 - Normalized streams can be queried with standard SQL—no unusual parsing or UDFs needed.
-- Schema evolution (adds/drops/type promotions) is detected and written per Iceberg v2 spec, so downstream tables continue to operate without pipeline breaks as source schemas evolve.
+- Schema evolution (adds/drops/type promotions) is detected and written per the Iceberg v2 or v3 spec, so downstream tables continue to operate without pipeline breaks as source schemas evolve.
 - With transformation and normalization integrated into the pipeline (before the write) mean no extra post-processing jobs, so no extra Spark/DBT/Glue jobs later to "fix" the shape is required.
 
 ---
@@ -94,7 +94,7 @@ The data filter feature allows selective ingestion from source systems by applyi
 - A filter on a decimal column compares exact values. Write a value with more than 15 significant digits as a string, such as `"value": "12345678901234.5678"`, because a JSON number is read as a double first.
 
 :::note
-Data filter is supported **only when Normalisation is enabled** for the job.
+Data filter is supported **only when Normalisation is enabled** for the job. OLake UI does not block a filter on a stream with Normalization off, but OLake Go ignores that filter at sync.
 :::
 
 :::info[CDC/Incremental Filter Behavior]
@@ -245,7 +245,7 @@ Once the sync is complete, the streams will be available in the Iceberg database
 These modes control how records are written to the destination for CDC and Incremental syncs. These modes can be configured in the Streams panel after discovery completes.
 
 ::::info
-- By default, all streams are set to `All Upsert`, except for **Kafka** source which defaults to **Append** mode.
+- By default, all streams are set to `All Upsert`, except for **Kafka** and **S3** sources, which default to **Append** mode.
 - All streams can be switched to **Append** with the global selector `All Append`, or overridden per table via the stream’s **Ingestion Method**.
 ::::
 
@@ -274,10 +274,12 @@ These modes control how records are written to the destination for CDC and Incre
   - **Positional Deletes**: Identifies rows to delete by file path and row position (Iceberg V2).
   - **Deletion Vectors**: Identifies rows to delete using a compact bitmap per data file (Iceberg V3).
 
-  The default delete format is determined by your selected query engine and follows this order: **equality deletes**, **positional deletes**, then **deletion vectors**, selecting the first format your engine supports. Different streams can have different upsert type in a particular job. 
+  The default delete format is the first of **equality deletes**, **positional deletes** and **deletion vectors** that every selected query engine can read, the destination catalog accepts and the source allows. Different streams can have different upsert type in a particular job.
 
-  :::note Kafka source
-  - For Kafka source, only positional deletes are supported. 
+  Since OLake Go v1.1.2 the destination catalog narrows the list: no deletion vectors on Nessie, deletion vectors only on Unity Catalog, and positional deletes or deletion vectors on Snowflake Horizon. Kafka sources, and Postgres sources with **Preserve TOAST Values** on, offer positional deletes and deletion vectors only. With no query engine selected, the default is therefore equality deletes, except on Snowflake Horizon and Kafka (positional deletes) and Unity Catalog (deletion vectors).
+
+  :::note[Kafka source]
+  - For Kafka source, upsert supports positional deletes and deletion vectors, not equality deletes.
   - When Upsert is selected, you must configure at least one **Dedup Key** in the stream Configuration tab before the job can be saved.
 
     <div style={{textAlign: 'center'}}>
@@ -289,12 +291,14 @@ These modes control how records are written to the destination for CDC and Incre
 
   :::important[Upsert Type Changes]
   - Switching from **equality deletes** to **positional deletes** or **deletion vectors** on existing jobs is supported. Subsequent syncs use the new format, and OLake Go builds indexes to migrate existing equality delete files to the new format. 
-  - Switching from **deletion vector** to **equality/positional deletes** and vice versa on existing jobs will trigger **clear destination** operation because this is an Iceberg version downgrade (v3 to v2).
+  - Switching from **positional deletes** to **equality deletes** also keeps the table.
+  - Switching from **deletion vectors** to **equality deletes** or **positional deletes** triggers **Clear Destination**, because the table is already on Iceberg v3 and cannot go back to v2 delete files.
+  - Switching from **positional deletes** to **deletion vectors** also triggers **Clear Destination**. OLake Go migrates only equality deletes to deletion vectors in place.
   :::
 
   :::warning
   Delete format options require every component below to meet these minimum version requirements. 
-  - OLake Version **0.11.0 and above**.
+  - OLake Go **v0.11.0 and above** (positional deletes alone need OLake Go v0.10.0 and OLake UI v0.5.1).
   - OLake UI **0.6.0 and above**.
   - Helm chart **0.0.28 and above**.
   - OLake worker **0.3.11 and above**.
