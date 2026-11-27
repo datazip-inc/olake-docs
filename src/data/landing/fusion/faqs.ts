@@ -16,11 +16,11 @@ export const FAQS: ProductFaqItem[] = [
   },
   {
     q: 'Can I use OLake Fusion together with OLake Go?',
-    a: "Yes, that's the intended path. Iceberg Maintenance ships as a maintenance module inside the OLake UI from v0.4.0, so Go handles ingestion and Fusion handles maintenance from the same place. New users can start with a combined Ingestion + Maintenance setup, and existing OLake Go users just upgrade the UI (Docker or Helm/Kubernetes) to unlock the module, no separate tool to adopt. Our own compaction benchmark ran exactly this way: OLake Go ingesting the TPC-H lineitem table while Fusion compacted it."
+    a: "Yes, that's the intended path. Iceberg Maintenance ships as a maintenance module inside the OLake UI (v0.4.6 or later, and v0.9.2 or later for Cleanup), so Go handles ingestion and Fusion handles maintenance from the same place. New users can start with a combined Ingestion + Maintenance setup, and existing OLake Go users just upgrade the UI (Docker or Helm/Kubernetes) to unlock the module, no separate tool to adopt. Our own compaction benchmark ran exactly this way: OLake Go ingesting the TPC-H lineitem table while Fusion compacted it. One limit: when OLake Go writes deletion vectors, it creates the table at Iceberg format version 3, and Fusion v0.2.2 does not compact or expire snapshots on format version 3 tables yet."
   },
   {
     q: 'Can I use OLake Fusion on its own, without OLake Go?',
-    a: "Yes, Fusion maintains Apache Iceberg tables through your Iceberg catalog, so it operates on the tables themselves rather than on OLake's ingestion pipeline."
+    a: "Yes. Fusion maintains Apache Iceberg format version 1 and 2 tables through your Iceberg catalog, whether or not OLake Go wrote them, so it operates on the tables themselves rather than on OLake Go's ingestion pipeline. Format version 3 tables are not supported yet."
   },
   {
     q: 'How much faster is Fusion than Apache Spark?',
@@ -36,7 +36,7 @@ export const FAQS: ProductFaqItem[] = [
   },
   {
     q: 'How often does compaction run?',
-    a: "Fusion uses tiered triggers rather than one blunt job: Lite every 20 minutes and Medium every 40 minutes in the benchmark, plus Full as a periodic deep-clean for much larger datasets, terabyte-scale tables where long-term small-file buildup is higher. At the benchmark's sub-100 GB destination size, Full wasn't needed."
+    a: "By default Lite runs every hour and Medium every 8 hours, and Full is off until you schedule it. Each tier has its own schedule per table, set from presets or a cron expression. The benchmark used Lite every 20 minutes and Medium every 40 minutes; Full is a periodic deep-clean for much larger datasets, terabyte-scale tables where long-term small-file buildup is higher. At the benchmark's sub-100 GB destination size, Full wasn't needed."
   },
   {
     q: 'How do I deploy it, and what does it cost to license?',

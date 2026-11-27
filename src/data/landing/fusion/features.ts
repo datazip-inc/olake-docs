@@ -11,7 +11,7 @@ export const FEATURES: ProductFeature[] = [
     id: 'tiered',
     tab: 'Tiered Compaction',
     title: 'Tiered Compaction',
-    body: 'Run compaction on trigger tiers instead of one whole job.\nLite every 20 minutes, Medium every 40 minutes, and Full as a periodic deep-clean for much larger datasets like terabyte-scale tables.'
+    body: 'Schedule Lite, Medium and Full compaction per table instead of one whole job.\nDefaults: Lite every hour, Medium every 8 hours, Full off until you schedule it as a periodic deep-clean for much larger datasets.'
   },
   {
     id: 'decay',
