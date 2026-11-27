@@ -1,0 +1,88 @@
+# ./run.sh lock    PostgreSQL 18.7    2026-11-27T10:49:18Z
+
+## The lock the statement takes, seen from inside its own transaction, and whether it rewrites the table
+SELECT pg_relation_filenode('orders') AS filenode_before;
+ filenode_before 
+-----------------
+           16402
+(1 row)
+
+BEGIN;
+BEGIN
+ALTER TABLE orders REPLICA IDENTITY FULL;
+ALTER TABLE
+SELECT locktype, mode, granted FROM pg_locks WHERE relation = 'orders'::regclass AND pid = pg_backend_pid();
+ locktype |        mode         | granted 
+----------+---------------------+---------
+ relation | AccessExclusiveLock | t
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+Timing is on.
+ALTER TABLE orders REPLICA IDENTITY FULL;
+ALTER TABLE
+Time: 0.794 ms
+ALTER TABLE orders REPLICA IDENTITY DEFAULT;
+ALTER TABLE
+Time: 0.388 ms
+Timing is off.
+SELECT pg_relation_filenode('orders') AS filenode_after, count(*) AS order_rows FROM orders;
+ filenode_after | order_rows 
+----------------+------------
+          16402 |     200000
+(1 row)
+
+
+## A long read holds the table open. The ALTER, from another session, with lock_timeout = 2s:
+$ psql -c "BEGIN; SELECT count(*) FROM orders; SELECT pg_sleep(12); COMMIT;" &    (a long read)
+SET lock_timeout = '2s';
+SET
+ALTER TABLE orders REPLICA IDENTITY FULL;
+ERROR:  canceling statement due to lock timeout
+
+## The ALTER again without lock_timeout, in the background, then a short read from a third session with lock_timeout = 2s
+$ psql -c "ALTER TABLE orders REPLICA IDENTITY FULL" &    (no lock_timeout)
+SET lock_timeout = '2s';
+SET
+SELECT count(*) FROM orders WHERE id = 1;
+ERROR:  canceling statement due to lock timeout
+LINE 1: SELECT count(*) FROM orders WHERE id = 1;
+                             ^
+RESET lock_timeout;
+RESET
+SELECT pid, wait_event_type, wait_event, pg_blocking_pids(pid) AS blocked_by, left(query, 60) AS query
+FROM pg_stat_activity WHERE datname = 'appdb' AND pid <> pg_backend_pid() AND state <> 'idle' ORDER BY backend_start;
+ pid | wait_event_type | wait_event | blocked_by |                            query                             
+-----+-----------------+------------+------------+--------------------------------------------------------------
+ 832 | Timeout         | PgSleep    | {}         | BEGIN; SELECT count(*) FROM orders; SELECT pg_sleep(12); COM
+ 862 | Lock            | relation   | {832}      | ALTER TABLE orders REPLICA IDENTITY FULL;
+(2 rows)
+
+SELECT c.relname, CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity
+FROM pg_class c WHERE c.relname = 'documents';
+  relname  | replica_identity 
+-----------+------------------
+ documents | default
+(1 row)
+
+SELECT relname, CASE relreplident WHEN 'd' THEN 'default' WHEN 'f' THEN 'full' END AS replica_identity FROM pg_class WHERE relname = 'orders';
+ relname | replica_identity 
+---------+------------------
+ orders  | full
+(1 row)
+
+ALTER TABLE orders REPLICA IDENTITY DEFAULT;
+ALTER TABLE
+
+## A role that does not own the table, such as a capture role
+CREATE ROLE cdc_user LOGIN REPLICATION;
+CREATE ROLE
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
+GRANT
+ALTER TABLE documents REPLICA IDENTITY FULL;    -- as cdc_user
+ERROR:  must be owner of table documents
+DROP OWNED BY cdc_user;
+DROP OWNED
+DROP ROLE cdc_user;
+DROP ROLE

@@ -1,0 +1,81 @@
+# ./run.sh partitions    PostgreSQL 19.0    2026-11-27T10:48:41Z
+
+## Set FULL on the partitioned table
+ALTER TABLE measurements REPLICA IDENTITY FULL;
+ALTER TABLE
+SELECT c.relname, c.relkind, CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity
+FROM pg_class c WHERE c.relname LIKE 'measurements%' AND c.relkind IN ('r', 'p') ORDER BY c.relname;
+     relname     | relkind | replica_identity 
+-----------------+---------+------------------
+ measurements    | p       | full
+ measurements_eu | r       | default
+ measurements_us | r       | default
+(3 rows)
+
+
+## A partition created afterwards
+CREATE TABLE measurements_apac PARTITION OF measurements FOR VALUES IN ('apac');
+CREATE TABLE
+SELECT c.relname, c.relkind, CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity
+FROM pg_class c WHERE c.relname LIKE 'measurements%' AND c.relkind IN ('r', 'p') ORDER BY c.relname;
+      relname      | relkind | replica_identity 
+-------------------+---------+------------------
+ measurements      | p       | full
+ measurements_apac | r       | default
+ measurements_eu   | r       | default
+ measurements_us   | r       | default
+(4 rows)
+
+
+## An UPDATE and a DELETE in a partition
+SELECT * FROM pg_create_logical_replication_slot('pgo_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ pgo_slot  | 0/03BA7390
+(1 row)
+
+UPDATE measurements SET reading = 11 WHERE id = 1 AND region = 'eu';
+UPDATE 1
+DELETE FROM measurements WHERE id = 2 AND region = 'us';
+DELETE 1
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('pgo_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- printed by pgoutput.py
+RELATION public.measurements_eu  replica identity default
+UPDATE public.measurements_eu
+    new row [N]: id='1' region='eu' reading='11'
+RELATION public.measurements_us  replica identity default
+DELETE public.measurements_us
+    old key [K]: id='2' region='us' reading=null
+
+## FULL on each partition
+ALTER TABLE measurements_eu REPLICA IDENTITY FULL;
+ALTER TABLE
+ALTER TABLE measurements_us REPLICA IDENTITY FULL;
+ALTER TABLE
+ALTER TABLE measurements_apac REPLICA IDENTITY FULL;
+ALTER TABLE
+SELECT c.relname, c.relkind, CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity
+FROM pg_class c WHERE c.relname LIKE 'measurements%' AND c.relkind IN ('r', 'p') ORDER BY c.relname;
+      relname      | relkind | replica_identity 
+-------------------+---------+------------------
+ measurements      | p       | full
+ measurements_apac | r       | full
+ measurements_eu   | r       | full
+ measurements_us   | r       | full
+(4 rows)
+
+INSERT INTO measurements VALUES (2, 'us', 20);
+INSERT 0 1
+UPDATE measurements SET reading = 12 WHERE id = 1 AND region = 'eu';
+UPDATE 1
+DELETE FROM measurements WHERE id = 2 AND region = 'us';
+DELETE 1
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('pgo_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- printed by pgoutput.py
+RELATION public.measurements_us  replica identity full
+INSERT public.measurements_us
+    new row [N]: id='2' region='us' reading='20'
+RELATION public.measurements_eu  replica identity full
+UPDATE public.measurements_eu
+    old row [O]: id='1' region='eu' reading='11'
+    new row [N]: id='1' region='eu' reading='12'
+DELETE public.measurements_us
+    old row [O]: id='2' region='us' reading='20'

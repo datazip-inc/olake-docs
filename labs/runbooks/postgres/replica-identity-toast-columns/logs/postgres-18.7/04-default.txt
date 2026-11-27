@@ -1,0 +1,56 @@
+# ./run.sh default    PostgreSQL 18.7    2026-11-27T10:49:09Z
+SELECT c.relname, CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity
+FROM pg_class c WHERE c.relname = 'documents';
+  relname  | replica_identity 
+-----------+------------------
+ documents | default
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('pgo_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ pgo_slot  | 0/3A754A8
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('td_slot', 'test_decoding');
+ slot_name |    lsn    
+-----------+-----------
+ td_slot   | 0/3A754E0
+(1 row)
+
+
+## An INSERT, then the three changes
+INSERT INTO documents SELECT 3, 'title 3', body, attachment, meta, tags, summary FROM documents WHERE id = 1;
+INSERT 0 1
+UPDATE documents SET title = 'second title' WHERE id = 1;
+UPDATE 1
+UPDATE documents SET body = body || 'x' WHERE id = 1;
+UPDATE 1
+DELETE FROM documents WHERE id = 2;
+DELETE 1
+
+## What pgoutput sent
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('pgo_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- printed by pgoutput.py
+RELATION public.documents  replica identity default
+INSERT public.documents
+    new row [N]: id='3' title='title 3' body=<32000 chars> attachment=<32002 chars> meta=<32022 chars> tags=<33001 chars> summary=<100000 chars>
+UPDATE public.documents
+    new row [N]: id='1' title='second title' body=UNCHANGED-TOAST attachment=UNCHANGED-TOAST meta=UNCHANGED-TOAST tags=UNCHANGED-TOAST summary=<100000 chars>
+UPDATE public.documents
+    new row [N]: id='1' title='second title' body=<32001 chars> attachment=UNCHANGED-TOAST meta=UNCHANGED-TOAST tags=UNCHANGED-TOAST summary=<100000 chars>
+DELETE public.documents
+    old key [K]: id='2' title=null body=null attachment=null meta=null tags=null summary=null
+
+## What test_decoding sent for the same changes
+SELECT regexp_replace(data, ':''([^'']{30})[^'']{11,}''', ':''\1...''', 'g') AS data, length(data) AS chars
+FROM pg_logical_slot_get_changes('td_slot', NULL, NULL) WHERE data NOT LIKE 'BEGIN%' AND data NOT LIKE 'COMMIT%';
+                                                                                                                                                            data                                                                                                                                                            | chars  
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ table public.documents: INSERT: id[bigint]:3 title[text]:'title 3' body[text]:'6512bd43d9caa6e02c990b0a82652d...' attachment[bytea]:'\xfaecbd2dae425cfd3e4b4e5a9ecf...' meta[jsonb]:'{"doc": 1, "text": "b1be26117e...' tags[text[]]:'{616f074347c329a4629c1d7dd85b3...' summary[text]:'ssssssssssssssssssssssssssssss...' | 229174
+ table public.documents: UPDATE: id[bigint]:1 title[text]:'second title' body[text]:unchanged-toast-datum attachment[bytea]:unchanged-toast-datum meta[jsonb]:unchanged-toast-datum tags[text[]]:unchanged-toast-datum summary[text]:'ssssssssssssssssssssssssssssss...'                                                    | 100230
+ table public.documents: UPDATE: id[bigint]:1 title[text]:'second title' body[text]:'6512bd43d9caa6e02c990b0a82652d...' attachment[bytea]:unchanged-toast-datum meta[jsonb]:unchanged-toast-datum tags[text[]]:unchanged-toast-datum summary[text]:'ssssssssssssssssssssssssssssss...'                                      | 132212
+ table public.documents: DELETE: id[bigint]:2                                                                                                                                                                                                                                                                               |     44
+(4 rows)
+
+DELETE FROM documents WHERE id = 3;
+DELETE 1

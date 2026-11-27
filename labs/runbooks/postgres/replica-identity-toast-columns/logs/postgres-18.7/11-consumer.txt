@@ -1,0 +1,61 @@
+# ./run.sh consumer    PostgreSQL 18.7    2026-11-27T10:49:38Z
+
+## A jsonb column cannot store the text Debezium writes for an unchanged jsonb value
+SELECT '__debezium_unavailable_value'::jsonb;
+ERROR:  invalid input syntax for type json
+LINE 1: SELECT '__debezium_unavailable_value'::jsonb;
+               ^
+DETAIL:  Token "__debezium_unavailable_value" is invalid.
+CONTEXT:  JSON data, line 1: __debezium_unavailable_value
+
+## A target table, and one UPDATE event as the Debezium runs delivered it: a new title, the placeholder for the four large values
+CREATE TABLE documents_target (LIKE documents INCLUDING ALL);
+CREATE TABLE
+INSERT INTO documents_target SELECT * FROM documents;
+INSERT 0 2
+CREATE TABLE incoming (id bigint, title text, body text, attachment text, meta text, tags text[]);
+CREATE TABLE
+INSERT INTO incoming VALUES (1, 'new title', '__debezium_unavailable_value',
+  'X19kZWJleml1bV91bmF2YWlsYWJsZV92YWx1ZQ==', '__debezium_unavailable_value', '{__debezium_unavailable_value}');
+INSERT 0 1
+
+## Applied as it arrived: the placeholder replaces the stored value
+UPDATE documents_target t SET title = i.title, body = i.body, attachment = decode(i.attachment, 'base64'), tags = i.tags
+FROM incoming i WHERE t.id = i.id;
+UPDATE 1
+SELECT id, title, left(body, 40) AS body, convert_from(attachment, 'UTF8') AS attachment, tags FROM documents_target WHERE id = 1;
+ id |   title   |             body             |          attachment          |              tags              
+----+-----------+------------------------------+------------------------------+--------------------------------
+  1 | new title | __debezium_unavailable_value | __debezium_unavailable_value | {__debezium_unavailable_value}
+(1 row)
+
+SELECT count(*) AS rows_with_placeholder FROM documents_target WHERE body = '__debezium_unavailable_value';
+ rows_with_placeholder 
+-----------------------
+                     1
+(1 row)
+
+
+## Applied with a rule that keeps the stored value when the placeholder arrives
+TRUNCATE documents_target;
+TRUNCATE TABLE
+INSERT INTO documents_target SELECT * FROM documents;
+INSERT 0 2
+UPDATE documents_target t SET
+  title      = i.title,
+  body       = CASE WHEN i.body = '__debezium_unavailable_value' THEN t.body ELSE i.body END,
+  attachment = CASE WHEN i.attachment = 'X19kZWJleml1bV91bmF2YWlsYWJsZV92YWx1ZQ==' THEN t.attachment ELSE decode(i.attachment, 'base64') END,
+  meta       = CASE WHEN i.meta = '__debezium_unavailable_value' THEN t.meta ELSE i.meta::jsonb END,
+  tags       = CASE WHEN i.tags = '{__debezium_unavailable_value}' THEN t.tags ELSE i.tags END
+FROM incoming i WHERE t.id = i.id;
+UPDATE 1
+SELECT t.id, t.title, t.body = d.body AS body_kept, t.attachment = d.attachment AS attachment_kept,
+       t.meta = d.meta AS meta_kept, t.tags = d.tags AS tags_kept
+FROM documents_target t JOIN documents d USING (id) WHERE t.id = 1;
+ id |   title   | body_kept | attachment_kept | meta_kept | tags_kept 
+----+-----------+-----------+-----------------+-----------+-----------
+  1 | new title | t         | t               | t         | t
+(1 row)
+
+DROP TABLE documents_target, incoming;
+DROP TABLE
