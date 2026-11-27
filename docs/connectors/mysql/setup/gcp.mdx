@@ -1,7 +1,7 @@
 ---
-title: "Google Cloud SQL MySQL CDC Setup Guide | OLake Real-Time Sync"
-seo_title: "Cloud SQL for MySQL CDC Setup for OLake"
-description: Configure CDC on Google Cloud SQL MySQL with OLake. Includes read replica setup, binary log verification, CDC user creation, network config, troubleshooting.
+title: "Google Cloud SQL MySQL CDC Setup Guide | OLake Go Real-Time Sync"
+seo_title: "Cloud SQL for MySQL CDC Setup for OLake Go"
+description: Configure CDC on Google Cloud SQL MySQL with OLake Go. Includes read replica setup, binary log verification, CDC user creation, network config, troubleshooting.
 sidebar_label: 5. Google Cloud SQL for MySQL
 sidebar_position: 5
 ---
@@ -16,13 +16,12 @@ Google Cloud SQL for MySQL supports CDC through binary logging with comprehensiv
 - `cloudsqlsuperuser` privileges (default `root` user)
 - Access to Google Cloud Console for configuration
 - TLS enabled if connecting directly
-- Unique **replica ID** for OLake (any integer ≥ 1000 that does not collide with existing replicas)
 
 ## Master vs Read Replica Connection
 
 **Both Primary and Read Replica Supported**
 
-You can connect OLake to either the master database or a read replica. The choice depends on your requirements:
+You can connect OLake Go to either the master database or a read replica. The choice depends on your requirements:
 
 **Using Read Replica (Recommended for High-Load Systems):**
 - **Reduced load**: CDC operations don't impact your production workload
@@ -78,7 +77,7 @@ In Google Cloud Console, open your Cloud SQL for MySQL instance and confirm that
     :::info[GTID Mode (Optional)]
     Google Cloud SQL automatically enables GTID mode on all MySQL instances, so no configuration is needed.
     
-    How OLake Uses GTID:
+    How OLake Go Uses GTID:
     - **Microsecond precision for CDC timestamps:** OLake Go uses the timestamp from the GTID event. Without GTID, it falls back to the seconds-precision timestamp from the binlog header. Requires MySQL 8.0.1 or higher.
     - **Replica promotion:** CDC continues when a replica is promoted to primary (OLake Go v1.1.2 and above is required).
     :::
@@ -97,16 +96,16 @@ SHOW VARIABLES LIKE 'gtid_mode';
 SHOW VARIABLES LIKE 'binlog_row_metadata';
 ```
 
-They should show `ON`, `ROW`, `FULL`, and `FULL` for `log_bin`, `binlog_format`, `binlog_row_image`, and `binlog_row_metadata` respectively. If you enabled GTID for microsecond timestamp precision, `enforce_gtid_consistency` and `gtid_mode` should both be `ON`.
+They should show `ON`, `ROW`, `FULL`, and `FULL` for `log_bin`, `binlog_format`, `binlog_row_image`, and `binlog_row_metadata` respectively. Cloud SQL turns GTID on by default, so `enforce_gtid_consistency` and `gtid_mode` are both `ON`.
 
 ## 3. Configure Network Access
 
-Set up connectivity for OLake:
+Set up connectivity for OLake Go:
 
 **Option A: Direct Connection (Requires TLS)**
 1. Go to **Connections** → **Networking**
 2. Click **Add network**
-3. Add OLake's IP addresses with `/32` CIDR
+3. Add OLake Go's IP addresses with `/32` CIDR
 4. **Save** the configuration
 
 **Option B: Private IP**
@@ -119,7 +118,7 @@ Configure Private Service Connect or VPC peering for secure connectivity.
 Connect to your MySQL instance (primary or read replica) as `cloudsqlsuperuser` (usually `root`) and create a dedicated CDC user:
 
 ```sql
-CREATE USER 'cdc_user'@'%' IDENTIFIED WITH mysql_native_password BY 'strongpassword';
+CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'strongpassword';
 GRANT SELECT, REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
 FLUSH PRIVILEGES;
 ```
@@ -134,7 +133,7 @@ Grant access only to specific databases for stricter security:
 
 ```sql
 -- Grant access to specific database
-CREATE USER 'cdc_user'@'%' IDENTIFIED WITH mysql_native_password BY 'strongpassword';
+CREATE USER 'cdc_user'@'%' IDENTIFIED BY 'strongpassword';
 GRANT SELECT ON mydb.* TO 'cdc_user'@'%';
 GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'cdc_user'@'%';
 FLUSH PRIVILEGES;
@@ -145,7 +144,9 @@ FLUSH PRIVILEGES;
 Verify that CDC is working correctly:
 
 ```sql
--- Check binary log status
+-- Check binary log status (MySQL 8.2 and later; SHOW MASTER STATUS was removed in 8.4)
+SHOW BINARY LOG STATUS;
+-- MySQL 8.1 and earlier
 SHOW MASTER STATUS;
 
 -- List available binary logs
@@ -159,7 +160,7 @@ INSERT INTO test_cdc (data) VALUES ('GCP MySQL CDC test');
 SHOW BINLOG EVENTS LIMIT 10;
 ```
 
-✅ **Success:** `SHOW MASTER STATUS` returns file name and position  
+✅ **Success:** `SHOW BINARY LOG STATUS` (or `SHOW MASTER STATUS`) returns file name and position  
 ✅ **Success:** `SHOW BINARY LOGS` lists available log files  
 ❌ **Permission denied:** Check user has `REPLICATION CLIENT` role  
 ❌ **Binary logging disabled:** Verify flags are set and instance restarted
@@ -171,8 +172,8 @@ SHOW BINLOG EVENTS LIMIT 10;
 Google Cloud SQL manages binary log retention automatically (default **7 days**). You can adjust it with the flags below:
 
 ```sql
--- Check current retention setting
-SHOW VARIABLES LIKE 'expire_logs_days';
+-- Check current retention setting (MySQL 8.0+; use expire_logs_days on MySQL 5.7)
+SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';
 ```
 
 For manual log management:
@@ -185,13 +186,11 @@ PURGE BINARY LOGS BEFORE DATE_SUB(NOW(), INTERVAL 3 DAY);
 PURGE BINARY LOGS TO 'mysql-bin.000010';
 ```
 
-## Connect OLake to Your Database
+## Connect OLake Go to Your Database
 
-When configuring OLake:
+When configuring OLake Go:
 
-- **If using a read replica**: Use the **read replica connection name** (e.g., `project:region:replica-instance-name`)
-- **If using primary directly**: Use the **primary connection name** (e.g., `project:region:primary-instance-name`)
-- **Host**: The public or private IP address of your chosen instance
+- **Host**: The public or private IP address of the read replica or the primary, or a Cloud SQL Auth Proxy address. OLake Go takes a host name or IP address, not a Cloud SQL connection name such as `project:region:instance`.
 - **Port**: Usually `3306`
 - **User**: The `cdc_user` you created
 - **Password**: The password for the CDC user
@@ -201,10 +200,10 @@ Unlike Azure, GCP allows you to create the CDC user on either the primary or rea
 :::
 
 :::important[Replica ID Configuration]
-When configuring OLake, use a **unique replica ID** that doesn't conflict with existing MySQL replicas. OLake will use a replica ID greater than 1000 by default, but you can specify your own in the source configuration.
+OLake Go generates its own replication client ID (1000 or higher) and stores it in state; there is no setting for it.
 :::
 
-Now that you have configured the Google Cloud database and created the CDC user, you can add the MySQL source in OLake to build an ELT pipeline to Iceberg or Parquet. See the [MySQL connector overview](/docs/connectors/mysql) for a high-level walkthrough.
+Now that you have configured the Google Cloud database and created the CDC user, you can add the MySQL source in OLake Go to build an ELT pipeline to Iceberg or Parquet. See the [MySQL connector overview](/docs/connectors/mysql) for a high-level walkthrough.
 
 ## Troubleshooting
 
@@ -214,7 +213,7 @@ Now that you have configured the Google Cloud database and created the CDC user,
   ```sql
   SHOW VARIABLES LIKE 'log_bin';  -- Shows OFF
   ```
-  **Solution:** Set `log_bin = ON` database flag and restart the instance.
+  **Solution:** Enable Point-in-time recovery on the instance. Cloud SQL turns binary logging on with it.
 
 - **Wrong Binary Log Format:**
   ```sql
@@ -239,8 +238,8 @@ Now that you have configured the Google Cloud database and created the CDC user,
   FLUSH PRIVILEGES;
   ```
 
-- **Connection Denied:** If OLake cannot connect:
-  - Check **authorized networks** include OLake's IP addresses
+- **Connection Denied:** If OLake Go cannot connect:
+  - Check **authorized networks** include OLake Go's IP addresses
   - Verify the instance has a **public IP** or proper **private connectivity**
   - Ensure **SSL/TLS** is configured if required
 
@@ -252,7 +251,7 @@ Now that you have configured the Google Cloud database and created the CDC user,
   - Test connectivity: `telnet your-instance-ip 3306`
 
 - **SSL/TLS Issues:** Cloud SQL enforces SSL by default for public connections:
-  - Use `sslmode=required` in OLake connection configuration
+  - Set `ssl.mode` to `require` in the OLake Go source configuration (SSL Mode in OLake UI), or to `verify-ca` or `verify-full` with the Cloud SQL server CA certificate
   - Download Google Cloud's SSL certificates if needed
   - For testing, SSL can be disabled (not recommended for production)
 
@@ -261,7 +260,7 @@ Now that you have configured the Google Cloud database and created the CDC user,
 - **Binary Log Disk Usage:** Monitor through Google Cloud Console:
   - **Monitoring** → **Disk utilization**
   - Set up alerts for high disk usage
-  - Consider reducing `expire_logs_days` if storage is limited
+  - Consider reducing `binlog_expire_logs_seconds` if storage is limited
 
 - **Connection Limits:** Cloud SQL has connection limits based on instance size:
   - Monitor active connections in Cloud Console
@@ -269,8 +268,8 @@ Now that you have configured the Google Cloud database and created the CDC user,
 
 - **Replication Lag:** Monitor binary log position:
   ```sql
-  SHOW MASTER STATUS;
-  -- Compare with OLake's last processed position
+  SHOW BINARY LOG STATUS; -- or SHOW MASTER STATUS on MySQL 8.1 and earlier
+  -- Compare with OLake Go's last processed position
   ```
 
 ### Google Cloud Specific Issues
