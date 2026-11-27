@@ -14,7 +14,7 @@ Ensure the following requirements are met before proceeding:
     *   The content of each file will be placed within the `cm_olake-streams-config.yaml` ConfigMap.
 4.  **Kubernetes Namespace**: The manifests default to the `olake` namespace. Create it (`kubectl create namespace olake`) or update the `namespace` fields in all YAML files if using a different target.
 5.  **Node Labels (Optional)**: If you uncomment the `affinity` block in `cronjob_olake.yaml`, ensure target nodes possess the specified labels.
-6.  **ReadWriteMany StorageClass**: The PVC that holds the config files and the sync state needs a StorageClass with `ReadWriteMany` support (`kubectl get storageclass`).
+6.  **ReadWriteMany StorageClass**: The PVC that holds the config files and the sync state needs a StorageClass with `ReadWriteMany` support (`kubectl get storageclass`). If any stream uses positional deletes or deletion vectors, use block storage with `ReadWriteOnce` instead; see **Index storage** below.
 
 ## Configuration Steps
 
@@ -68,6 +68,12 @@ Edit the downloaded files with your specific configurations:
 **Sync state.** The sync writes `state.json` next to the config files on the PVC. Each run passes it back with `--state` once it exists, so CDC and incremental streams resume where the last run stopped.
 
 The first run starts without `--state`, which gives a new pipeline the current state version. Deleting the PVC (or `state.json`) makes the next run start from scratch.
+
+**Index storage.** Streams with `update_type` set to `pos` (positional deletes) or `dv` (deletion vectors) keep a row index between runs. The sync container sets `OLAKE_INDEX_DB_DIR=/mnt/config/index-db`, so the index lives on the same PVC; without it, every run would rebuild the index by scanning the whole Iceberg table. Streams with `eq` (equality deletes) or append mode do not use it.
+
+The index needs file locking and reliable `fsync`, so the PVC must then be block storage: set `accessModes` to `ReadWriteOnce` and use a block StorageClass (an EBS, Persistent Disk or Azure Disk class) with room for the index. Shared filesystems such as NFS, EFS, Filestore and Azure Files are not supported for it.
+
+`concurrencyPolicy: Forbid` keeps one sync pod at a time, so a single-attach volume is enough. See [index storage](https://olake.io/docs/install/docker-cli#index-storage) for the details.
 
 ## Deployment Procedure
 

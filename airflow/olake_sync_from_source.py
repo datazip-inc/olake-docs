@@ -27,8 +27,8 @@ TARGET_NAMESPACE = "olake" # <-- EDIT THIS LINE
 OLAKE_IMAGE = "olakego/source-postgres:v1.2.2" # <-- EDIT THIS LINE (image and version for your source)
 
 # !!! IMPORTANT: Set this to the name of a StorageClass in your K8s cluster !!!
-# This StorageClass MUST support ReadWriteMany (RWX) access mode.
-# Examples: "azurefile" (AKS), "standard-rwx" (GKE Filestore), an EFS provisioner (EKS)
+# It MUST support PVC_ACCESS_MODE (set next to the PVC below). ReadWriteMany examples:
+# "azurefile" (AKS), "standard-rwx" (GKE Filestore), an EFS provisioner (EKS)
 STORAGE_CLASS_NAME = "default" # <-- EDIT THIS LINE
 
 # --- Optional Node Affinity ---
@@ -98,13 +98,21 @@ with DAG(
         )
     )
     
+    # !!! IMPORTANT: Access mode of the shared PVC, which holds the configs, state.json and the row index !!!
+    # If any stream uses update_type "pos" (positional deletes) or "dv" (deletion vectors), OLake Go
+    # keeps a row index on this PVC (OLAKE_INDEX_DB_DIR in the sync task). The index needs block storage
+    # with file locking and reliable fsync: set "ReadWriteOnce" and a block StorageClass (an EBS,
+    # Persistent Disk or Azure Disk class). NFS, EFS, Filestore and Azure Files are not supported for it.
+    # Keep "ReadWriteMany" only when every stream uses "eq" or append mode.
+    PVC_ACCESS_MODE = "ReadWriteMany" # <-- EDIT THIS LINE ("ReadWriteMany" or "ReadWriteOnce")
+
     # Persistent Volume Claim spec to share data between tasks
     # Note: This is the PVC definition model but not used directly 
     # (created via API call in the create_pvc_with_hook function)
     shared_pvc = k8s.V1PersistentVolumeClaim(
         metadata=k8s.V1ObjectMeta(name="olake-shared-data"),
         spec=k8s.V1PersistentVolumeClaimSpec(
-            access_modes=["ReadWriteMany"],  # Allow multiple pods to read/write
+            access_modes=[PVC_ACCESS_MODE],
             resources=k8s.V1ResourceRequirements(
                 requests={"storage": "1Gi"}
             )
@@ -137,7 +145,7 @@ with DAG(
             kind="PersistentVolumeClaim",
             metadata=client.V1ObjectMeta(name=pvc_name),
             spec=client.V1PersistentVolumeClaimSpec(
-                access_modes=["ReadWriteMany"],
+                access_modes=[PVC_ACCESS_MODE],
                 resources=client.V1ResourceRequirements(requests={"storage": "1Gi"}),
                 storage_class_name=storage_class # Uses the top-level variable
             )
@@ -255,6 +263,10 @@ with DAG(
                 mount_propagation="HostToContainer"  # May help with permission propagation
             ),
         ],
+
+        # Keep the row index for "pos" and "dv" streams on the PVC, so the next run reuses it
+        # instead of rebuilding it with a scan of the whole Iceberg table. Other streams ignore it.
+        env_vars=[k8s.V1EnvVar(name="OLAKE_INDEX_DB_DIR", value="/mnt/config/index-db")],
 
         # Run the OLake Go binary through a shell so --state is passed only when a saved
         # state exists. OLake Go writes state.json next to source.json on the PVC after each

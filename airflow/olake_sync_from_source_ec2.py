@@ -51,6 +51,15 @@ EC2_CONFIG_DIR = f"{EC2_OLAKE_BASE_DIR}/configs"
 EC2_STATE_DIR = EC2_CONFIG_DIR  # Same directory for configs and state
 EC2_STATE_FILE = f"{EC2_CONFIG_DIR}/state.json"
 
+# Row index for streams with update_type "pos" (positional deletes) or "dv" (deletion vectors).
+# It is bind-mounted into the container and passed as OLAKE_INDEX_DB_DIR. It sits outside
+# EC2_CONFIG_DIR because the config download runs `aws s3 sync --delete` on that folder.
+# This DAG terminates the instance after every run, so the index does not survive it: each run
+# rebuilds the index by scanning the whole Iceberg table. To keep it between runs, mount a
+# persistent block volume (for example an EBS volume) here, or run on a long-lived instance.
+# NFS and EFS are not supported for the index. Streams with "eq" or append mode do not use it.
+EC2_INDEX_DB_DIR = f"{EC2_OLAKE_BASE_DIR}/index-db"
+
 S3_STATE_KEY_PATH = f"{S3_PREFIX}state.json"
 
 # --- Initialization script for compute instance ---
@@ -59,7 +68,7 @@ exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 echo "--- Instance initialization: Starting Setup ---"
 
 echo "Creating application directories ({EC2_OLAKE_BASE_DIR})..."
-sudo mkdir -p {EC2_CONFIG_DIR}
+sudo mkdir -p {EC2_CONFIG_DIR} {EC2_INDEX_DB_DIR}
 sudo chmod -R 775 {EC2_OLAKE_BASE_DIR}
 
 echo "--- Initialization script finished ---"
@@ -197,9 +206,10 @@ date
 
 EC2_CONFIG_DIR="{EC2_OLAKE_BASE_DIR}/configs"
 EC2_STATE_FILE="{EC2_CONFIG_DIR}/state.json"
+EC2_INDEX_DB_DIR="{EC2_INDEX_DB_DIR}"
 
 echo "Creating directories if they don't exist..."
-sudo mkdir -p $EC2_CONFIG_DIR
+sudo mkdir -p $EC2_CONFIG_DIR $EC2_INDEX_DB_DIR
 
 echo "Fetching configuration files from object storage..."
 sudo aws s3 sync --region {AWS_REGION_NAME} s3://{S3_BUCKET}/{S3_PREFIX} $EC2_CONFIG_DIR --delete || {{
@@ -228,6 +238,8 @@ echo "Running data sync process..."
 set +e
 sudo ctr run --rm \
     --mount type=bind,src=$EC2_CONFIG_DIR,dst=/mnt/config,options=rbind:rw \
+    --mount type=bind,src=$EC2_INDEX_DB_DIR,dst=/mnt/index-db,options=rbind:rw \
+    --env OLAKE_INDEX_DB_DIR=/mnt/index-db \
     --net-host \
     docker.io/{OLAKE_IMAGE} \
     olake-ssh-sync \
