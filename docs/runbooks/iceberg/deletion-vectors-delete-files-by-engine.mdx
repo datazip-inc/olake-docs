@@ -1,0 +1,413 @@
+---
+title: "Iceberg deletion vectors and delete files: engine support"
+description: "Which engines read Iceberg position deletes, equality deletes and deletion vectors on v2 and v3 tables: Spark 3.3, 3.5 and 4.0, Trino 484, PyIceberg 0.12."
+sidebar_label: Delete files by engine
+unlisted: true
+keywords:
+  - iceberg deletion vectors
+  - iceberg equality deletes
+  - iceberg position deletes
+  - iceberg v3
+  - athena iceberg v3
+  - format-version
+  - write.delete.mode
+  - merge-on-read
+  - rewrite_position_delete_files
+  - remove-dangling-deletes
+  - "PyIceberg does not yet support equality deletes"
+  - "Cannot read unsupported version 3"
+  - "Cannot downgrade v3 table to v2"
+  - "Cannot downgrade v2 table to v1"
+  - "Must use DVs for position deletes in V3"
+  - "Iceberg table updates require at least format version 2"
+  - "Deletes are supported in V2 and above"
+  - "Merge on read is not yet supported, falling back to copy-on-write"
+  - "Cannot write manifest for table version: 3"
+  - "Cannot support vectorized reads for column"
+  - "DecodeArrow of DictAccumulator for DeltaLengthByteArrayDecoder"
+runbook:
+  family: iceberg
+  author: nayan
+  reproduced:
+    date: "2026-11-27"
+    versions:
+      - "Spark 3.5.6 with Iceberg 1.12.0"
+      - "Spark 4.0.5 with Iceberg 1.12.0"
+      - "Spark 3.3.3 with Iceberg 1.4.3"
+      - "PyIceberg 0.12.0 (PyArrow 26.0.1), without and with pyiceberg-core 0.10.1"
+      - "Trino 484"
+      - "Iceberg REST catalog fixture 1.10.1 and MinIO RELEASE.2025-04-03T14-56-28Z"
+    lab: labs/runbooks/iceberg/deletion-vectors-delete-files-by-engine
+    summary: "Spark on three versions, Trino and PyIceberg wrote the same rows and the same delete, update and merge to their own format version 2 and 3 tables, with position deletes, deletion vectors, copy-on-write, and equality deletes from the Iceberg Java API. Every engine then read every table, and its rows were compared with the expected rows. The failures were diagnosed and fixed with compaction, delete file rewrites and a version 2 copy. Athena, Redshift, Snowflake, BigQuery, Databricks, DuckDB and ClickHouse were not run."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+An Iceberg table records deleted rows in position delete files or equality delete files on format version 2, and in deletion vectors (DVs) or equality delete files on format version 3. Not every engine reads every format. In the lab, Spark with Iceberg 1.12.0 and Trino 484 read all of them correctly, PyIceberg 0.12.0 refused every table with equality deletes, and Spark with Iceberg 1.4.3 refused every version 3 table.
+
+This page wrote each format with Spark 3.3, 3.5 and 4.0, Trino 484, PyIceberg 0.12 and the Iceberg Java API, read every table with every engine, and gives the message each failure printed and the fix that made the table readable. Amazon Athena, Amazon Redshift, Snowflake, BigQuery, Databricks, DuckDB and ClickHouse were not run. Their rows come from their documentation, checked in November 2026.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** What a reader can open depends on the format version first, then on the delete format:
+
+- **Format version 3:** Spark with Iceberg 1.4.3 could not open any version 3 table, and the Amazon Web Services (AWS) documentation states that Amazon Athena cannot read them. Iceberg added deletion vector reads in 1.8.0, and the move to version 3 is one-way.
+- **Equality deletes:** PyIceberg 0.12.0 refuses a table while an equality delete file is in its current snapshot, and Snowflake and Databricks document that they do not support them. Rewrite the data files with `rewrite_data_files` with `delete-file-threshold` 1 and `remove-dangling-deletes`, or with Trino's `optimize`.
+- **Position deletes and deletion vectors:** every engine that could open the table read them correctly, except for two failures on Parquet encodings that Trino writes ([Issue 8](#issue-8-cannot-support-vectorized-reads-with-encoding-delta_length_byte_array) and [Issue 9](#issue-9-decodearrow-of-dictaccumulator-for-deltalengthbytearraydecoder)).
+
+<TLDR title='Key takeaways'>
+
+- Spark 3.5.6 and 4.0.5 with Iceberg 1.12.0 and Trino 484 returned the correct 9 rows from all 16 tables: position deletes, equality deletes and deletion vectors, from every writer, on format version 2 and 3.
+- PyIceberg 0.12.0 refused all 5 tables with equality deletes. The 3 rewritten with `remove-dangling-deletes` or Trino's `optimize` then read correctly, and the one rewritten without `remove-dangling-deletes` kept an equality delete file and was still refused.
+- A version 2 table moved to version 3 kept its position delete files and was read correctly by every engine that opens version 3. The next `MERGE` replaced one with a deletion vector, and `rewrite_position_delete_files` converted the other.
+
+</TLDR>
+
+## Which engine read which delete format
+
+Each engine wrote its own tables with the same changes: ids 1 to 10 in two inserts, a `DELETE` of ids 3 and 8, an `UPDATE` of id 5, and a `MERGE` that updated id 10 and inserted id 11. Then every engine read every table. A read is correct when it returned the 9 rows those changes leave and a `count(*)` of 9; no read returned wrong rows, so each read was either correct or an error.
+
+| Table written by | Format version | Delete files at the end | Spark 3.5.6 and 4.0.5, Iceberg 1.12.0 | Spark 3.3.3, Iceberg 1.4.3 | PyIceberg 0.12.0 | Trino 484 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Spark 3.5.6 or 4.0.5, merge-on-read | 2 | 2 position delete files | Correct | Correct | Correct | Correct |
+| Spark 3.3.3, merge-on-read | 2 | 3 position delete files | Correct | Correct | Correct | Correct |
+| Trino 484 | 2 | 4 position delete files | Correct | Failed, [Issue 8](#issue-8-cannot-support-vectorized-reads-with-encoding-delta_length_byte_array) | Failed, [Issue 9](#issue-9-decodearrow-of-dictaccumulator-for-deltalengthbytearraydecoder) | Correct |
+| Iceberg Java API 1.12.0 or 1.4.3 | 2 | 3 equality delete files | Correct | Correct | Refused, [Issue 1](#issue-1-pyiceberg-does-not-yet-support-equality-deletes) | Correct |
+| Spark 3.5.6 copy-on-write, PyIceberg 0.12.0 | 2 | None | Correct | Correct | Correct | Correct |
+| Spark 3.5.6 or 4.0.5, merge-on-read | 3 | 2 deletion vectors | Correct | Refused, [Issue 2](#issue-2-cannot-read-unsupported-version-3) | Correct | Correct |
+| Trino 484 | 3 | 2 deletion vectors | Correct | Refused | Correct | Correct |
+| Iceberg Java API 1.12.0 | 3 | 3 equality delete files | Correct | Refused | Refused | Correct |
+| Spark 3.5.6, copy-on-write | 3 | None | Correct | Refused | Correct | Correct |
+| Spark 3.5.6, moved from version 2 to 3 | 3 | 1 position delete file and 1 deletion vector | Correct | Refused | Correct | Correct |
+
+PyIceberg gave the same results without and with `pyiceberg-core` 0.10.1. Spark 3.3.3 with Iceberg 1.4.3 read Trino's version 2 table correctly once vectorized reads were turned off.
+
+### What each engine wrote
+
+None of the `DELETE`, `UPDATE` and `MERGE` statements in Spark, Trino or PyIceberg wrote equality deletes. The lab wrote them with the Iceberg Java API in the Spark session: each change was one `RowDelta` commit with an equality delete file on `id` and, for the update and the merge, a data file with the new rows. That is how a streaming upsert writer commits a change.
+
+| Writer | Format version 2 | Format version 3 |
+| --- | --- | --- |
+| Spark 3.5.6 and 4.0.5, merge-on-read | Position delete files, one per data file, replaced at each later change: 2 files | Deletion vectors, one per data file, replaced at each later change: 2 |
+| Spark 3.3.3, merge-on-read | Position delete files, a new one at each change: 3 files | Not run: Iceberg 1.4.3 has no format version 3 |
+| Spark, copy-on-write | No delete files; changed data files are rewritten | No delete files |
+| Trino 484 | Position delete files, a new one per data file at each change: 4 files | Deletion vectors, one per data file, replaced at each later change: 2 |
+| PyIceberg 0.12.0 | No delete files, even with merge-on-read set ([Issue 7](#issue-7-pyiceberg-writes-no-delete-files-and-cannot-append-to-version-3)) | Created the table, then could not append to it |
+
+Merge-on-read is set per operation with the table properties `write.delete.mode`, `write.update.mode` and `write.merge.mode`. The [configuration documentation](https://iceberg.apache.org/docs/latest/configuration/#write-properties) gives each a default of `copy-on-write` and the note "(v2 and above)" (checked Nov 2026).
+
+## What you see
+
+Each message below was printed by the lab. The issue sections give the full text.
+
+| Message | When | Printed by |
+| --- | --- | --- |
+| `PyIceberg does not yet support equality deletes: https://github.com/apache/iceberg/issues/6568` | reading a table with an equality delete file in its current snapshot | PyIceberg 0.12.0 |
+| `Cannot read unsupported version 3` | loading any version 3 table | Iceberg 1.4.3 |
+| `Received a success response code of 200, but failed to parse response body into LoadTableResponse` | the same, through a REST catalog | Iceberg 1.4.3 |
+| `Cannot downgrade v3 table to v2` | `'format-version' = '2'` on a version 3 table | Iceberg 1.12.0 |
+| `Cannot downgrade v2 table to v1` | `'format-version' = '1'` on a version 2 table | Iceberg 1.12.0 |
+| `Must use DVs for position deletes in V3: ...` | a position delete file committed to a version 3 table | Iceberg 1.12.0 |
+| `Iceberg table updates require at least format version 2` | `DELETE`, `UPDATE` or `MERGE` on a version 1 table | Trino 484 |
+| `Deletes are supported in V2 and above` | a merge-on-read `DELETE` on a version 1 table | Iceberg 1.12.0 |
+| `Merge on read is not yet supported, falling back to copy-on-write` | `delete`, `overwrite` or `upsert` with merge-on-read set (a warning) | PyIceberg 0.12.0 |
+| `Cannot write manifest for table version: 3` | `append` to a version 3 table | PyIceberg 0.12.0 |
+| `Cannot support vectorized reads for column [v] ... with encoding DELTA_LENGTH_BYTE_ARRAY` | reading data files that Trino wrote | Iceberg 1.4.3 |
+| `Not yet implemented: DecodeArrow of DictAccumulator for DeltaLengthByteArrayDecoder.` | reading position delete files that Trino wrote | PyIceberg 0.12.0 with PyArrow 26.0.1 |
+
+## How Iceberg records deleted rows
+
+The [table specification](https://iceberg.apache.org/spec/#row-level-deletes) names three representations (checked Nov 2026). "The current representation is deletion vectors (v3 or above), which encode deleted positions of a single file in a bitmap." Position deletes "may be created in v2 tables only", and equality deletes "may be created in v2 and v3 tables only".
+
+A position delete or a deletion vector names a data file and a row position in it, so a reader drops those rows from that file. An equality delete holds key values, such as `id = 5`, and a reader must compare them with every row of the older data files in the same partition. Spark's and Trino's `DELETE`, which find the rows first, wrote positions in the lab; a streaming upsert that has only the key writes equality deletes, as the lab's Java API commits did.
+
+Deletion vectors are stored in Puffin files, and a data file can have only one. The [specification](https://iceberg.apache.org/spec/#deletion-vectors) states: "At most one deletion vector is allowed per data file in a snapshot. If a DV is written for a data file, it must replace all previously written position delete files so that when a DV is present, readers can safely ignore matching position delete files."
+
+Every later change to a data file in the lab replaced its deletion vector, and the snapshot summary showed `added-dvs=1` with `removed-dvs=1`.
+
+The format version is set per table and only goes up. A reader that does not support a table's version cannot open it, whatever its delete files: Iceberg 1.4.3 refused the version 3 table written with copy-on-write as well. Copy-on-write writes no delete files, so every reader that opens the table's version reads it.
+
+## Confirm the diagnosis
+
+Find the table's format version and the delete files of its current snapshot. In Spark, the `delete_files` metadata table lists them: `content` 1 is a position delete file, or a deletion vector when `file_format` is `PUFFIN`, and `content` 2 is an equality delete file.
+
+```sql
+SHOW TBLPROPERTIES demo.db.s35_v2to3 ('format-version');
+SELECT content, file_format, count(*) AS files, sum(record_count) AS records
+FROM demo.db.s35_v2to3.delete_files GROUP BY content, file_format ORDER BY content, file_format;
+```
+
+For the table moved from version 2 to 3, before the fix in [Issue 4](#issue-4-position-delete-files-left-in-a-table-moved-to-version-3):
+
+```text
+content | file_format | files | records
+1 | PARQUET | 1 | 2
+1 | PUFFIN | 1 | 2
+```
+
+In Trino, `SHOW CREATE TABLE` shows `format_version = 2` or `3`, and the `$files` metadata table has the same `content` and `file_format` columns for data and delete files:
+
+```sql
+SELECT content, file_format, count(*), sum(record_count) FROM iceberg.db."t_v3_dv$files" GROUP BY content, file_format ORDER BY content, file_format;
+```
+
+```text
+0	PARQUET	4	13
+1	PUFFIN	2	4
+```
+
+In PyIceberg, `tbl.format_version` gives the version and `tbl.inspect.files()` has the same `content` column. The snapshot summary also counts what each commit added: `added-position-delete-files`, `added-equality-delete-files` and `added-dvs`.
+
+## Issue 1: PyIceberg does not yet support equality deletes
+
+PyIceberg 0.12.0 refused all 5 tables with equality delete files, on format version 2 and 3, written by Iceberg 1.12.0 and 1.4.3, without and with `pyiceberg-core`:
+
+```text
+ValueError: PyIceberg does not yet support equality deletes: https://github.com/apache/iceberg/issues/6568
+```
+
+`tbl.inspect.files()` still listed the table's files, and the scan failed. The link in the message is to [iceberg#6568](https://github.com/apache/iceberg/issues/6568), "Python: Table scan returning deleted data", opened in January 2023 and closed in May 2023.
+
+The open request for this feature is [iceberg-python#1210](https://github.com/apache/iceberg-python/issues/1210), "Support reading equality delete files", opened in September 2024. PyIceberg 0.12.0 was the latest release on PyPI on 27 November 2026.
+
+Snowflake and Databricks do not read equality deletes either, by their documentation ([Engines that were not run](#engines-that-were-not-run)).
+
+**Fix:** rewrite the data files that the equality deletes apply to, and remove the delete files from the snapshot. Iceberg 1.12.0 in Spark:
+
+```sql
+CALL demo.system.rewrite_data_files(table => 'db.s40_v2_eq', options => map('delete-file-threshold', '1', 'remove-dangling-deletes', 'true'))
+```
+
+```text
+rewritten_data_files_count | added_data_files_count | rewritten_bytes_count | failed_data_files_count | removed_delete_files_count
+4 | 1 | 2555 | 0 | 1
+```
+
+The table was left with no delete files, and PyIceberg 0.12.0 read its 9 rows; the same call did the same on the version 3 table `s35_v3_eq`. Without `remove-dangling-deletes`, on `s35_v2_eq`, the rewrite removed 2 of the 3 equality delete files and left one with 2 records. PyIceberg still refused that table.
+
+The [procedures documentation](https://iceberg.apache.org/docs/latest/spark-procedures/#rewrite_data_files) describes the option: "Remove dangling position and equality deletes after rewriting. A delete file is considered dangling if it does not apply to any live data files" (checked Nov 2026). Iceberg 1.4.3 rejects the option, as [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/#issue-5-files-with-deletes-are-not-rewritten) shows.
+
+Trino's `optimize` did the same in one step, on the table that Iceberg 1.4.3 wrote:
+
+```sql
+ALTER TABLE iceberg.db.s33_v2_eq EXECUTE optimize
+```
+
+```text
+rewritten_data_files_count |            4
+removed_delete_files_count |            3
+added_data_files_count     |            1
+```
+
+The table had one data file and no delete files afterwards, and PyIceberg read its 9 rows. A table that gets new equality deletes needs the rewrite again after each batch of them.
+
+## Issue 2: Cannot read unsupported version 3
+
+Spark 3.3.3 with Iceberg 1.4.3 could not load any of the 7 version 3 tables, whatever their delete files, the copy-on-write table included. Through the REST catalog the message came wrapped:
+
+```text
+org.apache.iceberg.exceptions.RESTException: Received a success response code of 200, but failed to parse response body into LoadTableResponse
+Caused by: org.apache.iceberg.shaded.com.fasterxml.jackson.databind.JsonMappingException: Cannot read unsupported version 3 (through reference chain: org.apache.iceberg.rest.responses.LoadTableResponse["metadata"])
+Caused by: java.lang.IllegalArgumentException: Cannot read unsupported version 3
+```
+
+In the Iceberg source, the highest format version a release reads, `SUPPORTED_TABLE_FORMAT_VERSION`, is 2 at the [1.4.3](https://github.com/apache/iceberg/blob/apache-iceberg-1.4.3/core/src/main/java/org/apache/iceberg/TableMetadata.java), 1.5.0 and 1.6.0 release tags, and 3 at [1.7.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.7.0/core/src/main/java/org/apache/iceberg/TableMetadata.java). The [1.8.0 release notes](https://iceberg.apache.org/releases/#180-release) list "Support for reading Deletion Vectors" and "Support for writing Deletion Vectors" (checked Nov 2026). Iceberg 1.7 and 1.8 were not run.
+
+The same release notes list Spark 3.3 under "Deprecation / End of Support", and the last `iceberg-spark-runtime-3.3_2.12` on Maven Central is 1.8.1. A reader on Spark 3.3 cannot move past that Iceberg version.
+
+**Fix:** move the reader to an Iceberg release that reads version 3. Spark 3.5.6 and 4.0.5 with Iceberg 1.12.0 read all 7 tables correctly. If the reader cannot move, give it a version 2 copy ([Issue 3](#issue-3-cannot-downgrade-v3-table-to-v2)).
+
+## Issue 3: Cannot downgrade v3 table to v2
+
+Iceberg 1.12.0 refused to set a version 3 table back to version 2, and a version 2 table back to version 1:
+
+```sql
+ALTER TABLE demo.db.s35_v3_dv SET TBLPROPERTIES ('format-version' = '2')
+```
+
+```text
+org.apache.spark.SparkException: Unsupported table change: Cannot downgrade v3 table to v2
+Caused by: java.lang.IllegalArgumentException: Cannot downgrade v3 table to v2
+```
+
+The second change gave `Unsupported table change: Cannot downgrade v2 table to v1`. The Amazon S3 [Iceberg V3 guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/working-with-apache-iceberg-v3.html) gives the same rule: "V3 is a one-way upgrade. Once a table is upgraded from V2 to V3, it cannot be downgraded back to V2 through standard operations" (checked Nov 2026).
+
+**Fix:** for a reader that cannot open version 3, write the rows to a new version 2 table:
+
+```sql
+CREATE TABLE demo.db.s35_v3_dv_v2copy USING iceberg TBLPROPERTIES ('format-version' = '2') AS SELECT * FROM demo.db.s35_v3_dv
+```
+
+The copy was a version 2 table with no delete files, and Spark 3.3.3 with Iceberg 1.4.3 read its 9 rows. It is a new table with its own snapshots, so the source table's history does not carry over, and writers must move to it.
+
+## Issue 4: Position delete files left in a table moved to version 3
+
+This prints no error. `s35_v2to3` was a version 2 merge-on-read table with position delete files from its `DELETE` and `UPDATE`, and was then moved to version 3:
+
+```sql
+ALTER TABLE demo.db.s35_v2to3 SET TBLPROPERTIES ('format-version' = '3')
+```
+
+The position delete files stayed. The next `MERGE` changed one of the two data files, wrote a deletion vector for it and removed that file's position delete file, `added-dvs=1, removed-position-delete-files=1`. The other data file kept its Parquet position delete file, so the table had both kinds, as in Confirm the diagnosis.
+
+Spark with Iceberg 1.12.0, PyIceberg 0.12.0 and Trino 484 read the table correctly in that state.
+
+The [specification](https://iceberg.apache.org/spec/#position-delete-files) describes this state: "Position delete files are deprecated in v3. Existing position deletes must be written to delete vectors when updating the position deletes for a data file" (checked Nov 2026). The Amazon Redshift [v3 page](https://docs.aws.amazon.com/redshift/latest/dg/iceberg-v3-features.html) says the same of Redshift's own writes: "On subsequent DELETE, UPDATE, or MERGE operations, Amazon Redshift merges v2 positional deletes into deletion vectors for the data files affected by the operation" (checked Nov 2026).
+
+**Fix:** to convert the rest, rewrite the position delete files. On the version 3 table, Iceberg 1.12.0 wrote them as deletion vectors:
+
+```sql
+CALL demo.system.rewrite_position_delete_files(table => 'db.s35_v2to3', options => map('rewrite-all', 'true'))
+```
+
+```text
+rewritten_delete_files_count | added_delete_files_count | rewritten_bytes_count | added_bytes_count
+2 | 2 | 1513 | 88
+```
+
+The table then had `1 | PUFFIN | 2 | 4` in `delete_files`: two deletion vectors and no Parquet position delete file.
+
+## Issue 5: Must use DVs for position deletes in V3
+
+Iceberg 1.12.0 refused a Parquet position delete file in a version 3 table when the commit was made, with an `IllegalArgumentException`, and the table kept its 10 rows. The lab committed one with the Iceberg Java API:
+
+```text
+Must use DVs for position deletes in V3: s3://warehouse/db/s35_v3_posfile/data/00001-1795793453741-40abe8d6-7b25-45e4-aa24-e2806dfb9fa4-00001.parquet
+```
+
+Spark and Trino wrote deletion vectors on version 3 tables without any setting. A writer that writes position delete files can still meet a table that another engine moved to version 3.
+
+**Fix:** keep the table on version 2 until every writer writes deletion vectors, or move the writer to one that does: Iceberg 1.8.0 or later in Spark, or Trino 484.
+
+## Issue 6: Iceberg table updates require at least format version 2
+
+Row-level changes need format version 2 or later. Trino 484 refused `DELETE`, `UPDATE` and `MERGE` on a version 1 table:
+
+```text
+Query 20261127_153034_00024_yekwy failed: Iceberg table updates require at least format version 2
+```
+
+After `ALTER TABLE iceberg.db.t_v1 SET PROPERTIES format_version = 2`, the same `DELETE` ran and wrote a position delete file. Spark with Iceberg 1.12.0 refused a merge-on-read `DELETE` on a version 1 table with an `IllegalArgumentException`, `Deletes are supported in V2 and above`.
+
+Amazon Athena was not run. On [AWS re:Post](https://repost.aws/questions/QUNB9OpGvFRvqlIzhZmBw0Tw/merge-into-query-using-iceberg-table-throws-iceberg-v2-support-error), in February 2024, an Athena user reported `NOT_SUPPORTED: Iceberg table updates require at least format version 2` from a `MERGE`, and found that the table had been created by Spark as version 1. The [Athena documentation](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg.html) states: "Athena only creates and operates on Iceberg v2 tables" (checked Nov 2026).
+
+Tables that a writer creates without `format-version` were version 2 in the lab, on Iceberg 1.4.3 and 1.12.0, in PyIceberg 0.12.0 and in Trino 484. The [configuration documentation](https://iceberg.apache.org/docs/latest/configuration/#table-behavior-properties) says the default is 2: "Defaults to 2 since version 1.4.0" (checked Nov 2026).
+
+**Fix:** move the table to version 2, `ALTER TABLE ... SET TBLPROPERTIES ('format-version' = '2')` in Spark or `SET PROPERTIES format_version = 2` in Trino. [Partition evolution errors](/docs/runbooks/iceberg/partition-evolution-errors/#issue-13-cannot-build-accessor-for-field-null) has another failure that the same move fixed.
+
+## Issue 7: PyIceberg writes no delete files and cannot append to version 3
+
+The table `py_v2` had `write.delete.mode`, `write.update.mode` and `write.merge.mode` set to `merge-on-read`. PyIceberg 0.12.0 warned at `delete`, `overwrite` and `upsert`, and rewrote the data files:
+
+```text
+WARNING UserWarning: Merge on read is not yet supported, falling back to copy-on-write
+```
+
+The table ended with 5 data files of 9 records and no delete files, and every engine read it correctly. The open requests are [iceberg-python#1078](https://github.com/apache/iceberg-python/issues/1078), "Support Merge-on-Read mode for Deletes", opened in August 2024, and [iceberg-python#3618](https://github.com/apache/iceberg-python/issues/3618), opened in July 2026.
+
+On format version 3, `create_table` ran and the first `append` failed:
+
+```text
+ValueError: Cannot write manifest for table version: 3
+```
+
+[iceberg-python#1551](https://github.com/apache/iceberg-python/issues/1551), "Support writing V3 tables", opened in January 2025, is open. PyIceberg 0.12.0 read version 3 tables that Spark and Trino wrote, deletion vectors included.
+
+**Fix:** write version 3 tables with an engine that writes them, such as Spark with Iceberg 1.8.0 or later or Trino 484, and keep tables that PyIceberg writes on version 2.
+
+## Issue 8: Cannot support vectorized reads with encoding DELTA_LENGTH_BYTE_ARRAY
+
+This is not a delete file problem, and it showed only on the table Trino wrote. Spark 3.3.3 with Iceberg 1.4.3 failed on Trino's data files:
+
+```text
+java.lang.UnsupportedOperationException: Cannot support vectorized reads for column [v] optional binary v (STRING) = 2 with encoding DELTA_LENGTH_BYTE_ARRAY. Disable vectorized reads to read this table/file
+```
+
+Trino 484 wrote its files with `created_by parquet-mr-trino version 484` and encoded the string column `v` as `DELTA_LENGTH_BYTE_ARRAY`; Spark's data files used `PLAIN`. Iceberg 1.4.3's vectorized Parquet reader does not read that encoding. [iceberg#15362](https://github.com/apache/iceberg/pull/15362), "Add vectorized parquet read support for `DELTA_LENGTH_BYTE_ARRAY` & `DELTA_BYTE_ARRAY` encodings", was merged in February 2026 and is in the 1.11.0 and 1.12.0 release tags.
+
+**Fix:** turn vectorized reads off for that reader:
+
+```text
+--conf spark.sql.iceberg.vectorization.enabled=false
+```
+
+With it, Spark 3.3.3 with Iceberg 1.4.3 read the table correctly, Trino's 4 position delete files applied. The table property `read.parquet.vectorization.enabled` controls the same reads, with a default of `true` ([configuration](https://iceberg.apache.org/docs/latest/configuration/#read-properties), checked Nov 2026); it was not run. Spark with Iceberg 1.12.0 read the table with vectorized reads on.
+
+## Issue 9: DecodeArrow of DictAccumulator for DeltaLengthByteArrayDecoder
+
+PyIceberg 0.12.0 failed on Trino's version 2 table, without and with `pyiceberg-core`:
+
+```text
+OSError: Not yet implemented: DecodeArrow of DictAccumulator for DeltaLengthByteArrayDecoder.
+```
+
+It read Trino's version 3 table, which has the same kind of data files and deletion vectors in place of position delete files. The cause is in the position delete files.
+
+Trino encodes their `file_path` column as `DELTA_LENGTH_BYTE_ARRAY`, and PyIceberg reads that column as a dictionary. Its `_read_deletes` function, printed by the lab, opens Parquet delete files with:
+
+```python
+_get_file_format(data_file.file_format, dictionary_columns=("file_path",), pre_buffer=True, buffer_size=ONE_MEGABYTE)
+```
+
+PyArrow 26.0.1 read each of Trino's delete files without a dictionary, `1 rows`, and failed with `read_dictionary=['file_path']` with the message above. Spark's delete files encode `file_path` as `PLAIN_DICTIONARY`, and PyArrow read them both ways. [seaweedfs#11639](https://github.com/seaweedfs/seaweedfs/issues/11639), opened and closed in October 2026, reports the same PyIceberg failure on delete files that SeaweedFS wrote with the same encoding.
+
+**Fix:** rewrite the position delete files with Spark:
+
+```sql
+CALL demo.system.rewrite_position_delete_files(table => 'db.t_v2_pos', options => map('rewrite-all', 'true'))
+```
+
+```text
+rewritten_delete_files_count | added_delete_files_count | rewritten_bytes_count | added_bytes_count
+4 | 2 | 4028 | 3365
+```
+
+PyIceberg then read the table's 9 rows. All 4 of Trino's delete files had this encoding, so repeat the rewrite after Trino's later deletes on the table.
+
+## Engines that were not run
+
+None of these engines was run for this page. Each statement is from the engine's documentation, checked in November 2026.
+
+| Engine | Format version 2 | Format version 3 | Source |
+| --- | --- | --- | --- |
+| Amazon Athena | `UPDATE`, `MERGE INTO` and `DELETE FROM` "always use the merge-on-read approach with positional deletes" | "Amazon Athena can't read V3 tables" | [Athena DML](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-updating-iceberg-table-data.html), [S3 Iceberg V3 guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/working-with-apache-iceberg-v3.html) |
+| Amazon Redshift | Lists version 2 among the versions it queries, "handling table data changes using delete files" | Reads and writes deletion vectors, "only on Amazon Redshift Serverless clusters and on provisioned clusters that use Amazon Redshift RG instances". "You can't use Iceberg v3 tables that contain equality deletes" | [Redshift Iceberg tables](https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html), [Redshift v3 features](https://docs.aws.amazon.com/redshift/latest/dg/iceberg-v3-features.html) |
+| Snowflake | "Snowflake supports position deletes only for v2 Iceberg tables", and "Row-level deletes with equality delete files aren't supported" | "deletion vectors for v3 Iceberg tables" | [Snowflake Iceberg tables](https://docs.snowflake.com/en/user-guide/tables-iceberg) |
+| BigQuery | Version 2 "including merge-on-read"; "No more than 100,000 equality deletes can be applied to a data file" | Version 3 with deletion vectors "is in Preview"; "You can only read V3 tables from BigQuery" | [BigQuery Iceberg external tables](https://docs.cloud.google.com/bigquery/docs/iceberg-external-tables), [Lakehouse deletion vectors](https://docs.cloud.google.com/lakehouse/docs/use-iceberg-v3-binary-deletion-vectors) |
+| Databricks | "For Iceberg v2, position deletes and equality-based deletes aren't supported" | "Databricks supports Iceberg v3 deletion vectors for row-level deletions" | [Iceberg on Databricks](https://docs.databricks.com/aws/en/iceberg/) |
+| DuckDB (duckdb-iceberg 1.5.3) | "In v2 tables, DuckDB-Iceberg writes positional deletes as Parquet files" | Writes deletion vectors; the post does not mention equality deletes | [New DuckDB-Iceberg features in v1.5.3](https://duckdb.org/2026/05/29/new-iceberg-features) |
+| ClickHouse | Position deletes, and "Equality deletes (supported from version 25.8+)" | "Deletion vector support is read-only. ClickHouse does not write, update, or compact deletion vectors" | [ClickHouse Iceberg table engine](https://clickhouse.com/docs/engines/table-engines/integrations/iceberg) |
+| Spark on Amazon EMR, AWS Glue ETL | Not covered by this source | Version 3 from EMR release 7.12 and Glue version 5.1 | [S3 Iceberg V3 guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/working-with-apache-iceberg-v3.html) |
+
+Two of these sources state more limits. Snowflake: "Excessive position deletes, especially dangling position deletes, might prevent table creation and refresh operations." Databricks, for managed Iceberg tables: "When an external Iceberg client runs a row-level change (DELETE, UPDATE, or MERGE) on a managed Iceberg v3 table, the client must use copy-on-write mode or record deleted rows as Iceberg v3 deletion vectors."
+
+**Flink**, the common source of equality deletes, was not run either. The [Flink writes documentation](https://iceberg.apache.org/docs/latest/flink-writes/#upsert) states: "Iceberg supports UPSERT based on the primary key when writing data into v2 table format." Iceberg 1.12.0 added a sink option that "converts equality deletes to deletion vectors (requires equality fields and table format version >= 3)", `convertEqualityDeletes()` ([post-commit table maintenance](https://iceberg.apache.org/docs/latest/flink-writes/#post-commit-table-maintenance), checked Nov 2026).
+
+## Prevent it
+
+- List every engine that reads or writes a table before you choose its format version and its writers' delete format, then check each against the matrix above.
+- Keep a table on format version 2 while any reader is older than Iceberg 1.8.0 or is Amazon Athena. Moving to version 3 cannot be undone.
+- When PyIceberg, Snowflake or Databricks read a table that gets equality deletes, rewrite it on a schedule with `delete-file-threshold` 1 and `remove-dangling-deletes`, or with Trino's `optimize`, and check `delete_files` afterwards.
+- After a move to version 3, run `rewrite_position_delete_files` so that the old position delete files become deletion vectors.
+- Before a new engine reads a table that another engine wrote, read the table once with it and compare the rows and the count. Two of the failures here came from the Parquet encodings Trino writes, not from the delete format.
+
+:::note[How OLake Go handles this]
+
+OLake Go writes all three formats in Upsert mode. Its [upsert documentation](/docs/understanding/terminologies/olake/#upsert) says: "The default delete format is determined by your selected query engine and follows this order: **equality deletes**, **positional deletes**, then **deletion vectors**, selecting the first format your engine supports." The same page says that switching between deletion vectors and the version 2 formats on an existing job triggers a clear destination operation, "because this is an Iceberg version downgrade (v3 to v2)": OLake Go has the same one-way move.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Iceberg: [specification, row-level deletes](https://iceberg.apache.org/spec/#row-level-deletes), [deletion vectors](https://iceberg.apache.org/spec/#deletion-vectors), [position delete files](https://iceberg.apache.org/spec/#position-delete-files), [equality delete files](https://iceberg.apache.org/spec/#equality-delete-files); [configuration](https://iceberg.apache.org/docs/latest/configuration/); [Spark procedures](https://iceberg.apache.org/docs/latest/spark-procedures/), for `rewrite_data_files` and `rewrite_position_delete_files`; [Flink writes](https://iceberg.apache.org/docs/latest/flink-writes/); [release notes](https://iceberg.apache.org/releases/), 1.4.0, 1.8.0 and 1.12.0
+- PyIceberg: [iceberg-python#1210](https://github.com/apache/iceberg-python/issues/1210), reading equality delete files, opened September 2024, open; [iceberg-python#1078](https://github.com/apache/iceberg-python/issues/1078), merge-on-read deletes, opened August 2024, open; [iceberg-python#1551](https://github.com/apache/iceberg-python/issues/1551), writing v3 tables, opened January 2025, open; [iceberg#6568](https://github.com/apache/iceberg/issues/6568), linked from the equality delete error, opened January 2023, closed May 2023
+- Trino: [Iceberg connector, Trino 484](https://trino.io/docs/484/connector/iceberg.html), for `format_version` and row-level deletes
+- Iceberg source: [iceberg#15362](https://github.com/apache/iceberg/pull/15362), vectorized reads of `DELTA_LENGTH_BYTE_ARRAY`, merged February 2026; `SUPPORTED_TABLE_FORMAT_VERSION` in `TableMetadata.java` at [1.4.3](https://github.com/apache/iceberg/blob/apache-iceberg-1.4.3/core/src/main/java/org/apache/iceberg/TableMetadata.java) and [1.7.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.7.0/core/src/main/java/org/apache/iceberg/TableMetadata.java)
+- AWS: [Athena Iceberg tables](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg.html), [Athena DML](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-updating-iceberg-table-data.html), [S3 Iceberg V3 guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/working-with-apache-iceberg-v3.html), [Redshift v3 features](https://docs.aws.amazon.com/redshift/latest/dg/iceberg-v3-features.html), [re:Post question on the format version 2 error](https://repost.aws/questions/QUNB9OpGvFRvqlIzhZmBw0Tw/merge-into-query-using-iceberg-table-throws-iceberg-v2-support-error)
+- Other engines: [Snowflake](https://docs.snowflake.com/en/user-guide/tables-iceberg), [BigQuery](https://docs.cloud.google.com/bigquery/docs/iceberg-external-tables), [Databricks](https://docs.databricks.com/aws/en/iceberg/), [DuckDB](https://duckdb.org/2026/05/29/new-iceberg-features), [ClickHouse](https://clickhouse.com/docs/engines/table-engines/integrations/iceberg)
+- GitHub: [seaweedfs#11639](https://github.com/seaweedfs/seaweedfs/issues/11639), PyIceberg and `DELTA_LENGTH_BYTE_ARRAY` delete files, opened and closed October 2026
+- Related runbooks: [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/), for `delete-file-threshold` and `remove-dangling-deletes`; [Storage not freed](/docs/runbooks/iceberg/expire-snapshots-remove-orphan-files/#issue-4-delete-did-not-free-space), for merge-on-read deletes and expiry; [Spark cannot find Iceberg](/docs/runbooks/iceberg/spark-cannot-find-iceberg/#issue-4-no-sql-extensions), for the SQL extensions that `MERGE` and `UPDATE` need on Spark 3.3; [Partition evolution errors](/docs/runbooks/iceberg/partition-evolution-errors/); [Schema evolution errors](/docs/runbooks/iceberg/schema-evolution-errors/)

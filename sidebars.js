@@ -481,7 +481,8 @@ const runbooksSidebar = {
         { type: 'doc', id: 'runbooks/iceberg/partition-evolution-errors', label: 'Partition evolution errors' },
         { type: 'doc', id: 'runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing', label: 'Compaction rewrites nothing' },
         { type: 'doc', id: 'runbooks/iceberg/expire-snapshots-remove-orphan-files', label: 'Storage not reclaimed' },
-        { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' }
+        { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' },
+        { type: 'doc', id: 'runbooks/iceberg/deletion-vectors-delete-files-by-engine', label: 'Delete files by engine' }
       ]
     }
   ]
