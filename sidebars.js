@@ -459,7 +459,8 @@ const runbooksSidebar = {
       collapsed: false,
       items: [
         { type: 'doc', id: 'runbooks/debezium/connector-running-captures-nothing', label: 'Running but captures nothing' },
-        { type: 'doc', id: 'runbooks/debezium/schema-history-topic-missing', label: 'Schema history topic missing' }
+        { type: 'doc', id: 'runbooks/debezium/schema-history-topic-missing', label: 'Schema history topic missing' },
+        { type: 'doc', id: 'runbooks/debezium/add-table-incremental-snapshot', label: 'Add a table to a running connector' }
       ]
     },
     {

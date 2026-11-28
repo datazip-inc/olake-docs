@@ -1,0 +1,547 @@
+---
+title: "Debezium incremental snapshot for a newly added table"
+description: "Why a table added to a running Debezium connector gets no existing rows, and the execute-snapshot signals that loaded them on Debezium 1.9 and 3.7."
+sidebar_label: Add a table to a running connector
+unlisted: true
+keywords:
+  - debezium incremental snapshot
+  - debezium add table to existing connector
+  - debezium new table not snapshotted
+  - execute-snapshot
+  - stop-snapshot
+  - signal.data.collection
+  - debezium_signal
+  - incremental.snapshot.chunk.size
+  - debezium blocking snapshot
+  - debezium read.only signal.kafka.topic
+  - SQL error while executing incremental snapshot
+  - Incremental snapshot for table skipped because the table has no primary keys
+runbook:
+  family: debezium
+  author: nayan
+  reproduced:
+    date: "2026-11-28"
+    versions:
+      - "Debezium 3.7.1.Final on Kafka Connect 4.3.1 with MySQL 8.4.13"
+      - "Debezium 1.9.7.Final on Kafka Connect 3.2.0 with MySQL 8.0.46"
+    lab: labs/runbooks/debezium/add-table-incremental-snapshot
+    summary: "A table that already held 20,000 rows was added to a running MySQL connector, and the rows that reached its topic were counted for each way of loading them: the include list alone, an incremental snapshot started from a signal table, a read-only one started from a Kafka topic, and a blocking snapshot. The runs also covered signals that start nothing or skip the table, stop-snapshot, a task restart and changes made during a snapshot."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+A table added to `table.include.list` on a running Debezium connector gets the changes made from then on and none of the rows it already holds. The connector finds its stored offset, skips the snapshot and goes on reading the binary log (binlog). To load the existing rows without resetting the connector, send it an `execute-snapshot` signal: an incremental snapshot reads the table in chunks while the connector keeps streaming.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Add the table to `table.include.list`, then ask for a snapshot of it with a signal:
+
+1. Create a signal table and name it in `signal.data.collection`. On Debezium 1.x, also add the signal table to `table.include.list`.
+2. Grant the connector's database user `INSERT` on the signal table.
+3. Insert an `execute-snapshot` row that names the new table.
+
+In the runs this loaded all 20,001 rows on Debezium 1.9.7 and 3.7.1. If the connector may not write to the database, send the signal to a Kafka topic and set `read.only=true` ([Fix 2](#fix-2-a-read-only-incremental-snapshot-from-a-kafka-topic)).
+
+<TLDR title='Key takeaways'>
+
+- Adding a table to `table.include.list` delivered **0 of its 20,000 rows** on Debezium 1.9.7 and 3.7.1. Only the changes made after the edit arrived.
+- An incremental snapshot delivered **every row** as a read event (`op=r`) while the connector kept streaming. 100 updates and 20 deletes made during a snapshot all ended with the right last event per row.
+- Without `INSERT` on the signal table, **Debezium 3.7.1** skipped the snapshot with a warning and stayed `RUNNING`. **Debezium 1.9.7** failed the task, and after the fix it ran every signal sent so far, so each row arrived three times.
+
+</TLDR>
+
+## What you see
+
+The connector and its task stay `RUNNING`. The new table gets a topic when its first change arrives, and the topic holds only changes.
+
+In the run, `orders` held 20,000 rows when it was added to the include list, and one row was inserted after the change. The lab's `count.py` compared the topic with the table:
+
+```text
+events: 1 (op=c 1)
+source.snapshot: false 1
+distinct id values: 1, read as op=r: 0, with more than one event: 0
+rows in the table: 20001, of them in the topic: 1, never arrived: 20000
+```
+
+The worker log shows that the restarted task found its offset and skipped the snapshot:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+```text
+INFO   MySQL|dbserver1|snapshot  A previous offset indicating a completed snapshot has been found. Neither schema nor data will be snapshotted.   [io.debezium.connector.mysql.MySqlSnapshotChangeEventSource]
+```
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+```text
+INFO   MySQL||snapshot  A previous offset indicating a completed snapshot has been found.   [io.debezium.relational.RelationalSnapshotChangeEventSource]
+INFO   MySQL||snapshot  Snapshot ended with SnapshotResult [status=SKIPPED, ...]
+```
+
+</TabItem>
+</Tabs>
+
+### What each method delivered
+
+Each row is one way to load the rows of a table added to a running connector. The count is the number of the table's rows that reached its topic.
+
+| Method | Debezium 1.9.7 | Debezium 3.7.1 |
+| --- | --- | --- |
+| Add the table to `table.include.list` | 0 of 20,000 | 0 of 20,000 |
+| `execute-snapshot` from a signal table ([Fix 1](#fix-1-an-incremental-snapshot-from-a-signal-table)) | 20,001 of 20,001, each three times ([why](#a-signal-sent-earlier-runs-after-a-restart)) | 20,001 of 20,001 |
+| `execute-snapshot` from a Kafka topic, `read.only=true` ([Fix 2](#fix-2-a-read-only-incremental-snapshot-from-a-kafka-topic)) | 20,001 of 20,001 | 20,001 of 20,001 |
+| `execute-snapshot` with `"type": "blocking"` ([Fix 3](#fix-3-a-blocking-snapshot)) | None: the task failed | 20,001 of 20,001 |
+| Recovery mode, the documented fix for `schema isn't known to this connector` | Not run | 1 of 5, in the lab of [The db history topic is missing](/docs/runbooks/debezium/schema-history-topic-missing/#issue-3-a-table-added-to-a-running-connector) |
+
+Deleting the connector's offsets and taking a new initial snapshot also loads the rows, and sends again every row that had already arrived. [Connector is RUNNING but captures nothing](/docs/runbooks/debezium/connector-running-captures-nothing/#issue-1-the-include-list-matches-no-table) shows that reset.
+
+### Names and behaviour by Debezium version
+
+| | Debezium 1.9.7 | Debezium 3.7.1 |
+| --- | --- | --- |
+| Topic prefix | `database.server.name` | `topic.prefix` |
+| Snapshot mode that reads no rows | `schema_only` | `no_data` |
+| Signal table left out of `table.include.list` | The signal was ignored, with no log line | The signal was read |
+| No `INSERT` on the signal table | The task `FAILED` | A warning; the snapshot was skipped and the task stayed `RUNNING` |
+| Table without a primary key | `Incremental snapshot for table 'inventory.order_notes' skipped cause the table has no primary keys` | `Incremental snapshot for table 'inventory.order_notes' skipped because the table has no primary keys` |
+| `surrogate-key` in the signal, table without a primary key | Ignored; 0 of 50 rows | Accepted; 1 of 50 rows |
+| `stop-snapshot` | Not recognized; the snapshot read the whole table | Stopped the snapshot |
+| `"type": "blocking"` | The task `FAILED`, and again after a restart | A blocking snapshot |
+| Signal from a Kafka topic | `read.only=true` and `signal.kafka.topic` | The same, plus `signal.enabled.channels=kafka` |
+
+Every cell comes from the runs on this page. The [Debezium blog](https://debezium.io/blog/2021/10/07/incremental-snapshots/) dates incremental snapshots to version 1.6. The 2.0 release notes list two of the changes between the columns: "Add signal table automatically to include list" ([2.0.0.Beta2](https://debezium.io/releases/2.0/release-notes#release-2.0.0-beta2)) and "Provide a signal to stop the running incremental snapshot" ([2.0.0.Alpha2](https://debezium.io/releases/2.0/release-notes#release-2.0.0-alpha2)).
+
+## Why the existing rows do not arrive
+
+A Debezium connector reads the rows of a table only during a snapshot. It takes the initial snapshot once, when it has no offset, and from then on it reads the binlog from its stored position. A change to `table.include.list` restarts the task, the task finds the offset, and no snapshot runs.
+
+The connector already knew the structure of `orders`. The lab kept `schema.history.internal.store.only.captured.tables.ddl` at its default, `false`, under which, the [documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-database-history-store-only-captured-tables-ddl) says, "the connector records the schema data for all non-system tables in the database, including tables that are not designated for capture". With `true`, the change fails instead with `Encountered change event for table inventory.orders whose schema isn't known to this connector`, which [The db history topic is missing](/docs/runbooks/debezium/schema-history-topic-missing/#issue-3-a-table-added-to-a-running-connector) covers.
+
+Setting `snapshot.mode=initial` on the same connector does not start a snapshot either, for the same reason. [Connector is RUNNING but captures nothing](/docs/runbooks/debezium/connector-running-captures-nothing/#issue-2-a-snapshot-mode-that-reads-no-existing-rows) has that run.
+
+### What an incremental snapshot does
+
+The [Debezium documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#debezium-mysql-incremental-snapshots) describes the mechanism. The connector "sorts each table by primary key and then splits the table into chunks based on the configured chunk size", which is 1,024 rows by default. Around each chunk it opens a [snapshot window](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-incremental-snapshot-snapshot-window), and a streamed change to a row in the window replaces the buffered copy of that row.
+
+The windows are rows in the signal table, which the connector writes itself. After the snapshot of the 20,001 rows on **Debezium 3.7.1**, the signal table held:
+
+```text
++-----------------------+-------------+
+| type                  | signal_rows |
++-----------------------+-------------+
+| execute-snapshot      |           3 |
+| snapshot-window-close |          21 |
+| snapshot-window-open  |          21 |
++-----------------------+-------------+
+```
+
+The three `execute-snapshot` rows are the signals sent in the runs, two of which failed ([why](#the-connector-user-cannot-write-to-the-signal-table)). The rows read by the snapshot reach the same topic as the streamed changes, with `source.snapshot` set to `incremental`:
+
+```json
+{ "op": "r", "after": { "id": 1, "customer_id": 2, "quantity": 2, "placed_at": 1795853407000 },
+  "source": { "version": "3.7.1.Final", "name": "dbserver1", "snapshot": "incremental", "db": "inventory", "table": "orders" } }
+```
+
+## Confirm the diagnosis
+
+**1. Count the topic against the table.** In the lab each table topic has one partition, so its end offset is the number of events written.
+
+```bash
+kafka-get-offsets.sh --bootstrap-server kafka:9092 --topic dbserver1.inventory.orders
+mysql -e 'SELECT COUNT(*) FROM inventory.orders'
+```
+
+Fewer events than rows, and no `op=r` event in the topic, means the rows were never read. The lab's `count.py` prints both counts from one read of the topic.
+
+**2. Find the restart in the worker log.** After the change to `table.include.list`, the line `A previous offset indicating a completed snapshot has been found` confirms that no snapshot ran.
+
+**3. After a signal, look for three lines in this order.** From the **Debezium 3.7.1** run:
+
+```text
+INFO   MySQL||binlog  Requested 'INCREMENTAL' snapshot of data collections '[inventory.orders]' with additional conditions '[]' and surrogate key 'PK of table will be used'   [io.debezium.pipeline.signal.actions.snapshotting.ExecuteSnapshot]
+INFO   MySQL||binlog  Incremental snapshot for table 'inventory.orders' will end at position [REDACTED]   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+INFO   MySQL||binlog  No data returned by the query, incremental snapshotting of table 'inventory.orders' finished   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+```
+
+**Debezium 1.9.7** prints the same three lines with shorter wording, and the end position in clear: `will end at position [20001]`. If the first line is missing, the connector never read the signal. If a warning follows it, see [When the signal starts nothing or skips the table](#when-the-signal-starts-nothing-or-skips-the-table).
+
+**4. While a snapshot runs, read its progress from the stored offset.** The offsets topic holds it on both Kafka Connect versions:
+
+```bash
+kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic lab_connect_offsets \
+  --from-beginning --formatter-property print.key=true --timeout-ms 3000
+```
+
+In the **Debezium 3.7.1** run, an offset stored during a snapshot of `orders` held:
+
+```json
+{
+  "incremental_snapshot_correlation_id": "restart-1",
+  "incremental_snapshot_collections": "[{\"incremental_snapshot_collections_id\":\"inventory.orders\", ...}]",
+  "incremental_snapshot_primary_key": "aced0005757200135b4c...",
+  "incremental_snapshot_maximum_key": "aced0005757200135b4c...",
+  "snapshot": "INCREMENTAL"
+}
+```
+
+The two keys are Java-serialized arrays, which the lab decodes: the last key read was `[3670]` and the end of the table `[20001]`. On **Debezium 1.9.7** the offset held `incremental_snapshot_collections`, `incremental_snapshot_primary_key` and `incremental_snapshot_maximum_key`, decoded as `[5434]` and `[20001]` when it was read.
+
+## Fix 1: An incremental snapshot from a signal table
+
+This is the procedure the [Debezium documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-capturing-data-from-new-tables-with-schema-changes) gives for a new table when `store.only.captured.tables.ddl` is `false`: "Edit the `table.include.list` property", restart, and "Initiate an incremental snapshot if you want to capture existing data from the newly added tables."
+
+**1. Create the signal table** in the captured database, with the statement from the [signalling documentation](https://debezium.io/documentation/reference/stable/configuration/signalling.html#debezium-signaling-creating-a-signal-data-collection):
+
+```sql
+CREATE TABLE inventory.debezium_signal (id VARCHAR(42) PRIMARY KEY, type VARCHAR(32) NOT NULL, data VARCHAR(2048) NULL);
+```
+
+**2. Let the connector's user write to it.** The connector writes the window rows itself. The signalling documentation says: "The Debezium database user must have the `INSERT` privilege on the `debezium_signal` table." The grants the [MySQL connector page](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-creating-user) lists for that user do not include it.
+
+```sql
+GRANT INSERT ON inventory.debezium_signal TO 'debezium'@'%';
+```
+
+**3. Add the new table and the signal settings** in one configuration change. A `PUT` to `/config` replaces the whole configuration, so send every existing setting along with these:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The signal table must be in `table.include.list` as well:
+
+```json
+{
+  "...": "your existing settings",
+  "table.include.list": "inventory.customers,inventory.orders,inventory.debezium_signal",
+  "signal.data.collection": "inventory.debezium_signal"
+}
+```
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+The signal table does not need to be in `table.include.list`, as the [documentation](https://debezium.io/documentation/reference/stable/configuration/signalling.html#debezium-signaling-enabling-source-signaling-channel) says. The run with it and the run without it behaved the same:
+
+```json
+{
+  "...": "your existing settings",
+  "table.include.list": "inventory.customers,inventory.orders",
+  "signal.data.collection": "inventory.debezium_signal"
+}
+```
+
+</TabItem>
+</Tabs>
+
+The value of `signal.data.collection` is `<databaseName>.<tableName>` on MySQL ([property reference](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-signal-data-collection)).
+
+**4. Send the signal** as any user that may write to the table:
+
+```sql
+INSERT INTO inventory.debezium_signal (id, type, data)
+VALUES ('backfill-3', 'execute-snapshot', '{"data-collections": ["inventory.orders"], "type": "incremental"}');
+```
+
+**5. Check the result** with the three log lines under [Confirm the diagnosis](#confirm-the-diagnosis), then count the topic again. On **Debezium 3.7.1**:
+
+```text
+events: 20002 (op=c 1, op=r 20001)
+source.snapshot: false 1, incremental 20001
+distinct id values: 20001, read as op=r: 20001, with more than one event: 1
+rows in the table: 20001, of them in the topic: 20001, never arrived: 0
+```
+
+Every row arrived once as a read event. The one row with two events is the order inserted after the include list change: first its insert, then its read.
+
+On **Debezium 1.9.7** every row arrived too, but three times: 60,003 read events for 20,001 rows. The two signals sent before the fix had not been dropped, and the connector ran all three after the fix ([A signal sent earlier runs after a restart](#a-signal-sent-earlier-runs-after-a-restart)). Whatever reads the topic has to treat a repeated key as an update, not as a new row.
+
+## Fix 2: A read-only incremental snapshot from a Kafka topic
+
+Use this when the connector may not write to the database, or no signal table can be created. The [documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-read-only-incremental-snapshots) says that for a read-only snapshot "the connector uses the executed global transaction IDs (GTID) set as high and low watermarks", and lists "Enable MySQL GTIDs" as a prerequisite. The lab's MySQL runs with `gtid-mode=ON`.
+
+**1. Create the signal topic.** The lab created it with one partition:
+
+```bash
+kafka-topics.sh --bootstrap-server kafka:9092 --create --topic readonly-signals --partitions 1 --replication-factor 1
+```
+
+**2. Point the connector at it.** No signal table and no `signal.data.collection` are needed:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+```json
+{
+  "...": "your existing settings",
+  "read.only": "true",
+  "signal.kafka.topic": "readonly-signals",
+  "signal.kafka.bootstrap.servers": "kafka:9092"
+}
+```
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+```json
+{
+  "...": "your existing settings",
+  "read.only": "true",
+  "signal.enabled.channels": "kafka",
+  "signal.kafka.topic": "readonly-signals",
+  "signal.kafka.bootstrap.servers": "kafka:9092"
+}
+```
+
+</TabItem>
+</Tabs>
+
+**3. Send the signal** as a message whose key is the connector's topic prefix (`readonly` in the lab), `database.server.name` on 1.9.7 and `topic.prefix` on 3.7.1:
+
+```bash
+echo 'readonly|{"type":"execute-snapshot","data":{"data-collections":["inventory.orders"],"type":"INCREMENTAL"}}' |
+  kafka-console-producer.sh --bootstrap-server kafka:9092 --topic readonly-signals \
+    --reader-property parse.key=true --reader-property 'key.separator=|'
+```
+
+These are the option names of the Kafka 4.3.1 tools the lab used.
+
+**4. Check the result.** The log shows the request, on 1.9.7 from the thread that reads the topic:
+
+```text
+INFO   MySQL|readonly|streaming  Requested 'INCREMENTAL' snapshot of data collections '[inventory.orders]'   [io.debezium.connector.mysql.signal.KafkaSignalThread]
+```
+
+On both versions all 20,001 rows arrived as read events, and the signal table did not change: 40,169 rows before and after on 1.9.7, and 21,475 on 3.7.1. From the request to the end of the snapshot, the log timestamps give 23.2 s on 1.9.7 and 23.7 s on 3.7.1, against 1.5 s and 1.1 s for the same table in Fix 1. The lab wrote nothing else to the database during this step, and the documentation says that the window state "is updated by comparing the GTIDs of binary log (binlog) events or the server's heartbeats against low and high watermarks".
+
+## Fix 3: A blocking snapshot
+
+A blocking snapshot reads the table the way an initial snapshot does, while streaming waits. The [documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-blocking-snapshots) describes it as "temporarily pausing streaming until the snapshot completes". Send the same signal as in Fix 1 with `"type": "blocking"`:
+
+```sql
+INSERT INTO inventory.debezium_signal (id, type, data)
+VALUES ('blocking-1', 'execute-snapshot', '{"data-collections": ["inventory.orders"], "type": "blocking"}');
+```
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The signal failed the task, and a restart of the task failed again on the same signal:
+
+```text
+WARN   MySQL|blocking|binlog  Detected an unexpected snapshot type 'blocking'   [io.debezium.pipeline.signal.ExecuteSnapshot]
+INFO   MySQL|blocking|binlog  Requested 'null' snapshot of data collections '[inventory.orders]'   [io.debezium.pipeline.signal.ExecuteSnapshot]
+ERROR  ||  WorkerSourceTask{id=blocking-connector-0} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted   [org.apache.kafka.connect.runtime.WorkerTask]
+```
+
+The trace ends in `Caused by: java.lang.NullPointerException`, and none of the rows arrived. The lab did not get the task past this signal, so do not send it to a Debezium 1.9 connector.
+
+The [1.9 documentation](https://debezium.io/documentation/reference/1.9/configuration/signalling.html#debezium-signaling-ad-hoc-snapshots) says: "Currently, the `execute-snapshot` action triggers incremental snapshots only."
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+All 20,001 rows arrived. Their `source.snapshot` values were `first` (1 event), `true` (19,999) and `last` (1), as in an initial snapshot. The log shows streaming stop, the table lock and streaming start again:
+
+```text
+INFO   MySQL||binlog  Requested 'BLOCKING' snapshot of data collections '[inventory.orders]' with additional conditions '[]' and surrogate key 'PK of table will be used'   [io.debezium.pipeline.signal.actions.snapshotting.ExecuteSnapshot]
+INFO   MySQL||streaming  Streaming will now pause   [io.debezium.connector.binlog.BinlogStreamingChangeEventSource]
+INFO   MySQL||snapshot  Snapshot step 3 - Locking captured tables [inventory.orders]   [io.debezium.relational.RelationalSnapshotChangeEventSource]
+INFO   MySQL||snapshot  Snapshot completed   [io.debezium.pipeline.source.AbstractSnapshotChangeEventSource]
+INFO   MySQL||streaming  Streaming resumed   [io.debezium.connector.binlog.BinlogStreamingChangeEventSource]
+```
+
+</TabItem>
+</Tabs>
+
+## When the signal starts nothing or skips the table
+
+On **Debezium 3.7.1** every case below left the task `RUNNING`, with a line in the worker log. On **Debezium 1.9.7** the missing grant failed the task, and a signal table outside the include list left no line at all.
+
+### The signal table is not in table.include.list
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The signal was ignored. The worker log had no line about it, no topic was created for the signal table, and none of the 20,000 rows arrived. The [1.9 documentation](https://debezium.io/documentation/reference/1.9/configuration/signalling.html#debezium-signaling-enabling-signaling) says: "Add the signaling table to the list of tables to monitor."
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+The signal was read, and then stopped at the missing grant described below. The rows of the signal table also reached a topic of their own, `dbserver1.inventory.debezium_signal`, although the table was not in the include list. The [2.0.0.Beta2 release notes](https://debezium.io/releases/2.0/release-notes#release-2.0.0-beta2) list "Add signal table automatically to include list".
+
+</TabItem>
+</Tabs>
+
+### A signal sent earlier runs after a restart
+
+On **Debezium 1.9.7** the ignored signal was not lost. When the signal table was added to `table.include.list`, the restarted task started from its stored position and ran a snapshot request before the next signal was written:
+
+```text
+INFO   ||  Found previous partition offset MySqlPartition [sourcePartition={server=dbserver1}]: {transaction_id=null, file=mysql-bin.000003, pos=787, gtids=dfa52450-eafe-11f1-820a-3ada1ecb06b5:1-18}   [io.debezium.connector.common.BaseSourceTask]
+INFO   MySQL|dbserver1|binlog  Requested 'INCREMENTAL' snapshot of data collections '[inventory.orders]'   [io.debezium.pipeline.signal.ExecuteSnapshot]
+```
+
+The only signal written by then was the one the connector had ignored. After the grant described in the next section, all three signals of the run were executed, one full snapshot each. On **Debezium 3.7.1** a signal that failed did not run again.
+
+### The connector user cannot write to the signal table
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The task failed with:
+
+```text
+org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped.
+Caused by: io.debezium.DebeziumException: Error processing binlog event
+Caused by: org.apache.kafka.connect.errors.ConnectException: Error while processing event at offset {transaction_id=null, ts_sec=1795851728, file=mysql-bin.000003, pos=866, incremental_snapshot_maximum_key=aced000570, gtids=dfa52450-eafe-11f1-820a-3ada1ecb06b5:1-19, row=1, server_id=223344, event=2, incremental_snapshot_collections=inventory.orders, incremental_snapshot_primary_key=aced000570}
+Caused by: io.debezium.DebeziumException: Database error while executing incremental snapshot for table 'inventory.orders'
+Caused by: java.sql.SQLSyntaxErrorException: INSERT command denied to user 'debezium'@'172.19.0.4' for table 'debezium_signal'
+```
+
+A restart of the task failed again in the same way. After `GRANT INSERT` and one more restart the task stayed `RUNNING`.
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+The task stayed `RUNNING` and the snapshot was skipped:
+
+```text
+WARN   MySQL||binlog  SQL error while executing incremental snapshot for table 'inventory.orders', skipping and continuing streaming   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+java.sql.SQLSyntaxErrorException: INSERT command denied to user 'debezium'@'172.19.0.4' for table 'debezium_signal'
+```
+
+None of the rows arrived. After `GRANT INSERT` only the new signal ran: the two that had failed were not retried.
+
+</TabItem>
+</Tabs>
+
+**Fix:** grant `INSERT` on the signal table, as in step 2 of [Fix 1](#fix-1-an-incremental-snapshot-from-a-signal-table), or use the read-only snapshot of [Fix 2](#fix-2-a-read-only-incremental-snapshot-from-a-kafka-topic), which writes nothing.
+
+### The table is not in table.include.list
+
+A signal for `inventory.shipments`, a table the connector does not capture, started nothing on either version, and no topic was created for the table:
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+```text
+WARN   MySQL|dbserver1|binlog  Schema not found for table 'inventory.shipments', known tables [inventory.customers, inventory.debezium_signal, inventory.orders]   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+```
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+```text
+WARN   MySQL||binlog  Schema retrieval failed due to an exception for inventory.shipments   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+java.lang.NullPointerException: Cannot invoke "io.debezium.relational.Table.id()" because "table" is null
+```
+
+</TabItem>
+</Tabs>
+
+**Fix:** add the table to `table.include.list` first, then send the signal.
+
+### The table has no primary key
+
+`inventory.order_notes` holds 50 rows and has no primary key. It was added to the include list and signalled. Both versions skipped it, with a warning that differs by one word:
+
+```text
+WARN   MySQL|dbserver1|binlog  Incremental snapshot for table 'inventory.order_notes' skipped cause the table has no primary keys   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+WARN   MySQL||binlog  Incremental snapshot for table 'inventory.order_notes' skipped because the table has no primary keys   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+```
+
+The first line is from 1.9.7 and the second from 3.7.1. The [Debezium blog post on incremental snapshots](https://debezium.io/blog/2021/10/07/incremental-snapshots/) lists this limit: "The snapshotted table must contain primary keys".
+
+The `surrogate-key` field of the signal did not help. **1.9.7** ignored it and skipped the table again. **3.7.1** logged `surrogate key 'note_id'`, finished the snapshot, and 1 of the 50 rows arrived.
+
+**Fix:** give the table a key with [`message.key.columns`](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-property-message-key-columns). With `inventory.order_notes:note_id`, the same signal delivered 50 of 50 rows on both versions. The documentation describes the setting as the way "to specify a key for tables that lack a primary key", so it also sets the message key of every event of that table.
+
+### Stop a running snapshot
+
+<Tabs groupId="debezium-version">
+<TabItem value="1.9.7" label="Debezium 1.9.7" default>
+
+The signal was refused, and the snapshot read the whole table: 20,001 of 20,001 rows, although the signal was sent when the topic held 408 events.
+
+```text
+WARN   MySQL|stop|binlog  Signal 'stop-2' has been received but the type 'stop-snapshot' is not recognized   [io.debezium.pipeline.signal.Signal]
+```
+
+The [1.9 documentation](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-stopping-an-incremental-snapshot) describes the signal: "You can also stop an incremental snapshot by sending a signal to the table on the source database." The [2.0.0.Alpha2 release notes](https://debezium.io/releases/2.0/release-notes#release-2.0.0-alpha2) list "Provide a signal to stop the running incremental snapshot".
+
+</TabItem>
+<TabItem value="3.7.1" label="Debezium 3.7.1">
+
+The signal stopped the snapshot. It was sent when the topic held 794 events, and the snapshot stopped at 1,370 of 20,001 rows:
+
+```text
+INFO   MySQL||binlog  Requested stop of snapshot 'INCREMENTAL' for data collections '[inventory.orders]'   [io.debezium.pipeline.signal.actions.snapshotting.StopSnapshot]
+INFO   MySQL||binlog  Incremental snapshot has stopped.   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+```
+
+</TabItem>
+</Tabs>
+
+The signal names the same tables as the one that started the snapshot:
+
+```sql
+INSERT INTO inventory.debezium_signal (id, type, data)
+VALUES ('stop-2', 'stop-snapshot', '{"data-collections": ["inventory.orders"], "type": "incremental"}');
+```
+
+### A restart during the snapshot
+
+The task was restarted with `POST /connectors/<name>/tasks/0/restart` during the snapshot, when the topic held 8,378 events on 1.9.7 and 11,090 on 3.7.1. On both versions it came back with this line, here from 3.7.1, and finished the table:
+
+```text
+INFO   MySQL||streaming  Incremental snapshot in progress, need to read new chunk on start   [io.debezium.pipeline.source.snapshot.incremental.AbstractIncrementalSnapshotChangeEventSource]
+```
+
+Every row arrived once: 20,001 of 20,001, none twice. This was a restart through the Kafka Connect API; a crash of the worker was not run.
+
+## Changes made during the snapshot
+
+While a snapshot of `orders` ran, the lab updated 100 rows and deleted 20, spread over the table. All the changes were made before the snapshot ended: on 3.7.1 the topic held 1,406 events before the first change, 3,852 after the last and 20,131 at the end, and on 1.9.7 778, 2,680 and 20,121.
+
+The lab then rebuilt each row from its last event and compared it with the table:
+
+```text
+rows in the table: 19981, last event matches the table: 19981, differs or is missing: 0
+rows deleted from the table: 20, last event is a delete: 20, last event is a row: 0
+```
+
+Both versions gave this result. It is what the documented [snapshot window](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-incremental-snapshot-snapshot-window) is for: "If Debezium detects a match, it discards the buffered READ event, and writes the streamed record to the destination topic."
+
+## Prevent it
+
+- Create the signal table, grant `INSERT` on it and set `signal.data.collection` when you create the connector. Adding a table later is then one configuration change and one signal.
+- On Debezium 1.x, keep the signal table in `table.include.list`.
+- Give every table a connector may capture a primary key, or a `message.key.columns` entry, before you add it.
+- Watch the worker log for `WARN` lines from `AbstractIncrementalSnapshotChangeEventSource`. On Debezium 3.7.1 a skipped snapshot leaves the task `RUNNING`, so an alert on `FAILED` tasks does not fire.
+- Expect the signal table to grow. The connector writes two rows per chunk, and in the runs it deleted none: before the Kafka signal step the table held 21,475 rows on 3.7.1 and 40,169 on 1.9.7.
+
+## How other tools load a new table
+
+**Flink CDC.** Not run for this page. The MySQL connector of Flink CDC, the Apache Flink project for change data capture (CDC), documents a "Scan Newly Added Tables" feature: "the newly added tables will read theirs snapshot data firstly and then read their changelog automatically" ([Flink CDC documentation](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/mysql-cdc/#scan-newly-added-tables)). The page names the option `scan.newly-added-table.enabled`, shows `.scanNewlyAddedTableEnabled(true)` in its Java example, and adds the tables by updating the table list and restoring the job from a savepoint.
+
+:::note[How OLake Go handles this]
+
+In OLake Go a table is added to the job, not started with a signal. A table added with [Edit Streams](/docs/getting-started/job-level-properties/#5-edit-streams) is synced with the sync mode chosen for its stream, and the streams already in the job run as usual ([schema evolution](/docs/features/schema/)).
+
+With **Full Refresh + CDC**, OLake Go first copies the table and then reads its changes. With **CDC Only**, it skips the copy, so the rows the table already holds are not loaded, as with Debezium's include list ([sync modes](/docs/understanding/terminologies/olake/#2-sync-modes)).
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Debezium MySQL connector: [incremental snapshots](https://debezium.io/documentation/reference/stable/connectors/mysql.html#debezium-mysql-incremental-snapshots), [snapshot window](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-incremental-snapshot-snapshot-window), [triggering an incremental snapshot](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-triggering-an-incremental-snapshot), [read-only incremental snapshots](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-read-only-incremental-snapshots), [blocking snapshots](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-blocking-snapshots), [tables not captured by the initial snapshot](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-capturing-data-from-new-tables-with-schema-changes)
+- Debezium signalling: [current](https://debezium.io/documentation/reference/stable/configuration/signalling.html), and [1.9](https://debezium.io/documentation/reference/1.9/configuration/signalling.html#debezium-signaling-enabling-signaling), which asks for the signal table in `table.include.list`
+- Debezium [2.0 release notes](https://debezium.io/releases/2.0/release-notes), for the signal table that is included automatically and the `stop-snapshot` signal
+- [Incremental Snapshots in Debezium](https://debezium.io/blog/2021/10/07/incremental-snapshots/), Debezium blog, 7 October 2021
+- Flink CDC MySQL source: [Scan Newly Added Tables](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/mysql-cdc/#scan-newly-added-tables)
