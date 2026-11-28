@@ -1,0 +1,65 @@
+# ./run.sh recreate    PostgreSQL 17.12    2026-11-28T09:40:44Z
+
+## A slot with the test_decoding plugin, so that the rows it sends can be read here. A consumer reads it and keeps the position it reached, as a CDC tool keeps its offset.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'test_decoding');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/21C8438
+(1 row)
+
+INSERT INTO orders VALUES (101, 'before the drop');
+INSERT 0 1
+$ pg_recvlogical -d appdb --slot cdc_slot --start --endpos 0/21C84F8 -f -
+BEGIN 751
+table public.orders: INSERT: id[bigint]:101 status[text]:'before the drop'
+COMMIT 751
+position the consumer keeps: 0/21C84F8
+
+## The slot is dropped, and two rows are written while there is no slot.
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+INSERT INTO orders VALUES (102, 'while there was no slot'), (103, 'while there was no slot');
+INSERT 0 2
+
+## The fix: create the slot again. It starts at the current position.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'test_decoding');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/21C8690
+(1 row)
+
+INSERT INTO orders VALUES (104, 'after the new slot');
+INSERT 0 1
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type |    plugin     | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+-----------+-----------+---------------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot  | logical   | test_decoding | appdb    | f      |            | 0/21C8690           | reserved   |                     | f        | f
+(1 row)
+
+
+## The consumer comes back and asks for its saved position.
+$ pg_recvlogical -d appdb --slot cdc_slot --start --startpos 0/21C84F8 --endpos 0/21C8758 -f -
+BEGIN 753
+table public.orders: INSERT: id[bigint]:104 status[text]:'after the new slot'
+COMMIT 753
+--- server log of pg
+2026-11-28 09:40:47.277 UTC [517] LOG:  0/21C84F8 has been already streamed, forwarding to 0/21C8690
+2026-11-28 09:40:47.277 UTC [517] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/21C84F8
+---
+
+## The table holds all four rows.
+SELECT id, status FROM orders WHERE id > 100 ORDER BY id;
+ id  |         status          
+-----+-------------------------
+ 101 | before the drop
+ 102 | while there was no slot
+ 103 | while there was no slot
+ 104 | after the new slot
+(4 rows)
+
+DELETE FROM orders WHERE id > 100;
+DELETE 4

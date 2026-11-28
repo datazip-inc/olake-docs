@@ -1,0 +1,58 @@
+# ./run.sh exists    PostgreSQL 19.0    2026-11-28T09:30:19Z
+
+## A second slot with a name that is taken
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/02474C98
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ERROR:  replication slot "cdc_slot" already exists
+
+## The same name from another database, and for a physical slot
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ERROR:  replication slot "cdc_slot" already exists
+SELECT * FROM pg_create_physical_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" already exists
+
+## Over the replication protocol, as a CDC tool creates its slot
+$ pg_recvlogical -d otherdb --slot cdc_slot --create-slot -P pgoutput
+pg_recvlogical: error: could not send replication command "CREATE_REPLICATION_SLOT "cdc_slot" LOGICAL "pgoutput" ( SNAPSHOT 'nothing')": ERROR:  replication slot "cdc_slot" already exists
+--- server log of pg
+2026-11-28 09:30:21.599 UTC [726] ERROR:  replication slot "cdc_slot" already exists
+2026-11-28 09:30:21.599 UTC [726] STATEMENT:  SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+2026-11-28 09:30:21.726 UTC [734] ERROR:  replication slot "cdc_slot" already exists
+2026-11-28 09:30:21.726 UTC [734] STATEMENT:  SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+2026-11-28 09:30:21.861 UTC [742] ERROR:  replication slot "cdc_slot" already exists
+2026-11-28 09:30:21.861 UTC [742] STATEMENT:  SELECT * FROM pg_create_physical_replication_slot('cdc_slot');
+2026-11-28 09:30:21.985 UTC [749] ERROR:  replication slot "cdc_slot" already exists
+2026-11-28 09:30:21.985 UTC [749] STATEMENT:  CREATE_REPLICATION_SLOT "cdc_slot" LOGICAL "pgoutput" ( SNAPSHOT 'nothing')
+---
+
+## Who holds the name
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+-----------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot  | logical   | pgoutput | appdb    | f      |            | 0/02474C98          | reserved   |                     | f        | f
+(1 row)
+
+
+## Fix 1: a script that may run twice keeps the slot that is there
+$ pg_recvlogical -d appdb --slot cdc_slot --create-slot -P pgoutput --if-not-exists; echo "exit status $?"
+exit status 0
+
+## Fix 2: a second consumer gets a name of its own
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot_otherdb', 'pgoutput');
+    slot_name     |    lsn     
+------------------+------------
+ cdc_slot_otherdb | 0/02474CD0
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+    slot_name     | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+------------------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot         | logical   | pgoutput | appdb    | f      |            | 0/02474C98          | reserved   |                     | f        | f
+ cdc_slot_otherdb | logical   | pgoutput | otherdb  | f      |            | 0/02474CD0          | reserved   |                     | f        | f
+(2 rows)
+

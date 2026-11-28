@@ -1,0 +1,86 @@
+# ./run.sh recreate    PostgreSQL 13.23    2026-11-28T09:45:59Z
+
+## A slot with the test_decoding plugin, so that the rows it sends can be read here. A consumer reads it and keeps the position it reached, as a CDC tool keeps its offset.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'test_decoding');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/1644CF8
+(1 row)
+
+INSERT INTO orders VALUES (101, 'before the drop');
+INSERT 0 1
+$ pg_recvlogical -d appdb --slot cdc_slot --start --endpos 0/1644DB8 -f -
+BEGIN 498
+table public.orders: INSERT: id[bigint]:101 status[text]:'before the drop'
+COMMIT 498
+position the consumer keeps: 0/1644DB8
+
+## The slot is dropped, and two rows are written while there is no slot.
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+INSERT INTO orders VALUES (102, 'while there was no slot'), (103, 'while there was no slot');
+INSERT 0 2
+
+## The fix: create the slot again. It starts at the current position.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'test_decoding');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/1644F50
+(1 row)
+
+INSERT INTO orders VALUES (104, 'after the new slot');
+INSERT 0 1
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type |    plugin     | database | active | active_pid | confirmed_flush_lsn | wal_status 
+-----------+-----------+---------------+----------+--------+------------+---------------------+------------
+ cdc_slot  | logical   | test_decoding | appdb    | f      |            | 0/1644F50           | reserved
+(1 row)
+
+
+## The consumer comes back and asks for its saved position.
+$ pg_recvlogical -d appdb --slot cdc_slot --start --startpos 0/1644DB8 --endpos 0/1645018 -f -
+BEGIN 500
+table public.orders: INSERT: id[bigint]:104 status[text]:'after the new slot'
+COMMIT 500
+--- server log of pg
+(no matching line)
+---
+
+## Before PostgreSQL 15 the server writes this message at the DEBUG1 level only. The same request again, with log_min_messages = debug1:
+ALTER SYSTEM SET log_min_messages = debug1;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+$ pg_recvlogical -d appdb --slot cdc_slot --start --startpos 0/1644DB8 --endpos 0/1645018 -f -
+--- server log of pg
+2026-11-28 09:46:04.407 UTC [574] DEBUG:  cannot stream from 0/1644DB8, minimum is 0/1645018, forwarding
+---
+ALTER SYSTEM RESET log_min_messages;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+
+## The table holds all four rows.
+SELECT id, status FROM orders WHERE id > 100 ORDER BY id;
+ id  |         status          
+-----+-------------------------
+ 101 | before the drop
+ 102 | while there was no slot
+ 103 | while there was no slot
+ 104 | after the new slot
+(4 rows)
+
+DELETE FROM orders WHERE id > 100;
+DELETE 4

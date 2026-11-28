@@ -1,0 +1,187 @@
+# ./run.sh active    PostgreSQL 19.0    2026-11-28T09:30:26Z
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/02474D08
+(1 row)
+
+SHOW wal_sender_timeout;
+ wal_sender_timeout 
+--------------------
+ 1min
+(1 row)
+
+
+## Consumer A streams the slot.
+$ pg_recvlogical -d "dbname=appdb application_name=consumer_a" --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null &
+
+## Who holds the slot
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |        988 | consumer_a       | walsender    | 00:00:02
+(1 row)
+
+
+## SQL functions on the slot while A holds it
+SELECT count(*) FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  replication slot "cdc_slot" is active for PID 988
+SELECT * FROM pg_replication_slot_advance('cdc_slot', pg_current_wal_lsn());
+ERROR:  replication slot "cdc_slot" is active for PID 988
+SELECT pg_drop_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" is active for PID 988
+
+## A second consumer, B, on the same slot, as a second connector with the same slot name would be
+$ pg_recvlogical -d "dbname=appdb application_name=consumer_b" --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null --no-loop
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 988
+pg_recvlogical: error: disconnected
+--- server log of pg
+2026-11-28 09:30:30.598 UTC [1021] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:30.598 UTC [1021] STATEMENT:  SELECT count(*) FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+2026-11-28 09:30:30.719 UTC [1029] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:30.719 UTC [1029] STATEMENT:  SELECT * FROM pg_replication_slot_advance('cdc_slot', pg_current_wal_lsn());
+2026-11-28 09:30:30.847 UTC [1037] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:30.847 UTC [1037] STATEMENT:  SELECT pg_drop_replication_slot('cdc_slot');
+2026-11-28 09:30:30.969 UTC [1045] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:30.969 UTC [1045] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')
+---
+
+## A stops answering and keeps its connection open (SIGSTOP), as a hung client does. B starts again and retries every 5 seconds.
+$ kill -STOP <pid of consumer_a>
+$ pg_recvlogical -d "dbname=appdb application_name=consumer_b" --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null &
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |        988 | consumer_a       | walsender    | 00:00:15
+(1 row)
+
+B holds the slot 60 s after A was frozen
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |       1645 | consumer_b       | walsender    | 00:00:00
+(1 row)
+
+--- server log of pg
+2026-11-28 09:30:31.275 UTC [1059] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:36.287 UTC [1084] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:41.297 UTC [1102] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:46.308 UTC [1160] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:51.326 UTC [1209] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:30:56.333 UTC [1267] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:01.336 UTC [1316] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:06.350 UTC [1374] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:11.366 UTC [1431] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:16.378 UTC [1480] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:21.382 UTC [1546] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:26.396 UTC [1595] ERROR:  replication slot "cdc_slot" is active for PID 988
+2026-11-28 09:31:28.230 UTC [988] LOG:  terminating walsender process due to replication timeout
+---
+--- output of consumer_b
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 988    (12 times)
+pg_recvlogical: disconnected; waiting 5 seconds to try again    (12 times)
+---
+
+## A is resumed. The server has closed its connection, and now A gets the error.
+$ kill -CONT <pid of consumer_a>
+--- output of consumer_a
+pg_recvlogical: error: could not send feedback packet: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/024C7D28 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 1645
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+---
+$ kill -TERM <pid of consumer_a>
+
+## The fix without waiting for the timeout: stop the old client, then end its session. Here B is frozen and C waits for the slot.
+$ kill -STOP <pid of consumer_b>
+$ pg_recvlogical -d "dbname=appdb application_name=consumer_c" --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null &
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |       1645 | consumer_b       | walsender    | 00:00:14
+(1 row)
+
+SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot';
+ pg_terminate_backend 
+----------------------
+ t
+(1 row)
+
+C holds the slot 5 s after the session of B was ended
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |       1836 | consumer_c       | walsender    | 00:00:00
+(1 row)
+
+--- output of consumer_c
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 1645
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 1645
+pg_recvlogical: disconnected; waiting 5 seconds to try again
+---
+
+## With wal_sender_timeout = 0 the server keeps the session of a client that hangs. C is frozen, and D waits 90 seconds for the slot.
+ALTER SYSTEM SET wal_sender_timeout = 0;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+$ kill -STOP <pid of consumer_c>
+$ pg_recvlogical -d "dbname=appdb application_name=consumer_d" --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null &
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |       1836 | consumer_c       | walsender    | 00:01:34
+(1 row)
+
+--- server log of pg
+(no matching line)
+---
+--- output of consumer_d
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 1836    (19 times)
+pg_recvlogical: disconnected; waiting 5 seconds to try again    (19 times)
+---
+ALTER SYSTEM RESET wal_sender_timeout;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+

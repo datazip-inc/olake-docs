@@ -1,0 +1,621 @@
+---
+title: "Replication slot does not exist, already exists, is active"
+description: "Why a PostgreSQL replication slot does not exist, already exists or is active for PID, and the fix for each, also on a promoted standby. Run on 13 and 17 to 19."
+sidebar_label: Replication slot errors
+unlisted: true
+keywords:
+  - replication slot does not exist
+  - replication slot already exists
+  - replication slot is active for PID
+  - pg_drop_replication_slot
+  - replication slot was not created in this database
+  - could not start WAL streaming replication slot does not exist
+  - could not create replication slot already exists
+  - could not drop replication slot on publisher
+  - has been already streamed, forwarding to
+  - wal_sender_timeout
+  - sync_replication_slots
+  - synchronized_standby_slots
+  - postgres failover slot
+runbook:
+  family: postgres
+  author: nayan
+  reproduced:
+    date: "2026-11-28"
+    versions:
+      - "PostgreSQL 19.0"
+      - "PostgreSQL 18.7"
+      - "PostgreSQL 17.12"
+      - "PostgreSQL 13.23"
+    lab: labs/runbooks/postgres/replication-slot-errors
+    summary: "Each slot error was triggered through the SQL functions, a pg_recvlogical consumer and a subscription, and each fix was run. A consumer then resumed on a slot that had been created again, and a standby was promoted without and with a failover slot."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+PostgreSQL finds a replication slot by its name on the server that a consumer connects to. `replication slot "x" does not exist` means that server has no slot of that name, `already exists` means the name is taken somewhere on the server, and `is active for PID n` means another session is reading the slot. A slot that is created again starts at the current position, so a consumer that comes back to it misses every change made while the slot was gone.
+
+This page triggers each error on PostgreSQL 13.23, 17.12, 18.7 and 19.0: through the SQL functions, through a consumer that streams the slot as a change data capture (CDC) tool does, and through a subscription. It then promotes a standby, with and without the failover slots of PostgreSQL 17.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** The message says what PostgreSQL could not do with the name:
+
+- **`does not exist`:** look for the slot in `pg_replication_slots` on the server and in the database that the consumer uses. If you create it again, take a new snapshot, because the new slot starts at the current position.
+- **`already exists`:** a slot name is unique across the whole server. Give each consumer its own name, or reuse the slot with `pg_recvlogical --if-not-exists` or `CREATE SUBSCRIPTION ... WITH (create_slot = false)`.
+- **`is active for PID n`:** another session holds the slot. Find it in `pg_stat_activity` and stop the second consumer. The session of a client that hung ends by itself after `wal_sender_timeout`, 60 seconds by default.
+
+A slot that has been invalidated gives a different message, covered in [The slot was invalidated](#the-slot-was-invalidated). `all replication slots are in use` is covered in [Enable logical replication for CDC](/docs/runbooks/postgres/enable-logical-replication/#issue-2-no-free-slot-or-wal-sender).
+
+<TLDR title='Key takeaways'>
+
+- A consumer that resumed at its saved position on a slot created again received only the change written after the new slot, and no error. 17.12 to 19.0 logged `has been already streamed, forwarding to`, and 13.23 logged nothing at its default settings.
+- While a frozen client kept its connection open, a second consumer got `is active for PID` every 5 seconds until the server ended the old session after 60 seconds. Ending that session with `pg_terminate_backend` let the next consumer in within 5 seconds.
+- A promoted standby had no copy of a logical slot on any of the four versions. On 17.12, 18.7 and 19.0 a slot created with `failover = true` and synchronized to the standby was there after the promotion, and the consumer read the two changes it had not read yet.
+
+</TLDR>
+
+## What you see
+
+The slots in the lab are `cdc_slot` (logical) and `standby_slot` (physical). In your logs the name is the one that your tool or your standby uses. Each message below was printed in the lab:
+
+| Message | Where it came from | Section |
+| --- | --- | --- |
+| `ERROR:  replication slot "cdc_slot" does not exist` | The SQL functions, a streaming consumer, a promoted standby | [does not exist](#replication-slot-x-does-not-exist) |
+| `ERROR:  replication slot "cdc_slot" was not created in this database` | A consumer connected to another database | [was not created in this database](#replication-slot-x-was-not-created-in-this-database) |
+| `FATAL:  could not start WAL streaming: ERROR:  replication slot "standby_slot" does not exist` | The log of a standby | [On a standby](#on-a-standby-could-not-start-wal-streaming) |
+| `pg_receivewal: error: replication slot "standby_slot" does not exist` | `pg_receivewal`, 17.12 to 19.0 | [pg_receivewal](#pg_receivewal-replication-slot-x-does-not-exist) |
+| `pg_receivewal: error: could not send replication command "START_REPLICATION": ERROR:  replication slot "standby_slot" does not exist` | `pg_receivewal`, 13.23 | [pg_receivewal on 13](#pg_receivewal-could-not-send-replication-command-start_replication-postgresql-13) |
+| `ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" does not exist` | The log of a subscriber | [A subscription whose slot is gone](#a-subscription-whose-slot-is-gone) |
+| `ERROR:  could not drop replication slot "cdc_slot" on publisher: ERROR:  replication slot "cdc_slot" does not exist` | `DROP SUBSCRIPTION`, 17.12 to 19.0 | [could not drop replication slot](#could-not-drop-replication-slot-x-on-publisher) |
+| `ERROR:  could not drop the replication slot "cdc_slot" on publisher` | `DROP SUBSCRIPTION`, 13.23 | [could not drop the replication slot](#could-not-drop-the-replication-slot-x-on-publisher-postgresql-13) |
+| `LOG:  0/02474878 has been already streamed, forwarding to 0/02474A10` | A consumer that resumes on a slot created again, 17.12 to 19.0 | [forwarding](#has-been-already-streamed-forwarding-to) |
+| `DEBUG:  cannot stream from 0/1644DB8, minimum is 0/1645018, forwarding` | The same on 13.23, written only at the `DEBUG1` level | [forwarding on 13](#cannot-stream-from-minimum-is-forwarding-postgresql-13) |
+| `ERROR:  replication slot "cdc_slot" already exists` | A second create, from any database, of either slot type | [already exists](#replication-slot-x-already-exists) |
+| `ERROR:  could not create replication slot "cdc_slot": ERROR:  replication slot "cdc_slot" already exists` | `CREATE SUBSCRIPTION` | [CREATE SUBSCRIPTION](#create-subscription-could-not-create-replication-slot) |
+| `ERROR:  replication slot "cdc_slot" is active for PID 988` | The SQL functions, a second consumer, a second subscription | [is active for PID](#replication-slot-x-is-active-for-pid-n) |
+| `LOG:  terminating walsender process due to replication timeout` | The server, when a client has not answered for `wal_sender_timeout` | [The session of a client that hung](#the-session-of-a-client-that-hung) |
+| `LOG:  could not synchronize replication slot "cdc_slot"` | A standby that synchronizes slots, 17.12 to 19.0 | [could not synchronize](#could-not-synchronize-replication-slot) |
+| `ERROR:  cannot use replication slot "cdc_slot" for logical decoding` | A synchronized slot on a standby, 17.12 to 19.0 | [On the standby](#cannot-use-replication-slot-x-for-logical-decoding) |
+| `ERROR:  cannot drop replication slot "cdc_slot"` | The same slot, dropped on the standby | [On the standby](#cannot-drop-replication-slot-x) |
+| `WARNING:  replication slot "standby_slot" specified in parameter "synchronized_standby_slots" does not exist` | A promoted standby, 17.12 to 19.0 | [After the promotion](#replication-slot-x-specified-in-parameter-synchronized_standby_slots-does-not-exist) |
+
+### What changes by version
+
+- **The server's own messages are the same on all four versions** for `does not exist`, `was not created in this database`, `already exists` and `is active for PID`.
+- **19.0 writes a position with eight digits after the slash**, so `LOGICAL 0/0` on 13.23 to 18.7 is `LOGICAL 0/00000000` on 19.0. A search of the logs for one form misses the other.
+- **The clients word the same error differently.** `DROP SUBSCRIPTION` and `pg_receivewal` printed other text on 13.23 than on 17.12 to 19.0, shown in their sections. The source code puts the first change in PostgreSQL 14 and the second in 15. 14 to 16 were not run.
+- **The skip after a slot is created again** is a `LOG` line on 17.12 to 19.0 and a `DEBUG` line on 13.23, which the default settings do not write. See [A consumer that resumes on a slot created again](#a-consumer-that-resumes-on-a-slot-created-again).
+- **Failover slots exist from 17.** On 13.23 the `failover` argument and `sync_replication_slots` are both unknown.
+- **Before 9.6** `is active for PID` was spelled differently. See [Before 9.6](#before-96-is-already-active).
+
+## Why it happens
+
+Three properties of a slot explain all of these errors. The manual states them: "A replication slot has an identifier that is unique across all databases in a PostgreSQL cluster", "Each slot streams a sequence of changes from a single database", and "Only one receiver may consume changes from a slot at any given time" ([Logical decoding concepts](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), checked Nov 2026). So a name is either free on the whole server or taken, a logical slot can be read only from its own database, and a second reader is refused while the first one is connected.
+
+A slot also exists only on the server where it was created. In the lab a standby cloned with `pg_basebackup` had no copy of the primary's logical slot, on all four versions, unless the slot was a failover slot on 17.12 or later.
+
+`pg_upgrade` does not carry logical slots over from older versions either: "Migration of logical slots is only supported when the old cluster is version 17.0 or later. Logical slots on clusters before version 17.0 will silently be ignored" ([Upgrade](https://www.postgresql.org/docs/current/logical-replication-upgrade.html), checked Nov 2026). No upgrade was run for this page.
+
+A slot that is created again starts at the current position of the write-ahead log (WAL). A consumer that asks for an older position gets no error: the server starts "at either WAL location XXX/XXX or the slot's confirmed_flush_lsn ... whichever is greater" ([Streaming replication protocol](https://www.postgresql.org/docs/current/protocol-replication.html), checked Nov 2026). [A consumer that resumes on a slot created again](#a-consumer-that-resumes-on-a-slot-created-again) shows what that costs.
+
+## Confirm the diagnosis
+
+List the slots on the server that the consumer connects to, with the database of each logical slot:
+
+```sql
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status
+FROM pg_replication_slots ORDER BY slot_name;
+```
+
+`wal_status` exists from PostgreSQL 13. On 17 and later, add `failover` and `synced`, which show whether a standby keeps a copy of the slot.
+
+For `is active for PID`, find the session that holds the slot, and how long ago its client last answered:
+
+```sql
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+```
+
+```text
+ slot_name | active_pid | application_name | backend_type | since_last_reply
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |        988 | consumer_a       | walsender    | 00:00:02
+```
+
+`application_name` is what the consumer set when it connected: in the lab, the name of each `pg_recvlogical` consumer or of the subscription. A `since_last_reply` that keeps growing means the client no longer answers.
+
+## replication slot "x" does not exist
+
+The message is the same on all four versions and from every way of reading a slot. On 19.0:
+
+```text
+SELECT pg_drop_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" does not exist
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  replication slot "cdc_slot" does not exist
+SELECT * FROM pg_replication_slot_advance('cdc_slot', pg_current_wal_lsn());
+ERROR:  replication slot "cdc_slot" does not exist
+```
+
+A consumer that streams the slot, as a CDC tool does, gets it as the answer to its `START_REPLICATION` command:
+
+```text
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" does not exist
+```
+
+The server log has the same error, with the command as `STATEMENT`. What differs is where the consumer looked, and the sections below go through the cases that the lab ran.
+
+### The slot was dropped
+
+A consumer whose slot was dropped gets `does not exist` at its next attempt. [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/#issue-2-a-slot-that-is-no-longer-needed) covers the drop itself, and what Debezium and Airbyte did after their slot was dropped. Before you create the slot again, read [the fix](#fix-create-the-slot-again-and-take-a-new-snapshot).
+
+### replication slot "x" was not created in this database
+
+A logical slot belongs to the database it was created in. Read from another database, it gives this message instead, on all four versions:
+
+```text
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  replication slot "cdc_slot" was not created in this database
+```
+
+A streaming consumer gets it in the same place as `does not exist`. The `database` column of `pg_replication_slots` names the right database: point the consumer at it. **Verify:** a read from `appdb`, where the slot was created, returned the row inserted there:
+
+```text
+INSERT public.orders
+    new row [N]: id='11' status='read from appdb'
+```
+
+### After a standby is promoted
+
+A logical slot on the primary was read and confirmed by its consumer. The standby had replayed the row, and its `pg_replication_slots` was empty. After `SELECT pg_promote();` the consumer connected to the new primary:
+
+```text
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" does not exist
+```
+
+This happened on all four versions: on 17.12 to 19.0 the slot was not a failover slot, and 13.23 has none. On the new primary the way forward is to [create the slot again](#fix-create-the-slot-again-and-take-a-new-snapshot) and take a new snapshot. To keep the slot through the next promotion, see [Keep the slot through a promotion](#keep-the-slot-through-a-promotion-postgresql-17-and-later).
+
+### On a standby: could not start WAL streaming
+
+A standby set to stream through a physical slot that the primary does not have retried every 5 seconds. The standby's log, the same on all four versions:
+
+```text
+FATAL:  could not start WAL streaming: ERROR:  replication slot "standby_slot" does not exist
+```
+
+The primary's log has the other half, here on 19.0:
+
+```text
+ERROR:  replication slot "standby_slot" does not exist
+STATEMENT:  START_REPLICATION SLOT "standby_slot" 0/09000000 TIMELINE 1
+```
+
+`pg_receivewal` reads a physical slot too, and it words the error by version.
+
+#### pg_receivewal: replication slot "x" does not exist
+
+On 17.12 to 19.0:
+
+```text
+pg_receivewal: error: replication slot "standby_slot" does not exist
+```
+
+#### pg_receivewal: could not send replication command "START_REPLICATION" (PostgreSQL 13)
+
+On 13.23:
+
+```text
+pg_receivewal: error: could not send replication command "START_REPLICATION": ERROR:  replication slot "standby_slot" does not exist
+```
+
+The source code of `pg_receivewal` asks for the slot itself from PostgreSQL 15, which gives the shorter message.
+
+#### Fix: create the physical slot
+
+Create the slot on the primary:
+
+```sql
+SELECT * FROM pg_create_physical_replication_slot('standby_slot');
+```
+
+**Verify:** on 19.0 the standby's next attempt logged `started streaming WAL from primary at 0/09000000 on timeline 1`, `pg_stat_wal_receiver` on the standby showed `streaming` with `standby_slot`, and the slot on the primary was `active`.
+
+### A subscription whose slot is gone
+
+The slot of a subscription was dropped on the publisher while the subscription was disabled, and the subscription was enabled again. Its apply worker failed at every start, 5 seconds apart, on all four versions:
+
+```text
+ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" does not exist
+```
+
+The line after it names the worker: `background worker "logical replication apply worker"` on 17.12 to 19.0 and `background worker "logical replication worker"` on 13.23, each with `exited with exit code 1`. `DROP SUBSCRIPTION` then failed too, because it also drops the slot on the publisher.
+
+#### could not drop replication slot "x" on publisher
+
+On 17.12 to 19.0:
+
+```text
+DROP SUBSCRIPTION sub_orders;
+ERROR:  could not drop replication slot "cdc_slot" on publisher: ERROR:  replication slot "cdc_slot" does not exist
+```
+
+#### could not drop the replication slot "x" on publisher (PostgreSQL 13)
+
+On 13.23 the cause is on a second line:
+
+```text
+DROP SUBSCRIPTION sub_orders;
+ERROR:  could not drop the replication slot "cdc_slot" on publisher
+DETAIL:  The error was: ERROR:  replication slot "cdc_slot" does not exist
+```
+
+#### Fix: detach the subscription from the slot
+
+The manual gives the way out: "first disable the subscription by executing `ALTER SUBSCRIPTION ... DISABLE`, and then disassociate it from the replication slot by executing `ALTER SUBSCRIPTION ... SET (slot_name = NONE)`" ([DROP SUBSCRIPTION](https://www.postgresql.org/docs/current/sql-dropsubscription.html), checked Nov 2026):
+
+```sql
+ALTER SUBSCRIPTION sub_orders DISABLE;
+ALTER SUBSCRIPTION sub_orders SET (slot_name = NONE);
+DROP SUBSCRIPTION sub_orders;
+```
+
+**Verify:** all three statements succeeded on the four versions, and `SELECT count(*) FROM pg_subscription;` returned 0.
+
+### A consumer that resumes on a slot created again
+
+Creating the slot again clears the error, and it does not resume anything. The lab showed it with the `test_decoding` plugin, so that the rows the consumer received can be read.
+
+A consumer read one row, 101, and kept the position it had reached, as a CDC tool keeps its offset. Then the slot was dropped, rows 102 and 103 were written, the slot was created again, and row 104 was written.
+
+The consumer came back and asked for its saved position. On 19.0:
+
+```text
+$ pg_recvlogical -d appdb --slot cdc_slot --start --startpos 0/02474878 --endpos 0/02474AD8 -f -
+BEGIN 677
+table public.orders: INSERT: id[bigint]:104 status[text]:'after the new slot'
+COMMIT 677
+```
+
+It received row 104 and nothing else, with no error. Rows 102 and 103 are in the table and never reached it. The same happened on all four versions, and only the server log said why.
+
+#### has been already streamed, forwarding to
+
+On 17.12 to 19.0 the server logged:
+
+```text
+LOG:  0/02474878 has been already streamed, forwarding to 0/02474A10
+STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/02474878
+```
+
+`0/02474A10` is the position at which the new slot was created.
+
+#### cannot stream from, minimum is, forwarding (PostgreSQL 13)
+
+On 13.23 the log had no line for it. The source code of 13 and 14 writes the message at the `DEBUG1` level, and with `log_min_messages = debug1` the lab printed it:
+
+```text
+DEBUG:  cannot stream from 0/1644DB8, minimum is 0/1645018, forwarding
+```
+
+### Fix: create the slot again, and take a new snapshot
+
+Create the slot again only together with a new snapshot of the tables that the consumer reads:
+
+```sql
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+```
+
+Create the slot before the snapshot. A slot created over the replication protocol exports a snapshot "which will show exactly the state of the database after which all changes will be included in the change stream" ([Logical decoding concepts](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), checked Nov 2026).
+
+**Verify:** `pg_replication_slots` shows the slot with the plugin and the database that the consumer uses. In the lab the next read of a new slot returned the changes made after it was created, as row 104 above.
+
+## replication slot "x" already exists
+
+### A second create, from any database or slot type
+
+A name can be used once on a server, whatever the database and the slot type. On all four versions, after `cdc_slot` had been created in `appdb`:
+
+```text
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- in appdb, a second time
+ERROR:  replication slot "cdc_slot" already exists
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- in otherdb
+ERROR:  replication slot "cdc_slot" already exists
+SELECT * FROM pg_create_physical_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" already exists
+```
+
+Over the replication protocol, which `pg_recvlogical --create-slot` uses, the error is the same. The command in it depends on the version of the server:
+
+```text
+pg_recvlogical: error: could not send replication command "CREATE_REPLICATION_SLOT "cdc_slot" LOGICAL "pgoutput" ( SNAPSHOT 'nothing')": ERROR:  replication slot "cdc_slot" already exists
+```
+
+That is 17.12 to 19.0. On 13.23 the command was `CREATE_REPLICATION_SLOT "cdc_slot" LOGICAL "pgoutput" NOEXPORT_SNAPSHOT`, with the same error after it.
+
+### CREATE SUBSCRIPTION: could not create replication slot
+
+`CREATE SUBSCRIPTION` creates a slot on the publisher by default, named after the subscription or after its `slot_name`. When that name is taken, on all four versions:
+
+```text
+CREATE SUBSCRIPTION sub_orders CONNECTION 'host=localhost dbname=appdb user=postgres' PUBLICATION cdc_pub WITH (slot_name = 'cdc_slot', copy_data = false);
+ERROR:  could not create replication slot "cdc_slot": ERROR:  replication slot "cdc_slot" already exists
+```
+
+### Fix: a name of its own, or reuse the slot
+
+First see who has the name: `pg_replication_slots` shows the slot's `database`, `plugin` and `active`, and the holder query of [Confirm the diagnosis](#confirm-the-diagnosis) shows the session that uses it. Then pick the case:
+
+- **A second consumer.** Give it its own name. In the lab `cdc_slot_otherdb` was created in `otherdb` next to `cdc_slot`. The manual's advice: "For most applications, a separate slot will be required for each consumer" ([Logical decoding concepts](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), checked Nov 2026).
+- **A script that may run twice.** `pg_recvlogical --if-not-exists` keeps the slot that is there. On an existing slot it printed nothing and returned `exit status 0` on all four versions.
+- **A subscription for a slot that you created.** Create it with `create_slot = false`, so that it uses the slot:
+
+  ```sql
+  CREATE SUBSCRIPTION sub_orders CONNECTION 'host=localhost dbname=appdb user=postgres' PUBLICATION cdc_pub
+    WITH (slot_name = 'cdc_slot', create_slot = false, copy_data = false);
+  ```
+
+  **Verify:** a row inserted on the publisher arrived in the subscriber's table, and the session that held the slot had the `application_name` `sub_orders`.
+- **A slot that nobody uses any more.** Drop it, then create yours. [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/#issue-2-a-slot-that-is-no-longer-needed) has the safe order for a slot that is still active.
+
+## replication slot "x" is active for PID n
+
+### A second consumer on the same slot
+
+While consumer A streamed `cdc_slot`, a second consumer, B, started on it, as a second connector with the same slot name would:
+
+```text
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 988
+```
+
+`988` is the process ID (PID) of the WAL sender that serves A, the `active_pid` of the slot. The SQL functions gave the same error while A was connected, on all four versions:
+
+```text
+SELECT count(*) FROM pg_logical_slot_peek_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  replication slot "cdc_slot" is active for PID 988
+SELECT * FROM pg_replication_slot_advance('cdc_slot', pg_current_wal_lsn());
+ERROR:  replication slot "cdc_slot" is active for PID 988
+```
+
+`pg_drop_replication_slot` gives it as well. [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/#issue-2-a-slot-that-is-no-longer-needed) has the order in which a slot in use can be dropped.
+
+### A second subscription on the same slot
+
+A second subscription that names the same slot is refused in the same way. Its apply worker logged, every 5 seconds:
+
+```text
+ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" is active for PID 2489
+```
+
+### The session of a client that hung
+
+The error also comes when the old client is gone and its session is not. In the lab A was frozen with `SIGSTOP`, so that its connection stayed open and it no longer answered, as with a client that hangs. B was started again, and retried every 5 seconds:
+
+```text
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 988    (12 times)
+pg_recvlogical: disconnected; waiting 5 seconds to try again    (12 times)
+```
+
+The server ended A's session once A had not answered for `wal_sender_timeout`, 60 seconds by default. The manual: "Terminate replication connections that are inactive for longer than this amount of time. This is useful for the sending server to detect a standby crash or network outage" ([Replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html), checked Nov 2026). The log line:
+
+```text
+LOG:  terminating walsender process due to replication timeout
+```
+
+On 19.0 B held the slot 60 seconds after A was frozen, and 61 seconds on 13.23, 17.12 and 18.7. When A was resumed, its connection was gone, and A was the one refused:
+
+```text
+pg_recvlogical: error: could not send feedback packet: server closed the connection unexpectedly
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/024C7D28 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" is active for PID 1645
+```
+
+With `wal_sender_timeout = 0` the server keeps such a session. In the lab a third client, frozen the same way, still held the slot after 94 seconds without an answer, and the consumer waiting for it was refused 19 times. The server log had no `replication timeout` line.
+
+### Before 9.6: is already active
+
+The source code of PostgreSQL before 9.6 spells this error differently. From [9.6](https://github.com/postgres/postgres/blob/REL9_6_STABLE/src/backend/replication/slot.c) it is `replication slot "%s" is active for PID %d`. No 9.x server was run for this page.
+
+#### replication slot "x" is already active for PID n (9.5)
+
+The [9.5 source](https://github.com/postgres/postgres/blob/REL9_5_STABLE/src/backend/replication/slot.c) has `replication slot "%s" is already active for PID %d`.
+
+#### replication slot "x" is already active (9.4)
+
+The [9.4 source](https://github.com/postgres/postgres/blob/REL9_4_STABLE/src/backend/replication/slot.c) has `replication slot "%s" is already active`, without the PID.
+
+### Fix: stop the second consumer, or end the stale session
+
+Run the holder query of [Confirm the diagnosis](#confirm-the-diagnosis), then:
+
+- **Two consumers that are both alive.** Stop one in the tool that runs it, or give it [a name of its own](#fix-a-name-of-its-own-or-reuse-the-slot). The documentation of Debezium, Airbyte and Flink CDC asks for a separate slot per connector, source or table, see [How CDC tools describe the same thing](#how-cdc-tools-describe-the-same-thing).
+- **A session whose client is gone.** Wait for `wal_sender_timeout`, or end the session once the old client is stopped:
+
+  ```sql
+  SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots WHERE slot_name = 'cdc_slot';
+  ```
+
+  In the lab B was frozen and a third consumer, C, waited for the slot. **Verify:** C held the slot 5 seconds after the session of B was ended, at its next attempt.
+
+End a session only when its client is stopped. A client that still runs connects again, as [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/#issue-2-a-slot-that-is-no-longer-needed) shows.
+
+## The slot was invalidated
+
+`can no longer get changes from replication slot "x"`, `cannot read from logical replication slot "x"` and `can no longer access replication slot "x"` mean that the slot was invalidated, for example by `max_slot_wal_keep_size`. The lab invalidated a slot on all four versions, and 19.0 printed the same text as 18.7:
+
+```text
+ERROR:  can no longer access replication slot "cdc_slot"
+DETAIL:  This replication slot has been invalidated due to "wal_removed".
+```
+
+An invalidated slot cannot be repaired. Drop it and [create it again with a new snapshot](#fix-create-the-slot-again-and-take-a-new-snapshot). The causes, the wording of each version and a cap that does not cost you the slot are in [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/#what-an-invalidated-slot-costs).
+
+## Keep the slot through a promotion (PostgreSQL 17 and later)
+
+PostgreSQL 17 added failover slots, logical slots that a standby keeps a synchronized copy of ([17 release notes](https://www.postgresql.org/docs/release/17.0/), checked Nov 2026). The manual lists what they need: the slot's `failover` option, `sync_replication_slots` on the standby, a physical slot between primary and standby set as `primary_slot_name`, `hot_standby_feedback` on the standby and "a valid dbname in the primary_conninfo". It adds: "It's highly recommended that the said physical replication slot is named in synchronized_standby_slots list on the primary, to prevent the subscriber from consuming changes faster than the hot standby" ([Replication slot synchronization](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html#LOGICALDECODING-REPLICATION-SLOTS-SYNCHRONIZATION), checked Nov 2026).
+
+The lab ran these steps on 17.12, 18.7 and 19.0:
+
+1. **Create the slot as a failover slot.** The fifth argument of `pg_create_logical_replication_slot` is `failover`. A slot that exists already can be switched over a replication connection:
+
+   ```sql
+   SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput', false, false, true);
+   ```
+
+   ```text
+   $ psql "dbname=appdb replication=database" -c 'ALTER_REPLICATION_SLOT tool_slot (FAILOVER true)'
+   ALTER_REPLICATION_SLOT
+   ```
+
+   Both slots then showed `failover = t` on the primary.
+
+2. **Name the standby's slot on the primary.**
+
+   ```sql
+   ALTER SYSTEM SET synchronized_standby_slots = 'standby_slot';
+   SELECT pg_reload_conf();
+   ```
+
+3. **Set the standby up for synchronization.** In the lab these lines went into the standby's `postgresql.auto.conf` before it started. The first matches the primary, which ran with `wal_level = logical`:
+
+   ```text
+   wal_level = logical
+   primary_slot_name = 'standby_slot'
+   hot_standby_feedback = on
+   sync_replication_slots = on
+   primary_conninfo = 'host=pg user=postgres password=labpw dbname=appdb'
+   ```
+
+4. **Wait until the copy is persistent.** **Verify** on the standby: `synced = t` and `temporary = f` for the slot in `pg_replication_slots`. Until then the standby logs `could not synchronize replication slot`, below.
+
+### could not synchronize replication slot
+
+At first the standby would not keep the copies:
+
+```text
+LOG:  could not synchronize replication slot "cdc_slot"
+DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/0B000550 and catalog xmin 795, but the standby has LSN 0/0C000028 and catalog xmin 795.
+```
+
+The manual's advice for this message, when no consumer reads the slot, is "to manually advance the slot on the primary using pg_logical_slot_get_changes or pg_logical_slot_get_binary_changes" ([Replication slot synchronization](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html#LOGICALDECODING-REPLICATION-SLOTS-SYNCHRONIZATION), checked Nov 2026). The lab did that and called `pg_log_standby_snapshot()` on the primary. Within 5 seconds the standby logged `newly created replication slot "cdc_slot" is sync-ready now`, on 17.12, 18.7 and 19.0.
+
+### On the standby: the copy can be neither read nor dropped
+
+#### cannot use replication slot "x" for logical decoding
+
+A read of the copy on the standby:
+
+```text
+ERROR:  cannot use replication slot "cdc_slot" for logical decoding
+DETAIL:  This replication slot is being synchronized from the primary server.
+HINT:  Specify another replication slot.
+```
+
+#### cannot drop replication slot "x"
+
+A drop of the copy on the standby:
+
+```text
+ERROR:  cannot drop replication slot "cdc_slot"
+DETAIL:  This replication slot is being synchronized from the primary server.
+```
+
+### replication slot "x" specified in parameter synchronized_standby_slots does not exist
+
+Two rows were written on the primary and not read, and the standby was promoted. The slot was on the new primary, and the first read of it waited:
+
+```text
+WARNING:  replication slot "standby_slot" specified in parameter "synchronized_standby_slots" does not exist    (10 times)
+DETAIL:  Logical replication is waiting on the standby associated with replication slot "standby_slot".    (10 times)
+HINT:  Create the replication slot "standby_slot" or amend parameter "synchronized_standby_slots".    (10 times)
+```
+
+The new primary had been cloned with the primary's `synchronized_standby_slots`, and it had no slot of that name. The manual: "logical replication will not proceed if the slots specified in the synchronized_standby_slots do not exist or are invalidated" ([Replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html), checked Nov 2026). Reset the setting on the new primary, or name the slot of a standby that the new primary has:
+
+```sql
+ALTER SYSTEM RESET synchronized_standby_slots;
+SELECT pg_reload_conf();
+```
+
+**Verify:** the next read returned the two rows that were written before the promotion:
+
+```text
+INSERT public.orders
+    new row [N]: id='402' status='read after the promotion'
+INSERT public.orders
+    new row [N]: id='403' status='read after the promotion'
+```
+
+### PostgreSQL 13
+
+On 13.23 the first step already fails, and the standby setting does not exist:
+
+```text
+ERROR:  function pg_create_logical_replication_slot(unknown, unknown, boolean, boolean, boolean) does not exist
+ERROR:  unrecognized configuration parameter "sync_replication_slots"
+```
+
+There the logical slot was lost at the promotion, as in [After a standby is promoted](#after-a-standby-is-promoted).
+
+## Prevent it
+
+- Give every consumer its own slot, named after the consumer, so that `pg_replication_slots` shows whose each slot is.
+- Create the slot in the database that the consumer reads, and check `pg_replication_slots.database` when you set the consumer up.
+- In scripts, use `pg_recvlogical --if-not-exists`, or check `pg_replication_slots` before you create a slot.
+- On PostgreSQL 17 and later, create a slot that must survive a promotion as a failover slot, and check `synced = t` on the standby. After a promotion, set `synchronized_standby_slots` on the new primary.
+- Plan for a new snapshot after a promotion when the slot is not a failover slot, and after a `pg_upgrade` from a version before 17.
+- Know your `wal_sender_timeout`. At the default of 60 seconds the session of a hung client freed its slot after a minute. At 0 it kept the slot until the session was ended by hand.
+
+## How CDC tools describe the same thing
+
+None of these tools was run for this page. The statements below are taken from their documentation and, for Debezium, from its source code at the release tags, checked in November 2026.
+
+### Debezium
+
+The PostgreSQL connector creates its slot when it starts and finds none. Its `slot.name` defaults to `debezium`, and "When deploying multiple connector instances, each must use a unique slot name" ([3.7 properties](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-slot-name)). In the source of 3.7.1.Final and 1.9.7.Final, an `already exists` error on creation is reported as:
+
+```text
+Creation of replication slot failed; when setting up multiple connectors for the same database host, please make sure to use a distinct replication slot name for each.
+```
+
+The 3.7.1.Final source looks the slot up by name, database and plugin, and creates it when no row matches. A slot of the same name in another database is such a case, and in the lab creating one failed with `already exists`.
+
+When starting the stream fails, the connector waits `slot.retry.delay.ms` (default 10 seconds) and tries again, up to `slot.max.retries` times (default 6) ([3.7 properties](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-slot-max-retries)). When the last try fails on `is active`, the source of both versions reports `Failed to start replication stream at` the position, followed by the same advice. With the defaults the retries span about 60 seconds, the same as the default `wal_sender_timeout` that freed the slot of a hung client in the lab.
+
+The 3.7 documentation also lists `slot.failover`, which "Specifies whether the connector creates a failover slot", and says that with PostgreSQL 16 or earlier the connector does not create one ([3.7 properties](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-slot-failover)).
+
+### AWS DMS
+
+AWS Database Migration Service (DMS) can use a slot that you created, named in the endpoint setting `SlotName`: "DMS verifies that the specified logical replication slot exists before starting the CDC load task", and "If the specified slot does not exist ... DMS raises an error" ([PostgreSQL as a DMS source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html)).
+
+### Airbyte
+
+The PostgreSQL source asks for a slot of its own: "Airbyte requires a replication slot configured only for its use. Only one source should be configured that uses this replication slot" ([Postgres source](https://docs.airbyte.com/integrations/sources/postgres)). Its troubleshooting page has a failover case: "When using CDC with Azure PG Flex, if a failover to a new leader happens, your CDC replication slot will not be re-created automatically" ([Troubleshooting](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting)). What Airbyte did after its slot was dropped and created again is in [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/#airbyte).
+
+### Flink CDC
+
+`slot.name` is required, and the documentation names this page's error: "The slot.name is recommended to set for different tables to avoid the potential PSQLException: ERROR: replication slot "flink" is active for PID 974 error" ([Postgres CDC connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/postgres-cdc/)).
+
+:::note[How OLake Go handles this]
+
+OLake Go reads a slot that you create, so the same errors apply to it. Its set-up guides have you create the slot with `pg_create_logical_replication_slot` and use "a unique slot name per OLake connection" ([generic set-up guide](/docs/connectors/postgres/setup/generic/)). Its Test Connection checks that "The specified replication slot must exist", and gives "logical slot in this database" as the recommended value ([PostgreSQL connector](/docs/connectors/postgres/#3-test-connection)).
+
+The connector docs also say not to reuse a slot "across multiple OLake Go jobs", and the set-up guides recommend `wal_sender_timeout = 0`. With that setting in the lab, the session of a frozen client kept its slot for as long as it was watched, as in [The session of a client that hung](#the-session-of-a-client-that-hung).
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- PostgreSQL manual: [logical decoding concepts](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), [replication slot synchronization](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html#LOGICALDECODING-REPLICATION-SLOTS-SYNCHRONIZATION), [pg_replication_slots](https://www.postgresql.org/docs/current/view-pg-replication-slots.html), [replication functions](https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-REPLICATION), [streaming replication protocol](https://www.postgresql.org/docs/current/protocol-replication.html), [replication settings](https://www.postgresql.org/docs/current/runtime-config-replication.html), [pg_recvlogical](https://www.postgresql.org/docs/current/app-pgrecvlogical.html), [CREATE SUBSCRIPTION](https://www.postgresql.org/docs/current/sql-createsubscription.html), [DROP SUBSCRIPTION](https://www.postgresql.org/docs/current/sql-dropsubscription.html), [upgrading logical replication clusters](https://www.postgresql.org/docs/current/logical-replication-upgrade.html)
+- PostgreSQL release notes: [17](https://www.postgresql.org/docs/release/17.0/)
+- PostgreSQL source of the version differences: `slot.c` at [9.4](https://github.com/postgres/postgres/blob/REL9_4_STABLE/src/backend/replication/slot.c), [9.5](https://github.com/postgres/postgres/blob/REL9_5_STABLE/src/backend/replication/slot.c) and [9.6](https://github.com/postgres/postgres/blob/REL9_6_STABLE/src/backend/replication/slot.c); `logical.c` at [14](https://github.com/postgres/postgres/blob/REL_14_STABLE/src/backend/replication/logical/logical.c) and [15](https://github.com/postgres/postgres/blob/REL_15_STABLE/src/backend/replication/logical/logical.c); `subscriptioncmds.c` at [13](https://github.com/postgres/postgres/blob/REL_13_STABLE/src/backend/commands/subscriptioncmds.c) and [14](https://github.com/postgres/postgres/blob/REL_14_STABLE/src/backend/commands/subscriptioncmds.c); `pg_receivewal.c` at [15](https://github.com/postgres/postgres/blob/REL_15_STABLE/src/bin/pg_basebackup/pg_receivewal.c)
+- Debezium: [PostgreSQL connector 3.7](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html), source at [3.7.1.Final](https://github.com/debezium/debezium/blob/v3.7.1.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorTask.java) and [1.9.7.Final](https://github.com/debezium/debezium/blob/v1.9.7.Final/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgresConnectorTask.java)
+- Vendors: [AWS DMS PostgreSQL source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), [Airbyte Postgres source](https://docs.airbyte.com/integrations/sources/postgres), [Airbyte troubleshooting](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting), [Flink CDC Postgres connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/postgres-cdc/)
+- Related runbooks: [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/), [Enable logical replication for CDC](/docs/runbooks/postgres/enable-logical-replication/)

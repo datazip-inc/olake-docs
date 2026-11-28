@@ -438,7 +438,8 @@ const runbooksSidebar = {
       items: [
         { type: 'doc', id: 'runbooks/postgres/replication-slot-filling-disk', label: 'Replication slot filling the disk' },
         { type: 'doc', id: 'runbooks/postgres/enable-logical-replication', label: 'Enable logical replication' },
-        { type: 'doc', id: 'runbooks/postgres/replica-identity-toast-columns', label: 'REPLICA IDENTITY and TOAST columns' }
+        { type: 'doc', id: 'runbooks/postgres/replica-identity-toast-columns', label: 'REPLICA IDENTITY and TOAST columns' },
+        { type: 'doc', id: 'runbooks/postgres/replication-slot-errors', label: 'Replication slot errors' }
       ]
     },
     {
