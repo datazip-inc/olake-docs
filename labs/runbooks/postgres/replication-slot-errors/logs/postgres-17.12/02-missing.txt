@@ -1,0 +1,69 @@
+# ./run.sh missing    PostgreSQL 17.12    2026-11-28T09:40:37Z
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | plugin | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+-----------+-----------+--------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+(0 rows)
+
+
+## SQL functions on a slot that does not exist
+SELECT pg_drop_replication_slot('cdc_slot');
+ERROR:  replication slot "cdc_slot" does not exist
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  replication slot "cdc_slot" does not exist
+SELECT * FROM pg_replication_slot_advance('cdc_slot', pg_current_wal_lsn());
+ERROR:  replication slot "cdc_slot" does not exist
+
+## A consumer that streams the slot, as a CDC tool does
+$ pg_recvlogical -d appdb --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null --no-loop
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" does not exist
+pg_recvlogical: error: disconnected
+
+## A physical slot, read by pg_receivewal as a standby would read it
+$ pg_receivewal -D /tmp/wal -S standby_slot --no-loop
+pg_receivewal: error: replication slot "standby_slot" does not exist
+pg_receivewal: error: disconnected
+--- server log of pg
+2026-11-28 09:40:39.879 UTC [180] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:40:39.879 UTC [180] STATEMENT:  SELECT pg_drop_replication_slot('cdc_slot');
+2026-11-28 09:40:40.002 UTC [188] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:40:40.002 UTC [188] STATEMENT:  SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+2026-11-28 09:40:40.117 UTC [196] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:40:40.117 UTC [196] STATEMENT:  SELECT * FROM pg_replication_slot_advance('cdc_slot', pg_current_wal_lsn());
+2026-11-28 09:40:40.247 UTC [204] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:40:40.247 UTC [204] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 ("proto_version" '1', "publication_names" 'cdc_pub')
+---
+
+## The slot exists, in another database. A logical slot belongs to the database it was created in.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/21C8180
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+-----------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot  | logical   | pgoutput | appdb    | f      |            | 0/21C8180           | reserved   |                     | f        | f
+(1 row)
+
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+ERROR:  replication slot "cdc_slot" was not created in this database
+$ pg_recvlogical -d otherdb --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null --no-loop
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" was not created in this database
+pg_recvlogical: error: disconnected
+--- server log of pg
+2026-11-28 09:40:40.953 UTC [244] ERROR:  replication slot "cdc_slot" was not created in this database
+2026-11-28 09:40:40.953 UTC [244] STATEMENT:  SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+2026-11-28 09:40:41.081 UTC [252] ERROR:  replication slot "cdc_slot" was not created in this database
+2026-11-28 09:40:41.081 UTC [252] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 ("proto_version" '1', "publication_names" 'cdc_pub')
+---
+
+## The fix: read the slot from the database it was created in
+INSERT INTO orders VALUES (11, 'read from appdb');
+INSERT 0 1
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- printed by pgoutput.py
+RELATION public.orders  replica identity default
+INSERT public.orders
+    new row [N]: id='11' status='read from appdb'
+DELETE FROM orders WHERE id > 10;
+DELETE 1

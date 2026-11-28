@@ -1,0 +1,110 @@
+# ./run.sh subscription    PostgreSQL 17.12    2026-11-28T09:43:59Z
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/2210968
+(1 row)
+
+
+## CREATE SUBSCRIPTION with a slot name that is taken on the publisher. The publisher is appdb on the same server.
+CREATE SUBSCRIPTION sub_orders CONNECTION 'host=localhost dbname=appdb user=postgres' PUBLICATION cdc_pub WITH (slot_name = 'cdc_slot', copy_data = false);
+ERROR:  could not create replication slot "cdc_slot": ERROR:  replication slot "cdc_slot" already exists
+
+## The fix: use the slot that is there
+CREATE SUBSCRIPTION sub_orders CONNECTION 'host=localhost dbname=appdb user=postgres' PUBLICATION cdc_pub WITH (slot_name = 'cdc_slot', create_slot = false, copy_data = false);
+CREATE SUBSCRIPTION
+INSERT INTO orders VALUES (201, 'through the subscription');
+INSERT 0 1
+SELECT id, status FROM orders WHERE id > 200;
+ id  |          status          
+-----+--------------------------
+ 201 | through the subscription
+(1 row)
+
+SELECT s.slot_name, s.active_pid, a.application_name, a.backend_type,
+       date_trunc('second', now() - r.reply_time) AS since_last_reply
+FROM pg_replication_slots s
+LEFT JOIN pg_stat_activity a ON a.pid = s.active_pid
+LEFT JOIN pg_stat_replication r ON r.pid = s.active_pid
+ORDER BY s.slot_name;
+ slot_name | active_pid | application_name | backend_type | since_last_reply 
+-----------+------------+------------------+--------------+------------------
+ cdc_slot  |       2441 | sub_orders       | walsender    | 00:00:00
+(1 row)
+
+
+## A second subscription on the same slot, in another database
+CREATE SUBSCRIPTION sub_copy CONNECTION 'host=localhost dbname=appdb user=postgres' PUBLICATION cdc_pub WITH (slot_name = 'cdc_slot', create_slot = false, copy_data = false);
+CREATE SUBSCRIPTION
+--- server log of pg
+2026-11-28 09:44:02.473 UTC [2492] ERROR:  replication slot "cdc_slot" is active for PID 2441
+2026-11-28 09:44:02.473 UTC [2492] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 (proto_version '4', origin 'any', publication_names '"cdc_pub"')
+2026-11-28 09:44:02.473 UTC [2491] ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" is active for PID 2441
+2026-11-28 09:44:02.473 UTC [1] LOG:  background worker "logical replication apply worker" (PID 2491) exited with exit code 1
+2026-11-28 09:44:07.486 UTC [2518] ERROR:  replication slot "cdc_slot" is active for PID 2441
+2026-11-28 09:44:07.486 UTC [2518] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 (proto_version '4', origin 'any', publication_names '"cdc_pub"')
+2026-11-28 09:44:07.486 UTC [2517] ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" is active for PID 2441
+2026-11-28 09:44:07.487 UTC [1] LOG:  background worker "logical replication apply worker" (PID 2517) exited with exit code 1
+2026-11-28 09:44:12.495 UTC [2537] ERROR:  replication slot "cdc_slot" is active for PID 2441
+2026-11-28 09:44:12.495 UTC [2537] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/0 (proto_version '4', origin 'any', publication_names '"cdc_pub"')
+2026-11-28 09:44:12.495 UTC [2536] ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" is active for PID 2441
+2026-11-28 09:44:12.496 UTC [1] LOG:  background worker "logical replication apply worker" (PID 2536) exited with exit code 1
+---
+
+## It is detached from the slot before it is dropped
+ALTER SUBSCRIPTION sub_copy DISABLE;
+ALTER SUBSCRIPTION
+ALTER SUBSCRIPTION sub_copy SET (slot_name = NONE);
+ALTER SUBSCRIPTION
+DROP SUBSCRIPTION sub_copy;
+DROP SUBSCRIPTION
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+-----------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot  | logical   | pgoutput | appdb    | t      |       2441 | 0/2212158           | reserved   |                     | f        | f
+(1 row)
+
+
+## The slot is dropped on the publisher while the subscription is disabled. Then the subscription is enabled again.
+ALTER SUBSCRIPTION sub_orders DISABLE;
+ALTER SUBSCRIPTION
+SELECT pg_drop_replication_slot('cdc_slot');
+ pg_drop_replication_slot 
+--------------------------
+ 
+(1 row)
+
+ALTER SUBSCRIPTION sub_orders ENABLE;
+ALTER SUBSCRIPTION
+--- server log of pg
+2026-11-28 09:44:15.854 UTC [2629] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:44:15.854 UTC [2629] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/2211568 (proto_version '4', origin 'any', publication_names '"cdc_pub"')
+2026-11-28 09:44:15.854 UTC [2628] ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:44:15.855 UTC [1] LOG:  background worker "logical replication apply worker" (PID 2628) exited with exit code 1
+2026-11-28 09:44:20.870 UTC [2648] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:44:20.870 UTC [2648] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/2211568 (proto_version '4', origin 'any', publication_names '"cdc_pub"')
+2026-11-28 09:44:20.870 UTC [2647] ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:44:20.871 UTC [1] LOG:  background worker "logical replication apply worker" (PID 2647) exited with exit code 1
+2026-11-28 09:44:25.884 UTC [2674] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:44:25.884 UTC [2674] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/2211568 (proto_version '4', origin 'any', publication_names '"cdc_pub"')
+2026-11-28 09:44:25.884 UTC [2673] ERROR:  could not start WAL streaming: ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:44:25.886 UTC [1] LOG:  background worker "logical replication apply worker" (PID 2673) exited with exit code 1
+---
+
+## DROP SUBSCRIPTION also drops the slot on the publisher, and that slot is gone
+DROP SUBSCRIPTION sub_orders;
+ERROR:  could not drop replication slot "cdc_slot" on publisher: ERROR:  replication slot "cdc_slot" does not exist
+
+## The fix: detach the subscription from the slot, then drop it
+ALTER SUBSCRIPTION sub_orders DISABLE;
+ALTER SUBSCRIPTION
+ALTER SUBSCRIPTION sub_orders SET (slot_name = NONE);
+ALTER SUBSCRIPTION
+DROP SUBSCRIPTION sub_orders;
+DROP SUBSCRIPTION
+SELECT count(*) AS subscriptions FROM pg_subscription;
+ subscriptions 
+---------------
+             0
+(1 row)
+

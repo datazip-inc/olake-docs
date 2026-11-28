@@ -1,0 +1,95 @@
+# ./run.sh promote    PostgreSQL 19.0    2026-11-28T09:34:30Z
+
+## A standby that streams through its physical slot
+SELECT * FROM pg_create_physical_replication_slot('standby_slot');
+  slot_name   | lsn 
+--------------+-----
+ standby_slot | 
+(1 row)
+
+$ pg_basebackup -h pg -U postgres -D /standby/data -X stream -R -c fast    (on the standby)
+$ echo "wal_level = logical" >> postgresql.auto.conf    (on the standby)
+$ echo "primary_slot_name = 'standby_slot'" >> postgresql.auto.conf    (on the standby)
+SELECT pg_is_in_recovery();    -- on the standby
+ pg_is_in_recovery 
+-------------------
+ t
+(1 row)
+
+
+## A CDC slot on the primary. Its consumer reads one change and confirms it.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/0B000060
+(1 row)
+
+INSERT INTO orders VALUES (301, 'before the promotion');
+INSERT 0 1
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- printed by pgoutput.py
+RELATION public.orders  replica identity default
+INSERT public.orders
+    new row [N]: id='301' status='before the promotion'
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+  slot_name   | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+--------------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot     | logical   | pgoutput | appdb    | f      |            | 0/0B0004A0          | reserved   |                     | f        | f
+ standby_slot | physical  |          |          | t      |       3509 |                     | reserved   |                     | f        | f
+(2 rows)
+
+
+## The standby has the row and no copy of the slot
+SELECT id, status FROM orders WHERE id > 300;    -- on the standby
+ id  |        status        
+-----+----------------------
+ 301 | before the promotion
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced, temporary FROM pg_replication_slots ORDER BY slot_name;    -- on the standby
+ slot_name | slot_type | plugin | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced | temporary 
+-----------+-----------+--------+----------+--------+------------+---------------------+------------+---------------------+----------+--------+-----------
+(0 rows)
+
+
+## The standby is promoted, as in a failover
+SELECT pg_promote();    -- on the standby
+ pg_promote 
+------------
+ t
+(1 row)
+
+SELECT pg_is_in_recovery();    -- on the standby
+ pg_is_in_recovery 
+-------------------
+ f
+(1 row)
+
+
+## The consumer connects to the new primary
+$ pg_recvlogical -d appdb --slot cdc_slot --start -o proto_version=1 -o publication_names=cdc_pub -f /dev/null --no-loop
+pg_recvlogical: error: could not send replication command "START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')": ERROR:  replication slot "cdc_slot" does not exist
+pg_recvlogical: error: disconnected
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- on the standby, printed by pgoutput.py
+ERROR:  replication slot "cdc_slot" does not exist
+--- server log of standby
+2026-11-28 09:34:38.975 UTC [125] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:34:38.975 UTC [125] STATEMENT:  START_REPLICATION SLOT "cdc_slot" LOGICAL 0/00000000 ("proto_version" '1', "publication_names" 'cdc_pub')
+2026-11-28 09:34:39.097 UTC [133] ERROR:  replication slot "cdc_slot" does not exist
+2026-11-28 09:34:39.097 UTC [133] STATEMENT:  SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');
+---
+
+## The fix: create the slot on the new primary. It starts at the current position.
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput');    -- on the standby
+ slot_name |    lsn     
+-----------+------------
+ cdc_slot  | 0/0B000620
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced, temporary FROM pg_replication_slots ORDER BY slot_name;    -- on the standby
+ slot_name | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced | temporary 
+-----------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------+-----------
+ cdc_slot  | logical   | pgoutput | appdb    | f      |            | 0/0B000620          | reserved   |                     | f        | f      | f
+(1 row)
+
+DELETE FROM orders WHERE id > 100;
+DELETE 1

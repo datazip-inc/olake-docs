@@ -437,7 +437,9 @@ const runbooksSidebar = {
       collapsed: false,
       items: [
         { type: 'doc', id: 'runbooks/postgres/replication-slot-filling-disk', label: 'Replication slot filling the disk' },
-        { type: 'doc', id: 'runbooks/postgres/enable-logical-replication', label: 'Enable logical replication' }
+        { type: 'doc', id: 'runbooks/postgres/enable-logical-replication', label: 'Enable logical replication' },
+        { type: 'doc', id: 'runbooks/postgres/replica-identity-toast-columns', label: 'REPLICA IDENTITY and TOAST columns' },
+        { type: 'doc', id: 'runbooks/postgres/replication-slot-errors', label: 'Replication slot errors' }
       ]
     },
     {
@@ -458,7 +460,8 @@ const runbooksSidebar = {
       collapsed: false,
       items: [
         { type: 'doc', id: 'runbooks/debezium/connector-running-captures-nothing', label: 'Running but captures nothing' },
-        { type: 'doc', id: 'runbooks/debezium/schema-history-topic-missing', label: 'Schema history topic missing' }
+        { type: 'doc', id: 'runbooks/debezium/schema-history-topic-missing', label: 'Schema history topic missing' },
+        { type: 'doc', id: 'runbooks/debezium/add-table-incremental-snapshot', label: 'Add a table to a running connector' }
       ]
     },
     {
@@ -477,8 +480,11 @@ const runbooksSidebar = {
       link: { type: 'doc', id: 'runbooks/iceberg/index' },
       items: [
         { type: 'doc', id: 'runbooks/iceberg/schema-evolution-errors', label: 'Schema evolution errors' },
+        { type: 'doc', id: 'runbooks/iceberg/partition-evolution-errors', label: 'Partition evolution errors' },
         { type: 'doc', id: 'runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing', label: 'Compaction rewrites nothing' },
-        { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' }
+        { type: 'doc', id: 'runbooks/iceberg/expire-snapshots-remove-orphan-files', label: 'Storage not reclaimed' },
+        { type: 'doc', id: 'runbooks/iceberg/spark-cannot-find-iceberg', label: 'Spark cannot find Iceberg' },
+        { type: 'doc', id: 'runbooks/iceberg/deletion-vectors-delete-files-by-engine', label: 'Delete files by engine' }
       ]
     }
   ]

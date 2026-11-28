@@ -1,0 +1,883 @@
+:: loading settings :: url = jar:file:/opt/spark/jars/ivy-2.5.1.jar!/org/apache/ivy/core/settings/ivysettings.xml
+# Spark 3.3.3; Apache Iceberg 1.4.3 (commit 9a5d24fee239352021a9a73f6a4cad8ecf464f01); spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+
+######## case: create
+
+=== CREATE TABLE demo.db.bad_bucket (id bigint, amount double) USING iceberg PARTITIONED BY (bucket(16, amount))
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Invalid source type double for transform: bucket[16]
+
+=== CREATE TABLE demo.db.bad_hours (id bigint, d date) USING iceberg PARTITIONED BY (hours(d))
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Invalid source type date for transform: hour
+
+=== CREATE TABLE demo.db.bad_truncate (id bigint, ts timestamp) USING iceberg PARTITIONED BY (truncate(10, ts))
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Invalid source type timestamptz for transform: truncate[10]
+
+=== CREATE TABLE demo.db.bad_redundant (id bigint, ts timestamp) USING iceberg PARTITIONED BY (days(ts), hours(ts))
+ERROR pyspark.sql.utils.IllegalArgumentException
+Cannot add redundant partition: 1000: ts_day: day(1) conflicts with 1001: ts_hour: hour(1)
+error class: None
+
+=== CREATE TABLE demo.db.bad_struct (id bigint, point struct<x: double, y: double>) USING iceberg PARTITIONED BY (point)
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Cannot partition by non-primitive source field: struct<2: x: optional double, 3: y: optional double>
+
+=== CREATE TABLE demo.db.bad_column (id bigint, ts timestamp) USING iceberg PARTITIONED BY (days(created))
+ERROR pyspark.sql.utils.AnalysisException
+Couldn't find column created in:
+root
+ |-- id: long (nullable = true)
+ |-- ts: timestamp (nullable = true)
+error class: None
+
+=== CREATE TABLE demo.db.nested_p (id bigint, point struct<x: double, y: double>) USING iceberg PARTITIONED BY (point.x)
+OK
+
+=== INSERT INTO demo.db.nested_p VALUES (1, named_struct('x', 1.0D, 'y', 2.0D)), (2, named_struct('x', 3.0D, 'y', 4.0D))
+OK
+
+=== partition specs and schema of demo.db.nested_p
+OK
+  format version 2, current spec 0
+  spec 0: [1000: point.x: identity(3)]
+  schema 0: [1: id: optional long, 2: point: optional struct<3: x: optional double, 4: y: optional double>]
+
+=== SELECT * FROM demo.db.nested_p ORDER BY id
+OK
+  id | point
+  1 | Row(x=1.0, y=2.0)
+  2 | Row(x=3.0, y=4.0)
+
+######## case: evolve
+
+=== CREATE TABLE demo.db.evo_t (id bigint, ts timestamp, category string, amount double) USING iceberg PARTITIONED BY (days(ts))
+OK
+
+=== INSERT INTO demo.db.evo_t VALUES (1, TIMESTAMP '2026-11-01 10:00:00', 'a', 1.0)
+OK
+
+=== ALTER TABLE demo.db.evo_t ADD PARTITION FIELD hours(ts)
+OK
+
+=== ALTER TABLE demo.db.evo_t ADD PARTITION FIELD months(ts)
+OK
+
+=== ALTER TABLE demo.db.evo_t ADD PARTITION FIELD days(ts)
+ERROR pyspark.sql.utils.IllegalArgumentException
+Cannot add duplicate partition field null=day(ref(name="ts")), conflicts with 1000: ts_day: day(2)
+error class: None
+
+=== ALTER TABLE demo.db.evo_t ADD PARTITION FIELD days(ts) AS day_of_ts
+ERROR pyspark.sql.utils.IllegalArgumentException
+Cannot add duplicate partition field day_of_ts=day(ref(name="ts")), conflicts with 1000: ts_day: day(2)
+error class: None
+
+=== ALTER TABLE demo.db.evo_t ADD PARTITION FIELD category AS ts_day
+ERROR pyspark.sql.utils.IllegalArgumentException
+Cannot add duplicate partition field name: ts_day
+error class: None
+
+=== ALTER TABLE demo.db.evo_t ADD PARTITION FIELD bucket(16, amount)
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Cannot bind: bucket[16] cannot transform double values from 'amount'
+
+=== ALTER TABLE demo.db.evo_t DROP PARTITION FIELD hours(ts)
+OK
+
+=== ALTER TABLE demo.db.evo_t DROP PARTITION FIELD ts_hour
+ERROR pyspark.sql.utils.IllegalArgumentException
+Cannot find partition field to remove: ts_hour
+error class: None
+
+=== ALTER TABLE demo.db.evo_t REPLACE PARTITION FIELD ts_day WITH hours(ts)
+OK
+
+=== partition specs and schema of demo.db.evo_t
+OK
+  format version 2, current spec 4
+  spec 0: [1000: ts_day: day(2)]
+  spec 1: [1000: ts_day: day(2), 1001: ts_hour: hour(2)]
+  spec 2: [1000: ts_day: day(2), 1001: ts_hour: hour(2), 1002: ts_month: month(2)]
+  spec 3: [1000: ts_day: day(2), 1002: ts_month: month(2)]
+  spec 4: [1002: ts_month: month(2), 1001: ts_hour: hour(2)]
+  schema 0: [1: id: optional long, 2: ts: optional timestamptz, 3: category: optional string, 4: amount: optional double]
+
+=== INSERT INTO demo.db.evo_t VALUES (2, TIMESTAMP '2026-11-01 11:00:00', 'b', 2.0)
+OK
+
+=== SELECT spec_id, partition, record_count FROM demo.db.evo_t.files ORDER BY spec_id
+OK
+  spec_id | partition | record_count
+  0 | Row(ts_day=datetime.date(2026, 11, 1), ts_hour=None, ts_month=None) | 1
+  4 | Row(ts_day=None, ts_hour=498203, ts_month=682) | 1
+
+=== SELECT * FROM demo.db.evo_t ORDER BY id
+OK
+  id | ts | category | amount
+  1 | 2026-11-01 10:00:00 | a | 1.0
+  2 | 2026-11-01 11:00:00 | b | 2.0
+
+=== CREATE TABLE demo.db.name_t (id bigint, ts timestamp, ts_day date) USING iceberg
+OK
+
+=== ALTER TABLE demo.db.name_t ADD PARTITION FIELD days(ts)
+ERROR pyspark.sql.utils.IllegalArgumentException
+Cannot create identity partition sourced from different field in schema: ts_day
+error class: None
+
+=== ALTER TABLE demo.db.name_t ADD PARTITION FIELD days(ts) AS ts_day_part
+OK
+
+=== partition specs and schema of demo.db.name_t
+OK
+  format version 2, current spec 1
+  spec 0: []
+  spec 1: [1000: ts_day_part: day(2)]
+  schema 0: [1: id: optional long, 2: ts: optional timestamptz, 3: ts_day: optional date]
+
+######## case: prune
+
+=== CREATE TABLE demo.db.split_t (id bigint, ts timestamp, category string, amount double) USING iceberg PARTITIONED BY (days(ts))
+OK
+
+=== INSERT INTO demo.db.split_t
+SELECT 0 + id AS id,
+       timestamp_seconds(unix_seconds(TIMESTAMP '2026-11-01 00:00:00') + (id DIV 3000) * 86400 + (id % 3000) * 20) AS ts,
+       element_at(array('a', 'b', 'c'), CAST(id % 3 AS INT) + 1) AS category,
+       CAST(id % 100 AS DOUBLE) AS amount
+FROM range(12000)
+OK
+
+=== ALTER TABLE demo.db.split_t ADD PARTITION FIELD category
+OK
+
+=== INSERT INTO demo.db.split_t
+SELECT 12000 + id AS id,
+       timestamp_seconds(unix_seconds(TIMESTAMP '2026-11-05 00:00:00') + (id DIV 3000) * 86400 + (id % 3000) * 20) AS ts,
+       element_at(array('a', 'b', 'c'), CAST(id % 3 AS INT) + 1) AS category,
+       CAST(id % 100 AS DOUBLE) AS amount
+FROM range(6000)
+OK
+
+=== partition specs and schema of demo.db.split_t
+OK
+  format version 2, current spec 1
+  spec 0: [1000: ts_day: day(2)]
+  spec 1: [1000: ts_day: day(2), 1001: category: identity(3)]
+  schema 0: [1: id: optional long, 2: ts: optional timestamptz, 3: category: optional string, 4: amount: optional double]
+
+=== CREATE TABLE demo.db.prune_t (id bigint, ts timestamp, category string, amount double) USING iceberg PARTITIONED BY (days(ts))
+OK
+
+=== INSERT INTO demo.db.prune_t
+SELECT 0 + id AS id,
+       timestamp_seconds(unix_seconds(TIMESTAMP '2026-11-01 00:00:00') + (id DIV 3000) * 86400 + (id % 3000) * 20) AS ts,
+       element_at(array('a', 'b', 'c'), CAST(id % 3 AS INT) + 1) AS category,
+       CAST(id % 100 AS DOUBLE) AS amount
+FROM range(12000)
+OK
+
+=== ALTER TABLE demo.db.prune_t ADD PARTITION FIELD category
+OK
+
+=== INSERT INTO demo.db.prune_t
+SELECT 12000 + id AS id,
+       timestamp_seconds(unix_seconds(TIMESTAMP '2026-11-05 00:00:00') + (id DIV 3000) * 86400 + (id % 3000) * 20) AS ts,
+       element_at(array('a', 'b', 'c'), CAST(id % 3 AS INT) + 1) AS category,
+       CAST(id % 100 AS DOUBLE) AS amount
+FROM range(6000)
+OK
+
+=== partition specs and schema of demo.db.prune_t
+OK
+  format version 2, current spec 1
+  spec 0: [1000: ts_day: day(2)]
+  spec 1: [1000: ts_day: day(2), 1001: category: identity(3)]
+  schema 0: [1: id: optional long, 2: ts: optional timestamptz, 3: category: optional string, 4: amount: optional double]
+
+=== SELECT spec_id, partition, record_count FROM demo.db.prune_t.files ORDER BY spec_id, partition.ts_day, partition.category
+OK
+  spec_id | partition | record_count
+  0 | Row(ts_day=datetime.date(2026, 11, 1), category=None) | 3000
+  0 | Row(ts_day=datetime.date(2026, 11, 2), category=None) | 3000
+  0 | Row(ts_day=datetime.date(2026, 11, 3), category=None) | 3000
+  0 | Row(ts_day=datetime.date(2026, 11, 4), category=None) | 3000
+  1 | Row(ts_day=datetime.date(2026, 11, 5), category='a') | 1000
+  1 | Row(ts_day=datetime.date(2026, 11, 5), category='b') | 1000
+  1 | Row(ts_day=datetime.date(2026, 11, 5), category='c') | 1000
+  1 | Row(ts_day=datetime.date(2026, 11, 6), category='a') | 1000
+  1 | Row(ts_day=datetime.date(2026, 11, 6), category='b') | 1000
+  1 | Row(ts_day=datetime.date(2026, 11, 6), category='c') | 1000
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE ts >= TIMESTAMP '2026-11-02 00:00:00' AND ts < TIMESTAMP '2026-11-03 00:00:00'
+OK
+  3000 | 148500.0
+  scan: BatchScan[ts#159, amount#161] demo.db.prune_t (branch=null) [filters=ts IS NOT NULL, ts >= 1793577600000000, ts < 1793664000000000, groupedBy=] RuntimeFilters: []
+  scan: BatchScan[ts#159, amount#161] demo.db.prune_t (branch=null) [filters=ts IS NOT NULL, ts >= 1793577600000000, ts < 1793664000000000, groupedBy=] RuntimeFilters: []
+  read: number of output rows 3,000
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE CAST(ts AS DATE) = DATE '2026-11-02'
+OK
+  3000 | 148500.0
+  scan: BatchScan[ts#180, amount#182] demo.db.prune_t (branch=null) [filters=ts IS NOT NULL, groupedBy=] RuntimeFilters: []
+  scan: BatchScan[ts#180, amount#182] demo.db.prune_t (branch=null) [filters=ts IS NOT NULL, groupedBy=] RuntimeFilters: []
+  read: number of output rows 18,000
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE date_format(ts, 'yyyy-MM-dd') = '2026-11-02'
+OK
+  3000 | 148500.0
+  scan: BatchScan[ts#201, amount#203] demo.db.prune_t (branch=null) [filters=ts IS NOT NULL, groupedBy=] RuntimeFilters: []
+  scan: BatchScan[ts#201, amount#203] demo.db.prune_t (branch=null) [filters=ts IS NOT NULL, groupedBy=] RuntimeFilters: []
+  read: number of output rows 18,000
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE demo.system.days(ts) = demo.system.days(TIMESTAMP '2026-11-02 00:00:00')
+OK
+  3000 | 148500.0
+  scan: BatchScan[ts#222, amount#224] demo.db.prune_t (branch=null) [filters=, groupedBy=] RuntimeFilters: []
+  scan: BatchScan[ts#222, amount#224] demo.db.prune_t (branch=null) [filters=, groupedBy=] RuntimeFilters: []
+  read: number of output rows 18,000
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE ts_day = DATE '2026-11-02'
+ERROR pyspark.sql.utils.AnalysisException
+Column 'ts_day' does not exist. Did you mean one of the following? [demo.db.prune_t.id, demo.db.prune_t.ts, demo.db.prune_t.amount, demo.db.prune_t.category]; line 1 pos 70;
+'Aggregate [count(1) AS n#240L, 'sum('amount) AS total#241]
++- 'Filter ('ts_day = 2026-11-02)
+   +- SubqueryAlias demo.db.prune_t
+      +- RelationV2[id#242L, ts#243, category#244, amount#245] demo.db.prune_t
+error class: MISSING_COLUMN
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE category = 'b'
+OK
+  6000 | 297000.0
+  scan: BatchScan[category#256, amount#257] demo.db.prune_t (branch=null) [filters=category IS NOT NULL, category = 'b', groupedBy=] RuntimeFilters: []
+  scan: BatchScan[category#256, amount#257] demo.db.prune_t (branch=null) [filters=category IS NOT NULL, category = 'b', groupedBy=] RuntimeFilters: []
+  read: number of output rows 14,000
+
+=== CALL demo.system.rewrite_data_files(table => 'db.prune_t')
+OK
+  rewritten_data_files_count | added_data_files_count | rewritten_bytes_count
+  0 | 0 | 0
+
+=== SELECT spec_id, count(*) AS files, sum(record_count) AS records FROM demo.db.prune_t.files GROUP BY spec_id ORDER BY spec_id
+OK
+  spec_id | files | records
+  0 | 4 | 12000
+  1 | 6 | 6000
+
+=== CALL demo.system.rewrite_data_files(table => 'db.prune_t', options => map('rewrite-all', 'true'))
+OK
+  rewritten_data_files_count | added_data_files_count | rewritten_bytes_count
+  10 | 18 | 92302
+
+=== SELECT spec_id, count(*) AS files, sum(record_count) AS records FROM demo.db.prune_t.files GROUP BY spec_id ORDER BY spec_id
+OK
+  spec_id | files | records
+  1 | 18 | 18000
+
+=== SELECT count(*) AS n, sum(amount) AS total FROM demo.db.prune_t WHERE category = 'b'
+OK
+  6000 | 297000.0
+  scan: BatchScan[category#496, amount#497] demo.db.prune_t (branch=null) [filters=category IS NOT NULL, category = 'b', groupedBy=] RuntimeFilters: []
+  scan: BatchScan[category#496, amount#497] demo.db.prune_t (branch=null) [filters=category IS NOT NULL, category = 'b', groupedBy=] RuntimeFilters: []
+  read: number of output rows 6,000
+
+######## case: replace
+
+=== DataFrame(some_date).writeTo('demo.db.rep_v2').partitionedBy('some_date').tableProperty('format-version', '2').create()
+OK
+
+=== partition specs and schema of demo.db.rep_v2
+OK
+  format version 2, current spec 0
+  spec 0: [1000: some_date: identity(1)]
+  schema 0: [1: some_date: optional string]
+
+=== DataFrame(some_date_2).write.format('iceberg').mode('overwrite').partitionBy('some_date_2').saveAsTable('demo.db.rep_v2')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 1 in stage 43.0 failed 1 times, most recent failure: Lost task 1.0 in stage 43.0 (TID 1488) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+
+=== partition specs and schema of demo.db.rep_v2
+OK
+  format version 2, current spec 0
+  spec 0: [1000: some_date: identity(1)]
+  schema 0: [1: some_date: optional string]
+
+=== SELECT * FROM demo.db.rep_v2
+OK
+  some_date
+  1991-04-01
+
+=== DataFrame(some_date_2).writeTo('demo.db.rep_v2').partitionedBy('some_date_2').createOrReplace()
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 7 in stage 45.0 failed 1 times, most recent failure: Lost task 7.0 in stage 45.0 (TID 1505) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+
+=== partition specs and schema of demo.db.rep_v2
+OK
+  format version 2, current spec 0
+  spec 0: [1000: some_date: identity(1)]
+  schema 0: [1: some_date: optional string]
+
+=== SELECT * FROM demo.db.rep_v2
+OK
+  some_date
+  1991-04-01
+
+=== DataFrame(some_date).writeTo('demo.db.rep_v1').partitionedBy('some_date').tableProperty('format-version', '1').create()
+OK
+
+=== partition specs and schema of demo.db.rep_v1
+OK
+  format version 1, current spec 0
+  spec 0: [1000: some_date: identity(1)]
+  schema 0: [1: some_date: optional string]
+
+=== DataFrame(some_date_2).write.format('iceberg').mode('overwrite').partitionBy('some_date_2').saveAsTable('demo.db.rep_v1')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 7 in stage 48.0 failed 1 times, most recent failure: Lost task 7.0 in stage 48.0 (TID 1526) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+
+=== partition specs and schema of demo.db.rep_v1
+OK
+  format version 1, current spec 0
+  spec 0: [1000: some_date: identity(1)]
+  schema 0: [1: some_date: optional string]
+
+=== SELECT * FROM demo.db.rep_v1
+OK
+  some_date
+  1991-04-01
+
+=== DataFrame(some_date_2).writeTo('demo.db.rep_v1').partitionedBy('some_date_2').createOrReplace()
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 3 in stage 50.0 failed 1 times, most recent failure: Lost task 3.0 in stage 50.0 (TID 1533) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: identity(1)
+
+=== partition specs and schema of demo.db.rep_v1
+OK
+  format version 1, current spec 0
+  spec 0: [1000: some_date: identity(1)]
+  schema 0: [1: some_date: optional string]
+
+=== SELECT * FROM demo.db.rep_v1
+OK
+  some_date
+  1991-04-01
+
+######## case: dropcol
+
+######## catalog: demo
+
+=== CREATE TABLE demo.db.dc_cur (id bigint, category string, v string) USING iceberg PARTITIONED BY (category)
+OK
+
+=== INSERT INTO demo.db.dc_cur VALUES (1, 'a', 'x')
+OK
+
+=== ALTER TABLE demo.db.dc_cur DROP COLUMN category
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== SELECT * FROM demo.db.dc_cur ORDER BY id
+OK
+  id | category | v
+  1 | a | x
+
+=== CREATE TABLE demo.db.dc_v2 (id bigint, category string, v string) USING iceberg PARTITIONED BY (category) TBLPROPERTIES ('format-version' = '2')
+OK
+
+=== INSERT INTO demo.db.dc_v2 VALUES (1, 'a', 'x'), (2, 'b', 'y')
+OK
+
+=== ALTER TABLE demo.db.dc_v2 DROP PARTITION FIELD category
+OK
+
+=== INSERT INTO demo.db.dc_v2 VALUES (3, 'c', 'z')
+OK
+
+=== partition specs and schema of demo.db.dc_v2
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 0: [1: id: optional long, 2: category: optional string, 3: v: optional string]
+
+--- current metadata file of demo.db.dc_v2: s3://warehouse/db/dc_v2/metadata/00003-ef916a8a-dc2f-4373-bfea-72a67969af2a.metadata.json
+
+=== ALTER TABLE demo.db.dc_v2 DROP COLUMN category
+OK
+
+=== partition specs and schema of demo.db.dc_v2
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== SELECT * FROM demo.db.dc_v2 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT spec_id, partition, record_count FROM demo.db.dc_v2.files ORDER BY spec_id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT * FROM demo.db.dc_v2.partitions
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== INSERT INTO demo.db.dc_v2 VALUES (4, 'w')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 60.0 failed 1 times, most recent failure: Lost task 0.0 in stage 60.0 (TID 1946) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.i
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== ALTER TABLE demo.db.dc_v2 ADD COLUMN category string
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Unsupported table change: Cannot create identity partition sourced from different field in schema: category
+Caused by: java.lang.IllegalArgumentException: Cannot create identity partition sourced from different field in schema: category
+
+=== SELECT * FROM demo.db.dc_v2 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== CALL demo.system.rewrite_manifests(table => 'db.dc_v2')
+OK
+  rewritten_manifests_count | added_manifests_count
+  0 | 0
+
+=== partition specs and schema of demo.db.dc_v2
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== CALL demo.system.register_table(table => 'db.dc_v2_restored', metadata_file => 's3://warehouse/db/dc_v2/metadata/00003-ef916a8a-dc2f-4373-bfea-72a67969af2a.metadata.json')
+OK
+  current_snapshot_id | total_records_count | total_data_files_count
+  3596709639977223918 | 3 | 3
+
+=== SELECT * FROM demo.db.dc_v2_restored ORDER BY id
+OK
+  id | category | v
+  1 | a | x
+  2 | b | y
+  3 | c | z
+
+=== CREATE TABLE demo.db.dc_v1 (id bigint, category string, v string) USING iceberg PARTITIONED BY (category) TBLPROPERTIES ('format-version' = '1')
+OK
+
+=== INSERT INTO demo.db.dc_v1 VALUES (1, 'a', 'x'), (2, 'b', 'y')
+OK
+
+=== ALTER TABLE demo.db.dc_v1 DROP PARTITION FIELD category
+OK
+
+=== INSERT INTO demo.db.dc_v1 VALUES (3, 'c', 'z')
+OK
+
+=== partition specs and schema of demo.db.dc_v1
+OK
+  format version 1, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: [1000: category: void(2)]
+  schema 0: [1: id: optional long, 2: category: optional string, 3: v: optional string]
+
+--- current metadata file of demo.db.dc_v1: s3://warehouse/db/dc_v1/metadata/00003-d35f8bac-1046-4dd0-8dd3-38c9bbc9844f.metadata.json
+
+=== ALTER TABLE demo.db.dc_v1 DROP COLUMN category
+OK
+
+=== partition specs and schema of demo.db.dc_v1
+OK
+  format version 1, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: [1000: category: void(2)]
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== SELECT * FROM demo.db.dc_v1 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT spec_id, partition, record_count FROM demo.db.dc_v1.files ORDER BY spec_id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT * FROM demo.db.dc_v1.partitions
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== INSERT INTO demo.db.dc_v1 VALUES (4, 'w')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 66.0 failed 1 times, most recent failure: Lost task 0.0 in stage 66.0 (TID 2151) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.i
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== ALTER TABLE demo.db.dc_v1 ADD COLUMN category string
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Unsupported table change: Cannot create identity partition sourced from different field in schema: category
+Caused by: java.lang.IllegalArgumentException: Cannot create identity partition sourced from different field in schema: category
+
+=== SELECT * FROM demo.db.dc_v1 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== CALL demo.system.rewrite_manifests(table => 'db.dc_v1')
+OK
+  rewritten_manifests_count | added_manifests_count
+  0 | 0
+
+=== partition specs and schema of demo.db.dc_v1
+OK
+  format version 1, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: [1000: category: void(2)]
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== CALL demo.system.register_table(table => 'db.dc_v1_restored', metadata_file => 's3://warehouse/db/dc_v1/metadata/00003-d35f8bac-1046-4dd0-8dd3-38c9bbc9844f.metadata.json')
+OK
+  current_snapshot_id | total_records_count | total_data_files_count
+  2672979604031417783 | 3 | 3
+
+=== SELECT * FROM demo.db.dc_v1_restored ORDER BY id
+OK
+  id | category | v
+  1 | a | x
+  2 | b | y
+  3 | c | z
+
+######## catalog: local
+
+=== CREATE TABLE local.db.dc_cur (id bigint, category string, v string) USING iceberg PARTITIONED BY (category)
+OK
+
+=== INSERT INTO local.db.dc_cur VALUES (1, 'a', 'x')
+OK
+
+=== ALTER TABLE local.db.dc_cur DROP COLUMN category
+ERROR py4j.protocol.Py4JJavaError
+org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== SELECT * FROM local.db.dc_cur ORDER BY id
+OK
+  id | category | v
+  1 | a | x
+
+=== CREATE TABLE local.db.dc_v2 (id bigint, category string, v string) USING iceberg PARTITIONED BY (category) TBLPROPERTIES ('format-version' = '2')
+OK
+
+=== INSERT INTO local.db.dc_v2 VALUES (1, 'a', 'x'), (2, 'b', 'y')
+OK
+
+=== ALTER TABLE local.db.dc_v2 DROP PARTITION FIELD category
+OK
+
+=== INSERT INTO local.db.dc_v2 VALUES (3, 'c', 'z')
+OK
+
+=== partition specs and schema of local.db.dc_v2
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 0: [1: id: optional long, 2: category: optional string, 3: v: optional string]
+
+--- current metadata file of local.db.dc_v2: /tmp/hadoop-warehouse/db/dc_v2/metadata/v4.metadata.json
+
+=== ALTER TABLE local.db.dc_v2 DROP COLUMN category
+OK
+
+=== partition specs and schema of local.db.dc_v2
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== SELECT * FROM local.db.dc_v2 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT spec_id, partition, record_count FROM local.db.dc_v2.files ORDER BY spec_id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT * FROM local.db.dc_v2.partitions
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== INSERT INTO local.db.dc_v2 VALUES (4, 'w')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 76.0 failed 1 times, most recent failure: Lost task 0.0 in stage 76.0 (TID 2558) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.i
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== ALTER TABLE local.db.dc_v2 ADD COLUMN category string
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Unsupported table change: Cannot create identity partition sourced from different field in schema: category
+Caused by: java.lang.IllegalArgumentException: Cannot create identity partition sourced from different field in schema: category
+
+=== SELECT * FROM local.db.dc_v2 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== CALL local.system.rewrite_manifests(table => 'db.dc_v2')
+OK
+  rewritten_manifests_count | added_manifests_count
+  0 | 0
+
+=== partition specs and schema of local.db.dc_v2
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== CREATE TABLE local.db.dc_v1 (id bigint, category string, v string) USING iceberg PARTITIONED BY (category) TBLPROPERTIES ('format-version' = '1')
+OK
+
+=== INSERT INTO local.db.dc_v1 VALUES (1, 'a', 'x'), (2, 'b', 'y')
+OK
+
+=== ALTER TABLE local.db.dc_v1 DROP PARTITION FIELD category
+OK
+
+=== INSERT INTO local.db.dc_v1 VALUES (3, 'c', 'z')
+OK
+
+=== partition specs and schema of local.db.dc_v1
+OK
+  format version 1, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: [1000: category: void(2)]
+  schema 0: [1: id: optional long, 2: category: optional string, 3: v: optional string]
+
+--- current metadata file of local.db.dc_v1: /tmp/hadoop-warehouse/db/dc_v1/metadata/v4.metadata.json
+
+=== ALTER TABLE local.db.dc_v1 DROP COLUMN category
+OK
+
+=== partition specs and schema of local.db.dc_v1
+OK
+  format version 1, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: [1000: category: void(2)]
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+=== SELECT * FROM local.db.dc_v1 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT spec_id, partition, record_count FROM local.db.dc_v1.files ORDER BY spec_id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== SELECT * FROM local.db.dc_v1.partitions
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== INSERT INTO local.db.dc_v1 VALUES (4, 'w')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 81.0 failed 1 times, most recent failure: Lost task 0.0 in stage 81.0 (TID 2762) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.i
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== ALTER TABLE local.db.dc_v1 ADD COLUMN category string
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Unsupported table change: Cannot create identity partition sourced from different field in schema: category
+Caused by: java.lang.IllegalArgumentException: Cannot create identity partition sourced from different field in schema: category
+
+=== SELECT * FROM local.db.dc_v1 ORDER BY id
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+
+=== CALL local.system.rewrite_manifests(table => 'db.dc_v1')
+OK
+  rewritten_manifests_count | added_manifests_count
+  0 | 0
+
+=== partition specs and schema of local.db.dc_v1
+OK
+  format version 1, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: [1000: category: void(2)]
+  schema 1: [1: id: optional long, 3: v: optional string]
+
+######## repair
+
+=== CREATE TABLE demo.db.dc_fix (id bigint, category string, v string) USING iceberg PARTITIONED BY (category)
+OK
+
+=== INSERT INTO demo.db.dc_fix VALUES (1, 'a', 'x'), (2, 'b', 'y')
+OK
+
+=== ALTER TABLE demo.db.dc_fix DROP PARTITION FIELD category
+OK
+
+=== INSERT INTO demo.db.dc_fix VALUES (3, 'c', 'z')
+OK
+
+--- current metadata file of demo.db.dc_fix: s3://warehouse/db/dc_fix/metadata/00003-07e3a997-fc17-46ef-9583-17660a6f25fc.metadata.json
+
+=== ALTER TABLE demo.db.dc_fix DROP COLUMN category
+OK
+
+=== INSERT INTO demo.db.dc_fix VALUES (4, 'w')
+ERROR py4j.protocol.Py4JJavaError
+org.apache.spark.SparkException: Writing job aborted
+Caused by: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 86.0 failed 1 times, most recent failure: Lost task 0.0 in stage 86.0 (TID 2966) (c96a0750e9fc executor driver): org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
+	at org.apache.iceberg.PartitionSpec.checkCompatibility(PartitionSpec.java:562)
+	at org.apache.iceberg.PartitionSpec$Builder.build(PartitionSpec.java:543)
+	at org.apache.iceberg.UnboundPartitionSpec.bind(UnboundPartitionSpec.java:46)
+	at org.apache.iceberg.PartitionSpecParser.fromJson(PartitionSpecParser.java:71)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$1(PartitionSpecParser.java:88)
+	at org.apache.iceberg.util.JsonUtil.parse(JsonUtil.java:98)
+	at org.apache.iceberg.PartitionSpecParser.lambda$fromJson$2(PartitionSpecParser.java:88)
+	at org.apache.iceberg.shaded.com.github.benmanes.caffeine.cache.BoundedLocalCache.lambda$doComputeIfAbsent$14(BoundedLocalCache.java:2406)
+	at java.base/java.util.concurrent.ConcurrentHashMap.compute(Unknown Source)
+	at org.apache.i
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+
+=== SELECT timestamp, file, latest_snapshot_id FROM demo.db.dc_fix.metadata_log_entries ORDER BY timestamp
+OK
+  timestamp | file | latest_snapshot_id
+  2026-11-27 14:24:31.214000 | s3://warehouse/db/dc_fix/metadata/00000-061d77a2-9103-4f93-92c2-e6eac5095645.metadata.json | None
+  2026-11-27 14:24:31.427000 | s3://warehouse/db/dc_fix/metadata/00001-dffa6a03-d3db-4f1b-820d-b974ccbb3efa.metadata.json | 2005754529966490972
+  2026-11-27 14:24:31.457000 | s3://warehouse/db/dc_fix/metadata/00002-5aa0e63f-0897-4516-ac87-40ca6ded4577.metadata.json | 2005754529966490972
+  2026-11-27 14:24:31.548000 | s3://warehouse/db/dc_fix/metadata/00003-07e3a997-fc17-46ef-9583-17660a6f25fc.metadata.json | 3791162235749705381
+  2026-11-27 14:24:31.605000 | s3://warehouse/db/dc_fix/metadata/00004-ca000744-f15d-4d2b-8f28-e2e65f4142ee.metadata.json | 3791162235749705381
+
+=== DROP TABLE demo.db.dc_fix
+OK
+
+=== CALL demo.system.register_table(table => 'db.dc_fix', metadata_file => 's3://warehouse/db/dc_fix/metadata/00003-07e3a997-fc17-46ef-9583-17660a6f25fc.metadata.json')
+OK
+  current_snapshot_id | total_records_count | total_data_files_count
+  3791162235749705381 | 3 | 3
+
+=== SELECT * FROM demo.db.dc_fix ORDER BY id
+OK
+  id | category | v
+  1 | a | x
+  2 | b | y
+  3 | c | z
+
+=== partition specs and schema of demo.db.dc_fix
+OK
+  format version 2, current spec 1
+  spec 0: [1000: category: identity(2)]
+  spec 1: []
+  schema 0: [1: id: optional long, 2: category: optional string, 3: v: optional string]

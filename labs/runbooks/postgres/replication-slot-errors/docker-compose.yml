@@ -1,0 +1,46 @@
+# Lab: the errors a PostgreSQL replication slot gives when it does not exist, when its name is taken,
+# when another session holds it, and when it has been invalidated.
+# No host port is published. Every query runs through `docker compose exec`.
+#
+#   PG_VERSION=13.23 ./run.sh up      another PostgreSQL version (default 19.0)
+name: pg-replication-slot-errors
+
+services:
+  # The primary. Everything is at its default except wal_level.
+  pg:
+    image: postgres:${PG_VERSION:-19.0}
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_PASSWORD: labpw
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+      - ./hba.sh:/docker-entrypoint-initdb.d/20-hba.sh:ro
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d appdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  # A standby, started only by the standby steps. Its container stays up without PostgreSQL, so that
+  # run.sh can first clone the primary into it with pg_basebackup and write the standby settings.
+  # `touch /tmp/start-postgres` inside it then starts PostgreSQL.
+  standby:
+    profiles: ["standby"]
+    image: postgres:${PG_VERSION:-19.0}
+    init: true
+    environment:
+      PGDATA: /standby/data
+      PGPASSWORD: labpw
+    entrypoint:
+      - bash
+      - -c
+      - |
+        mkdir -p /standby && chown postgres:postgres /standby && chmod 700 /standby
+        while true; do
+          until [ -e /tmp/start-postgres ]; do sleep 1; done
+          rm -f /tmp/start-postgres
+          gosu postgres postgres
+          echo "postgres exited with status $$?; waiting for /tmp/start-postgres"
+        done
+    mem_limit: 384m

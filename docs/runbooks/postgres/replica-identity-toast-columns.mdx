@@ -1,0 +1,462 @@
+---
+title: "REPLICA IDENTITY FULL and __debezium_unavailable_value"
+description: "Why CDC readers get __debezium_unavailable_value for large PostgreSQL values, and what REPLICA IDENTITY FULL fixes and costs. Run on PostgreSQL 13, 18 and 19."
+sidebar_label: REPLICA IDENTITY and TOAST columns
+unlisted: true
+keywords:
+  - replica identity full
+  - __debezium_unavailable_value
+  - unchanged-toast-datum
+  - postgres toast cdc
+  - unavailable.value.placeholder
+  - toasted.value.placeholder
+  - replica.identity.autoset.values
+  - alter table replica identity full lock
+  - cannot update table because it does not have a replica identity and publishes updates
+  - pgoutput unchanged toast
+runbook:
+  family: postgres
+  author: nayan
+  reproduced:
+    date: "2026-11-27"
+    versions:
+      - "PostgreSQL 19.0"
+      - "PostgreSQL 18.7"
+      - "PostgreSQL 13.23"
+      - "Debezium 3.7.1.Final on Kafka Connect 4.3.1 (PostgreSQL 19.0)"
+      - "Debezium 1.9.7.Final on Kafka Connect 3.2.0 (PostgreSQL 13.23)"
+    lab: labs/runbooks/postgres/replica-identity-toast-columns
+    summary: "A table with four large values stored out of line was changed under each replica identity, and each change was read back from a pgoutput slot and a test_decoding slot. The same changes then went through Debezium. The lab also measured the lock that ALTER TABLE ... REPLICA IDENTITY takes and the WAL that FULL adds."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+PostgreSQL leaves a large value out of the change that an `UPDATE` sends when the update did not touch that value. The value is stored out of line with TOAST (The Oversized-Attribute Storage Technique), the `pgoutput` plugin marks it as unchanged instead of sending it, and Debezium writes `__debezium_unavailable_value` in its place. `REPLICA IDENTITY FULL` makes PostgreSQL log the whole old row, so a reader gets every value again, at the cost of more write-ahead log (WAL).
+
+This page shows what a change data capture (CDC) reader receives under each replica identity on PostgreSQL 13.23, 18.7 and 19.0, and what Debezium 1.9.7 and 3.7.1 make of it. It then sets `REPLICA IDENTITY FULL` without blocking the application, measures what it costs, and gives the fix in the consumer for tables where that cost is too high.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Under the default replica identity, an `UPDATE` that leaves a value stored out of line alone does not carry that value:
+
+- **What arrives:** `pgoutput` sends the column as unchanged without its value, `test_decoding` prints `unchanged-toast-datum`, and Debezium writes `__debezium_unavailable_value`.
+- **Fix it in PostgreSQL:** `ALTER TABLE ... REPLICA IDENTITY FULL` with `lock_timeout` set, on the table and on each of its partitions.
+- **Or fix it in the consumer:** when the placeholder arrives, keep the value that is already stored.
+
+A `DELETE` has the same gap. Under the default identity it carries the primary key and nothing else.
+
+<TLDR title='Key takeaways'>
+
+- On PostgreSQL 13.23, 18.7 and 19.0, an `UPDATE` that changed one small column sent none of the four values stored out of line. A 100,000-character value that compressed into the row was sent in full every time.
+- With `REPLICA IDENTITY FULL` the old row carried every value, and Debezium 1.9.7 and 3.7.1 filled the new row from it. The statement took an `ACCESS EXCLUSIVE` lock, finished in under a millisecond and did not rewrite the table.
+- On 19.0 that `UPDATE` wrote 768 bytes of WAL under `DEFAULT` and 110,288 bytes under `FULL`.
+
+</TLDR>
+
+## What you see
+
+The lab's table `documents` has a primary key `id`, a small column `title`, four large columns of four types, and `summary`, 100,000 characters of one letter. One `UPDATE` changed `title` and nothing else. Every output below was captured in the lab, and the two plugins printed the same on PostgreSQL 13.23, 18.7 and 19.0.
+
+The `pgoutput` messages, printed by the lab's `pgoutput.py`. `UNCHANGED-TOAST` stands for a column the server sent with the kind `u` and no value:
+
+```text
+UPDATE public.documents
+    new row [N]: id='1' title='second title' body=UNCHANGED-TOAST attachment=UNCHANGED-TOAST meta=UNCHANGED-TOAST tags=UNCHANGED-TOAST summary=<100000 chars>
+```
+
+The `test_decoding` plugin, with each long value cut to its first 30 characters:
+
+```text
+table public.documents: UPDATE: id[bigint]:1 title[text]:'second title' body[text]:unchanged-toast-datum attachment[bytea]:unchanged-toast-datum meta[jsonb]:unchanged-toast-datum tags[text[]]:unchanged-toast-datum summary[text]:'ssssssssssssssssssssssssssssss...'
+```
+
+The `after` field of the Debezium 3.7.1 change event, with `summary` cut:
+
+```json
+{"id": 1, "title": "second title", "body": "__debezium_unavailable_value", "attachment": "X19kZWJleml1bV91bmF2YWlsYWJsZV92YWx1ZQ==", "meta": "__debezium_unavailable_value", "tags": ["__debezium_unavailable_value"], "summary": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss...(100000 chars)"}
+```
+
+What Debezium wrote depends on the column type, and in one case on the version:
+
+| Column type | Debezium 3.7.1 | Debezium 1.9.7 |
+| --- | --- | --- |
+| `text` | `"__debezium_unavailable_value"` | The same |
+| `bytea` | `"X19kZWJleml1bV91bmF2YWlsYWJsZV92YWx1ZQ=="`, the bytes of the placeholder in base64 | The same |
+| `jsonb` | `"__debezium_unavailable_value"`, a string that is not valid JSON (JavaScript Object Notation) | The same |
+| `text[]` | `["__debezium_unavailable_value"]` | `null` |
+
+A `DELETE` under the default identity gave both versions the key and no other value. The large columns came out as `null`, and the `NOT NULL` column `title` as an empty string, which a consumer cannot tell from a real one:
+
+```json
+{"id": 2, "title": "", "body": null, "attachment": null, "meta": null, "tags": null, "summary": null}
+```
+
+A table whose identity is `NOTHING` refuses the change itself, for every session, even with a primary key:
+
+```text
+UPDATE documents SET title = 'fifth title' WHERE id = 1;
+ERROR:  cannot update table "documents" because it does not have a replica identity and publishes updates
+HINT:  To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.
+```
+
+A published table without a primary key gives the same error under the default identity. [Enable logical replication](/docs/runbooks/postgres/enable-logical-replication/#issue-6-a-table-has-no-replica-identity) covers that case.
+
+### What changes by version
+
+- **PostgreSQL 13.23, 18.7 and 19.0** sent the same messages for every change on this page, through both plugins.
+- **PostgreSQL 19.0 compresses with `lz4` by default**, where 18.7 uses `pglz` (`default_toast_compression`; 13.23 has no such setting). The stored sizes differ, and which values went out of line did not.
+- **PostgreSQL 19.0 names the lock** when a statement gives up waiting for it: `CONTEXT:  waiting for AccessExclusiveLock on relation 16402 of database 16384`. 13.23 and 18.7 print the error line alone.
+- **Debezium 1.9.7 wrote `null` for an unchanged `text[]` value**, where 3.7.1 wrote a one-element array holding the placeholder.
+- **The placeholder settings differ.** See [Fix 3](#fix-3-keep-the-stored-value-in-the-consumer).
+
+## Why it happens
+
+PostgreSQL moves a value out of the row when the row gets too wide. The manual: "The TOAST management code is triggered only when a row value to be stored in a table is wider than `TOAST_TUPLE_THRESHOLD` bytes (normally 2 kB)", and for most types "Compression will be attempted first, then out-of-line storage if the row is still too big" ([TOAST](https://www.postgresql.org/docs/current/storage-toast.html), checked Nov 2026). In the lab, four values of 16,000 to 36,020 bytes went out of line, and `summary` compressed to 411 bytes on 19.0 and 1,156 bytes on 18.7 and 13.23 and stayed in the row.
+
+An `UPDATE` that does not change an out-of-line value keeps pointing at it, and its WAL record holds no copy. The update of `title` wrote 768 bytes of WAL on 19.0, although the four large values of that row took 108,843 bytes at the start of the run. The logical replication protocol then marks the column with `u`: "Identifies unchanged TOASTed value (the actual value is not sent)" ([message formats](https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html), checked Nov 2026).
+
+The replica identity decides how much of the old row is logged. Under `DEFAULT` it is the primary key, sent only when the key changed or for a `DELETE`. Under `FULL` it is every column, large values included, but the new row still marks the unchanged values with `u`, so a reader has to take them from the old row.
+
+What each replica identity sent through `pgoutput`, the same on all three versions:
+
+| Replica identity | `UPDATE` of `title` | `UPDATE` of `body` | `DELETE` |
+| --- | --- | --- | --- |
+| `DEFAULT` (the primary key) | New row, four values `u` | New row, `body` in full, three values `u` | Old key: `id`, every other column empty |
+| `USING INDEX` on `title` | Old key: `title`. New row, four values `u` | New row, three values `u`, no old key | Old key: `title`, every other column empty |
+| `FULL` | Old row with every value. New row, four values `u` | Old row with every value. New row, three values `u` | Old row with every value |
+| `NOTHING` | Refused with the error above | Refused | Refused |
+
+`summary`, the value that compressed into the row, was sent in full in every new row, 100,000 characters each time. Which columns arrive as a placeholder depends on how PostgreSQL stored the value, not on its length.
+
+## Confirm the diagnosis
+
+Debezium logs the identity of each captured table when its task starts. Both versions wrote the same line:
+
+```text
+REPLICA IDENTITY for 'public.documents' is 'DEFAULT'; UPDATE and DELETE events will contain previous values only for PK columns
+```
+
+On the database, list the published tables with their identity:
+
+```sql
+SELECT p.pubname, c.oid::regclass AS table_name,
+       CASE c.relreplident WHEN 'd' THEN 'default' WHEN 'n' THEN 'nothing' WHEN 'f' THEN 'full' WHEN 'i' THEN 'index' END AS replica_identity,
+       EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS has_primary_key
+FROM pg_publication_tables p
+JOIN pg_class c ON c.oid = format('%I.%I', p.schemaname, p.tablename)::regclass
+ORDER BY p.pubname, table_name;
+```
+
+```text
+ pubname |   table_name    | replica_identity | has_primary_key
+---------+-----------------+------------------+-----------------
+ cdc_pub | documents       | default          | t
+ cdc_pub | orders          | default          | t
+ cdc_pub | measurements_eu | default          | t
+ cdc_pub | measurements_us | default          | t
+(4 rows)
+```
+
+A partitioned table is listed by its partitions, and each partition has its own identity ([Fix 1](#partitioned-tables)). Then list the columns whose values PostgreSQL may store out of line, which are the columns that can arrive as a placeholder:
+
+```sql
+SELECT a.attrelid::regclass AS table_name, a.attname, a.atttypid::regtype AS type, a.attstorage
+FROM pg_attribute a
+WHERE a.attrelid IN (SELECT format('%I.%I', schemaname, tablename)::regclass FROM pg_publication_tables WHERE pubname = 'cdc_pub')
+  AND a.attnum > 0 AND NOT a.attisdropped AND a.attstorage <> 'p'
+ORDER BY 1, a.attnum;
+```
+
+```text
+   table_name    |  attname   |  type   | attstorage
+-----------------+------------+---------+------------
+ documents       | title      | text    | x
+ documents       | body       | text    | x
+ documents       | attachment | bytea   | x
+ documents       | meta       | jsonb   | x
+ documents       | tags       | text[]  | x
+ documents       | summary    | text    | x
+ orders          | status     | text    | x
+ orders          | note       | text    | x
+ measurements_eu | region     | text    | x
+ measurements_eu | reading    | numeric | m
+ measurements_us | region     | text    | x
+ measurements_us | reading    | numeric | m
+(12 rows)
+```
+
+Any column in this list can arrive as a placeholder once one of its values is stored out of line, which depends on the size of that value.
+
+On PostgreSQL 17 and later, `pg_column_toast_chunk_id()` says per value whether it is stored out of line. It returned `t` for the four large columns of `documents` and `f` for `summary` on 19.0:
+
+```sql
+SELECT id, pg_column_toast_chunk_id(body) IS NOT NULL AS body_out_of_line,
+       pg_column_toast_chunk_id(summary) IS NOT NULL AS summary_out_of_line
+FROM documents ORDER BY id;
+```
+
+In the target, count the rows that hold the placeholder. In the lab's target, after one event applied as it arrived ([Fix 3](#fix-3-keep-the-stored-value-in-the-consumer)):
+
+```sql
+SELECT count(*) AS rows_with_placeholder FROM documents_target WHERE body = '__debezium_unavailable_value';
+```
+
+```text
+ rows_with_placeholder
+-----------------------
+                     1
+(1 row)
+```
+
+## Fix 1: Set REPLICA IDENTITY FULL
+
+`ALTER TABLE ... REPLICA IDENTITY` changes what PostgreSQL writes to the WAL for each later change. It took an `ACCESS EXCLUSIVE` lock on all three versions, seen here from inside its own transaction:
+
+```text
+BEGIN;
+ALTER TABLE orders REPLICA IDENTITY FULL;
+SELECT locktype, mode, granted FROM pg_locks WHERE relation = 'orders'::regclass AND pid = pg_backend_pid();
+ locktype |        mode         | granted
+----------+---------------------+---------
+ relation | AccessExclusiveLock | t
+(1 row)
+```
+
+The lock is short. On 200,000 rows the statement took 0.3 to 0.8 ms, and the table's file node was the same before and after, so the table was not rewritten.
+
+Getting the lock is the risk. While a long read held `orders`, the `ALTER TABLE` waited, and a one-row read that came after it waited behind it. On 19.0:
+
+```text
+SELECT count(*) FROM orders WHERE id = 1;
+ERROR:  canceling statement due to lock timeout
+LINE 1: SELECT count(*) FROM orders WHERE id = 1;
+                             ^
+CONTEXT:  waiting for AccessShareLock on relation 16402 of database 16384
+
+ pid | wait_event_type | wait_event | blocked_by |                            query
+-----+-----------------+------------+------------+--------------------------------------------------------------
+ 834 | Timeout         | PgSleep    | {}         | BEGIN; SELECT count(*) FROM orders; SELECT pg_sleep(12); COM
+ 856 | Lock            | relation   | {834}      | ALTER TABLE orders REPLICA IDENTITY FULL;
+```
+
+Set `lock_timeout` so that the statement gives up instead of holding up the application, and run it again until it succeeds:
+
+```sql
+SET lock_timeout = '2s';
+ALTER TABLE orders REPLICA IDENTITY FULL;
+```
+
+Against the same long read, this gave up after two seconds. PostgreSQL 19.0 also named the lock it was waiting for:
+
+```text
+ERROR:  canceling statement due to lock timeout
+CONTEXT:  waiting for AccessExclusiveLock on relation 16402 of database 16384
+```
+
+A role that does not own the table cannot change its identity. A capture role that could read the table got:
+
+```text
+ALTER TABLE documents REPLICA IDENTITY FULL;    -- as cdc_user
+ERROR:  must be owner of table documents
+```
+
+**Verify.** The identity query of [Confirm the diagnosis](#confirm-the-diagnosis) shows `full`. The next `UPDATE` then carries an old row with every value, and Debezium filled the new row from it. Both versions wrote the real values in `after` for the same `UPDATE` of `title`. Printed by the lab's `events.py`, which shows a long value by its length:
+
+```text
+op=u  update
+  before:
+    id         1
+    title      "second title"
+    body       <32001 chars>
+    attachment <21336 chars>
+    meta       <32022 chars>
+    tags       <array of 1000>
+    summary    <100000 chars>
+  after:
+    id         1
+    title      "third title"
+    body       <32001 chars>
+    attachment <21336 chars>
+    meta       <32022 chars>
+    tags       <array of 1000>
+    summary    <100000 chars>
+```
+
+The Debezium documentation states it the same way for both versions: "Tables with `REPLICA IDENTITY FULL` - TOAST column values are part of the `before` and `after` fields in change events just like any other column" ([1.9](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-toasted-values), [3.7](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-toasted-values), checked Nov 2026).
+
+### Partitioned tables
+
+Setting the identity on a partitioned table did not set it on its partitions, nor on a partition created afterwards. Changes are logged per partition, so they kept arriving under `DEFAULT`:
+
+```text
+ALTER TABLE measurements REPLICA IDENTITY FULL;
+CREATE TABLE measurements_apac PARTITION OF measurements FOR VALUES IN ('apac');
+      relname      | relkind | replica_identity
+-------------------+---------+------------------
+ measurements      | p       | full
+ measurements_apac | r       | default
+ measurements_eu   | r       | default
+ measurements_us   | r       | default
+(4 rows)
+
+UPDATE public.measurements_eu
+    new row [N]: id='1' region='eu' reading='11'
+DELETE public.measurements_us
+    old key [K]: id='2' region='us' reading=null
+```
+
+Set it on each partition, and on every partition you add later:
+
+```sql
+ALTER TABLE measurements_eu REPLICA IDENTITY FULL;
+ALTER TABLE measurements_us REPLICA IDENTITY FULL;
+ALTER TABLE measurements_apac REPLICA IDENTITY FULL;
+```
+
+The next `UPDATE` in a partition then carried the old row: `old row [O]: id='1' region='eu' reading='11'`.
+
+### What FULL costs
+
+`FULL` writes the whole old row into the WAL for every `UPDATE` and `DELETE`, large values included. The lab measured the WAL of one `UPDATE` of 10,000 small rows of `orders`, and of one `UPDATE` of `title` in `documents`. Each was run twice and the second run measured, so that pages written in full after a checkpoint did not count:
+
+| Version | `orders`, `DEFAULT` | `orders`, `FULL` | `documents`, `DEFAULT` | `documents`, `FULL` |
+| --- | --- | --- | --- | --- |
+| 19.0 | 2,367,032 bytes | 2,607,936 bytes | 768 bytes | 110,288 bytes |
+| 18.7 | 2,367,032 bytes | 2,607,936 bytes | 1,496 bytes | 119,016 bytes |
+| 13.23 | 2,403,416 bytes | 2,595,904 bytes | 1,496 bytes | 119,040 bytes |
+
+On the small rows `FULL` added 8 to 10 percent. On the row with large values it added about their stored size: 109,520 bytes more on 19.0, where the four values took 108,843 bytes at the start of the run, for an update of a column that was not one of them. The manual's own advice is that "replica identity `FULL` should only be used as a fallback if no other solution is possible", because of how a PostgreSQL subscriber searches for the row ([Replica Identity](https://www.postgresql.org/docs/current/logical-replication-publication.html#LOGICAL-REPLICATION-PUBLICATION-REPLICA-IDENTITY), checked Nov 2026).
+
+## Fix 2: Let Debezium set the identity
+
+Debezium 3.7.1 sets the identity itself when its task starts, with `replica.identity.autoset.values`:
+
+```json
+"replica.identity.autoset.values": "public.documents:FULL"
+```
+
+```text
+REPLICA IDENTITY for 'public.documents' is 'DEFAULT'; UPDATE and DELETE events will contain previous values only for PK columns
+Updating Replica Identity
+Replica identity set to FULL for table 'public.documents'
+Updating Replica Identity
+Replica identity for table 'public.documents' is already FULL
+```
+
+The identity query then showed `full`, and the next `UPDATE` of `title` had a `before` field with every value and real values in `after`. The first line still reports the identity the table had when the task started.
+
+The documentation adds that the values it sets "overwrite the replica identity values that are set in the database", and that the property "applies only to tables that the connector captures" ([replica.identity.autoset.values](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-replica-autoset-type), checked Nov 2026). The connector in the lab ran as the superuser `postgres`. With a role that does not own the table, PostgreSQL refuses the statement as in Fix 1, and what Debezium then does was not run.
+
+Debezium 1.9.7 accepted the property and did nothing with it. The table stayed `default`, and the next `UPDATE` arrived with the placeholder.
+
+**Verify.** Look for `Replica identity set to FULL` in the connector log, then run the identity query of [Confirm the diagnosis](#confirm-the-diagnosis).
+
+## Fix 3: Keep the stored value in the consumer
+
+When `FULL` costs too much WAL for a table, leave the identity as it is and handle the placeholder where the events are applied. Written as it arrives, the placeholder replaces the stored value:
+
+```text
+UPDATE documents_target t SET title = i.title, body = i.body, attachment = decode(i.attachment, 'base64'), tags = i.tags
+FROM incoming i WHERE t.id = i.id;
+UPDATE 1
+SELECT id, title, left(body, 40) AS body, convert_from(attachment, 'UTF8') AS attachment, tags FROM documents_target WHERE id = 1;
+ id |   title   |             body             |          attachment          |              tags
+----+-----------+------------------------------+------------------------------+--------------------------------
+  1 | new title | __debezium_unavailable_value | __debezium_unavailable_value | {__debezium_unavailable_value}
+(1 row)
+```
+
+A `jsonb` column cannot even hold it:
+
+```text
+SELECT '__debezium_unavailable_value'::jsonb;
+ERROR:  invalid input syntax for type json
+LINE 1: SELECT '__debezium_unavailable_value'::jsonb;
+               ^
+DETAIL:  Token "__debezium_unavailable_value" is invalid.
+CONTEXT:  JSON data, line 1: __debezium_unavailable_value
+```
+
+Apply an unchanged large value as "keep what is there". This is the rule in SQL for the lab's event, with every incoming value as text:
+
+```sql
+UPDATE documents_target t SET
+  title      = i.title,
+  body       = CASE WHEN i.body = '__debezium_unavailable_value' THEN t.body ELSE i.body END,
+  attachment = CASE WHEN i.attachment = 'X19kZWJleml1bV91bmF2YWlsYWJsZV92YWx1ZQ==' THEN t.attachment ELSE decode(i.attachment, 'base64') END,
+  meta       = CASE WHEN i.meta = '__debezium_unavailable_value' THEN t.meta ELSE i.meta::jsonb END,
+  tags       = CASE WHEN i.tags = '{__debezium_unavailable_value}' THEN t.tags ELSE i.tags END
+FROM incoming i WHERE t.id = i.id;
+```
+
+```text
+ id |   title   | body_kept | attachment_kept | meta_kept | tags_kept
+----+-----------+-----------+-----------------+-----------+-----------
+  1 | new title | t         | t               | t         | t
+(1 row)
+```
+
+The output compares each column of the target with the source table: the title changed, and the four large values are the ones that were there. The rule gave the same result on 13.23, 18.7 and 19.0.
+
+Three limits of this fix:
+
+- **An array on Debezium 1.9.7 arrives as `null`**, the same as a real `NULL`, so the rule cannot tell them apart. Use `FULL` for tables with array columns on that version.
+- **A real value equal to the placeholder** would be skipped. Pick a placeholder that cannot occur in your data.
+- **The target must already hold the row.** An event for a row the consumer never received has nothing to keep.
+
+The placeholder is a connector setting, and the two versions honoured different names:
+
+| Setting | Debezium 3.7.1 | Debezium 1.9.7 |
+| --- | --- | --- |
+| `unavailable.value.placeholder` | Used: `"__lab_unavailable__"` in all four columns | Accepted, ignored: `"__debezium_unavailable_value"` |
+| `toasted.value.placeholder` | Accepted, ignored: `"__debezium_unavailable_value"` | Used: `"__lab_toasted__"` in the `text`, `bytea` and `jsonb` columns |
+
+Each version logged the setting in its configuration at task start, so it was read in both runs. The 1.9 documentation lists both names and calls the second "deprecated, please use `unavailable.value.placeholder` instead", yet on 1.9.7 only that second name changed the value. The 3.7 documentation lists only the first ([1.9 properties](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-unavailable-value-placeholder), [3.7 properties](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-property-unavailable-value-placeholder), checked Nov 2026).
+
+## Prevent it
+
+- Decide the identity of a table with large columns before it joins the publication, and set it with `lock_timeout`.
+- Set it on every new partition. A partitioned table's own setting did not reach its partitions.
+- On Debezium 3.x, keep `replica.identity.autoset.values` in the connector configuration so that the setting is applied at each task start.
+- Read the `REPLICA IDENTITY for ...` lines in the Debezium log after every deployment.
+- Alert on the placeholder in target tables, with the count query of [Confirm the diagnosis](#confirm-the-diagnosis).
+- Budget the WAL of `FULL` against the size of the large values, not the size of the rows that change.
+
+## How CDC tools describe the same thing
+
+Only Debezium was run for this page. The statements below about AWS Database Migration Service (DMS), Airbyte and Flink CDC are taken from their documentation, checked in November 2026.
+
+### Debezium
+
+The documentation gives the rule behind the placeholder: "Values that were stored by using the TOAST mechanism and that have not been changed are not included in the message, unless they are part of the table's replica identity" ([3.7](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html#postgresql-toasted-values), checked Nov 2026). The rest of what this page says about Debezium was run.
+
+### AWS DMS
+
+The PostgreSQL source page ties updates and deletes to a key: "A captured table must have a primary key. If a table does not have a primary key, AWS DMS ignores DELETE and UPDATE record operations for that table." It names `FULL` as the workaround, with a warning: "Use `REPLICA IDENTITY FULL` carefully for each table as `FULL` generates an extra number of WALs that might not be necessary", and "REPLICA IDENTITY FULL is supported with a logical decoding plugin, but isn't supported with a pglogical plugin" ([PostgreSQL as a DMS source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), checked Nov 2026). The page does not say what DMS writes for an unchanged large value.
+
+### Airbyte
+
+The set-up guide recommends `FULL` for tables with large values: "In rare cases, if your tables use data types that support TOAST or have very large field values, consider instead using replica identity type full" ([Postgres source](https://docs.airbyte.com/integrations/sources/postgres#step-5-create-publication-and-replication-identities-for-each-postgres-table), checked Nov 2026). The troubleshooting page says: "The records produced by `DELETE` statements only contain primary keys. All other data fields are unset" ([Troubleshooting Postgres Sources](https://docs.airbyte.com/integrations/sources/postgres/postgres-troubleshooting#cdc-requirements), checked Nov 2026).
+
+### Flink CDC
+
+The PostgreSQL connector's `changelog-mode` option has an `upsert` mode: "`upsert` mode can be used for tables with primary keys when replica identity `FULL` is not an option. Primary keys must be set to use `upsert` mode" ([Postgres CDC connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/postgres-cdc/#connector-options), checked Nov 2026).
+
+:::note[How OLake Go handles this]
+
+OLake Go reads the same `pgoutput` messages, so it has the same gap. Its docs say that when an update leaves a large column unchanged, "OLake Go writes `__olake_unavailable_value__` for that column", and that a delete under the default identity keeps only the primary key ([troubleshooting](/docs/connectors/postgres/#troubleshooting)).
+
+The docs give two ways out: `REPLICA IDENTITY FULL` on the table, or the [Preserve TOAST Values](/docs/connectors/postgres/#toast-columns-preserve) option, which reads the previous value from the Iceberg destination. That option needs the OLake Go Postgres source v1.2.0 or later and OLake UI v0.9.3 or later, and it can only be set when the source is created.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- PostgreSQL manual: [ALTER TABLE, REPLICA IDENTITY](https://www.postgresql.org/docs/current/sql-altertable.html#SQL-ALTERTABLE-REPLICA-IDENTITY), [replica identity in publications](https://www.postgresql.org/docs/current/logical-replication-publication.html#LOGICAL-REPLICATION-PUBLICATION-REPLICA-IDENTITY), [TOAST](https://www.postgresql.org/docs/current/storage-toast.html), [logical replication message formats](https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html), [test_decoding](https://www.postgresql.org/docs/current/test-decoding.html)
+- Debezium PostgreSQL connector: [3.7](https://debezium.io/documentation/reference/3.7/connectors/postgresql.html), [1.9](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html)
+- Vendors: [AWS DMS PostgreSQL source](https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.PostgreSQL.html), [Airbyte Postgres source](https://docs.airbyte.com/integrations/sources/postgres), [Flink CDC Postgres connector](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/postgres-cdc/)
+- Related runbooks: [Enable logical replication for CDC](/docs/runbooks/postgres/enable-logical-replication/), [Replication slot is filling the disk](/docs/runbooks/postgres/replication-slot-filling-disk/)

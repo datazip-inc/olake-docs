@@ -1,0 +1,337 @@
+---
+title: "Iceberg storage not freed: expire_snapshots and orphan files"
+description: "Why CALL expire_snapshots and remove_orphan_files free no storage in an Iceberg table, and the settings that make them work. Run on Iceberg 1.4 and 1.12."
+sidebar_label: Storage not reclaimed
+unlisted: true
+keywords:
+  - iceberg expire snapshots
+  - iceberg maintenance
+  - expire_snapshots
+  - remove_orphan_files
+  - "Cannot expire snapshots: GC is disabled"
+  - Cannot remove orphan files with an interval less than 24 hours
+  - Unable to determine whether certain files are orphan
+  - Conflicting authorities/schemes
+  - No FileSystem for scheme "s3"
+  - history.expire.max-snapshot-age-ms
+  - history.expire.min-snapshots-to-keep
+  - write.metadata.delete-after-commit.enabled
+  - prefix_mismatch_mode
+runbook:
+  family: iceberg
+  author: nayan
+  reproduced:
+    date: "2026-11-27"
+    versions:
+      - "Iceberg 1.12.0 on Spark 3.5.6 (Java 17)"
+      - "Iceberg 1.12.0 on Spark 4.0.5 (Java 17)"
+      - "Iceberg 1.4.3 on Spark 3.3.3 (Java 11)"
+      - "hadoop-aws 3.3.4, 3.4.1 and 3.3.2 for the S3A sessions"
+      - "Iceberg REST catalog fixture 1.10.1 and MinIO RELEASE.2025-04-03T14-56-28Z"
+    lab: labs/runbooks/iceberg/expire-snapshots-remove-orphan-files
+    summary: "Small tables were changed by appends, deletes, a tag and table properties, and expire_snapshots and remove_orphan_files were run against each case, with the table's storage listed before and after every call. Orphan files were planted under the data directory and looked for with the default listing, with prefix listing and with the Hadoop S3A file system."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+Iceberg frees storage only when `expire_snapshots` removes the last snapshot that references a file, or when `remove_orphan_files` finds a file that no snapshot references. With the defaults, expiry keeps every snapshot younger than 5 days and orphan removal ignores files younger than 3 days, so on a new table both calls succeed and delete nothing. Tags, the table's own properties, `gc.enabled` and the file system the orphan listing needs stop them in other ways.
+
+This page measures each case on Iceberg 1.12.0 and 1.4.3 and gives the setting that frees the space. [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/#issue-8-compaction-ran-but-storage-and-manifests-did-not-shrink) already showed that a default `expire_snapshots` after compaction deleted nothing until `older_than` was given as a timestamp literal, so this page starts from there.
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Storage comes back only for files that no remaining snapshot, tag or branch references:
+
+- **Snapshot expiry:** pass `older_than` as a timestamp literal and `retain_last`, or lower `history.expire.max-snapshot-age-ms` and `history.expire.min-snapshots-to-keep` on the table, which are where the defaults come from.
+- **Tags and branches:** a tag keeps its snapshot and every file it references until the tag is dropped.
+- **Deleted rows:** with merge-on-read, compact the table first. Expiry cannot free a data file the current snapshot still reads.
+- **`.metadata.json` files:** set `write.metadata.delete-after-commit.enabled`. Files that are already untracked go only with orphan removal.
+- **Orphan files:** the default listing needs a Hadoop file system for `s3://`. On Iceberg 1.12 pass `prefix_listing => true`, on older versions add the S3A file system.
+
+<TLDR title='Key takeaways'>
+
+- Expiring nine snapshots of a table that only had appends deleted nine manifest lists and no data file: 7,478,145 bytes became 7,439,750. Every data file was still in the current snapshot.
+- A tag kept 2,199,810 bytes of deleted data in storage through expiry. After `DROP TAG` the same call left 55,379 bytes.
+- The default `remove_orphan_files` failed on every version with `No FileSystem for scheme "s3"`. Its error for conflicting schemes tells you to use a mode `'NONE'` that does not exist.
+
+</TLDR>
+
+## What you see
+
+A call that frees nothing still succeeds. This is `expire_snapshots` on a table with ten appends, with `older_than` set to the current time:
+
+```text
+CALL demo.system.expire_snapshots(table => 'db.appends', older_than => TIMESTAMP '2026-11-27 12:51:36.391', retain_last => 1)
+  deleted_data_files_count | deleted_position_delete_files_count | deleted_equality_delete_files_count | deleted_manifest_files_count | deleted_manifest_lists_count | deleted_statistics_files_count
+  0 | 0 | 0 | 0 | 9 | 0
+```
+
+The failures have their own messages, and each one was printed by the lab:
+
+| Message | When | Printed by |
+| --- | --- | --- |
+| `Cannot expire snapshots: GC is disabled (deleting files may corrupt other tables)` | `expire_snapshots` on a table with `gc.enabled = false` | 1.4.3, 1.12.0 |
+| `Cannot delete orphan files: GC is disabled (deleting files may corrupt other tables)` | `remove_orphan_files` on the same table | 1.4.3, 1.12.0 |
+| `org.apache.hadoop.fs.UnsupportedFileSystemException: No FileSystem for scheme "s3"` | `remove_orphan_files` on an `s3://` table with no Hadoop S3 file system | 1.4.3, 1.12.0 |
+| `Cannot remove orphan files with an interval less than 24 hours. Executing this procedure with a short interval may corrupt the table if other operations are happening at the same time. [...]` | `older_than` less than a day ago | 1.4.3, 1.12.0 |
+| `Unable to determine whether certain files are orphan. Metadata references files that match listed/provided files except for authority/scheme. [...] Conflicting authorities/schemes: [(s3, minio)].` | the listing returns the table's files under another scheme | 1.4.3, 1.12.0 |
+| `Could not build name to arg map: Unknown argument: prefix_listing` | `prefix_listing => true` | 1.4.3 |
+
+On Iceberg 1.12.0, Spark 3.5.6 and Spark 4.0.5 gave the same results and messages for every call on this page. The byte counts below are from Spark 3.5.6.
+
+## Why it happens
+
+Each commit to an Iceberg table writes a new snapshot, and a snapshot lists the data files of the table at that moment. A file can be deleted only when no snapshot that is kept still lists it. The [maintenance documentation](https://iceberg.apache.org/docs/latest/maintenance/#expire-snapshots) puts it this way: "Data files are not deleted until they are no longer referenced by a snapshot that may be used for time travel or rollback" (checked Nov 2026).
+
+So expiry frees space only for files that a later commit replaced, as the `DELETE` and the compaction did in the lab. Files added by appends stay in the current snapshot and are never candidates. What else keeps a snapshot alive is set by the procedure's arguments, the table's properties, and the tags and branches on the table.
+
+Orphan files are a different case: objects under the table location that no snapshot lists, such as the output of a write that failed. Expiry cannot see them, because it works from the snapshots. `remove_orphan_files` lists the location and compares the listing with the metadata, which needs a file system that can list the location and paths that match the metadata exactly.
+
+`.metadata.json` files are a third case. Each commit writes one, and neither procedure trims the ones the table still tracks.
+
+## Confirm the diagnosis
+
+Look at the snapshots, the references and the table properties first. A snapshot newer than `older_than`, one of the newest `retain_last`, or one that a tag points to will not be expired:
+
+```sql
+SELECT count(*) AS snapshots FROM demo.db.props.snapshots;
+SELECT name, type, snapshot_id FROM demo.db.tagged.refs ORDER BY name;
+SHOW TBLPROPERTIES demo.db.props;
+```
+
+Compare the files of the current snapshot with the files of all snapshots. Only the difference can be freed by expiry:
+
+```sql
+SELECT count(*) AS data_files_in_current_snapshot FROM demo.db.props.files;
+SELECT count(*) AS data_files_in_any_snapshot FROM demo.db.props.all_data_files;
+```
+
+On the table `db.props` after four appends and a `DELETE`, these returned 2 and 6. After expiry they were both 2.
+
+Then measure the storage itself, before and after the call. The lab counted the objects under each table location by kind, through the table's FileIO and with `mc`:
+
+```text
+--- storage of db.props, before: 27 objects, 4,497,610 bytes | data files 6 (4,382,224 B), metadata.json 9 (37,466 B), manifest lists 3 (13,643 B), manifests 9 (64,277 B)
+--- storage of db.props, after: 18 objects, 1,536,720 bytes | data files 2 (1,455,800 B), metadata.json 10 (40,689 B), manifest lists 1 (4,489 B), manifests 5 (35,742 B)
+```
+
+## Issue 1: The defaults keep every snapshot younger than five days
+
+Without arguments, `expire_snapshots` reads two table properties. The [configuration documentation](https://iceberg.apache.org/docs/latest/configuration/#table-behavior-properties) gives `history.expire.max-snapshot-age-ms` a default of "432000000 (5 days)" and `history.expire.min-snapshots-to-keep` a default of 1 (checked Nov 2026). On a table of four appends and a `DELETE`, all of them minutes old, the call deleted nothing:
+
+```text
+CALL demo.system.expire_snapshots(table => 'db.props')
+  0 | 0 | 0 | 0 | 0 | 0
+```
+
+The same call without arguments follows the properties when they change. With a maximum age of one second and a minimum of three snapshots, it expired two snapshots and no data files, because the three it kept still listed the old files. With a minimum of one, it deleted the four replaced data files:
+
+```sql
+ALTER TABLE demo.db.props SET TBLPROPERTIES ('history.expire.max-snapshot-age-ms' = '1000', 'history.expire.min-snapshots-to-keep' = '3');
+CALL demo.system.expire_snapshots(table => 'db.props');
+-- 0 | 0 | 0 | 0 | 2 | 0
+ALTER TABLE demo.db.props SET TBLPROPERTIES ('history.expire.min-snapshots-to-keep' = '1');
+CALL demo.system.expire_snapshots(table => 'db.props');
+-- 4 | 0 | 0 | 4 | 2 | 0
+```
+
+Storage went from 4,497,610 to 1,536,720 bytes on the last call. The procedure's `retain_last` argument behaves like the property: with `older_than` set to now and `retain_last => 3`, a table with two `DELETE` commits freed no data files on either version.
+
+**Fix:** pass `older_than` as a timestamp literal and `retain_last` for the history you need, or set the two properties on the table so that scheduled calls without arguments do the same. A one-second maximum age is for the lab only; it removes time travel.
+
+## Issue 2: A table with only appends has nothing to free
+
+Ten appends of 20,000 rows wrote ten data files, and the current snapshot lists all ten. Expiry with `older_than` now and `retain_last => 1` deleted nine manifest lists and nothing else:
+
+```text
+--- storage of db.appends, before: 41 objects, 7,478,145 bytes | data files 10 (7,291,808 B), metadata.json 11 (68,377 B), manifest lists 10 (46,607 B), manifests 10 (71,353 B)
+--- storage of db.appends, after: 33 objects, 7,439,750 bytes | data files 10 (7,291,808 B), metadata.json 12 (71,734 B), manifest lists 1 (4,855 B), manifests 10 (71,353 B)
+```
+
+That is the table's real size. An append-only table does not shrink with expiry, and the call itself added one `.metadata.json` file.
+
+## Issue 3: A tag or branch keeps old snapshots
+
+A tag was created after three appends, then every row was deleted. Expiry kept the tagged snapshot and its three data files:
+
+```text
+SELECT name, type, snapshot_id FROM demo.db.tagged.refs ORDER BY name
+  before_purge | TAG | 3798941182261458155
+  main | BRANCH | 3920534036094680690
+CALL demo.system.expire_snapshots(table => 'db.tagged', older_than => TIMESTAMP '2026-11-27 12:52:24.560', retain_last => 1)
+  0 | 0 | 0 | 0 | 2 | 0
+--- storage of db.tagged, after: 18 objects, 2,274,523 bytes | data files 3 (2,199,810 B), [...]
+```
+
+After `ALTER TABLE demo.db.tagged DROP TAG before_purge`, the same call deleted the three files, and the table went to 55,379 bytes of metadata. The procedures documentation states the rule: "Snapshots that are still referenced by branches or tags won't be removed. By default, branches and tags never expire, but their retention policy can be changed with the table property `history.expire.max-ref-age-ms`" ([expire_snapshots](https://iceberg.apache.org/docs/latest/spark-procedures/#expire_snapshots), checked Nov 2026). `CREATE TAG` and `DROP TAG` ran in Spark SQL on 1.4.3 with Spark 3.3.3 as well.
+
+**Fix:** list `refs`, drop the tags and branches you no longer need, or give them a retention with `history.expire.max-ref-age-ms`.
+
+## Issue 4: DELETE did not free space
+
+How a `DELETE` is written decides when its space comes back. With copy-on-write, the default, it rewrote the data file without the deleted rows, so storage grew until expiry removed the old file:
+
+| `db.cow`, copy-on-write | Bytes |
+| --- | --- |
+| After the append of 100,000 rows | 3,669,303 |
+| After `DELETE` of half the rows | 5,510,612 |
+| After `expire_snapshots` with `older_than` now | 1,846,387 |
+
+With merge-on-read, the `DELETE` wrote a position delete file of 59,106 bytes and kept the data file. The data file is still in the current snapshot, so expiry freed nothing until compaction rewrote it:
+
+| `db.mor`, merge-on-read | Bytes |
+| --- | --- |
+| After `DELETE` of half the rows | 3,743,116 |
+| After `expire_snapshots` | 3,740,968 |
+| After `rewrite_data_files` with `delete-file-threshold` 1 | 5,582,670 |
+| After `expire_snapshots` again | 1,918,601 |
+
+The position delete file was still referenced by the current snapshot at the end, and stayed in storage. [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/#issue-5-files-with-deletes-are-not-rewritten) covers the options that rewrite files with deletes.
+
+**Fix:** on merge-on-read tables, compact the files that carry deletes, then expire.
+
+## Issue 5: Cannot expire snapshots: GC is disabled
+
+With `gc.enabled` set to `false`, both procedures refuse before they touch anything:
+
+```text
+org.apache.iceberg.exceptions.ValidationException: Cannot expire snapshots: GC is disabled (deleting files may corrupt other tables)
+org.apache.iceberg.exceptions.ValidationException: Cannot delete orphan files: GC is disabled (deleting files may corrupt other tables)
+```
+
+The property "Allows garbage collection operations such as expiring snapshots and removing orphan files", and its default is `true` ([configuration](https://iceberg.apache.org/docs/latest/configuration/#table-behavior-properties), checked Nov 2026). The message gives the reason it is off on some tables: the files may belong to another table as well.
+
+**Fix:** find out why the property was set before you change it. If the table owns its files, set it back with `ALTER TABLE ... SET TBLPROPERTIES ('gc.enabled' = 'true')`. In the lab the next expiry then deleted the two replaced data files.
+
+## Issue 6: .metadata.json files keep growing
+
+Every commit writes a `.metadata.json`, and in the lab so did each `expire_snapshots` and each `ALTER TABLE ... SET TBLPROPERTIES`. Expiry does not delete them: after twelve appends and an expiry, the table had 14.
+
+Two properties trim them, and both are needed:
+
+| `db.meta` | `.metadata.json` files |
+| --- | --- |
+| After 12 appends | 13 |
+| After `expire_snapshots` | 14 |
+| After `write.metadata.delete-after-commit.enabled = true` and `write.metadata.previous-versions-max = 3` | 4 |
+| After one more commit | 4 |
+
+On a second table, `previous-versions-max = 3` was set without `delete-after-commit`. The table stopped tracking all but the newest files, and all 15 stayed in storage. Turning on `delete-after-commit` afterwards left 15, because it deletes only files the table still tracks.
+
+Orphan removal then deleted the 11 untracked files, and 4 were left. The [maintenance documentation](https://iceberg.apache.org/docs/latest/maintenance/#remove-old-metadata-files) says the same: "this will only delete metadata files that are **tracked** in the metadata log and will not delete orphaned metadata files" (checked Nov 2026).
+
+**Fix:** set both properties together, and run orphan removal once for the files that are already untracked.
+
+## Issue 7: No FileSystem for scheme "s3"
+
+`remove_orphan_files` lists the table location with a Hadoop file system. A Spark session that reaches S3 only through Iceberg's `S3FileIO` has none for `s3://`, and the call failed on all three versions:
+
+```text
+CALL demo.system.remove_orphan_files(table => 'db.orphans')
+java.io.UncheckedIOException: org.apache.hadoop.fs.UnsupportedFileSystemException: No FileSystem for scheme "s3"
+```
+
+The Spark images in the lab ship the Hadoop client jars and no `hadoop-aws`. There are two ways to give the listing a file system:
+
+- **Iceberg 1.12.0:** `prefix_listing => true` lists through the table's FileIO. The documentation describes it as "use prefix-based file listing via the `SupportsPrefixOperations` interface" ([remove_orphan_files](https://iceberg.apache.org/docs/latest/spark-procedures/#remove_orphan_files), checked Nov 2026). On 1.4.3 the argument does not exist: `Could not build name to arg map: Unknown argument: prefix_listing`.
+- **Any version:** add `hadoop-aws` in the version of the Hadoop jars of your Spark, and map `s3://` to the S3A file system. With this the default call ran on 1.4.3 and 1.12.0:
+
+```text
+--packages org.apache.hadoop:hadoop-aws:3.3.4
+--conf spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+--conf spark.hadoop.fs.s3a.path.style.access=true
+```
+
+The lab used `hadoop-aws` 3.3.4 for Spark 3.5.6, 3.4.1 for Spark 4.0.5 and 3.3.2 for Spark 3.3.3, and also set the region, SSL off and the keys of its MinIO. A listing through `s3a://` was not a conflict: the action found the orphan under `s3a://warehouse/db/orphans/data/` on both versions. The procedure's default `equal_schemes` is "`map('s3a,s3n','s3')`" ([remove_orphan_files](https://iceberg.apache.org/docs/latest/spark-procedures/#remove_orphan_files), checked Nov 2026).
+
+## Issue 8: The 24-hour guard, and orphans younger than three days
+
+Once the listing works, the defaults still find nothing new. `older_than` defaults to three days ago, and the procedure refuses anything closer than a day:
+
+```text
+Cannot remove orphan files with an interval less than 24 hours. Executing this procedure with a short interval may corrupt the table if other operations are happening at the same time. If you are absolutely confident that no concurrent operations will be affected by removing orphan files with such a short interval, you can use the Action API to remove orphan files with an arbitrary interval.
+```
+
+The orphans in the lab were minutes old, so the default call and `dry_run => true` returned no rows. The Action API that the message names did find and delete them, called through Py4J from the lab's `maintenance.py` (the Iceberg 1.12.0 run shown, with prefix listing):
+
+```python
+jvm = spark._jvm
+table = jvm.org.apache.iceberg.spark.Spark3Util.loadIcebergTable(spark._jsparkSession, "demo.db.orphans")
+jvm.org.apache.iceberg.spark.actions.SparkActions.get(spark._jsparkSession) \
+    .deleteOrphanFiles(table).olderThan(int(time.time() * 1000)).usePrefixListing(True).execute()
+```
+
+```text
+--- storage of db.orphans, before: 14 objects, 2,245,451 bytes | data files 4 (2,200,802 B), [...]
+=== SparkActions.get(spark).deleteOrphanFiles(table).olderThan(now).usePrefixListing(true).execute()
+  orphan_file_location (1 deleted)
+  s3://warehouse/db/orphans/data/orphan-a.parquet
+--- storage of db.orphans, after: 13 objects, 2,244,459 bytes | data files 3 (2,199,810 B), [...]
+```
+
+The guard is there for writes in progress. The documentation warns: "It is dangerous to remove orphan files with a retention interval shorter than the time expected for any write to complete because it might corrupt the table if in-progress files are considered orphaned and are deleted. The default interval is 3 days" ([maintenance](https://iceberg.apache.org/docs/latest/maintenance/#delete-orphan-files), checked Nov 2026).
+
+**Fix:** keep the default interval, or one longer than your longest write, and let a scheduled call catch the orphans when they are old enough. Use the Action API with a short interval only when nothing else writes to the table.
+
+## Issue 9: Unable to determine whether certain files are orphan
+
+The comparison uses the strings of the paths. When the listing returns the table's own files under a different scheme or authority than the metadata, the call stops. In the lab the same bucket was listed under a second scheme name, `minio://`:
+
+```text
+org.apache.iceberg.exceptions.ValidationException: Unable to determine whether certain files are orphan. Metadata references files that match listed/provided files except for authority/scheme. Please, inspect the conflicting authorities/schemes and provide which of them are equal by further configuring the action via equalSchemes() and equalAuthorities() methods. Set the prefix mismatch mode to 'NONE' to ignore remaining locations with conflicting authorities/schemes or to 'DELETE' iff you are ABSOLUTELY confident that remaining conflicting authorities/schemes are different. It will be impossible to recover deleted files. Conflicting authorities/schemes: [(s3, minio)].
+```
+
+The message names a mode `'NONE'` that does not exist on either version:
+
+```text
+No enum constant org.apache.iceberg.actions.DeleteOrphanFiles.PrefixMismatchMode.NONE
+```
+
+What worked was to declare the two schemes equal, or to use `IGNORE`, which skips the mismatched paths. Each of these deleted only the planted orphan:
+
+```text
+deleteOrphanFiles(table).location('minio://warehouse/db/orphans').equalSchemes({'minio': 's3'})
+  minio://warehouse/db/orphans/data/orphan-d.parquet
+deleteOrphanFiles(table).location('minio://warehouse/db/orphans').prefixMismatchMode(IGNORE)
+  minio://warehouse/db/orphans/data/orphan-e.parquet
+```
+
+The 1.12.0 documentation lists them in SQL as `equal_schemes`, `equal_authorities` and `prefix_mismatch_mode`, with the modes `ERROR`, `IGNORE` and `DELETE`. The procedure took `equal_schemes` and `prefix_mismatch_mode => 'IGNORE'` on 1.4.3 as well, although its documentation does not list them, and answered `prefix_mismatch_mode => 'NONE'` with `Invalid mode: NONE` on both versions.
+
+Do not use `DELETE` to get past the error. The documentation's own warning is that a changed authority on HDFS (the Hadoop Distributed File System) means "none of the old path urls used during creation will match those that appear in a current listing. _This will lead to data loss when RemoveOrphanFiles is run_" ([maintenance](https://iceberg.apache.org/docs/latest/maintenance/#delete-orphan-files), checked Nov 2026).
+
+## Other engines
+
+Neither engine was run for this page. The statements are from their documentation, checked in November 2026.
+
+**Trino** runs both operations as table procedures, `ALTER TABLE test_table EXECUTE expire_snapshots(retention_threshold => '7d')` and the same with `remove_orphan_files`. Both refuse a shorter threshold than the catalog allows: "The value for `retention_threshold` must be higher than or equal to `iceberg.expire-snapshots.min-retention` in the catalog, otherwise the procedure fails with a similar message: `Retention specified (1.00d) is shorter than the minimum retention configured in the system (7.00d)`. The default value for this property is `7d`" ([Trino 484 Iceberg connector](https://trino.io/docs/current/connector/iceberg.html#expire-snapshots)). The orphan-file setting is `iceberg.remove-orphan-files.min-retention`, also `7d`.
+
+**Amazon Athena** combines both in `VACUUM`, which "performs table maintenance on Apache Iceberg tables by performing snapshot expiration and orphan file removal" ([VACUUM](https://docs.aws.amazon.com/athena/latest/ug/vacuum-statement.html)). It reads its own table properties, `vacuum_max_snapshot_age_seconds` with a default of 432000 seconds (5 days) and `vacuum_min_snapshots_to_keep` with a default of 1. The page adds one more way to free nothing: without `s3:DeleteObject`, "the `VACUUM` query will succeed, but the files will not be deleted."
+
+## Prevent it
+
+- Schedule expiry with explicit `older_than` and `retain_last`, or set `history.expire.max-snapshot-age-ms` and `history.expire.min-snapshots-to-keep` on the table, and check `deleted_data_files_count` after each run.
+- Review `refs` before you count on expiry; every tag and branch holds its files.
+- On merge-on-read tables, compact before you expire.
+- Set `write.metadata.delete-after-commit.enabled = true` with `write.metadata.previous-versions-max` when you create the table, not after the files have piled up.
+- Make sure the orphan listing can reach the location before you schedule it: `prefix_listing => true` on Iceberg 1.12, or `hadoop-aws` with `fs.s3.impl`.
+- Measure the table location before and after a maintenance run, not only the procedure's counts.
+
+:::note[How OLake handles this]
+
+OLake Fusion, OLake's table maintenance product, can run snapshot expiry on a schedule per table. Its [cleanup documentation](/docs/fusion/cleanup/configuration/) says: "Snapshot expiry is the only cleanup action available right now." The defaults it gives are snapshots older than 7 days, a minimum of 30 snapshots kept (10 or more), and a run every 12 hours.
+
+:::
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Iceberg: [Spark procedures](https://iceberg.apache.org/docs/latest/spark-procedures/) and the same page for [1.4.3](https://iceberg.apache.org/docs/1.4.3/spark-procedures/); [maintenance](https://iceberg.apache.org/docs/latest/maintenance/); [configuration](https://iceberg.apache.org/docs/latest/configuration/)
+- Trino: [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html), for `expire_snapshots` and `remove_orphan_files`
+- Amazon Athena: [VACUUM](https://docs.aws.amazon.com/athena/latest/ug/vacuum-statement.html), [Iceberg table properties](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html#querying-iceberg-table-properties)
+- Stack Overflow: [How to actually delete files in Iceberg](https://stackoverflow.com/questions/74142050)
+- Related runbook: [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/)

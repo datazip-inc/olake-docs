@@ -1,0 +1,169 @@
+# ./run.sh failover-slots    PostgreSQL 17.12    2026-11-28T09:45:15Z
+
+## On the primary: the physical slot of the standby, a CDC slot created with failover = true, and one created without it
+SELECT * FROM pg_create_physical_replication_slot('standby_slot');
+  slot_name   | lsn 
+--------------+-----
+ standby_slot | 
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('cdc_slot', 'pgoutput', false, false, true);
+ slot_name |    lsn    
+-----------+-----------
+ cdc_slot  | 0/B000588
+(1 row)
+
+SELECT * FROM pg_create_logical_replication_slot('tool_slot', 'pgoutput');
+ slot_name |    lsn    
+-----------+-----------
+ tool_slot | 0/B0005C0
+(1 row)
+
+
+## A slot that exists already is switched over the replication protocol
+$ psql "dbname=appdb replication=database" -c 'ALTER_REPLICATION_SLOT tool_slot (FAILOVER true)'
+ALTER_REPLICATION_SLOT
+ALTER SYSTEM SET synchronized_standby_slots = 'standby_slot';
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced FROM pg_replication_slots ORDER BY slot_name;
+  slot_name   | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced 
+--------------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------
+ cdc_slot     | logical   | pgoutput | appdb    | f      |            | 0/B000588           | reserved   |                     | t        | f
+ standby_slot | physical  |          |          | f      |            |                     |            |                     | f        | f
+ tool_slot    | logical   | pgoutput | appdb    | f      |            | 0/B0005C0           | reserved   |                     | t        | f
+(3 rows)
+
+
+## A standby with the settings that slot synchronization needs
+$ pg_basebackup -h pg -U postgres -D /standby/data -X stream -R -c fast    (on the standby)
+$ echo "wal_level = logical" >> postgresql.auto.conf    (on the standby)
+$ echo "primary_slot_name = 'standby_slot'" >> postgresql.auto.conf    (on the standby)
+$ echo "hot_standby_feedback = on" >> postgresql.auto.conf    (on the standby)
+$ echo "sync_replication_slots = on" >> postgresql.auto.conf    (on the standby)
+$ echo "primary_conninfo = 'host=pg user=postgres password=labpw dbname=appdb'" >> postgresql.auto.conf    (on the standby)
+SELECT pg_is_in_recovery();    -- on the standby
+ pg_is_in_recovery 
+-------------------
+ t
+(1 row)
+
+
+## The consumer reads one change on the primary and confirms it
+INSERT INTO orders VALUES (401, 'read before the promotion');
+INSERT 0 1
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- printed by pgoutput.py
+RELATION public.orders  replica identity default
+INSERT public.orders
+    new row [N]: id='401' status='read before the promotion'
+
+## Waiting for the standby to hold synchronized copies of the two slots
+(the standby held 2 synchronized slots after about 5 s)
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced, temporary FROM pg_replication_slots ORDER BY slot_name;    -- on the standby
+ slot_name | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced | temporary 
+-----------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------+-----------
+ cdc_slot  | logical   | pgoutput | appdb    | f      |            | 0/D000530           | reserved   |                     | t        | t      | f
+ tool_slot | logical   | pgoutput | appdb    | f      |            | 0/D000530           | reserved   |                     | t        | t      | f
+(2 rows)
+
+--- server log of standby
+2026-11-28 09:45:23.258 UTC [76] LOG:  slot sync worker started
+2026-11-28 09:45:23.269 UTC [76] LOG:  could not synchronize replication slot "cdc_slot"
+2026-11-28 09:45:23.269 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000550 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:23.271 UTC [76] LOG:  could not synchronize replication slot "tool_slot"
+2026-11-28 09:45:23.271 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000588 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:23.472 UTC [76] LOG:  could not synchronize replication slot "cdc_slot"
+2026-11-28 09:45:23.472 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000550 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:23.472 UTC [76] LOG:  could not synchronize replication slot "tool_slot"
+2026-11-28 09:45:23.472 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000588 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:23.879 UTC [76] LOG:  could not synchronize replication slot "cdc_slot"
+2026-11-28 09:45:23.879 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000550 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:23.879 UTC [76] LOG:  could not synchronize replication slot "tool_slot"
+2026-11-28 09:45:23.879 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000588 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:24.681 UTC [76] LOG:  starting logical decoding for slot "cdc_slot"
+2026-11-28 09:45:24.681 UTC [76] DETAIL:  Streaming transactions committing after 0/0, reading WAL from 0/C000028.
+2026-11-28 09:45:24.683 UTC [76] LOG:  newly created replication slot "cdc_slot" is sync-ready now
+2026-11-28 09:45:24.683 UTC [76] LOG:  could not synchronize replication slot "tool_slot"
+2026-11-28 09:45:24.683 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000588 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:24.884 UTC [76] LOG:  starting logical decoding for slot "cdc_slot"
+2026-11-28 09:45:24.884 UTC [76] DETAIL:  Streaming transactions committing after 0/D0004C0, reading WAL from 0/C000028.
+2026-11-28 09:45:24.884 UTC [76] LOG:  could not synchronize replication slot "tool_slot"
+2026-11-28 09:45:24.884 UTC [76] DETAIL:  Synchronization could lead to data loss, because the remote slot needs WAL at LSN 0/B000588 and catalog xmin 873, but the standby has LSN 0/C000028 and catalog xmin 873.
+2026-11-28 09:45:25.288 UTC [76] LOG:  starting logical decoding for slot "cdc_slot"
+2026-11-28 09:45:25.288 UTC [76] DETAIL:  Streaming transactions committing after 0/D0004C0, reading WAL from 0/C000028.
+2026-11-28 09:45:25.296 UTC [76] LOG:  starting logical decoding for slot "tool_slot"
+2026-11-28 09:45:25.296 UTC [76] DETAIL:  Streaming transactions committing after 0/0, reading WAL from 0/C000028.
+2026-11-28 09:45:25.300 UTC [76] LOG:  newly created replication slot "tool_slot" is sync-ready now
+---
+
+## On the standby the copy can be neither read nor dropped
+SELECT count(*) FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- on the standby
+ERROR:  cannot use replication slot "cdc_slot" for logical decoding
+DETAIL:  This replication slot is being synchronized from the primary server.
+HINT:  Specify another replication slot.
+SELECT pg_drop_replication_slot('cdc_slot');    -- on the standby
+ERROR:  cannot drop replication slot "cdc_slot"
+DETAIL:  This replication slot is being synchronized from the primary server.
+
+## Two more changes on the primary, not read yet. Then the standby is promoted.
+INSERT INTO orders VALUES (402, 'read after the promotion'), (403, 'read after the promotion');
+INSERT 0 2
+SELECT pg_promote();    -- on the standby
+ pg_promote 
+------------
+ t
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status, invalidation_reason, failover, synced, temporary FROM pg_replication_slots ORDER BY slot_name;    -- on the standby
+ slot_name | slot_type |  plugin  | database | active | active_pid | confirmed_flush_lsn | wal_status | invalidation_reason | failover | synced | temporary 
+-----------+-----------+----------+----------+--------+------------+---------------------+------------+---------------------+----------+--------+-----------
+ cdc_slot  | logical   | pgoutput | appdb    | f      |            | 0/D000530           | reserved   |                     | t        | t      | f
+ tool_slot | logical   | pgoutput | appdb    | f      |            | 0/D000530           | reserved   |                     | t        | t      | f
+(2 rows)
+
+
+## The consumer reads the slot on the new primary. The new primary was cloned with the primary's synchronized_standby_slots, and has no slot of that name.
+SHOW synchronized_standby_slots;    -- on the standby
+ synchronized_standby_slots 
+----------------------------
+ standby_slot
+(1 row)
+
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- on the standby, stopped after 10 s
+WARNING:  replication slot "standby_slot" specified in parameter "synchronized_standby_slots" does not exist    (10 times)
+DETAIL:  Logical replication is waiting on the standby associated with replication slot "standby_slot".    (10 times)
+HINT:  Create the replication slot "standby_slot" or amend parameter "synchronized_standby_slots".    (10 times)
+(no change returned within 10 s)
+
+## The fix on the new primary: reset the setting, or name the slot of a standby that the new primary has
+ALTER SYSTEM RESET synchronized_standby_slots;    -- on the standby
+ALTER SYSTEM
+SELECT pg_reload_conf();    -- on the standby
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+SELECT encode(data, 'hex') FROM pg_logical_slot_get_binary_changes('cdc_slot', NULL, NULL, 'proto_version', '1', 'publication_names', 'cdc_pub');    -- on the standby, printed by pgoutput.py
+RELATION public.orders  replica identity default
+INSERT public.orders
+    new row [N]: id='402' status='read after the promotion'
+INSERT public.orders
+    new row [N]: id='403' status='read after the promotion'
+
+## synchronized_standby_slots is reset on the old primary before the standby is removed
+ALTER SYSTEM RESET synchronized_standby_slots;
+ALTER SYSTEM
+SELECT pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+DELETE FROM orders WHERE id > 100;
+DELETE 3

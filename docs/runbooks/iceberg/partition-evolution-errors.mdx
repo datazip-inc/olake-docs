@@ -1,0 +1,628 @@
+---
+title: "Iceberg partition evolution and partition spec errors"
+description: "Iceberg partition evolution errors in Spark 3.3, 3.5 and 4.0, Trino 484 and PyIceberg 0.12: invalid specs, partition field changes, dropped partition columns."
+sidebar_label: Partition evolution errors
+unlisted: true
+keywords:
+  - iceberg partition evolution
+  - ADD PARTITION FIELD
+  - REPLACE PARTITION FIELD
+  - Cannot find source column for partition field
+  - Cannot add redundant partition
+  - Cannot add duplicate partition field
+  - Cannot find partition field to remove
+  - Invalid source type double for transform
+  - Cannot create identity partition sourced from different field in schema
+  - "Unable to parse partitioning value: Invalid partition field declaration"
+  - Cannot drop column which is used by an old partition spec
+  - "NullPointerException: Type cannot be null"
+  - pyiceberg_core needs to be installed
+  - iceberg hidden partitioning
+  - Partitioning by nested field is unsupported
+runbook:
+  family: iceberg
+  author: nayan
+  reproduced:
+    date: "2026-11-27"
+    versions:
+      - "Spark 3.5.6 with Iceberg 1.12.0"
+      - "Spark 4.0.5 with Iceberg 1.12.0"
+      - "Spark 3.3.3 with Iceberg 1.4.3"
+      - "PyIceberg 0.12.0 (PyArrow 26.0.1), without and with pyiceberg-core 0.10.1"
+      - "Trino 484"
+      - "Iceberg REST catalog fixture 1.10.1 and MinIO RELEASE.2025-04-03T14-56-28Z"
+    lab: labs/runbooks/iceberg/partition-evolution-errors
+    summary: "Partitioned tables were created with valid and invalid specs, partition fields were added, dropped and replaced, and data was written before and after each change, in Spark on three versions and then in PyIceberg and Trino against the same tables. Columns that a partition spec used were dropped on a REST and on a Hadoop catalog, the tables were read by Spark 3.3.3 with Iceberg 1.4.3, PyIceberg and Trino, and two repairs were run. Flink and Athena were not run."
+---
+
+import * as R from '@site/src/components/runbooks';
+
+Iceberg keeps every partition spec a table has had, and each data file records the spec it was written with. Changing the partitioning is a metadata change that applies to new writes only, and every engine checks a new spec against the table schema before it commits it. Most partition errors are those checks, and the one that breaks a table is dropping a column that an old spec still uses.
+
+This page reproduces each error in Spark 3.3, 3.5 and 4.0, PyIceberg 0.12 and Trino 484, with the message each version prints and the fix. Column changes that no partition depends on are on [Iceberg schema evolution errors](/docs/runbooks/iceberg/schema-evolution-errors/).
+
+<R.Byline />
+
+<R.Disclosure />
+
+**The short answer.** Most of these errors are refused changes, and the table stays as it was:
+
+- **Spark:** `ADD`, `DROP` and `REPLACE PARTITION FIELD` need the Iceberg SQL extensions on Spark 3.3, 3.5 and 4.0. Change a field with `REPLACE PARTITION FIELD`, and name it with `AS` when its default name is taken.
+- **Trino:** transforms are written `day(ts)` and `bucket(id, 16)`, not Spark's `days(ts)` and `bucket(16, id)`, and a field inside a row is written `'"point.x"'`.
+- **Old data:** files written before a change keep the old spec, and a filter on the new field cannot skip them until `rewrite_data_files` rewrites them with `rewrite-all`.
+- **Partition columns:** do not drop a column that any spec of the table uses. If it is dropped, register the metadata file from before the drop, or rewrite the data and expire snapshots until the old spec is gone.
+
+<TLDR title='Key takeaways'>
+
+- After `ADD PARTITION FIELD category`, a filter on `category` read all 4 files written before the change: 14,000 rows for a count of 6,000, in Spark, PyIceberg and Trino. After `rewrite_data_files` with `rewrite-all`, the same query read 6,000 rows.
+- Spark with Iceberg 1.12.0 dropped a column that only an old partition spec used, without an error. Spark 3.3.3 with Iceberg 1.4.3 then failed on the table with `NullPointerException: Type cannot be null` and Trino 484 with `Error processing metadata for table`, while Trino refused the same `DROP COLUMN` on its own table.
+- `CAST(ts AS DATE) = DATE '2026-11-02'` and `system.days(ts)` read 1 of 10 files on Spark 3.5.6 and 4.0.5, and all 18,000 rows on Spark 3.3.3. `date_format(ts, 'yyyy-MM-dd')` read all 18,000 rows on all three.
+
+</TLDR>
+
+## What you see
+
+Each message below was printed by the lab. The issue sections give the full text in each version's spelling.
+
+| Message | When | Printed by |
+| --- | --- | --- |
+| `Syntax error at or near 'FIELD': missing '('` | `ADD` or `DROP PARTITION FIELD` without the Iceberg SQL extensions | Spark 3.3.3, 3.5.6 and 4.0.5 |
+| `Cannot add redundant partition: ... conflicts with ...` | two time transforms of one column in one new spec | Iceberg 1.4.3 and 1.12.0, Trino 484 |
+| `Cannot add duplicate partition field ...` | the same transform twice, or a field name already used | Iceberg 1.4.3 and 1.12.0, PyIceberg 0.12.0 |
+| `Cannot find partition field to remove: ts_hour` | `DROP PARTITION FIELD` with a name the current spec does not have | Iceberg 1.4.3 and 1.12.0 |
+| `Invalid source type double for transform: bucket[16]` | a transform that does not accept the column type | Iceberg 1.4.3 and 1.12.0, Trino 484 |
+| `Unable to parse partitioning value: Invalid partition field declaration: days(ts)` | Spark's spelling of a transform in Trino | Trino 484 |
+| ``A column or function parameter with name `ts_day` cannot be resolved`` | a filter on the name of a partition field | Spark 3.5.6 and 4.0.5; Spark 3.3.3 prints `Column 'ts_day' does not exist` |
+| `Cannot find source column for partition field: 1000: category: identity(2)` | `DROP COLUMN` of a column the current spec uses | Iceberg 1.4.3 and 1.12.0 |
+| `NullPointerException: Type cannot be null` | reading a table after a column that an old spec uses was dropped | Spark 3.3.3 with Iceberg 1.4.3 |
+| `Error processing metadata for table db.dc_v2` | the same table in Trino | Trino 484 |
+| `Cannot create identity partition sourced from different field in schema: ts_day` | a new field's default name is a column name, or a dropped partition column is added back | Iceberg 1.4.3 and 1.12.0, the REST catalog fixture |
+| `Cannot drop column which is used by an old partition spec: category` | `DROP COLUMN` in Trino of a column an old spec uses | Trino 484 |
+| `Cannot build accessor for field: null` | `saveAsTable` overwrite with another partition column, format version 1 | Iceberg 1.12.0 |
+| `pyiceberg_core needs to be installed` | a PyIceberg append to a table partitioned by a transform other than identity | PyIceberg 0.12.0 |
+
+## How Iceberg tracks partitions
+
+A partition spec is a list of partition fields. Each field has an ID from 1000 up, a name, a transform such as `day` or `bucket[16]`, and the field ID of its source column. The lab prints a field as `1000: ts_day: day(2)`: field 1000, named `ts_day`, the day of column 2.
+
+A partition change adds a spec and makes it current, and the old specs stay in the table metadata. Every data file keeps the ID of the spec it was written with. The [evolution documentation](https://iceberg.apache.org/docs/latest/evolution/#partition-evolution) says: "When you evolve a partition spec, the old data written with an earlier spec remains unchanged" (checked Nov 2026).
+
+Queries then plan each spec's files with that spec's fields. In the documentation's words, "you get split planning. This is where each partition layout plans files separately using the filter it derives for that specific partition layout." A filter on a field that an old spec does not have cannot skip any of that spec's files.
+
+Removing a field differs by format version. For version 1 tables the [specification](https://iceberg.apache.org/spec/#partition-evolution) recommends: "Do not drop partition fields; instead replace the field's transform with the `void` transform" (checked Nov 2026). In the lab, `DROP PARTITION FIELD category` left `spec 1: [1000: category: void(2)]` on a version 1 table and `spec 1: []` on a version 2 table.
+
+Each new spec is checked against the schema: the source column must exist and be a primitive type, the transform must accept its type, and field names must be unique. Spark and Trino run Iceberg's own checks, so their messages are mostly the same; PyIceberg has its own checks and wording.
+
+A REST catalog applies every commit again on the server, with the server's Iceberg version. The lab's catalog, the Iceberg REST catalog fixture, runs Iceberg 1.10.1. In one case it refused a change that Spark with Iceberg 1.12.0 made on a Hadoop catalog, where the client writes the metadata itself ([Issue 11](#issue-11-cannot-create-identity-partition-sourced-from-different-field-in-schema)).
+
+## Confirm the diagnosis
+
+List every spec of the table, not only the current one, with the schema and its field IDs. In Spark the table's Java object has them; this prints them the way the lab did:
+
+```python
+table = spark._jvm.org.apache.iceberg.spark.Spark3Util.loadIcebergTable(spark._jsparkSession, "demo.db.prune_t")
+print(f"format version {table.operations().current().formatVersion()}, current spec {table.spec().specId()}")
+for spec_id in sorted(int(s) for s in table.specs().keySet()):
+    print(f"spec {spec_id}: [{', '.join(str(f) for f in table.specs().get(spec_id).fields())}]")
+print(f"schema {table.schema().schemaId()}: [{', '.join(str(c) for c in table.schema().columns())}]")
+```
+
+```text
+format version 2, current spec 1
+spec 0: [1000: ts_day: day(2)]
+spec 1: [1000: ts_day: day(2), 1001: category: identity(3)]
+schema 0: [1: id: optional long, 2: ts: optional timestamptz, 3: category: optional string, 4: amount: optional double]
+```
+
+In PyIceberg, `tbl.specs()` returns the same list. Trino's `SHOW CREATE TABLE` shows only the current spec, here `partitioning = ARRAY['day(ts)','category']`.
+
+Then see which spec each data file was written with:
+
+```sql
+SELECT spec_id, partition, record_count FROM demo.db.prune_t.files ORDER BY spec_id, partition.ts_day, partition.category
+```
+
+```text
+0 | Row(ts_day=datetime.date(2026, 11, 1), category=None) | 3000
+...
+1 | Row(ts_day=datetime.date(2026, 11, 5), category='a') | 1000
+```
+
+To see whether a filter skips files, read the scan's metrics. With Iceberg 1.12.0 the Spark UI shows `number of result data files` for each Iceberg scan; with 1.4.3 the lab saw only `number of output rows`. Trino's `EXPLAIN ANALYZE` prints the rows and splits each scan read.
+
+## Issue 1: Syntax error at or near 'FIELD': missing '('
+
+`ALTER TABLE ... ADD PARTITION FIELD`, `DROP PARTITION FIELD` and `REPLACE PARTITION FIELD` are Iceberg's own SQL, parsed by the Iceberg SQL extensions. A session without `spark.sql.extensions` created and filled a table `PARTITIONED BY (days(ts), bucket(4, id))` on all three Spark versions, and refused all three statements:
+
+```sql
+ALTER TABLE demo.db.noext_t ADD PARTITION FIELD category
+```
+
+### Spark 3.3.3
+
+```text
+Syntax error at or near 'FIELD': missing '('(line 1, pos 42)
+
+== SQL ==
+ALTER TABLE demo.db.noext_t ADD PARTITION FIELD category
+------------------------------------------^^^
+```
+
+### Spark 3.5.6
+
+```text
+[PARSE_SYNTAX_ERROR] Syntax error at or near 'FIELD': missing '('.(line 1, pos 42)
+```
+
+### Spark 4.0.5
+
+```text
+[PARSE_SYNTAX_ERROR] Syntax error at or near 'FIELD': missing '('. SQLSTATE: 42601 (line 1, pos 42)
+```
+
+`DROP PARTITION FIELD` gave the same message at position 43. `REPLACE PARTITION FIELD` gave `Syntax error at or near 'PARTITION'` at position 36, with the same prefix and suffix on each version. The [Spark DDL documentation](https://iceberg.apache.org/docs/latest/spark-ddl/#alter-table-sql-extensions) says of these commands: "These commands are available in Spark 3 when using Iceberg SQL extensions" (checked Nov 2026), and Spark 4.0.5 needed them as well.
+
+**Fix:** set `spark.sql.extensions` to `org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions`. [Spark cannot find Iceberg](/docs/runbooks/iceberg/spark-cannot-find-iceberg/#issue-4-no-sql-extensions) covers the setting and how to check that a session loaded it. With the extensions, the partition statements on this page ran on all three versions.
+
+## Issue 2: Cannot add redundant partition
+
+A new spec may hold one time transform of a column. `CREATE TABLE ... PARTITIONED BY (days(ts), hours(ts))` was refused with the same text on Iceberg 1.4.3 and 1.12.0, raised as an `IllegalArgumentException`:
+
+```text
+Cannot add redundant partition: 1000: ts_day: day(1) conflicts with 1001: ts_hour: hour(1)
+```
+
+### Trino 484
+
+Trino builds the whole spec from its `partitioning` property, so it refused a change with `day(ts)` and `hour(ts)` together:
+
+```sql
+ALTER TABLE iceberg.db.trino_p SET PROPERTIES partitioning = ARRAY['day(ts)', 'hour(ts)']
+```
+
+```text
+Query 20261127_142129_00016_bjhyx failed: Unable to parse partitioning value: Cannot add redundant partition: 1000: ts_day: day(2) conflicts with 1001: ts_hour: hour(2)
+```
+
+### ALTER TABLE in Spark and PyIceberg
+
+Adding a time field to a spec that already has one was not refused. On a table `PARTITIONED BY (days(ts))`, `ADD PARTITION FIELD hours(ts)` and then `ADD PARTITION FIELD months(ts)` both ran on Iceberg 1.4.3 and 1.12.0, and the spec became `[1000: ts_day: day(2), 1001: ts_hour: hour(2), 1002: ts_month: month(2)]`. PyIceberg 0.12.0 added `HourTransform()` next to `DayTransform()` the same way.
+
+The documentation allows this on purpose: "To migrate from daily to hourly partitioning with transforms, it is not necessary to drop the daily partition field. Keeping the field ensures existing metadata table queries continue to work" ([Spark DDL](https://iceberg.apache.org/docs/latest/spark-ddl/#alter-table-add-partition-field), checked Nov 2026).
+
+**Fix:** create a table with one time transform per column. To move from days to hours, replace the field in one change:
+
+```sql
+ALTER TABLE demo.db.evo_t REPLACE PARTITION FIELD ts_day WITH hours(ts)
+```
+
+In Trino, set the whole list: `ALTER TABLE iceberg.db.trino_p SET PROPERTIES partitioning = ARRAY['hour(ts)', 'category']` ran, and the next insert was written under `ts_hour`. Check with the `files` query in Confirm the diagnosis that new files carry the new spec ID.
+
+## Issue 3: Cannot add duplicate partition field
+
+Adding a transform that the current spec already has is refused, under any name. On a table partitioned by `days(ts)`, Iceberg 1.4.3 and 1.12.0 printed for `ADD PARTITION FIELD days(ts)` and for `ADD PARTITION FIELD days(ts) AS day_of_ts`:
+
+```text
+Cannot add duplicate partition field null=day(ref(name="ts")), conflicts with 1000: ts_day: day(2)
+Cannot add duplicate partition field day_of_ts=day(ref(name="ts")), conflicts with 1000: ts_day: day(2)
+```
+
+A new field whose name another partition field already has, `ADD PARTITION FIELD category AS ts_day`, got a shorter message:
+
+```text
+Cannot add duplicate partition field name: ts_day
+```
+
+### PyIceberg 0.12.0
+
+`update_spec()` raised a `ValueError` with its own wording for the same two cases, `add_field('ts', DayTransform(), 'ts_day')` and `add_field('category', IdentityTransform(), 'ts_day')`:
+
+```text
+Duplicate partition field for $ts=$Reference(name='ts'), $1000: ts_day: day(2) already exists
+Cannot add duplicate partition field name: ts_day
+```
+
+**Fix:** list the current spec first (Confirm the diagnosis). If the transform is already there, nothing needs adding; if only the name is taken, choose another with `AS`.
+
+## Issue 4: Cannot find partition field to remove
+
+`DROP PARTITION FIELD` takes the transform or the field name, and either must be in the current spec. After `DROP PARTITION FIELD hours(ts)` removed `ts_hour`, `ALTER TABLE demo.db.evo_t DROP PARTITION FIELD ts_hour` failed on Iceberg 1.4.3 and 1.12.0:
+
+```text
+Cannot find partition field to remove: ts_hour
+```
+
+Without `AS`, a field's name comes from its transform: `days(ts)` was named `ts_day`, `hours(ts)` `ts_hour`, `months(ts)` `ts_month` and `bucket(4, id)` `id_bucket`. A field that only an earlier spec has cannot be dropped.
+
+**Fix:** drop a field by the name or the transform that the current spec shows, and list the spec again afterwards.
+
+## Issue 5: Invalid source type for transform
+
+A transform accepts only some column types. The [specification](https://iceberg.apache.org/spec/#partition-transforms) lists them (checked Nov 2026):
+
+| Transform | Source types |
+| --- | --- |
+| `bucket[N]` | `int`, `long`, `decimal`, `date`, `time`, `timestamp`, `timestamptz`, `timestamp_ns`, `timestamptz_ns`, `string`, `uuid`, `fixed`, `binary` |
+| `truncate[W]` | `int`, `long`, `decimal`, `string`, `binary` |
+| `year`, `month`, `day` | `date`, `timestamp`, `timestamptz`, `timestamp_ns`, `timestamptz_ns` |
+| `hour` | `timestamp`, `timestamptz`, `timestamp_ns`, `timestamptz_ns` |
+
+`CREATE TABLE` refused the other types with the same text on Iceberg 1.4.3 and 1.12.0. The first four came as `org.apache.iceberg.exceptions.ValidationException`, the last as a Spark `AnalysisException`:
+
+| `PARTITIONED BY` | Message |
+| --- | --- |
+| `bucket(16, amount)`, `amount double` | `Invalid source type double for transform: bucket[16]` |
+| `hours(d)`, `d date` | `Invalid source type date for transform: hour` |
+| `truncate(10, ts)`, `ts timestamp` | `Invalid source type timestamptz for transform: truncate[10]` |
+| `point`, a struct | `Cannot partition by non-primitive source field: struct<2: x: optional double, 3: y: optional double>` |
+| `days(created)`, no such column | `Couldn't find column created in:`, then the table schema |
+
+### ALTER TABLE ... ADD PARTITION FIELD
+
+The same type check printed other words when the field was added to an existing table, `ADD PARTITION FIELD bucket(16, amount)`, on Iceberg 1.4.3 and 1.12.0:
+
+```text
+org.apache.iceberg.exceptions.ValidationException: Cannot bind: bucket[16] cannot transform double values from 'amount'
+```
+
+### PyIceberg 0.12.0
+
+`add_field('amount', BucketTransform(16), 'amount_bucket')` and `add_field('created', DayTransform(), 'created_day')` raised a `ValueError`:
+
+```text
+bucket[16] cannot transform double values from amount
+Could not find field with name created, case_sensitive=True
+```
+
+### Trino 484
+
+```text
+Query 20261127_142122_00008_bjhyx failed: Unable to parse partitioning value: Invalid source type double for transform: bucket[16]
+```
+
+A field inside a struct is a primitive column: `PARTITIONED BY (point.x)` worked in Spark on all three versions, as `1000: point.x: identity(3)`, and Trino 484 and PyIceberg 0.12.0 read that table.
+
+**Fix:** partition on a column whose type the transform accepts, from the table above.
+
+## Issue 6: Unable to parse partitioning value: Invalid partition field declaration
+
+Trino has its own syntax for transforms in the `partitioning` property, and three Spark spellings failed in Trino 484:
+
+```sql
+CREATE TABLE iceberg.db.t_days (id bigint, ts timestamp(6), category varchar, amount double) WITH (partitioning = ARRAY['days(ts)'])
+```
+
+```text
+Query 20261127_142121_00006_bjhyx failed: Unable to parse partitioning value: Invalid partition field declaration: days(ts)
+```
+
+`ARRAY['bucket(16, id)']` and `ARRAY['point.x']` failed the same way, with `Invalid partition field declaration: bucket(16, id)` and `Invalid partition field declaration: point.x`. The [Trino Iceberg connector documentation](https://trino.io/docs/current/connector/iceberg.html#partitioned-tables) lists `year(ts)`, `month(ts)`, `day(ts)`, `hour(ts)`, `bucket(x, nbuckets)` and `truncate(s, nchars)`, and gives a nested field as `partitioning = ARRAY['"parent.child1"']` (Trino 484 documentation, checked Nov 2026). In the lab, `ARRAY['bucket(id, 16)']` and `ARRAY['"point.x"']` both created their tables.
+
+| Transform | Spark SQL | Trino |
+| --- | --- | --- |
+| Day of a timestamp | `days(ts)` | `day(ts)` |
+| 16 buckets of `id` | `bucket(16, id)` | `bucket(id, 16)` |
+| A field inside a struct | `point.x` | `'"point.x"'` |
+
+Amazon Athena was not run. Its [documentation](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html) gives the bucket and truncate transforms in Spark's order, `bucket(N, col)` and `truncate(L, col)`.
+
+The Athena documentation also states that "Partitioning by nested fields is not supported. Attempting to do so produces the message `NOT_SUPPORTED: Partitioning by nested field is unsupported:` column_name.nested_field_name" ([Iceberg considerations and limitations](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg.html), checked Nov 2026).
+
+**Fix:** write each transform in the syntax of the engine that runs the statement, and check the result with `SHOW CREATE TABLE`. For the table above, Trino showed `partitioning = ARRAY['bucket(id, 16)']`.
+
+## Issue 7: A filter on the new partition field still reads the old files
+
+This prints no error; the query reads more than it needs. The test table had 4 days written under `days(ts)`, one file of 3,000 rows per day, then `ADD PARTITION FIELD category` and 2 more days, one file per day and category:
+
+```text
+spec_id | files | records
+0 | 4 | 12000
+1 | 6 | 6000
+```
+
+A filter on `category` can skip files only under spec 1. On all three Spark versions, `SELECT count(*), sum(amount) FROM demo.db.prune_t WHERE category = 'b'` counted 6,000 rows, and its scan read 14,000. With Iceberg 1.12.0 the scan metrics show the files: 6 read, the 4 old ones and 2 new ones, and 4 new ones skipped.
+
+```text
+read: number of skipped data files 4, number of output rows 14,000, number of scanned data manifests 2, number of result data files 6, number of skipped data manifests 0
+```
+
+PyIceberg 0.12.0 planned the same files, `6 files {0: 4, 1: 2} by spec id, 14000 records planned`. Trino 484 read `Input: 14000 rows` in `Splits: 6` for the same query.
+
+A rewrite with the defaults did not help: `CALL demo.system.rewrite_data_files(table => 'db.prune_t')` rewrote 0 files on Iceberg 1.4.3 and 1.12.0. [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/) covers the thresholds that skip files.
+
+**Fix:** rewrite the old files into the current spec:
+
+```sql
+CALL demo.system.rewrite_data_files(table => 'db.prune_t', options => map('rewrite-all', 'true'))
+```
+
+It rewrote the 10 files into 18, all under spec 1, on both Iceberg versions; the 6 files already under spec 1 were rewritten too. The `category = 'b'` query then read 6,000 rows on all three Spark versions, and with Iceberg 1.12.0 6 files, with 12 skipped.
+
+## Issue 8: A column or function parameter with name ts_day cannot be resolved
+
+Iceberg partitioning is hidden: queries filter on the source column, and a partition field's name is not a column. A filter on `ts_day` failed:
+
+### Spark 3.3.3
+
+```text
+Column 'ts_day' does not exist. Did you mean one of the following? [demo.db.prune_t.id, demo.db.prune_t.ts, demo.db.prune_t.amount, demo.db.prune_t.category]; line 1 pos 70;
+```
+
+### Spark 3.5.6
+
+```text
+[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column or function parameter with name `ts_day` cannot be resolved. Did you mean one of the following? [`id`, `ts`, `amount`, `category`].; line 1 pos 70;
+```
+
+### Spark 4.0.5
+
+```text
+[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `ts_day` cannot be resolved. Did you mean one of the following? [`id`, `ts`, `amount`, `category`]. SQLSTATE: 42703; line 1 pos 70;
+```
+
+### Filters on ts that read every file
+
+A filter on a function of the source column can read every file without an error. Each query below counts the 3,000 rows of 2 November in `demo.db.prune_t`, 18,000 rows in 10 files, before the rewrite in Issue 7:
+
+| `WHERE` | Spark 3.3.3, Iceberg 1.4.3: rows read | Spark 3.5.6 and 4.0.5, Iceberg 1.12.0: files and rows read |
+| --- | --- | --- |
+| `ts >= TIMESTAMP '2026-11-02 00:00:00' AND ts < TIMESTAMP '2026-11-03 00:00:00'` | 3,000 | 1 file, 3,000 rows |
+| `CAST(ts AS DATE) = DATE '2026-11-02'` | 18,000 | 1 file, 3,000 rows |
+| `demo.system.days(ts) = demo.system.days(TIMESTAMP '2026-11-02 00:00:00')` | 18,000 | 1 file, 3,000 rows |
+| `date_format(ts, 'yyyy-MM-dd') = '2026-11-02'` | 18,000 | 10 files, 18,000 rows |
+
+The scan line of the plan shows what reached Iceberg. On Spark 3.5.6, `CAST(ts AS DATE)` arrived as a range, `[filters=ts IS NOT NULL, ts >= 1793577600000000, ts < 1793664000000000, groupedBy=]`, and `system.days` as `[filters=day(ts) = 20759, groupedBy=]`. `date_format` arrived as `[filters=ts IS NOT NULL, groupedBy=]`, as `CAST` did on Spark 3.3.3, where `system.days` arrived as `[filters=, groupedBy=]`.
+
+**Fix:** filter on the source column with a range, which every version pruned. Before you rely on a function, check the filters in the scan line of `EXPLAIN`.
+
+## Issue 9: Cannot find source column for partition field
+
+### DROP COLUMN of a column the current spec uses
+
+Iceberg refused it before committing, on 1.4.3 and 1.12.0, on the REST and on the Hadoop catalog, and the table stayed as it was:
+
+```sql
+ALTER TABLE demo.db.dc_cur DROP COLUMN category
+```
+
+```text
+org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+```
+
+### Writes on Iceberg 1.4.3 after a column of an old spec was dropped
+
+With Iceberg 1.4.3, the same message ended every insert into a table whose old spec's column had been dropped ([Issue 10](#issue-10-dropping-a-column-that-an-old-partition-spec-uses)):
+
+```text
+Caused by: org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: category: identity(2)
+```
+
+### saveAsTable overwrite with another partition column
+
+[iceberg#4510](https://github.com/apache/iceberg/issues/4510), opened in April 2022 and closed as not planned in August 2024, reported `org.apache.iceberg.exceptions.ValidationException: Cannot find source column for partition field: 1000: some_date: void(1)` from a DataFrame overwrite that partitioned by a renamed column. The report does not name the Iceberg version. The lab ran the same sequence: a table partitioned by `some_date`, then `write.format('iceberg').mode('overwrite').partitionBy('some_date_2').saveAsTable(...)` with only `some_date_2`.
+
+| Format version | Iceberg 1.4.3 | Iceberg 1.12.0 |
+| --- | --- | --- |
+| 2 | `Cannot find source column for partition field: 1000: some_date: identity(1)` | Replaced: spec `[1001: some_date_2: identity(2)]`, one row |
+| 1 | Same as version 2 | `Cannot build accessor for field: null` ([Issue 13](#issue-13-cannot-build-accessor-for-field-null)) |
+
+Each failed overwrite left the table as it was, with its first row. `writeTo(...).partitionedBy('some_date_2').createOrReplace()` gave the same results as `saveAsTable`, on both formats and both Iceberg versions.
+
+**Fix:** on Iceberg 1.12.0, move a version 1 table to version 2 first. After `ALTER TABLE ... SET TBLPROPERTIES ('format-version' = '2')`, the same overwrite replaced the table, with spec `[1001: some_date_2: identity(2)]`. On Iceberg 1.4.3 the upgrade did not help; what worked on every version was `DROP TABLE ... PURGE` and then `writeTo(...).partitionedBy('some_date_2').create()`, which also removes the table's snapshots and old files.
+
+## Issue 10: Dropping a column that an old partition spec uses
+
+This is the change that broke tables in the lab. A table partitioned by `category` got 2 rows, then `DROP PARTITION FIELD category`, 1 more row, and `DROP COLUMN category`. The `DROP COLUMN` ran without an error on both Iceberg versions and both catalogs, and left an old spec that points at a column the schema no longer has:
+
+```text
+spec 0: [1000: category: identity(2)]
+spec 1: []
+schema 1: [1: id: optional long, 3: v: optional string]
+```
+
+What followed depended on the version that read the table:
+
+| After `DROP COLUMN category` | Spark with Iceberg 1.12.0 | Spark 3.3.3 with Iceberg 1.4.3 | PyIceberg 0.12.0 | Trino 484 |
+| --- | --- | --- | --- | --- |
+| `SELECT * FROM demo.db.dc_v2` | 3 rows | `NullPointerException: Type cannot be null` | Read | `Error processing metadata for table db.dc_v2` |
+| `SELECT ... FROM demo.db.dc_v2.files` | No `partition` column | `NullPointerException: Type cannot be null` | Not run | Not run |
+| `INSERT INTO demo.db.dc_v2 VALUES (4, 'w')` | Written | `Cannot find source column for partition field` | Not run | Not run |
+
+The version 1 table, `dc_v1`, whose current spec kept `1000: category: void(2)`, gave the same results. Readers on Iceberg 1.4.3 failed both when 1.4.3 dropped the column itself and when Spark with Iceberg 1.12.0 dropped it.
+
+### NullPointerException: Type cannot be null
+
+Spark 3.3.3 with Iceberg 1.4.3, on `SELECT`, on the `files` and `partitions` metadata tables, and on every later query of the table:
+
+```text
+org.apache.spark.SparkException: The Spark SQL phase analysis failed with an internal error. Please, fill a bug report in, and provide the full stack trace.
+Caused by: java.lang.NullPointerException: Type cannot be null
+```
+
+[iceberg#10234](https://github.com/apache/iceberg/issues/10234) reports this on Iceberg 1.2.1, 1.4.3 and 1.5.1, and is open in November 2026.
+
+### Error processing metadata for table
+
+Trino 484, on `SELECT` from both tables, with `--debug` for the cause:
+
+```text
+Query 20261127_142141_00031_bjhyx failed: io.trino.spi.TrinoException: Error processing metadata for table db.dc_v2
+java.util.concurrent.CompletionException: io.trino.spi.TrinoException: Error processing metadata for table db.dc_v2
+Caused by: io.trino.spi.TrinoException: Error processing metadata for table db.dc_v2
+	at io.trino.plugin.iceberg.IcebergExceptions.translateMetadataException(IcebergExceptions.java:58)
+	at io.trino.plugin.iceberg.IcebergSplitSource.lambda$getNextBatch$1(IcebergSplitSource.java:277)
+Caused by: java.lang.NullPointerException: Cannot invoke "org.apache.iceberg.types.Type.typeId()" because "type" is null
+	at io.trino.plugin.iceberg.IcebergUtil.getPartitionKeys(IcebergUtil.java:858)
+```
+
+`SELECT * FROM iceberg.db."dc_v2$partitions"` still answered.
+
+### A column or function parameter with name partition cannot be resolved
+
+With Iceberg 1.12.0 the `files` metadata table had no `partition` column after the drop, so the query in Confirm the diagnosis failed. On Spark 3.5.6:
+
+```text
+[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column or function parameter with name `partition` cannot be resolved. Did you mean one of the following? [`spec_id`, `content`, `equality_ids`, `file_path`, `first_row_id`].; line 1 pos 16;
+```
+
+Spark 4.0.5 printed "A column, variable, or function parameter" and added `SQLSTATE: 42703`. The [Spark DDL documentation](https://iceberg.apache.org/docs/latest/spark-ddl/#alter-table-drop-partition-field) warns about dropped partition fields: "Be careful when dropping a partition field because it will change the schema of metadata tables, like `files`, and may cause metadata queries to fail or produce different results" (checked Nov 2026).
+
+### rewrite_manifests: Cannot find field 1000: category: optional unknown in struct
+
+On the version 1 table, Iceberg 1.12.0's `rewrite_manifests` failed inside its job, on Spark 3.5.6 and 4.0.5:
+
+```text
+CALL demo.system.rewrite_manifests(table => 'db.dc_v1')
+java.lang.IllegalArgumentException: Cannot find field 1000: category: optional unknown in struct<>
+```
+
+On the version 2 table it ran. With Iceberg 1.4.3 it ran on both tables and rewrote nothing, `0 | 0`.
+
+### Fix 1: register the metadata file from before the drop
+
+Every commit writes a new metadata file and leaves the old ones in place, so the table can be pointed back at the file from before `DROP COLUMN`. If you did not note it, the `metadata_log_entries` metadata table lists the files, and it still answered after the drop on Iceberg 1.4.3 and 1.12.0. For `dc_fix` on Iceberg 1.12.0 it listed `00000` to `00005`: `00003` was the last file before the drop, since `DROP COLUMN` wrote `00004` with the same `latest_snapshot_id` and the insert of row 4 wrote `00005`. Then drop the table from the catalog without `PURGE`, which keeps every file, and register the old file under the same name:
+
+```sql
+DROP TABLE demo.db.dc_fix;
+CALL demo.system.register_table(table => 'db.dc_fix', metadata_file => 's3://warehouse/db/dc_fix/metadata/00003-c587dcaa-2039-4260-8277-6db0457b957e.metadata.json');
+SELECT * FROM demo.db.dc_fix ORDER BY id;
+```
+
+The table came back with `category` and its 3 rows, on Spark with Iceberg 1.4.3 and 1.12.0. Spark 3.3.3 with Iceberg 1.4.3, PyIceberg 0.12.0 and Trino 484 read it. Rows written after the drop are not in it: with Iceberg 1.12.0, row 4 was gone.
+
+:::warning
+Do not register the old file under a second name while the broken table stays in use. In the lab, `dc_v2_restored` shared every data file with `dc_v2`. After `expire_snapshots` ran on `dc_v2` (Fix 2), reading `dc_v2_restored` failed with `software.amazon.awssdk.services.s3.model.NoSuchKeyException: null (Service: S3, Status Code: 404, ...)`, because the expiry had deleted files the other table still listed.
+:::
+
+### Fix 2: rewrite the data, then expire the old spec
+
+To keep the rows written after the drop, remove the old spec instead. Iceberg 1.12.0's `expire_snapshots` takes `clean_expired_metadata`, which removes the specs and schemas that no remaining snapshot uses:
+
+```sql
+CALL demo.system.rewrite_data_files(table => 'db.dc_v2', options => map('rewrite-all', 'true'));
+-- one more commit, here an insert
+INSERT INTO demo.db.dc_v2 VALUES (5, 'v');
+CALL demo.system.expire_snapshots(table => 'db.dc_v2', older_than => TIMESTAMP '<now>', retain_last => 1, clean_expired_metadata => true);
+```
+
+Expiring right after the rewrite left spec 0, because the rewrite's own snapshot still listed the old files as deleted entries of a spec 0 manifest, `0 | 0 | 0 | 2` in the `manifests` metadata table. After the insert, the same call removed spec 0. Spark 3.3.3 with Iceberg 1.4.3 and Trino 484 then read the table, 5 rows.
+
+A version 1 table keeps the void field in its current spec, which no expiry removes: on `dc_v1` the same steps removed spec 0 and left `spec 1: [1000: category: void(2)]`, and Iceberg 1.4.3 still failed. Moving the table to version 2 and dropping the void field came first:
+
+```sql
+ALTER TABLE demo.db.dc_v1 SET TBLPROPERTIES ('format-version' = '2');
+ALTER TABLE demo.db.dc_v1 DROP PARTITION FIELD category;
+```
+
+The same rewrite, insert and expiry then removed spec 1, and Iceberg 1.4.3 and Trino 484 read the table. Every engine that reads it must then read format version 2.
+
+## Issue 11: Cannot create identity partition sourced from different field in schema
+
+### The default name of a new field is a column name
+
+A new field gets a default name, and Iceberg refuses one that a column of the table has. On a table with columns `ts` and `ts_day`, `ADD PARTITION FIELD days(ts)` failed on Iceberg 1.4.3 and 1.12.0, although the new field is not an identity field:
+
+```text
+Cannot create identity partition sourced from different field in schema: ts_day
+```
+
+**Fix:** name the field. `ADD PARTITION FIELD days(ts) AS ts_day_part` ran on both versions.
+
+### Adding back a dropped partition column
+
+After Issue 10's `DROP COLUMN category`, adding the column back was refused on the REST catalog, by Spark with Iceberg 1.12.0 and with 1.4.3:
+
+```sql
+ALTER TABLE demo.db.dc_v2 ADD COLUMN category string
+```
+
+```text
+org.apache.spark.SparkException: Unsupported table change: Cannot create identity partition sourced from different field in schema: category
+```
+
+On the Hadoop catalog, Iceberg 1.12.0 added the column and 1.4.3 refused it with the same message. The REST catalog fixture runs Iceberg 1.10.1, and [iceberg#15967](https://github.com/apache/iceberg/pull/15967), merged in April 2026, relaxed this check for a source column that was dropped. The column that came back was a new one, field ID 4, and every earlier row read `None` in it.
+
+**Fix:** to get the old values back, use Fix 1 of Issue 10. A new column with the same name does not bring them back.
+
+## Issue 12: Trino: Cannot drop partition field, Cannot drop column which is used by an old partition spec
+
+Trino 484 refused both drops that Issues 9 and 10 describe, on its own table `iceberg.db.trino_p`, with its own messages.
+
+### Cannot drop partition field
+
+```sql
+ALTER TABLE iceberg.db.trino_p DROP COLUMN category
+```
+
+```text
+Query 20261127_142134_00022_bjhyx failed: Cannot drop partition field: category
+```
+
+### Cannot drop column which is used by an old partition spec
+
+After `SET PROPERTIES partitioning = ARRAY['hour(ts)']` removed `category` from the current spec, the same `DROP COLUMN` was refused, because an old spec uses the column:
+
+```text
+Query 20261127_142136_00024_bjhyx failed: Cannot drop column which is used by an old partition spec: category
+```
+
+**Fix:** keep the column. Spark with Iceberg 1.12.0 drops it, with the results in Issue 10.
+
+## Issue 13: Cannot build accessor for field: null
+
+On a format version 1 table partitioned by `some_date`, Iceberg 1.12.0 failed the `saveAsTable` overwrite of Issue 9 inside the write job, on Spark 3.5.6 and 4.0.5:
+
+```text
+Caused by: java.lang.IllegalArgumentException: Cannot build accessor for field: null
+```
+
+The stack ran through `org.apache.iceberg.StructTransform.<init>`, `org.apache.iceberg.PartitionKey.<init>` and `SparkWrite$PartitionedDataWriter`. The table kept its first row, and on a version 2 table the same overwrite replaced the table.
+
+**Fix:** move the table to format version 2 first. After `ALTER TABLE demo.db.rep_up_v1 SET TBLPROPERTIES ('format-version' = '2')`, the same overwrite replaced the table on Spark 3.5.6 and 4.0.5, and `writeTo(...).createOrReplace()` on version 1 had failed with the same message as the overwrite.
+
+## Issue 14: pyiceberg_core needs to be installed
+
+PyIceberg 0.12.0, installed with only the `pyarrow` extra, appended to a table partitioned by identity and failed on every other transform:
+
+```text
+ERROR pyiceberg.exceptions.NotInstalledError
+pyiceberg_core needs to be installed. pip install "pyiceberg[pyiceberg-core]"
+caused by builtins.ModuleNotFoundError: No module named 'pyiceberg_core'
+```
+
+| Spec | Without `pyiceberg-core` | With `pyiceberg-core` 0.10.1 |
+| --- | --- | --- |
+| `identity` | Written | Written |
+| `day`, `hour` | `NotInstalledError` | Written |
+| `bucket[16]`, `truncate[4]` | `NotInstalledError` | Written |
+
+**Fix:** install the extra that the message names. The lab installed `pyiceberg[pyarrow,pyiceberg-core]==0.12.0` with `pyiceberg-core==0.10.1`, and every append above was written. `tbl.inspect.files()` then listed the new files with their partition values.
+
+## Other engines
+
+Neither engine was run for this page. The statements are from their documentation, checked in November 2026.
+
+**Flink.** The [Flink DDL page](https://iceberg.apache.org/docs/latest/flink-ddl/) states: "Iceberg supports altering table properties and columns in Flink. Altering partition fields, watermarks, and computed columns is not supported." For new tables: "Iceberg supports hidden partitioning but Flink doesn't support partitioning by a function on columns. There is no way to support hidden partitions in the Flink DDL."
+
+**Amazon Athena.** Its transform syntax and its message for nested fields are in Issue 6. The [creating tables page](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html) adds: "Athena creates Iceberg v2 tables."
+
+## Prevent it
+
+- Create a table with one time transform per column, and change granularity with `REPLACE PARTITION FIELD` in Spark or a whole `partitioning` list in Trino.
+- Name new fields with `AS`, so that a default name never meets a column name.
+- After a partition change, rewrite the old files if queries filter on the new field, and check the files and rows the scan reads.
+- Filter on the source column with a range. Check the scan's filters before you rely on `CAST` or `system.days`, which Spark 3.3.3 did not push down.
+- Before `DROP COLUMN`, list every spec of the table. If any spec uses the column, keep it: Trino 484 refuses the drop, and Iceberg 1.12.0 lets it through.
+- Note the current metadata file before a schema change, so that Fix 1 of Issue 10 stays possible.
+- Install `pyiceberg-core` wherever PyIceberg writes to partitioned tables.
+
+<R.HowWeReproduced />
+
+## References
+
+- Apache Iceberg: [specification, partitioning and partition evolution](https://iceberg.apache.org/spec/#partitioning), [evolution](https://iceberg.apache.org/docs/latest/evolution/), [Spark DDL](https://iceberg.apache.org/docs/latest/spark-ddl/), [Spark procedures](https://iceberg.apache.org/docs/latest/spark-procedures/), for `rewrite_data_files`, `expire_snapshots` and `register_table`; [Flink DDL](https://iceberg.apache.org/docs/latest/flink-ddl/)
+- PyIceberg: [API, partition evolution](https://py.iceberg.apache.org/api/)
+- Trino: [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
+- Amazon Athena: [Iceberg tables](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg.html), [creating Iceberg tables](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html)
+- GitHub: [iceberg#4510](https://github.com/apache/iceberg/issues/4510), the `void(1)` message on overwrite, opened April 2022, closed as not planned August 2024; [iceberg#4563](https://github.com/apache/iceberg/issues/4563), `DROP COLUMN` of a column that old specs use, opened April 2022, closed by the stale bot in May 2025; [iceberg#10234](https://github.com/apache/iceberg/issues/10234), reported on 1.2.1, 1.4.3 and 1.5.1, open; [iceberg#16217](https://github.com/apache/iceberg/issues/16217), reported on 1.10.1, open; [iceberg#14089](https://github.com/apache/iceberg/pull/14089), metadata tables with a dropped partition source column, merged September 2025; [iceberg#15967](https://github.com/apache/iceberg/pull/15967), the name check for a dropped source column, merged April 2026; [trino#19281](https://github.com/trinodb/trino/issues/19281), partitioning on a field inside a row, opened and closed October 2023
+- Related runbooks: [Iceberg schema evolution errors](/docs/runbooks/iceberg/schema-evolution-errors/), [Spark cannot find Iceberg](/docs/runbooks/iceberg/spark-cannot-find-iceberg/), [Compaction rewrites nothing](/docs/runbooks/iceberg/compaction-rewrite-data-files-rewrites-nothing/)

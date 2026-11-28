@@ -1,0 +1,58 @@
+# ./run.sh standby    PostgreSQL 13.23    2026-11-28T09:49:57Z
+
+## A standby cloned from the primary and set to stream through the physical slot standby_slot, which the primary does not have
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status FROM pg_replication_slots ORDER BY slot_name;
+ slot_name | slot_type | plugin | database | active | active_pid | confirmed_flush_lsn | wal_status 
+-----------+-----------+--------+----------+--------+------------+---------------------+------------
+(0 rows)
+
+$ pg_basebackup -h pg -U postgres -D /standby/data -X stream -R -c fast    (on the standby)
+$ echo "wal_level = logical" >> postgresql.auto.conf    (on the standby)
+$ echo "primary_slot_name = 'standby_slot'" >> postgresql.auto.conf    (on the standby)
+SELECT pg_is_in_recovery();    -- on the standby
+ pg_is_in_recovery 
+-------------------
+ t
+(1 row)
+
+SELECT status, slot_name FROM pg_stat_wal_receiver;    -- on the standby
+ status | slot_name 
+--------+-----------
+(0 rows)
+
+--- server log of standby
+2026-11-28 09:50:03.451 UTC [58] FATAL:  could not start WAL streaming: ERROR:  replication slot "standby_slot" does not exist
+2026-11-28 09:50:03.453 UTC [59] FATAL:  could not start WAL streaming: ERROR:  replication slot "standby_slot" does not exist
+2026-11-28 09:50:08.469 UTC [75] FATAL:  could not start WAL streaming: ERROR:  replication slot "standby_slot" does not exist
+---
+--- server log of pg
+2026-11-28 09:50:03.451 UTC [3246] ERROR:  replication slot "standby_slot" does not exist
+2026-11-28 09:50:03.451 UTC [3246] STATEMENT:  START_REPLICATION SLOT "standby_slot" 0/8000000 TIMELINE 1
+2026-11-28 09:50:03.453 UTC [3247] ERROR:  replication slot "standby_slot" does not exist
+2026-11-28 09:50:03.453 UTC [3247] STATEMENT:  START_REPLICATION SLOT "standby_slot" 0/8000000 TIMELINE 1
+2026-11-28 09:50:08.469 UTC [3270] ERROR:  replication slot "standby_slot" does not exist
+2026-11-28 09:50:08.469 UTC [3270] STATEMENT:  START_REPLICATION SLOT "standby_slot" 0/8000000 TIMELINE 1
+---
+
+## The fix: create the physical slot on the primary
+SELECT * FROM pg_create_physical_replication_slot('standby_slot');
+  slot_name   | lsn 
+--------------+-----
+ standby_slot | 
+(1 row)
+
+--- server log of standby
+2026-11-28 09:50:13.476 UTC [84] LOG:  started streaming WAL from primary at 0/8000000 on timeline 1
+---
+SELECT status, slot_name FROM pg_stat_wal_receiver;    -- on the standby
+  status   |  slot_name   
+-----------+--------------
+ streaming | standby_slot
+(1 row)
+
+SELECT slot_name, slot_type, plugin, database, active, active_pid, confirmed_flush_lsn, wal_status FROM pg_replication_slots ORDER BY slot_name;
+  slot_name   | slot_type | plugin | database | active | active_pid | confirmed_flush_lsn | wal_status 
+--------------+-----------+--------+----------+--------+------------+---------------------+------------
+ standby_slot | physical  |        |          | t      |       3320 |                     | reserved
+(1 row)
+
