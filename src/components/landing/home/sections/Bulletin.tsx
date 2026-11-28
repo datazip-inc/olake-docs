@@ -43,7 +43,7 @@ export default function Bulletin({ latestReleaseLabel, latestReleasePath }: Bull
                 We just released our {latestReleaseLabel}
               </span>
               <Link
-                to={latestReleasePath || '/docs/release/ingestion'}
+                to={latestReleasePath || '/docs/release/ingestion/overview/'}
                 className='text-[13px] text-[#6b8afd] transition-colors hover:text-[#9ab0ff] lg:ml-auto'
               >
                 Read More

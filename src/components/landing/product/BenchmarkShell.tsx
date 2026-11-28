@@ -17,7 +17,7 @@ function ReleaseStrip() {
   const label = siteConfig.customFields?.latestOlakeReleaseLabel as string | undefined
   const path =
     (siteConfig.customFields?.latestOlakeReleasePath as string | undefined) ||
-    '/docs/release/ingestion'
+    '/docs/release/ingestion/overview/'
   if (!label) return null
   return (
     <div className='flex flex-col gap-[4px] rounded-b-[14px] bg-olake-surface-dark-2 px-[20px] py-[14px] text-[15px] leading-[1.3] lg:h-[64px] lg:flex-row lg:items-center lg:gap-[20px] lg:px-[40px] lg:py-0 lg:text-[16px]'>

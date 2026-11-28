@@ -1,7 +1,7 @@
 ---
-title: "OLake MongoDB Connector | Sync Modes & Configuration Guide"
-seo_title: "OLake MongoDB Connector: Sync Modes and Setup"
-description: Configure OLake MongoDB connector for full refresh, CDC, incremental sync; learn prerequisites, connection setup, data mapping, and troubleshooting.
+title: "OLake Go MongoDB Connector | Sync Modes & Configuration Guide"
+seo_title: "OLake Go MongoDB Connector: Sync Modes and Setup"
+description: Configure the OLake Go MongoDB connector for full refresh, CDC, incremental sync; learn prerequisites, connection setup, data mapping, and troubleshooting.
 sidebar_label: MongoDB
 ---
 
@@ -9,6 +9,7 @@ import DateTimeHandling from '@site/src/components/DateTimeHandling';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import TOCTabLinker from '@site/src/components/TOCTabLinker';
+import IndexStorageNote from '@site/docs/shared/IndexStorageNote.mdx';
 import SourceSSLModeDetails from '@site/docs/shared/config/SourceSSLModeDetails.jsx';
 
 # Overview {/* #overview */}
@@ -28,6 +29,8 @@ Tested, step-by-step guides take MongoDB to [Apache Iceberg](/docs/integrations/
 - **Full Refresh + CDC**
 - **CDC Only**
 
+<IndexStorageNote />
+
 ## Prerequisites
 
 ### Version Prerequisites
@@ -37,8 +40,9 @@ MongoDB Version 4.0 or higher
 ### CDC Prerequisites
 
 For [Change Data Capture (CDC)](/docs/understanding/terminologies/general/?terminology-type=general#39-change-data-capture) mode, MongoDB must meet the following requirements:
-- MongoDB must be running in **replica set mode** (`--replSet rs0`)
+- MongoDB must run as a **replica set** (`--replSet rs0`) or a **sharded cluster** (connect through `mongos`). Standalone servers cannot open change streams.
 - [**oplog**](/docs/understanding/terminologies/general/?terminology-type=general#26-oplog-mongodb) must be enabled (automatic in replica sets)
+- Deleted rows carry only `_id` unless the collection has `changeStreamPreAndPostImages` enabled (MongoDB 6.0+). With pre-images on, OLake Go writes the full deleted document. A `replace` event is written as an update.
 
 :::info
 
@@ -54,7 +58,7 @@ For local setup, follow **[MongoDB via Docker Compose](/docs/connectors/mongodb/
 
 ### Connection Prerequisites
 
-- Read access to the tables for the MongoDB user.
+- The `read` role on the database. Optionally, `read` on `local` for the oplog-retention check, and the `splitVector` action for faster chunking.
 
 **After initial Prerequisites are fulfilled, the configurations for MongoDB can be configured.**
 
@@ -101,16 +105,16 @@ For local setup, follow **[MongoDB via Docker Compose](/docs/connectors/mongodb/
 | Username `required`              | MongoDB authentication username. Optional when IAM Authentication is enabled.              | `mongo-user`                                                            |
 | Password `required`              | MongoDB authentication password. Optional when IAM Authentication is enabled.             | `mongo-pwd`                                                             |
 | Replica Set                      | Name of the replica set (if applicable)                                                    | `rs0`                                                                   |
-| Read Preference                  | MongoDB read preference setting                                                            | `secondaryPreferred`                                                    |
+| Read Preference                  | MongoDB read preference setting. Defaults to `secondaryPreferred` when Replica Set or Use SRV is set, otherwise `primary`. | `secondaryPreferred`                                                    |
 | Use SRV                          | Enable DNS SRV connection strings. When `true`, only one host allowed in `hosts` field     | `false`                                                                 |
-| Chunking Strategy                | Data chunking strategy: `timestamp`, `splitVector`. Defaults to `splitVector` if empty     | `splitVector`                                                           |
+| Chunking Strategy                | `Split Vector` (default, also used when empty) or `Timestamp`. Both need every `_id` to be an ObjectID; otherwise OLake Go uses `$bucketAuto`. It also falls back to `$bucketAuto` when the user lacks the `splitVector` privilege or the collection is sharded. | `Split Vector`                                                           |
 | IAM Authentication               | Turn on to use IAM credentials stored in host machine instead of `Username` and `Password` | `off`                                                                   |
-| Additional Connection Parameters | Additional MongoDB connection string parameters (e.g., `authMechanism`).<br/> Each parameter will be added to the connection URI | `authMechanism=SCRAM-SHA-256`     |
-| SSL Mode                         | 	Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic.  |   <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul> |
-| Certificate Input                | Defines how TLS/SSL certificates are provided. Paste the PEM content, or give the file path of each certificate. For `Certificate File Path`, mount the files first: [Docker Compose](/docs/install/olake-ui#for-connector-containers) or [Kubernetes](/docs/install/kubernetes#for-connector-pods). The three certificate fields below must all use the same method. | <ul> <li>`Inline Certificate (PEM)` (default)</li> <li>`Certificate File Path`</li> </ul> |
-| Server CA Certificate <br/> or <br/> Server CA Certificate Path | CA certificate for server verification. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the certificate.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/ca.pem` |
-| Client Certificate <br/> or <br/> Client Certificate Path | Client certificate for mutual TLS authentication. Set together with Client Key. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the certificate.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/client.pem` |
-| Client Key <br/> or <br/> Client Key Path | Client private key for mutual TLS authentication. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the key.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/client.key` |
+| Additional Connection Parameters | Additional MongoDB connection string parameters (e.g., `authMechanism`).<br/> Each parameter will be added to the connection URI. With SSL enabled, set certificates under SSL, not `tlsCAFile` or `tlsCertificateKeyFile`, which are then ignored. | `authMechanism=SCRAM-SHA-256`     |
+| SSL Mode                         | 	Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic. `require` encrypts without verifying the certificate.  |   <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul> |
+| Certificate Input                | Only for `verify-ca` and `verify-full`. Defines how TLS/SSL certificates are provided. Paste the PEM content, or give the file path of each certificate. For `Certificate File Path`, mount the files first: [Docker Compose](/docs/install/olake-ui#for-connector-containers) or [Kubernetes](/docs/install/kubernetes#for-connector-pods). The three certificate fields below must all use the same method. | <ul> <li>`Inline Certificate (PEM)` (default)</li> <li>`Certificate File Path`</li> </ul> |
+| Server CA Certificate <br/> or <br/> Server CA Certificate Path | Only for `verify-ca` and `verify-full`. CA certificate for server verification. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the certificate.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/ca.pem` |
+| Client Certificate <br/> or <br/> Client Certificate Path | Only for `verify-ca` and `verify-full`. Client certificate for mutual TLS authentication. Set together with Client Key. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the certificate.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/client.pem` |
+| Client Key <br/> or <br/> Client Key Path | Only for `verify-ca` and `verify-full`. Client private key for mutual TLS authentication. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the key.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/client.key` |
 
 #### Additional configuration
 
@@ -188,21 +192,21 @@ An example `source.json` file will look like this:
 | --------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ | -------- |
 | hosts `required`                                  | List of MongoDB hosts. Use DNS SRV format if `srv = true`                              | `["x.xxx.xxx.120:27017", "x.xxx.xxx.133:27017"]` | STRING [] |
 | username `required`  | MongoDB authentication username. Optional when `use_iam` is set to `true`.                                                       | `"mongo-user"`                                   | STRING   |
-| password `required`  | MongoDB authentication password. Optional when `use_iam` is set to `true`.                                                      | `"mongo-pwd"`                                    | STRING   |
+| password `required`  | MongoDB authentication password. Optional when `use_iam` is set to `true`. Required in the UI; optional in the CLI for password-less mechanisms (for example `authMechanism=MONGODB-X509` in `additional_params`).                                                      | `"mongo-pwd"`                                    | STRING   |
 | authdb `required`   | Authentication database name. Optional when `use_iam` is set to `true`.                                                           | `"admin-db"`                                     | STRING   |
 | replica_set                                       | Name of the replica set (if applicable)                                                | `"rs0"`                                          | STRING   |
-| read_preference                                   | MongoDB read preference setting                                                        | `"secondaryPreferred"`                           | STRING   |
+| read_preference                                   | MongoDB read preference setting. Defaults to `secondaryPreferred` when `replica_set` or `srv` is set, otherwise `primary`. | `"secondaryPreferred"`                           | STRING   |
 | srv                                               | Enable DNS SRV connection strings. When `true`, only one host allowed in `hosts` field | `false`                                          | BOOLEAN  |
 | database `required`                               | Target MongoDB database name to replicate                                              | `"my-db"`                                        | STRING   |
-| update_method `required`                          | Configures how OLake Go captures changes from MongoDB.                                                                 | <ul><li>`{"type": "CDC"}`: CDC sync modes (`Full Refresh + CDC`, `CDC Only`)</li><li>`{"type": "Standalone"}`: Full Refresh and Incremental</li></ul> | OBJECT   |
+| update_method                                     | Configures how OLake Go captures changes from MongoDB. Recommended. Without it, CDC stays available but prerequisite failures only warn.                                                                 | <ul><li>`{"type": "CDC"}`: CDC sync modes (`Full Refresh + CDC`, `CDC Only`)</li><li>`{"type": "Standalone"}`: Full Refresh and Incremental</li></ul> | OBJECT   |
 | max_threads                                       | Maximum parallel threads for chunk-based snapshotting                                  | `3`                                              | INTEGER  |
 | backoff_retry_count                               | Number of retry attempts with exponential backoff.                                     | `3`                                              | INTEGER  |
-| chunking_strategy                                 | Data chunking strategy: `timestamp`, `splitVector`. Defaults to `splitVector`          | `"splitVector"`                                  | STRING   |
-| use_iam                                           | Use IAM credentials stored in host machine instead of `username` and `pasword`         | `false`                                          | BOOLEAN  |
-| additional_params                     | Additional MongoDB connection string parameters (e.g., `authMechanism`).<br/> Each parameter will be added to the connection URI | `authMechanism=SCRAM-SHA-256`     | DICTIONARY |
+| chunking_strategy                                 | `timestamp` (case-insensitive), or empty or any other value for Split Vector (the default). Both need every `_id` to be an ObjectID; otherwise OLake Go uses `$bucketAuto`. It also falls back to `$bucketAuto` when the user lacks the `splitVector` privilege or the collection is sharded. | `""`                                  | STRING   |
+| use_iam                                           | Use IAM credentials stored in host machine instead of `username` and `password`         | `false`                                          | BOOLEAN  |
+| additional_params                     | Additional MongoDB connection string parameters (e.g., `authMechanism`).<br/> Each parameter will be added to the connection URI. With SSL enabled, set certificates in `ssl`, not `tlsCAFile` or `tlsCertificateKeyFile`, which are then ignored. | `authMechanism=SCRAM-SHA-256`     | DICTIONARY |
 | ssh_config                           | Configure OLake Go to connect through an SSH tunnel.  | `{"host": "my-tunnel-host", "port": 22 , "username": "my-tunnel-user", "password": "tunnel-password"}` | OBJECT                                                           |
-| ssl*                  | 	Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic.  |   <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul> | OBJECT |
-| ssl.cert_source       | Defines how TLS/SSL certificates are provided: `inline` (default) for PEM content, or `path` for file paths. For `path`, mount the files first: [Docker CLI](/docs/install/docker-cli#mounting-certificate-files). The three certificate parameters below must all use the same method. | <ul> <li>`"inline"` (default)</li> <li>`"path"`</li> </ul> | STRING |
+| ssl*                  | 	Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic. `require` encrypts without verifying the certificate.  |   <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul> | OBJECT |
+| ssl.cert_source       | Only for `verify-ca` and `verify-full`. Defines how TLS/SSL certificates are provided: `inline` (default) for PEM content, or `path` for file paths. For `path`, mount the files first: [Docker CLI](/docs/install/docker-cli#mounting-certificate-files). The three certificate parameters below must all use the same method. | <ul> <li>`"inline"` (default)</li> <li>`"path"`</li> </ul> | STRING |
 | ssl.server_ca <br/> or <br/> ssl.server_ca_path  | CA certificate for server verification. <ul><li>**Inline** (`ssl.server_ca`): PEM content of the certificate.</li><li>**Path** (`ssl.server_ca_path`): File path to the certificate.</li></ul> | **Inline:** `"<Inline PEM Content>"` <br/> <br/> **Path:** `"/etc/ssl/custom-certs/ca.pem"` | STRING |
 | ssl.client_cert <br/> or <br/> ssl.client_cert_path | Client certificate for mutual TLS authentication. Set together with the client key parameter. <ul><li>**Inline** (`ssl.client_cert`): PEM content of the certificate.</li><li>**Path** (`ssl.client_cert_path`): File path to the certificate.</li></ul> | **Inline:** `"<Inline PEM Content>"` <br/>  <br/> **Path:** `"/etc/ssl/custom-certs/client.pem"` | STRING |
 | ssl.client_key <br/> or <br/> ssl.client_key_path  | Client private key for mutual TLS authentication. <ul><li>**Inline** (`ssl.client_key`): PEM content of the key.</li><li>**Path** (`ssl.client_key_path`): File path to the key.</li></ul> | **Inline:** `"<Inline PEM Content>"` <br/>  <br/> **Path:** `"/etc/ssl/custom-certs/client.key"` | STRING |
@@ -293,6 +297,16 @@ check \
 OLake Go always ingests timestamp data in UTC format, independent of the source timezone.
 :::
 
+:::note[decimal128 and binData]
+`decimal128` is kept as exact text (string). Unlike SQL sources, it is not mapped to `decimal(p,s)`. `binData` is written hex-encoded.
+:::
+
+## Limitations
+
+- Discover skips views and `system.*` collections.
+- Time-series collections are not supported.
+- `NaN` and `±Infinity` double values are written as null.
+
 ---
 
 ## Date and Time Handling
@@ -321,30 +335,10 @@ OLake Go always ingests timestamp data in UTC format, independent of the source 
 
 **Solution**: Make sure both source.json is present in correct directory and the commands are executed while inside the directory
 
-### 4. file name too long & FATAL error occurred while reading records: failed to finish backfill chunk 381: main writer closed:
-
-**Cause**: The generated file or directory name exceeded the Linux limit of 255 bytes (often happens when partitioning on very long string values).
-```bash
-2025-02-17T07:03:00Z ERROR main writer closed, with error: failed to create parititon file: failed to create directories[output/otter_db/stream_8/H.
-```
-
-**Solution**: The max filename length is 255 bytes and this error shows that you have excceded that limit for file creation (might happen if you partion based on STRING field that contain values that are too large). Usually in a linux system, these limits are defined at:
-
-```bash
-cat /usr/include/linux/limits.h
-
-...
-#define NAME_MAX         255    /* # chars in a file name */
-#define PATH_MAX        4096    /* # chars in a path name including nul */
-...
-```
-
 ---
 
 ## Changelog
 
-| Date of Release | Version                                                              | Description                          |
-| --------------- | -------------------------------------------------------------------- | ------------------------------------ |
-| Aug 27, 2025    | [v0.1.11](https://github.com/datazip-inc/olake-go/releases/tag/v0.1.11) | override default timeout in Discover |
+Changes to the MongoDB connector are listed in the [OLake Go release notes](/docs/release/ingestion/overview/).
 
 ---

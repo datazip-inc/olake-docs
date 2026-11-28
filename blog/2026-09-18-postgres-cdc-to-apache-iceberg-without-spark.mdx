@@ -1,7 +1,7 @@
 ---
 slug: postgres-cdc-to-apache-iceberg-without-spark
 title: "PostgreSQL CDC to Iceberg: Tools & Setup"
-description: "Learn how to replicate PostgreSQL CDC data to Apache Iceberg without Spark using Kafka, Flink, or OLake, including setup, architecture, and best practices."
+description: "Learn how to replicate PostgreSQL CDC data to Apache Iceberg without Spark using Kafka, Flink, or OLake Go, including setup, architecture, and best practices."
 tags: [iceberg, cdc, delete-files, deletion-vectors, data-engineering, how-to]
 authors: [anshika]
 image: /img/blog/cover/postgres-to-iceberg-blog-cover.webp
@@ -71,7 +71,7 @@ OLake:  PostgreSQL WAL → OLake Go → Iceberg
 
 **Debezium, Kafka, and Kafka Connect.** Debezium publishes change events to one Kafka topic per table, and the Apache Iceberg Kafka Connect sink commits them to Iceberg on a fixed interval. The sink in the Apache Iceberg project currently appends records rather than applying upserts, because the upsert mode from the original Tabular connector was not part of the donated code. The result is a changelog table, and building a current-state table [needs a separate merge job](/blog/issues-debezium-kafka/), which is often where Spark returns.
 **Apache Flink.** Flink reads the WAL with the Flink CDC PostgreSQL connector, or consumes Debezium events from Kafka, and writes to Iceberg with upsert mode enabled on a format version 2 table that has a primary key. The sink converts updates and deletes into equality deletes and commits on each checkpoint, and Flink CDC 3.5 and later offers a PostgreSQL source and an Iceberg sink in its YAML pipeline API for replication without Flink SQL, on tables that have a primary key The trade-off is running a Flink cluster, with its checkpoint storage, state management, and JVM tuning.
-**OLake Go.** OLake Go reads the WAL through `pgoutput`, snapshots tables in parallel chunks, and [writes Parquet data files and equality delete files](/blog/olake-architecture-deep-dive/) through the Iceberg catalog, with no broker, processing cluster, or Spark job in the path.
+**OLake Go.** OLake Go reads the WAL through `pgoutput`, snapshots tables in parallel chunks, and [writes Parquet data files and delete files](/blog/olake-architecture-deep-dive/) (equality deletes, positional deletes, or deletion vectors) through the Iceberg catalog, with no broker, processing cluster, or Spark job in the path.
 
 ## PostgreSQL CDC to Iceberg Without Spark Using OLake Go
 
@@ -89,11 +89,13 @@ For PostgreSQL, OLake Go supports [four sync modes](/docs/connectors/postgres/):
 
 CDC runs on the native `pgoutput` plugin; the older `wal2json` method is no longer supported. Full loads split large tables into chunks that are read in parallel and checkpointed, so an interrupted sync resumes where it stopped instead of starting over.
 
-The initial load writes append-only data files, and CDC syncs add data files together with equality delete files keyed on the [`_olake_id`](/blog/olake-arrow-based-iceberg-ingestion/) column, plus position deletes when the same row changes more than once inside a single sync, giving merge-on-read upserts without rewriting existing files. An `_op_type` metadata column marks each record's operation, so downstream queries can separate deletes from inserts and updates. OLake Go supports AWS Glue, Hive Metastore, JDBC, and REST catalogs, including Nessie, Lakekeeper, Amazon S3 Tables, Apache Polaris, Unity Catalog, and Google BigLake, and it evolves Iceberg schemas automatically when source columns change.
+The initial load writes append-only data files, and CDC syncs add data files together with delete files for the old versions of rows, matched on the [`_olake_id`](/blog/olake-arrow-based-iceberg-ingestion/) column, giving merge-on-read upserts without rewriting existing files. The delete files are equality deletes, positional deletes, or deletion vectors, and by default OLake Go picks the first of these that the catalog and every [target query engine](/docs/getting-started/job-level-properties/#target-query-engines) of the job support. An `_op_type` metadata column marks each record's operation, so downstream queries can separate deletes from inserts and updates.
+
+OLake Go supports the AWS Glue, Apache Polaris, Lakekeeper, Snowflake Horizon, Unity Catalog, Google BigLake, Amazon S3 Tables, Nessie, Hive Metastore, JDBC, and generic REST catalogs. It evolves Iceberg schemas automatically when source columns change.
 
 [Table maintenance](/blog/apache-iceberg-table-maintenance-olake-fusion/) is handled by the companion project [OLake Fusion](/docs/fusion/getting-started/overview/), which connects to the same catalog and runs compaction on a [per-table schedule](/docs/fusion/compaction/configuration/). Its [Lite, Medium, and Full compaction tiers](/docs/fusion/compaction/types-of-compaction/) can be scheduled independently, so light cleanup runs often and full rewrites run occasionally, without writing Spark maintenance scripts.
 
-## How to Set Up PostgreSQL CDC With OLake
+## How to Set Up PostgreSQL CDC With OLake Go
 
 The steps below use a [self-managed PostgreSQL server](/docs/connectors/postgres/setup/generic/) and the OLake UI. [Amazon RDS](/docs/connectors/postgres/setup/rds/), [Aurora](/docs/connectors/postgres/setup/aurora/), [Google Cloud SQL](/docs/connectors/postgres/setup/gcp/), and [Azure Database for PostgreSQL](/docs/connectors/postgres/setup/azure/) enable logical replication through parameter groups or database flags instead, so use the matching guide in the [OLake PostgreSQL connector documentation](/docs/connectors/postgres/) for those.
 
@@ -132,6 +134,8 @@ Tables with a primary key work with the default replica identity. Use `REPLICA I
 ALTER TABLE public.orders REPLICA IDENTITY FULL;
 ```
 
+For TOAST columns, you can instead turn on **Preserve TOAST Values** when you create the source in Step 6 (OLake Go v1.2.0 and above).
+
 ### Step 4: Create a publication and replication slot
 
 Create the publication first, then create the slot in the same database OLake Go connects to:
@@ -154,7 +158,9 @@ Open `http://localhost:8000` and log in with the default credentials (`admin`, `
 
 ### Step 6: [Create the PostgreSQL source](/docs/getting-started/creating-first-pipeline/)
 
-Go to Sources, click Create Source, and select Postgres. Enter the connection details, set Update Method to CDC, and enter the replication slot and publication names exactly as created in PostgreSQL. Max Threads controls how many worker threads the connector runs in parallel, and SSL Mode controls encryption. Test the connection to save the source.
+Go to Sources, click Create Source, and select Postgres. Enter the connection details, turn on the **Enable CDC** toggle, and enter the replication slot and publication names exactly as created in PostgreSQL.
+
+Max Threads controls how many worker threads the connector runs in parallel, and SSL Mode controls encryption. Test the connection to save the source.
 
 ![PostgreSQL source configuration in the OLake UI](/img/blog/2026/18/postgres-to-iceberg-source-config.webp)
 
@@ -166,13 +172,15 @@ Go to Destinations, click Create Destination, select Apache Iceberg, and choose 
 
 ### Step 8: Create a job and configure streams
 
-Go to Jobs, click Create Job, name it, choose a sync frequency, and select the source and destination so OLake Go can validate both. On the Streams page, select the tables to replicate, set each one to Full Refresh + CDC, and turn on Normalization. The same panel supports [Iceberg partitioning](/docs/writers/iceberg/partitioning/), such as by year on a timestamp column, and row filters. Click Create Job to save.
+Go to Jobs, click Create Job, name it, choose a sync frequency, and select the source and destination so OLake Go can validate both. Optionally, pick the engines that will read the tables under **Advanced Settings** > **Target Query Engines**, so the Streams page offers only the delete formats they read.
+
+On the Streams page, select the tables to replicate, set each one to Full Refresh + CDC, and turn on Normalization. The same panel supports [Iceberg partitioning](/docs/writers/iceberg/partitioning/), such as by year on a timestamp column, and row filters. Click Create Job to save.
 
 ![Creating an OLake job with PostgreSQL source and Iceberg destination](/img/blog/2026/18/postgres-to-iceberg-job-setup.webp)
 
 ### Step 9: Run the sync and verify the data
 
-Start the job with Sync Now from its actions menu or wait for the next scheduled run, then follow progress in Job Logs and History. To confirm CDC end-to-end, insert, update, and delete a few rows in PostgreSQL, sync again, and query the table from an engine that supports equality deletes, such as Trino. [The same pipeline](/blog/creating-job-olake-docker-cli/) can also run through the [OLake Go CLI](/docs/install/docker-cli/) or on [Kubernetes](/docs/install/kubernetes/) with Helm.
+Start the job with Sync Now from its actions menu or wait for the next scheduled run, then follow progress in Job Logs and History. To confirm CDC end-to-end, insert, update, and delete a few rows in PostgreSQL, sync again, and query the table from an engine that reads the stream's delete format, such as Trino. [The same pipeline](/blog/creating-job-olake-docker-cli/) can also run through the [OLake Go CLI](/docs/install/docker-cli/) or on [Kubernetes](/docs/install/kubernetes/) with Helm.
 
 ![OLake sync running and job history for the PostgreSQL to Iceberg pipeline](/img/blog/2026/18/postgres-to-iceberg-sync-ref.webp)
 
@@ -192,6 +200,8 @@ FROM pg_replication_slots;
 
 With the default replica identity, delete events carry only the primary key, so deleted rows in Iceberg show nulls in every other column. Updates that leave a TOAST column untouched also omit it from the WAL. `REPLICA IDENTITY FULL` fixes both cases but enlarges WAL records, so apply it only to the tables that need it.
 
+For TOAST columns alone, OLake Go v1.2.0 and above offers [Preserve TOAST Values](/docs/connectors/postgres/#toast-columns-preserve), which reads the last value back from the Iceberg table without changing the replica identity. In OLake UI it can only be set when the source is created, and it limits upserts to positional deletes or deletion vectors. Syncs may take longer, because each such update reads the destination.
+
 ### Schema changes
 
 PostgreSQL logical replication does not replicate DDL, so the CDC tool must detect column changes and apply them to the Iceberg schema. Iceberg supports additions, renames, and type widening without rewriting data, although Kafka-based pipelines also need converter and schema registry settings that accept the new structure. OLake Go applies supported [schema changes](/docs/features/schema/) to Iceberg tables automatically.
@@ -202,14 +212,14 @@ Frequent CDC commits create many small data files and a steady stream of equalit
 
 ### Query engine support for equality deletes
 
-[Engine support for equality deletes](/blog/iceberg-interoperability-myth-row-level-deletes/) is uneven, and an engine that does not apply them can return rows that were already updated or deleted in PostgreSQL. Check [every engine on the read side](/docs/understanding/compatibility-engines/) before choosing a write strategy, and plan on regular compaction or a [merge-on-read to copy-on-write conversion](/blog/olake-mor-cow-databricks/) for engines without support.
+[Engine support for equality deletes](/blog/iceberg-interoperability-myth-row-level-deletes/) is uneven, and an engine that does not apply them can return rows that were already updated or deleted in PostgreSQL. Check [every engine on the read side](/docs/understanding/compatibility-engines/) before choosing a write strategy. In OLake Go, select those engines as the job's Target Query Engines, and it offers only the delete formats that all of them read.
 
 ## Which PostgreSQL CDC to Iceberg Approach Should You Choose?
 
 | | Debezium + Kafka + Kafka Connect | Flink CDC + Iceberg Flink sink | OLake Go |
 |---|---|---|---|
 | Components to operate | Debezium, Kafka, Kafka Connect, and usually a schema registry | Flink cluster with checkpoint storage, plus Kafka if Debezium feeds it | OLake Go containers |
-| Updates and deletes | Appended as change events, with a separate merge job for the current state | Upserts through equality deletes on tables with a primary key | Upserts through equality deletes |
+| Updates and deletes | Appended as change events, with a separate merge job for the current state | Upserts through equality deletes on tables with a primary key | Upserts through equality deletes, positional deletes, or deletion vectors, chosen from the target query engines |
 | Freshness | Set by the sink commit interval | Set by the checkpoint interval | Set by the job schedule |
 | Transformations | Single message transforms | Flink SQL and DataStream API | Row filters and partitioning |
 | Best fit | Kafka already carries change events for other consumers. | Joins, enrichment, or second-level latency | Replicating PostgreSQL tables into Iceberg with the least infrastructure |

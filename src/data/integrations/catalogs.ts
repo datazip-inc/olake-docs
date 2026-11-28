@@ -1,3 +1,5 @@
+import type { DeleteFormat } from './engines'
+
 /**
  * Iceberg catalogs OLake Go can write to.
  *
@@ -37,6 +39,14 @@ export interface Catalog {
   authTypes: string[]
   /** One line on when to pick it. */
   fitsWhen: string
+  /**
+   * Delete formats OLake Go writes through this catalog, for a catalog that cannot take all three
+   * (types/iceberg_catalog.go, OLake Go v1.1.2 and later). Absent means all three, narrowed only by
+   * the job's target query engines and the source.
+   */
+  deleteFormats?: DeleteFormat[]
+  /** Why the catalog limits the delete formats, with the vendor page and the check date. */
+  deleteFormatsWhy?: { text: string; source: { title: string; url: string; checked: string } }
   logo?: string
 }
 
@@ -87,6 +97,15 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     docsPath: '/docs/writers/iceberg/catalog/rest/?rest-catalog=horizon',
     authTypes: ['Programmatic access token (PAT)', 'Key-pair JWT', 'External OAuth', 'Workload identity federation'],
     fitsWhen: 'Snowflake is the main reader and you want the tables to appear there with no extra registration.',
+    deleteFormats: ['pos', 'dv'],
+    deleteFormatsWhy: {
+      text: 'Snowflake does not support equality deletes written by external engines through Horizon.',
+      source: {
+        title: 'Snowflake: Horizon Catalog, Iceberg REST API for external engines',
+        url: 'https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon',
+        checked: '2026-11-27'
+      }
+    },
     logo: '/img/logo/horizon.webp'
   },
   unity: {
@@ -99,6 +118,15 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     docsPath: '/docs/writers/iceberg/catalog/rest/?rest-catalog=unity',
     authTypes: ['OAuth2 M2M', 'OAuth2 U2M', 'Token federation', 'Personal access token'],
     fitsWhen: 'Databricks is the main reader; the tables become Unity Catalog managed Iceberg tables.',
+    deleteFormats: ['dv'],
+    deleteFormatsWhy: {
+      text: 'Unity Catalog takes row-level changes from external Iceberg clients only as copy-on-write files or v3 deletion vectors, and rejects commits with equality delete files.',
+      source: {
+        title: 'Databricks: access Databricks tables from Apache Iceberg clients',
+        url: 'https://docs.databricks.com/aws/en/external-access/iceberg',
+        checked: '2026-11-27'
+      }
+    },
     logo: '/img/logo/unity.webp'
   },
   biglake: {
@@ -146,6 +174,11 @@ export const CATALOGS: Record<CatalogId, Catalog> = {
     docsPath: '/docs/writers/iceberg/catalog/rest/?rest-catalog=nessie',
     authTypes: ['OAuth2 client credentials', 'Token', 'None'],
     fitsWhen: 'You want git-style branches and tags on the catalog.',
+    deleteFormats: ['eq', 'pos'],
+    deleteFormatsWhy: {
+      text: 'Nessie does not support the Iceberg v3 table spec, so OLake Go writes no deletion vectors to it.',
+      source: { title: 'Nessie: release notes (0.103.0 upgrade notes)', url: 'https://projectnessie.org/releases/', checked: '2026-11-27' }
+    },
     logo: '/img/logo/nessie.webp'
   },
   hive: {

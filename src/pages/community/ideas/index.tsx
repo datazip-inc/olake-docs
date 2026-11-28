@@ -5,7 +5,7 @@ import { serializeJsonLd } from '@site/src/components/JsonLd'
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext'
 import { useLocation } from '@docusaurus/router'
 import Link from '@docusaurus/Link'
-import { PiChartLineUp, PiCode, PiDatabase, PiCaretDown, PiCaretUp } from 'react-icons/pi'
+import { PiChartLineUp, PiCaretDown, PiCaretUp } from 'react-icons/pi'
 
 import Button from '@site/src/components/landing/ui/Button'
 import Section from '@site/src/components/landing/ui/Section'
@@ -64,139 +64,6 @@ const IDEAS = [
       'Week 3–4: job lifecycle counters (rows + run status)',
       'Week 5–6 (midterm): request counter + first docs + basic tests',
       'Week 7–8: CI polish, more tests, docs + examples, optional stretch metrics'
-    ]
-  },
-  {
-    id: 'postgres-toast',
-    title: 'PostgreSQL TOAST Support in OLake',
-    shortDesc:
-      "Correctly ingest UPDATE/DELETE events when pgoutput omits unchanged TOASTed values (byte 'u').",
-    size: 'Medium (~175 hours)',
-    difficulty: 'Medium',
-    techStack: ['Go', 'Java'] as const,
-    mentors: ['Vaibhav', 'Vikash'],
-    icon: <PiDatabase />,
-    summary:
-      'Implement correct handling of PostgreSQL logical decoding events where unchanged TOASTed values are omitted (pgoutput marks them as unchanged using byte `u`). OLake should reconstruct missing values (or fail explicitly, depending on config).',
-    problem:
-      'Postgres stores large values out-of-line using TOAST. In logical replication, unchanged TOASTed values may not be included in UPDATE/DELETE messages unless the table is configured with REPLICA IDENTITY FULL. For OLake CDC, this can cause partial row images and incorrect sink state.',
-    deliverables: [
-      <li key='d1'>
-        <span className='font-medium text-olake-ink'>
-          Correct handling of TOAST &quot;unchanged&quot; markers:{' '}
-        </span>
-        detect in decoding, treat as missing values requiring resolution
-      </li>,
-      <li key='d2'>
-        <span className='font-medium text-olake-ink'>Configurable behavior modes: </span>STRICT
-        (fail with clear error when missing values cannot be resolved), REUSE_LAST (reuse last
-        ingested TOAST value for same primary key), DB_RECOMMENDED (detect impacted tables;
-        recommend REPLICA IDENTITY FULL)
-      </li>,
-      <li key='d3'>
-        <span className='font-medium text-olake-ink'>Observability: </span>logs and counters for
-        toast_miss, toast_filled_from_cache, toast_filled_from_destination
-      </li>,
-      <li key='d4'>
-        <span className='font-medium text-olake-ink'>Tests: </span>unit tests for decoding and
-        marker detection; integration test with Postgres table containing TOAST-able column (INSERT
-        full value, UPDATE different column with TOAST unchanged, verify OLake writes correct full
-        row downstream)
-      </li>
-    ],
-    stretchGoals: null,
-    implementation: [
-      <li key='i1'>
-        <span className='font-medium text-olake-ink'>Step 1: </span>Detect missing TOAST values in
-        Go decoder (u =&gt; unchanged TOASTed value).
-      </li>,
-      <li key='i2'>
-        <span className='font-medium text-olake-ink'>Step 2: </span>Reconstruct via local TOAST
-        state store (KV keyed by table+primary_key); update on INSERT/UPDATE with full TOAST; on
-        UPDATE with missing TOAST, fill from store before sending to writer.
-      </li>,
-      <li key='i3'>
-        Fallback: query destination (Iceberg) if cache misses; cache fetched value back. Document
-        operational implications.
-      </li>
-    ],
-    timeline: [
-      'Community Bonding: reproduce issue locally, identify pgoutput decode paths and record model changes, draft KV store design + failure semantics.',
-      'Week 1–2: detection + config modes',
-      'Week 3–5: local state store + fill logic + unit tests',
-      'Week 6–8 (midterm): destination lookup fallback + caching + metrics/logs',
-      'Week 9–10: end-to-end integration tests + correctness validation',
-      'Week 11–12: docs (including DB-side mitigation tradeoffs) + polish + CI'
-    ]
-  },
-  {
-    id: 'iceberg-v3-deletion-vectors',
-    title: 'Apache Iceberg v3 Support with Deletion Vector–based CDC',
-    shortDesc:
-      'Upgrade OLake to Iceberg v3 and implement CDC updates/deletes using deletion vectors stored in Puffin files.',
-    size: 'Large (~350 hours)',
-    difficulty: 'Hard',
-    techStack: ['Go', 'Java'] as const,
-    mentors: ['Vaibhav', 'Vikash', 'Ankit'],
-    icon: <PiCode />,
-    summary:
-      "Upgrade OLake's Iceberg destination to support Iceberg v3 and implement CDC deletes/updates using deletion vectors (DV) as the primary row-level delete mechanism.",
-    problem:
-      'OLake ingests from DBs/Kafka in Go and writes to Iceberg via a Java gRPC writer. Today the pipeline targets Iceberg v2 semantics. Iceberg v3 introduces deletion vectors stored in Puffin files and new writer constraints (at most one DV per data file per snapshot; merge new deletes with existing DVs; no new position delete files for v3).',
-    deliverables: [
-      <li key='d1'>
-        <span className='font-medium text-olake-ink'>
-          Iceberg v3 compatibility in the Java writer:{' '}
-        </span>
-        upgrade Iceberg Java dependencies (v3-capable); ensure metadata read/write and commit
-        behavior works for v3 tables
-      </li>,
-      <li key='d2'>
-        <span className='font-medium text-olake-ink'>DV-based CDC deletes and updates: </span>Delete
-        = write/merge deletion vectors per impacted data file; Update = delete old row (via DV) +
-        append new row, within one commit flow when possible
-      </li>,
-      <li key='d3'>
-        <span className='font-medium text-olake-ink'>Correctness: </span>enforce at most one
-        deletion vector per data file per snapshot; merge new deletes with existing DVs (and any
-        legacy position deletes from upgraded v2 tables)
-      </li>,
-      <li key='d4'>
-        <span className='font-medium text-olake-ink'>Design documentation: </span>DV lifecycle
-        (creation, merge, replace), commit flow and idempotency expectations, table maintenance
-        implications and operational guardrails
-      </li>,
-      <li key='d5'>
-        <span className='font-medium text-olake-ink'>End-to-end tests: </span>validate correctness
-        via a query engine (e.g., Spark); include cases: multiple updates to same key,
-        retries/partial failures, schema evolution interactions
-      </li>
-    ],
-    stretchGoals:
-      'Explore v3 extended types if relevant to OLake (variant, geometry/geography) and define a minimal support story.',
-    implementation: [
-      <li key='i1'>
-        <span className='font-medium text-olake-ink'>Java writer: </span>implement DV writing and
-        merging logic stored as Puffin blobs; update manifest/snapshot metadata correctly; expose DV
-        apply primitives via gRPC (new RPCs or extended proto).
-      </li>,
-      <li key='i2'>
-        <span className='font-medium text-olake-ink'>gRPC contract: </span>add or extend RPC methods
-        to apply row changes (inserts + deletes/updates); return commit metadata to Go.
-      </li>,
-      <li key='i3'>
-        <span className='font-medium text-olake-ink'>Position planning for CDC: </span>provide a
-        defined strategy for mapping incoming CDC keys to file+position; first-cut reference
-        implementation; document future optimizations.
-      </li>
-    ],
-    timeline: [
-      'Community Bonding: design doc draft, local setup and baseline v2 writer understanding, establish integration test harness.',
-      'Week 1–3: dependency bump + v3 append/commit happy path',
-      'Week 4–9: DV writer implementation (Puffin blob handling, manifest updates)',
-      'Week 10–15: CDC apply path + position planning reference',
-      'Week 16–19: integration tests + correctness + edge cases',
-      'Week 20–22: polish + docs + final design doc + performance notes'
     ]
   }
 ]
@@ -318,14 +185,14 @@ const IdeasPage = () => {
   return (
     <CommunityPage
       title='GSoC Project Ideas'
-      description='Browse OLake GSoC project ideas: Prometheus metrics, PostgreSQL TOAST support, and Iceberg v3 deletion vectors.'
+      description='OLake GSoC project ideas: the open Prometheus metrics idea, plus PostgreSQL TOAST and Iceberg v3 deletion vector ideas that have since shipped.'
       activePath='/community'
       hero={
         <PageHero
           badge='Community / Ideas'
           breadcrumbs={<Breadcrumbs type='community' title='GSoC Project Ideas' />}
           title='GSoC Project Ideas'
-          description='Browse project ideas for Google Summer of Code at OLake. Pick a Small, Medium, or Large project and discuss with mentors before submitting your proposal.'
+          description='Project ideas from Google Summer of Code at OLake. Applications for GSoC 2026 are closed, and the ideas stay up as reference for future rounds.'
           actions={
             <>
               <Button href='/community/proposal-template' size='lg'>
@@ -344,7 +211,7 @@ const IdeasPage = () => {
         <meta property='og:title' content='GSoC Project Ideas | OLake' />
         <meta
           property='og:description'
-          content='Browse OLake GSoC project ideas: Prometheus metrics, PostgreSQL TOAST support, and Iceberg v3 deletion vectors.'
+          content='OLake GSoC project ideas: the open Prometheus metrics idea, plus PostgreSQL TOAST and Iceberg v3 deletion vector ideas that have since shipped.'
         />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:image' content='https://olake.io/img/logo/olake-og-card.png' />
@@ -365,6 +232,24 @@ const IdeasPage = () => {
               proposal guidelines
             </Link>{' '}
             page for expectations, evaluation criteria, and where to ask questions.
+          </Note>
+          <Note className='mx-auto mt-[12px] max-w-[860px] text-center'>
+            <strong className='font-medium text-olake-ink'>Shipped since the 2026 list:</strong>{' '}
+            PostgreSQL TOAST value preservation (
+            <Link
+              to='/docs/release/ingestion/v1.2.0/'
+              className='text-olake-blue hover:text-olake-blue-hover'
+            >
+              OLake Go v1.2.0
+            </Link>
+            ) and Iceberg v3 deletion vectors (
+            <Link
+              to='/docs/release/ingestion/v0.11.0/'
+              className='text-olake-blue hover:text-olake-blue-hover'
+            >
+              OLake Go v0.11.0
+            </Link>
+            ), so those two ideas are no longer listed.
           </Note>
         </Section>
 

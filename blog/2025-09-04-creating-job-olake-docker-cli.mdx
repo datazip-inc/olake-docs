@@ -87,7 +87,7 @@ Pick the sync mode and toggle **Normalization**.
 ![OLake create job stream selection for Postgres to Iceberg with Full Refresh + CDC on fivehundred](/img/docs/getting-started/create-your-first-job/job-stream-select.webp)
 
 Let's make the destination query-friendly. Open **Partitioning** → choose `dropoff_datetime` → **year**.  
-Want more? Read the [Partitioning Guide](/docs/writers/parquet/partitioning).
+Want more? Read the [Partitioning Guide](/docs/writers/iceberg/partitioning).
 
 ![OLake partitioning UI for stream fivehundred using dropoff_datetime and year fields in Iceberg](/img/docs/getting-started/create-your-first-job/job-stream-partition.webp)
 
@@ -138,7 +138,7 @@ Use the stepper to jump between **Source** and **Destination**.
 ![OLake destination config edit screen for Postgres Iceberg job with AWS Glue write guide](/img/docs/getting-started/create-your-first-job/job-edit-destination.webp)
 
 > 🔄 **Need to change Partitioning / Filter / Normalization for an existing stream?**  
-> Unselect the stream → **Save** → reopen **Edit Streams** → re-add it with new settings.
+> Edit it on the stream in **Edit Streams** and save. OLake Go clears only the affected streams and rebuilds them on the next run ([Clear Destination scenarios](/docs/getting-started/job-level-properties/#scenarios-to-trigger-clear-destination)).
 
 **Pause Job** — Temporarily stop runs. You'll find paused jobs under **Inactive Jobs**, where you can **Resume** any time.
 
@@ -198,14 +198,14 @@ We'll put everything under `/path/to/config/`.
   "ssl": { "mode": "require" },
   "update_method": {
     "replication_slot": "replication_slot",
-    "intital_wait_time": 120
+    "publication": "olake_publication",
+    "initial_wait_time": 120
   },
-  "default_mode": "cdc",
   "max_threads": 6
 }
 ```
 
-> 📝 If you plan to run CDC, ensure a Postgres **replication slot** exists.
+> 📝 If you plan to run CDC, ensure a Postgres **replication slot** and a **publication** exist. With the `pgoutput` plugin, the `publication` field is required.
 > See: [Replication Slot Guide](/docs/connectors/postgres/setup/generic).
 
 **Destination — `destination.json`**
@@ -214,12 +214,13 @@ We'll put everything under `/path/to/config/`.
 {
   "type": "ICEBERG",
   "writer": {
+    "catalog_type": "glue",
+    "catalog_name": "olake_iceberg",
     "iceberg_s3_path": "s3://vz-testing-olake/olake_cli_demo",
     "aws_region": "XXX",
     "aws_access_key": "XXX",
     "aws_secret_key": "XXX",
     "iceberg_db": "olake_cli_demo",
-    "grpc_port": 50051,
     "sink_rpc_server_host": "localhost"
   }
 }
@@ -256,7 +257,7 @@ Select exactly what to move and how. You edit only `selected_streams.json`. `ava
 
 * **Select streams** → keep only `fivehundred` under `"selected_streams"`.
 * **Normalization** → `"normalization": true`
-* **Filter** → `"filter": "dropoff_datetime >= \"2010-01-01 00:00:00\""`
+* **Filter** → a `"filter_config"` object with one condition, `dropoff_datetime >= "2010-01-01 00:00:00"`
 * **Partitioning** → `"partition_regex": "/{dropoff_datetime, year}"`
 * **Sync mode** → set `"sync_mode"` to `"cdc"`
 
@@ -269,7 +270,12 @@ Select exactly what to move and how. You edit only `selected_streams.json`. `ava
         "sync_mode": "cdc",
         "partition_regex": "/{dropoff_datetime, year}",
         "normalization": true,
-        "filter": "dropoff_datetime >= \"2010-01-01 00:00:00\""
+        "filter_config": {
+          "logical_operator": "and",
+          "conditions": [
+            { "column": "dropoff_datetime", "operator": ">=", "value": "2010-01-01 00:00:00" }
+          ]
+        }
       }
     ]
   }
@@ -330,16 +336,18 @@ docker run --pull=always \
 
 ### 5) Monitor Progress with `stats.json`
 
-A `stats.json` appears next to your configs:
+A `stats.json` appears next to your configs. The values below are a sample from a larger run, taken from the [Stats reference](/docs/install/docker-cli/#stats):
 
 ```json title="stats.json"
 {
-  "Estimated Remaining Time": "0.00 s",
-  "Memory": "367 mb",
-  "Running Threads": 0,
-  "Seconds Elapsed": "34.01",
-  "Speed": "14.70 rps",
-  "Synced Records": 500
+  "Writer Threads": 21,
+  "Synced Records": 14236868,
+  "Bytes Read": 9876543210,
+  "Speed": "76542.20 rps",
+  "Seconds Elapsed": "186.00",
+  "Estimated Remaining Time": "1642.00 s",
+  "Memory Usage Bytes": 2335248384,
+  "CPU Utilization": 0.9348
 }
 ```
 
@@ -408,7 +416,8 @@ More details: Check out our Postgres connector documentation for state file conf
       </ul>
       <p>For CDC specifically, a Postgres replication slot must exist before the connector starts.</p>
       <p><strong>Important:</strong> Each OLake Go job must have its own <strong>dedicated replication slot and publication</strong>. Never share a replication slot across multiple OLake Go jobs - doing so will result in data loss and inconsistencies.</p>
-      <p>If you cannot modify WAL settings (for example, on a read replica), OLake Go also supports JDBC-based Full Refresh and bookmark-based Incremental modes that work with standard credentials and do not require a replication slot.</p>
+      <p>If you cannot modify WAL settings, OLake Go also supports JDBC-based Full Refresh and bookmark-based Incremental modes that work with standard credentials and do not require a replication slot.</p>
+      <p>CDC can also run against a read replica on PostgreSQL 16 and later, supported since OLake Go v0.9.0. PostgreSQL 15 and earlier replicas cannot publish logical replication, so connect CDC to the primary there.</p>
     </div>
   },
   {
@@ -438,12 +447,14 @@ More details: Check out our Postgres connector documentation for state file conf
       <pre>
         <code className="language-json">
 {`{
-  "Estimated Remaining Time": "1642.00",
-  "Memory": "2228 mb",
-  "Running Threads": 21,
-  "Seconds Elapsed": "186.00",
+  "Writer Threads": 21,
+  "Synced Records": 14236868,
+  "Bytes Read": 9876543210,
   "Speed": "76542.20 rps",
-  "Synced Records": 14236868
+  "Seconds Elapsed": "186.00",
+  "Estimated Remaining Time": "1642.00 s",
+  "Memory Usage Bytes": 2335248384,
+  "CPU Utilization": 0.9348
 }`}
         </code>
       </pre>

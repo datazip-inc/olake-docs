@@ -1,12 +1,14 @@
 ---
-title: "MongoDB & Atlas CDC Setup Guide | OLake Change Data Capture"
-seo_title: "MongoDB and Atlas CDC Setup for OLake"
+title: "MongoDB & Atlas CDC Setup Guide | OLake Go Change Data Capture"
+seo_title: "MongoDB and Atlas CDC Setup for OLake Go"
 description: "Step-by-step guide to enable Change Data Capture on self-hosted MongoDB and Atlas. Includes replica set setup, user creation, and oplog verification."
 ---
 
 # MongoDB and Atlas CDC Setup
 
 This guide covers setting up Change Data Capture (CDC) for both self-hosted MongoDB and MongoDB Atlas. Most steps apply to both, with notes where Atlas differs because certain configurations are pre-enabled.
+
+CDC works on a replica set or a sharded cluster. For a sharded cluster, connect OLake Go to `mongos`, skip steps 1 and 2, and create the user through `mongos`. Standalone servers cannot open change streams.
 
 ## 1. Enable Replica Set Mode
 
@@ -15,7 +17,7 @@ This guide covers setting up Change Data Capture (CDC) for both self-hosted Mong
   - Inside Docker:
   
     ```bash
-    docker run -d --name mongodb  -p 27017:27017  mongo:6.0 --replSet rs0
+    docker run -d --name mongodb  -p 27017:27017  mongo:8.0 --replSet rs0
     ```
   - Outside Docker:
   
@@ -53,9 +55,9 @@ This guide covers setting up Change Data Capture (CDC) for both self-hosted Mong
 
 **Applicable for both MongoDB (Self-Hosted) and Atlas.**
 
-Olake needs a user that can:  
-- Read/write your application database (to ingest data).
-- Read from the local database (where oplog is stored).
+OLake Go only reads, so it needs a user that can:  
+- Read your application database (to ingest data and open change streams).
+- Read from the local database (where oplog is stored), for the optional oplog-retention check.
 
 Create the user in the `admin` database:
 
@@ -65,7 +67,7 @@ db.createUser({
   user: "olake_user",
   pwd: "your_password",
   roles: [
-    { role: "readWrite", db: "your_db" },
+    { role: "read", db: "your_db" },
     { role: "read", db: "local" }
   ]
 })
@@ -73,7 +75,7 @@ db.createUser({
 
 ## 4. Verify oplog
 
-***Applicable for both Self-Hosted and Atlas.**
+**Applicable for both Self-Hosted and Atlas.**
 
 Check that the oplog collection exists:
 
@@ -84,12 +86,30 @@ db.oplog.rs.findOne()
 ```
 If you see an entry, ✅ oplog is working. 
 
+## 5. Check the Oplog Window
+
+The `oplog_retention` check in OLake Go's test connection warns when the oplog window is shorter than 7 days. If a sync is paused longer than the window, its resume point is lost and a full resync is needed. Check the window with:
+
+```javascript
+rs.printReplicationInfo()
+```
+
+To keep entries longer on a self-hosted replica set, set a minimum retention with [`replSetResizeOplog`](https://www.mongodb.com/docs/manual/reference/command/replSetResizeOplog/) (checked Nov 2026), for example `db.adminCommand({ replSetResizeOplog: 1, minRetentionHours: 168 })` on each member.
+
+## 6. Enable Pre-images for Deletes (Optional, MongoDB 6.0+)
+
+By default, a deleted document reaches OLake Go with only its `_id`. To write the full deleted document, enable pre-images on each collection ([change streams](https://www.mongodb.com/docs/manual/changeStreams/), checked Nov 2026):
+
+```javascript
+db.runCommand({ collMod: "your_collection", changeStreamPreAndPostImages: { enabled: true } })
+```
+
 ---
 
 
 :::info
 - Atlas users can skip Steps 1 and 2 as these are pre-configured.
-- Follow Steps 3 and 4 for both environments.
+- Follow Steps 3 to 6 for both environments.
 
 :::
 

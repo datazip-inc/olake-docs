@@ -76,7 +76,7 @@ const CommunityIndexPage = () => {
     'url': 'https://olake.io/',
     'name': 'OLake: Open Source Data Replication to Apache Iceberg',
     'description':
-      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
+      'Open-source tool for replicating databases, Kafka and S3 to Apache Iceberg and Parquet, with change data capture (CDC) from Postgres, MySQL/MariaDB, MongoDB and SQL Server, streaming from Kafka, and full or incremental sync from Oracle, Db2 and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     'publisher': {
       '@type': 'Organization',
       'name': 'OLake'
@@ -150,7 +150,7 @@ const CommunityIndexPage = () => {
       status: 'archived',
       button: 'secondary',
       CTA: 'Watch Now',
-      date: '28 January 2025'
+      date: '28 January 2026'
     },
     {
       title: 'OLake 9th Community Meetup',
@@ -167,7 +167,7 @@ const CommunityIndexPage = () => {
     {
       title: 'OLake 8th Community Meetup',
       subtitle:
-        "Join us for an end-to-end demo of OLake's latest features, showcasing Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.",
+        "Join us for an end-to-end demo of OLake's latest features, showcasing the Oracle connector, filtering capabilities, incremental sync, and Helm deployment within the OLake UI.",
       route: '/community/8th-community-meetup',
       img: `/img/community/8th-olake-community-call.webp`,
       alt: 'OLake 8th Community Meetup',
@@ -288,9 +288,10 @@ const CommunityIndexPage = () => {
 
   const stats = [
     { label: 'Community Members', value: '500+' },
-    { label: 'Contributors', value: '35+' },
-    { label: 'Pull Requests', value: '500+' },
-    { label: 'Issues Resolved', value: '150+' }
+    // GitHub datazip-inc/olake-go, 27 Nov 2026: 58 contributors, 1,053 pull requests, 257 closed issues.
+    { label: 'Contributors', value: '55+' },
+    { label: 'Pull Requests', value: '1,000+' },
+    { label: 'Issues Resolved', value: '250+' }
   ]
 
   const SEO_DESCRIPTION =
@@ -497,8 +498,8 @@ const CommunityIndexPage = () => {
       {/* Google Summer of Code Section */}
       <Section>
         <SectionHeading
-          title='Google Summer of Code at OLake'
-          body='Work on a 12+ week open source project with OLake. Browse project ideas, read proposal guidelines, and submit your application.'
+          title='Google Summer of Code at OLake (2026 closed)'
+          body='OLake took part in Google Summer of Code 2026, and applications are closed. The project ideas, proposal guidelines and template stay up as reference.'
           align='center'
         />
         <Card className='mx-auto mt-[28px] max-w-[860px] p-[24px] lg:mt-[44px] lg:p-[40px]'>
@@ -513,11 +514,12 @@ const CommunityIndexPage = () => {
               className='block h-[48px] w-[48px] shrink-0'
             />
             <div className='min-w-0 flex-1'>
-              <h3 className='text-[22px] font-normal text-olake-ink'>GSoC 2026</h3>
+              <h3 className='text-[22px] font-normal text-olake-ink'>
+                GSoC 2026 (applications closed)
+              </h3>
               <p className='mt-[8px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
-                Pick a project idea (Prometheus metrics, PostgreSQL TOAST support, or Iceberg v3
-                deletion vectors), discuss with mentors, and submit a strong proposal. We provide
-                guidelines and a template to help you.
+                Contributor applications closed on Mar 31, 2026. The open project idea (Prometheus
+                metrics), the proposal guidelines and the template stay up for future rounds.
               </p>
               <div className='mt-[20px] flex flex-wrap gap-[8px] lg:gap-[12px]'>
                 <Button href='/community/gsoc' size='lg'>

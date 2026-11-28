@@ -199,6 +199,8 @@ Two files describe your streams. Discover writes both.
 - **`available_streams.json`**: It lists every stream OLake Go finds after running the discover command. This file is not supposed to be edited.
 - **`streams.json`**: Single file with your stream selections and per-stream settings. This `streams.json` has been **deprecated**. See [Streams v1 reference](/docs/core/configs/streams-legacy).
 
+To convert an existing `streams.json` without connecting to the source, run `discover --streams /mnt/config/streams.json --convert-streams`. It writes `available_streams.json` and `selected_streams.json` next to it. See the [migration guide](/docs/core/configs/streams-migration).
+
 ### 1. Selected Streams
 
 The top-level key is `selected_streams`. It maps each namespace (database or schema name) to a list of stream entries.
@@ -249,18 +251,19 @@ The top-level key is `selected_streams`. It maps each namespace (database or sch
 | `destination_table` | string | `orders_raw` | No | Specifies the name of the destination table where the data will be stored. The table name is derived from the source stream name and normalized by replacing special characters and spaces with underscores (_). | 
 | `partition_regex` | string | `/{created_at,year}` | No | A pattern defining how to partition the data. To read more, refer the [Partition Regex for S3](/docs/writers/parquet/partitioning#partition-regex-attributes) or [Partition Regex for iceberg](/docs/writers/iceberg/partitioning#how-iceberg-handles-partitions) | 
 | `normalization` | boolean | `true` | No | Converts top-level JSON fields into columns, while nested JSON objects are stored as string values. | 
-| `append_mode` | boolean | `false` | No | Disables upserts in Iceberg when set to `true`. (In upsert mode dedupe happens via equality delete) | 
+| `append_mode` | boolean | `false` | No | Disables upserts in Iceberg when set to `true`. In upsert mode, deletes are written in the `update_type` format. | 
 | `dedup_keys`     | array  | `["customer_id"]` | Only for **Kafka** with **Upsert** ingestion mode                                              | Required when **Upsert** ingestion mode is selected for **Kafka** source. Specifies the columns used to identify unique records for deduplication.                                                  |
-| `update_type` | string | `eq` | No | Specifies the format in which delete files are written during sync. <br/> `"eq"` writes equality delete files. <br/> `"pos"` writes positional delete files. <br/> `"dv"` writes deletion vector files.  | 
+| `update_type` | string | `eq` | No | Specifies the format in which delete files are written during sync. <br/> `"eq"` writes equality delete files. <br/> `"pos"` writes positional delete files. <br/> `"dv"` writes deletion vector files. <br/> `"pos"` and `"dv"` keep a row index between runs; see [Index storage](#index-storage).  | 
 | `use_source_column_names` | boolean | `true` | No | Controls destination column naming. When `false`, OLake Go lowercases names and replaces any non-alphanumeric character with `_` (for example `UserID` → `userid`, `First-Name` → `first_name`). When `true`, names are copied from the source as-is, including case, spaces, and hyphens. Use `true` only when queries or tools require exact source names; otherwise keep `false` for normalized, destination-safe identifiers.  | 
 | `filter_config` | object | <pre><code>{"{\n  \"logical_operator\": \"and\",\n  \"conditions\": [\n    {\n      \"column\": \"status\",\n      \"operator\": \"=\",\n      \"value\": \"active\"\n    }\n  ]\n}"}</code></pre> | No | Ensures that only data matching the specified condition is synced. | 
 | `selected_columns.columns` | array | [`id`, `status`, `updated_at`, `created_at`] | No | List of columns to be included in the sync for each stream. | 
 | `selected_columns.sync_new_columns` | boolean | `true` | No | If `true`, newly discovered columns are automatically included in future syncs. If `false`, new columns must be manually added to `selected_columns.columns` to be synced. | 
 
-:::note Kafka-specific configuration
+:::note[Kafka-specific configuration]
 For **Kafka** sources with **Upsert** ingestion mode, the following configuration is required:
 - `append_mode` must be set to `false`
-- `update_type` must be set to `"pos"` (Positional Deletes only)
+- `update_type` must be set to `"pos"` (positional deletes) or `"dv"` (deletion vectors, OLake Go [v1.1.2](/docs/release/ingestion/v1.1.0) and later). Equality deletes are not supported for Kafka upserts.
+- Both formats keep a row index between runs, so Kafka upserts always need [index storage](#index-storage).
 - An additional field `"dedup_keys"` (array) must be added to specify deduplication keys, for example: `"dedup_keys": ["customer_id"]`
 :::
 
@@ -320,11 +323,12 @@ The Sync section describes how to start the sync process using the configuration
 
 ### Sync command {/* #sync-command */}
 
-Run this command for a Full Refresh sync or a first sync, before a state file exists.
+Run this command for a Full Refresh sync or a first sync, before a state file exists. Do not pass an empty `{}` state file on the first run: OLake Go then loads the oldest state version and keeps it, so decimals, for example, land as double.
 
 ```bash title="sync command"
 docker run --pull=always \
 -v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+-e OLAKE_INDEX_DB_DIR=/mnt/config/index-db \
 olakego/source-[SOURCE-TYPE]:latest \
 sync \
 --config /mnt/config/source.json \
@@ -376,6 +380,43 @@ sync \
 <FlagDetail flag="discover-schema" mode="docker" command="sync" />
 
 </details>
+
+### Index Storage for Positional Deletes and Deletion Vectors {/* #index-storage */}
+
+Iceberg upsert streams with `update_type` set to `pos` (positional deletes) or `dv` (deletion vectors) need a row index. OLake Go keeps it on local disk as a Pebble key-value store per stream, which maps each row's key to its data file and row position. Equality deletes (`eq`), append mode and Parquet destinations need no index.
+
+These streams always need it:
+
+- **Kafka** upserts, which accept only `pos` or `dv`.
+- **Postgres** streams on a source with [`preserve_toast_values`](/docs/connectors/postgres/#toast-columns-preserve) set to `true`. OLake Go finds each row's previous version through the index to recover the unchanged TOAST values that Postgres leaves out of an `UPDATE`.
+- Upserts to **Unity Catalog** (only `dv`) and **Snowflake Horizon** (`pos` or `dv`).
+
+Set `OLAKE_INDEX_DB_DIR` to a directory that survives between runs. Each stream gets its own folder, `<OLAKE_INDEX_DB_DIR>/<destination database>/<stream>-<hash>`. If the variable is unset, OLake Go uses `olake-table-index` in its working directory, which in the `olakego/source-*` images is `/home/olake-table-index` inside the container and is lost when the container is removed.
+
+The sync command above keeps the index in the mounted config folder with `-e OLAKE_INDEX_DB_DIR=/mnt/config/index-db`. Pass the same value to `clear-destination`, which drops the index of every stream it clears. Pass `--state` too, so the saved state of the cleared streams is reset. Without it, `state.json` keeps the old cursors and positions, and the next sync does not reload the cleared tables:
+
+```bash title="clear-destination command"
+docker run --pull=always \
+-v "[PATH_OF_CONFIG_FOLDER]:/mnt/config" \
+-e OLAKE_INDEX_DB_DIR=/mnt/config/index-db \
+olakego/source-[SOURCE-TYPE]:latest \
+clear-destination \
+--selected-streams /mnt/config/selected_streams.json \
+--available-streams /mnt/config/available_streams.json \
+--destination /mnt/config/destination.json \
+--state /mnt/config/state.json
+```
+
+**Without a persistent directory**, results stay correct, but every run pays for a full rebuild. Before writing a stream, OLake Go finds no indexed snapshot, logs `not found starting index snapshot id, truncating stream index before rebuild`, and scans the whole Iceberg table to rebuild the index. That scan grows with the table, while a persistent index only catches up from the last indexed snapshot.
+
+**Storage type:** use a local disk or a block volume such as Amazon Elastic Block Store (EBS). The index needs file locking and reliable `fsync`, so shared network filesystems such as Network File System (NFS), Amazon EFS and Azure Files are not supported.
+
+**Tuning:** two optional variables size the store. Both apply to each stream that keeps an index.
+
+| Variable | Unit | Default | Sets |
+|---|---|---|---|
+| `OLAKE_INDEX_DB_CACHE_SIZE` | bytes | `134217728` (128 MB) | Pebble block cache |
+| `OLAKE_INDEX_DB_MAX_OPEN_FILES` | files | `1000` | Index files Pebble keeps open |
 
 ***Whats's Next***:  Monitor sync progress and performance using the `stats.json` file.
 

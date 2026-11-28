@@ -28,7 +28,7 @@ function getLatestOlakeRelease() {
       return A[0] - B[0] || A[1] - B[1] || A[2] - B[2]
     })
 
-  if (!files.length) return { version: '', label: 'OLake', docPath: '/docs/release/ingestion' }
+  if (!files.length) return { version: '', label: 'OLake Go', docPath: '/docs/release/ingestion/overview/' }
 
   const newest = files[files.length - 1]
   let version = newest.version
@@ -41,7 +41,7 @@ function getLatestOlakeRelease() {
   } catch {
     /* fall back to the filename version */
   }
-  return { version, label: `OLake v${version}`, docPath: `/docs/release/ingestion/${newest.file}` }
+  return { version, label: `OLake Go v${version}`, docPath: `/docs/release/ingestion/${newest.file}` }
 }
 
 const latestOlakeRelease = getLatestOlakeRelease()
@@ -51,7 +51,7 @@ const latestOlakeRelease = getLatestOlakeRelease()
 const config = {
   title: 'OLake',
   tagline:
-    'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
+    'Open-source tool for replicating databases, Kafka and S3 to Apache Iceberg and Parquet, with change data capture (CDC) from Postgres, MySQL/MariaDB, MongoDB and SQL Server, streaming from Kafka, and full or incremental sync from Oracle, Db2 and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
   favicon: 'img/logo/olake-blue.svg',
 
   // Exposed to components via useDocusaurusContext().siteConfig.customFields

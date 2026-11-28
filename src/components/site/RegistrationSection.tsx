@@ -152,8 +152,9 @@ const RegistrationSection: React.FC = () => {
                   Faster &amp; More Efficient
                 </h3>
                 <p className='mb-0 mt-[6px] text-[14px] leading-[1.6] text-olake-text-2 lg:text-[15px]'>
-                  OLake makes data replication faster by parallelising full loads, leveraging
-                  change streams for real-time sync, and pulling data in a lake house.
+                  OLake Go makes data replication faster by parallelising full loads and using
+                  change streams for CDC. OLake Fusion keeps the resulting Iceberg tables
+                  compacted.
                 </p>
               </div>
             </li>

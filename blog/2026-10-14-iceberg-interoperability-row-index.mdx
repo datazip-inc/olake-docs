@@ -1,7 +1,7 @@
 ---
 slug: iceberg-interoperability-row-index
 title: "One Table, Every Engine: What It Takes to Make Iceberg Interoperable"
-description: "Why CDC pipelines write Iceberg tables only Spark can read, what the Iceberg spec's delete rules actually say, and how a durable per-stream row index lets OLake write positional deletes and deletion vectors at commit time."
+description: "Why CDC pipelines write Iceberg tables only Spark can read, what the Iceberg spec's delete rules actually say, and how a durable per-stream row index lets OLake Go write positional deletes and deletion vectors at commit time."
 tags: [olake, iceberg, delete-formats, interoperability, lakehouse]
 authors: [ankit]
 image: /img/blog/cover/interoperability-blog.png
@@ -11,7 +11,7 @@ import BlogCTA from '@site/src/components/BlogCTA';
 
 ![Iceberg interoperability row index cover image](/img/blog/cover/interoperability-blog.png)
 
-OLake helps companies adopt Apache Iceberg, moving operational databases into an open table format without handing the data to a proprietary warehouse on the way in.
+OLake Go helps companies adopt Apache Iceberg, moving operational databases into an open table format without handing the data to a proprietary warehouse on the way in.
 
 This post is about the word *open* in that sentence, and why it often doesn't hold. An open table format promises that any engine implementing the spec can read your table. A table written by a CDC pipeline usually can't keep that promise: it is readable by Spark, and often by nothing else your company already pays for.
 
@@ -123,7 +123,7 @@ The engine is only half of it. The catalog, the service that tracks which tables
 
 | Catalog | Equality deletes | Positional deletes | Deletion vectors | Governance |
 |:---:|:---:|:---:|:---:|:---:|
-| Project Nessie | Yes | Yes | Yes | Limited |
+| Project Nessie | Yes | Yes | **No** | Limited |
 | Hive Metastore | Yes | Yes | Yes | Limited |
 | AWS Glue | Yes | Yes | Yes | Yes |
 | Apache Polaris | Yes | Yes | Yes | Yes |
@@ -132,13 +132,13 @@ The engine is only half of it. The catalog, the service that tracks which tables
 
 <div style={{fontSize: '0.82em', lineHeight: 1.5, opacity: 0.7, marginTop: '0.9rem'}}>
 
-The two catalogs with the strongest governance are the two that accept the least. Both refuse equality deletes.
+The two catalogs with the strongest governance are the two that accept the least. Both refuse equality deletes. Project Nessie refuses deletion vectors, because its Iceberg REST catalog defines only format versions 1 and 2 ([Nessie IcebergSpec source](https://github.com/projectnessie/nessie/blob/main/catalog/format/iceberg/src/main/java/org/projectnessie/catalog/formats/iceberg/IcebergSpec.java)) (checked Nov 2026).
 
 </div>
 
 </div>
 
-Read the delete columns against governance and the trade is clear. The open catalogs take anything and govern little. The managed ones govern properly and narrow what you may write, which is a reasonable product decision that happens to collide with how most CDC pipelines write.
+Read the delete columns against governance and the trade is clear. The open catalogs take almost anything and govern little. The managed ones govern properly and narrow what you may write, which is a reasonable product decision that happens to collide with how most CDC pipelines write.
 
 Snowflake Horizon is the one we hit directly. It requires access delegation, and in our experience it will not accept equality-delete writes.
 
@@ -168,11 +168,11 @@ Before each run the job checks who else wrote to the table, by walking back thro
 
 ## What we built
 
-### You declare the readers, OLake picks the format
+### You declare the readers, OLake Go picks the format
 
-We turned the question around. Instead of picking a delete format and hoping readers cope, you declare which engines will read the table. OLake works out what it is allowed to write.
+We turned the question around. Instead of picking a delete format and hoping readers cope, you declare which engines will read the table. OLake Go works out what it is allowed to write.
 
-Writable formats are ordered cheapest first: equality, positional, vector. Equality needs no index. Positional needs a full key-to-location index. Vectors need that same index plus a v3 table. OLake checks that list against what every declared engine can read, keeps only the formats all of them handle, and picks the cheapest survivor. If nothing survives, it tells you at configuration time.
+Writable formats are ordered cheapest first: equality, positional, vector. Equality needs no index. Positional needs a full key-to-location index. Vectors need that same index plus a v3 table. OLake Go checks that list against what every declared engine can read, keeps only the formats all of them handle, and picks the cheapest survivor. If nothing survives, it tells you at configuration time.
 
 The behavior falls out of the data:
 
@@ -181,11 +181,11 @@ The behavior falls out of the data:
 - **Add Databricks.** Positional drops out too. Vectors are selected and the table moves to v3.
 - **Databricks and Dremio together.** Empty. You hear about it at configuration time, not from a wrong dashboard six weeks later.
 
-All three formats (equality, positional and deletion vector) are live in OLake (starting from version v1.0.0).
+All three formats are live in OLake Go: positional deletes since [v0.10.0](/docs/release/ingestion/v0.10.0), deletion vectors and the choice based on the declared engines since [v0.11.0](/docs/release/ingestion/v0.11.0), and the check against the destination catalog since [v1.1.2](/docs/release/ingestion/v1.1.0).
 
-### Index storage: how OLake maintains it
+### Index storage: how OLake Go maintains it
 
-Two of the three formats need the same primitive: given an `_olake_id`, the primary-key field OLake generates, return the data file and ordinal where that row lives. The access pattern is narrow. Point lookups, no range scans, no query language, one entry per live row. Hundreds of millions of keys is normal.
+Two of the three formats need the same primitive: given an `_olake_id`, the primary-key field OLake Go generates, return the data file and ordinal where that row lives. The access pattern is narrow. Point lookups, no range scans, no query language, one entry per live row. Hundreds of millions of keys is normal.
 
 A key-value store covers that. Three constraints decided which one.
 
@@ -193,7 +193,7 @@ It has to be **embedded**, because the sync is one Go binary in a container and 
 
 We use **Pebble**, a pure-Go LSM store written as a RocksDB replacement for CockroachDB. Same durability model, no cgo, and its crash-recovery path gets harder use under a distributed SQL database than anything we would build a test harness for. That recovery path is load-bearing here: Pebble rebuilds from its write-ahead log at open, so a hard pod kill leaves a volume it can recover from rather than a corrupt index.
 
-![How OLake maintains the row index in Pebble](/img/blog/2026/5/pebble-db-in-olake.png)
+![How OLake Go maintains the row index in Pebble](/img/blog/2026/5/pebble-db-in-olake.png)
 
 **Each stream has its own index.** One Pebble store per stream, in its own directory, holding two logical tables:
 
@@ -204,13 +204,13 @@ A lookup hits the rows table, gets a file ID, and resolves the path from the pat
 
 **Following one row through its life.** Take David, `id = 2`, and follow him through everything a CDC table goes through.
 
-**Insert:** David's row arrives and lands in `s3://a.parquet` at position 1. OLake writes `a.parquet` to the paths table once, and David's `_olake_id` to the rows table pointing at that file and ordinal.
+**Insert:** David's row arrives and lands in `s3://a.parquet` at position 1. OLake Go writes `a.parquet` to the paths table once, and David's `_olake_id` to the rows table pointing at that file and ordinal.
 
 **Update:** A CDC record changes David's contact from `+01` to `+02`.
 
-![How OLake writes a positional delete directly](/img/blog/2026/5/example-for-positional-write.png)
+![How OLake Go writes a positional delete directly](/img/blog/2026/5/example-for-positional-write.png)
 
-OLake looks up David's `_olake_id`, gets back `s3://a.parquet`, position 1, and emits a positional delete naming exactly that file and ordinal. The updated row goes into a new file, say `s3://b.parquet` at position 0, and David's index entry now points there. A writer without the index knows only the key, so the best it can emit is `id = 2 is deleted`, an equality delete that Snowflake and Databricks will not read.
+OLake Go looks up David's `_olake_id`, gets back `s3://a.parquet`, position 1, and emits a positional delete naming exactly that file and ordinal. The updated row goes into a new file, say `s3://b.parquet` at position 0, and David's index entry now points there. A writer without the index knows only the key, so the best it can emit is `id = 2 is deleted`, an equality delete that Snowflake and Databricks will not read.
 
 **Crash:** Now the sync pod is killed mid-way. A sync writes two things, the Iceberg commit and the index, and the crash can land between them:
 
@@ -219,7 +219,7 @@ OLake looks up David's `_olake_id`, gets back `s3://a.parquet`, position 1, and 
 
 Either way David's entry converges on what the table actually holds. A stale entry is never trusted, because it would send the next delete to a row that has moved.
 
-**Compaction:** Later, Spark compacts the table, merging `a.parquet`, `b.parquet` and their delete files into `s3://c.parquet`. David's live row now sits in `c.parquet` at, say, position 7. On the next sync OLake reads only the newly added file, `c.parquet`, and updates David's entry to point there. Nothing else is rescanned. Flink's converter, at this same moment, throws away its whole index and rereads the entire table.
+**Compaction:** Later, Spark compacts the table, merging `a.parquet`, `b.parquet` and their delete files into `s3://c.parquet`. David's live row now sits in `c.parquet` at, say, position 7. On the next sync OLake Go reads only the newly added file, `c.parquet`, and updates David's entry to point there. Nothing else is rescanned. Flink's converter, at this same moment, throws away its whole index and rereads the entire table.
 
 **Keeping it small.** The naive row entry stores the full file path. Object-storage paths run 100 to 200 bytes, and a few thousand of them get repeated across hundreds of millions of rows, so almost the whole index is duplicated strings.
 
@@ -231,7 +231,7 @@ A 110 to 210 byte entry becomes two to six. At 2 billion records that is a ~9 GB
 
 ### The result
 
-With the index in the write path, OLake writes positional deletes on a v2 table or vectors on a v3 one, whichever the declared readers resolve, and the table is correct for all of them the moment it is committed. No maintenance job, no window.
+With the index in the write path, OLake Go writes positional deletes on a v2 table or vectors on a v3 one, whichever the declared readers resolve, and the table is correct for all of them the moment it is committed. No maintenance job, no window.
 
 For tables that arrive with the problem already there, the same index drives a one-time repair during reconciliation, before the first record of the sync is written: existing equality delete files are rewritten as positional deletes and the sync proceeds from a clean state.
 

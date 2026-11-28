@@ -1,7 +1,7 @@
 ---
-title: "Postgres Source Connector Guide | OLake Data Sync & CDC"
-seo_title: "OLake Postgres Connector: Sync Modes and CDC"
-description: Learn to configure OLake Postgres Connector for fast full refresh, incremental sync, and CDC. Tips on chunking, setup, and troubleshooting errors included.
+title: "Postgres Source Connector Guide | OLake Go Data Sync & CDC"
+seo_title: "OLake Go Postgres Connector: Sync Modes and CDC"
+description: Configure the OLake Go Postgres connector for fast full refresh, incremental sync, and CDC. Tips on chunking, setup, and troubleshooting errors included.
 sidebar_label: Postgres
 ---
 
@@ -9,6 +9,7 @@ import DateTimeHandling from '@site/src/components/DateTimeHandling';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import TOCTabLinker from '@site/src/components/TOCTabLinker';
+import IndexStorageNote from '@site/docs/shared/IndexStorageNote.mdx';
 import SourceSSLModeDetails from '@site/docs/shared/config/SourceSSLModeDetails.jsx';
 
 # Overview {/* #overview */}
@@ -29,8 +30,10 @@ Tested, step-by-step guides take Postgres to [Apache Iceberg](/docs/integrations
 - **Full Refresh + Incremental**
 
 :::danger[**wal2json is not supported**]
-OLake Go reads changes through the native `pgoutput` plugin. The older `wal2json`-based CDC method is no longer supported.
+OLake Go reads changes through the native `pgoutput` plugin. The older `wal2json`-based CDC method is no longer supported, so create the replication slot with `pgoutput`.
 :::
+
+<IndexStorageNote source="postgres" />
 
 ## Prerequisites
 
@@ -93,7 +96,7 @@ OLake Go reads changes through the native `pgoutput` plugin. The older `wal2json
 :::note[Preserve TOAST Values]
 - Requires the OLake Go Postgres source v1.2.0 or later and OLake UI v0.9.3 or later.
 - **Preserve TOAST Values** can only be set when creating the source and cannot be changed afterwards.
-- When enabled, the available update types are restricted to **Positional Deletes** (`pos`) and **Deletion Vectors** (`dv`).
+- When enabled, the available update types are restricted to **Positional Deletes** (`pos`) and **Deletion Vectors** (`dv`), and the write mode to upsert.
 :::
 
 #### Connection details
@@ -106,7 +109,7 @@ OLake Go reads changes through the native `pgoutput` plugin. The older `wal2json
 | Username `required`      | Database user used to authenticate the connection.                                                                                                                            | `pg-user`                                                                                                |
 | Password `required`      | The password corresponding to the provided username for authentication.                                                                                                       | `pgpwd`                                                                                                  |
 | Schemas                  | List of schemas for discovery. Helps avoid reading all schemas by limiting discovery to only the specified ones. When omitted, all accessible non-system schemas are discovered.                                          | `public,analytics`                                                                                       |
-| JDBC URL Parameters      | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                                   | `{"connect_timeout":"20"}`                                                                                |
+| JDBC URL Parameters      | Extra [libpq connection parameters](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS) added to the connection string. OLake Go connects through the native Go driver pgx, not JDBC, so use libpq keys such as `connect_timeout`. | `{"connect_timeout":"20"}`                                                                                |
 | SSL Mode                 | Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic.                                                                                         | <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul>                                                                                                |
 | Certificate Input        | Defines how TLS/SSL certificates are provided. Paste the PEM content, or give the file path of each certificate. For `Certificate File Path`, mount the files first: [Docker Compose](/docs/install/olake-ui#for-connector-containers) or [Kubernetes](/docs/install/kubernetes#for-connector-pods). The three certificate fields below must all use the same method. | <ul> <li>`Inline Certificate (PEM)` (default)</li> <li>`Certificate File Path`</li> </ul> |
 | Server CA Certificate <br/> or <br/> Server CA Certificate Path | CA certificate for server verification. <ul><li>**Inline**: Paste the PEM content.</li><li>**Path**: File path to the certificate.</li></ul> | **Inline:** `<PEM content>` <br/> <br/> **Path:** `/etc/ssl/custom-certs/ca.pem` |
@@ -117,8 +120,8 @@ OLake Go reads changes through the native `pgoutput` plugin. The older `wal2json
 
 | Field      | Description                                                                        | Example Value                                                                                         |
 | ---------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Max Threads | Maximum number of worker threads the connector can spin up for parallel tasks.    | `10`                                                                                                  |
-| Retry Count | Number of retry attempts for transient failures during connection or sync operations. | `3`                                                                                                   |
+| Max Threads | Maximum number of worker threads the connector can spin up for parallel tasks. Default `3`.    | `10`                                                                                                  |
+| Retry Count | Number of retry attempts for transient failures during connection or sync operations. Default `3`. | `3`                                                                                                   |
 | SSH Config | Configure OLake Go to connect through an SSH tunnel.                               | <ul> <li>`No Tunnel`</li> <li>`SSH Key Authentication`</li> <li>`SSH Password Authentication`</li> </ul> |
 
 :::warning[Important: Unique Replication Slot Required]
@@ -127,7 +130,7 @@ Do not reuse the same `replication slot` and `publication` across multiple OLake
 
 ### 3. Test Connection
 
-- Click **Set up source** to validate the configuration. The test performs two checks:
+- Click **Set up source** to validate the configuration. The test runs two kinds of checks:
   
   <Figure src='/img/docs/sources/postgres/postgres-test-conn.webp' alt='Testing Source Configuration modal showing connection success and required CDC prerequisite checks for wal_level, replication_privilege, replication_slot, and publication' />
 
@@ -137,7 +140,8 @@ Do not reuse the same `replication slot` and `publication` across multiple OLake
      - `wal_level`: Must be set to `logical`
      - `replication_privilege`: User must have replication privileges
      - `replication_slot`: The specified replication slot must exist
-     - `publication`: The specified publication must exist and include the required tables
+     - `publication`: The specified publication must exist. When a sync starts, OLake Go also checks that every selected table is in it, and fails with an `ALTER PUBLICATION ... ADD TABLE` hint if one is missing.
+     - `wal_sender_timeout` (recommended, not required): `0`. A non-zero value is reported but does not fail the test.
 
 - If any required check fails, the test connection will show the current and recommended values. Fix the server-side settings and retry the connection.
 
@@ -173,21 +177,21 @@ An example `source.json` file will look like this:
 | replication_slot `required for CDC`  | Logical replication slot (pgoutput) that retains WAL segments until read, ensuring consistent CDC.                                                                  | `"olake-repl-slot"`                                                                                    | STRING                                                           |
 | publication `required for CDC`       | Name of the PostgreSQL publication that defines which tables and operations (INSERT, UPDATE, DELETE, TRUNCATE) to replicate. Must exist in the same database as the replication slot and include all tables for CDC capture.  | `"postgres_pub"`                        | STRING                                                           |
 | preserve_toast_values                | When an UPDATE operation leaves a TOAST column unchanged, Postgres omits it. OLake Go writes **`__olake_unavailable_value__`** for that column. With the value set as **`true`**, OLake Go reads that record's previous value from the Iceberg destination and writes that value instead, so the unchanged column still shows its last real value. | `false` | BOOLEAN |
-| Schemas                             | Comma-separated list of schemas for discovery. Helps avoid reading all schemas by limiting discovery to only the specified ones. When omitted, all accessible non-system schemas are discovered.                                          | [`public`,`analytics`]                | STRING []                                                           |
-| max_threads                          | Maximum number of worker threads the connector can spin up for parallel tasks.                                                                                      | `10`                                                                                                   | INTEGER                                                          |
-| retry_count                          | Number of times the retry will take place incase of timeout before failing the sync.                                                                                | `3`                                                                                                    | INTEGER                                                          |
-| jdbc_url_params                      | Extra [JDBC URL parameters](https://jdbc.postgresql.org/documentation/use/) for fine-tuning the connection.                                                         | `{"connect_timeout":"20"}`                                                                              | OBJECT                                                           |
+| schemas                             | JSON array of schema names to discover. Helps avoid reading all schemas by limiting discovery to only the specified ones. Blank entries are rejected. When omitted, all accessible non-system schemas are discovered.                                          | `["public","analytics"]`                | STRING []                                                           |
+| max_threads                          | Maximum number of worker threads the connector can spin up for parallel tasks. Default `3`.                                                                                      | `10`                                                                                                   | INTEGER                                                          |
+| retry_count                          | Number of times the retry will take place incase of timeout before failing the sync. Default `3`.                                                                                | `3`                                                                                                    | INTEGER                                                          |
+| jdbc_url_params                      | Extra [libpq connection parameters](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS) added to the connection string. The field keeps its JDBC name, but OLake Go connects through the native Go driver pgx, so use libpq keys such as `connect_timeout`. | `{"connect_timeout":"20"}`                                                                              | OBJECT                                                           |
 | ssl*                                  | Defines whether the connection to the database is encrypted over TLS/SSL. Needed to meet security requirements and connect to databases that do not allow plain-text traffic.                                                                               |  <ul> <li>`require`</li> <li>`disable`</li> <li>`verify-ca`</li> <li>`verify-full`</li> </ul>          | OBJECT                                                           |
 | ssl.cert_source                      | Defines how TLS/SSL certificates are provided: `inline` (default) for PEM content, or `path` for file paths. For `path`, mount the files first: [Docker CLI](/docs/install/docker-cli#mounting-certificate-files). The three certificate parameters below must all use the same method. | <ul> <li>`"inline"` (default)</li> <li>`"path"`</li> </ul> | STRING |
 | ssl.server_ca <br/> or <br/> ssl.server_ca_path | CA certificate for server verification. <ul><li>**Inline** (`ssl.server_ca`): PEM content of the certificate.</li><li>**Path** (`ssl.server_ca_path`): File path to the certificate.</li></ul> | **Inline:** `"<Inline PEM Content>"` <br/> <br/> **Path:** `"/etc/ssl/custom-certs/ca.pem"` | STRING |
 | ssl.client_cert <br/> or <br/> ssl.client_cert_path | Client certificate for mutual TLS authentication. Set together with the client key parameter. <ul><li>**Inline** (`ssl.client_cert`): PEM content of the certificate.</li><li>**Path** (`ssl.client_cert_path`): File path to the certificate.</li></ul> | **Inline:** `"<Inline PEM Content>"` <br/> <br/> **Path:** `"/etc/ssl/custom-certs/client.pem"` | STRING |
 | ssl.client_key <br/> or <br/> ssl.client_key_path | Client private key for mutual TLS authentication. <ul><li>**Inline** (`ssl.client_key`): PEM content of the key.</li><li>**Path** (`ssl.client_key_path`): File path to the key.</li></ul> | **Inline:** `"<Inline PEM Content>"` <br/> <br/> **Path:** `"/etc/ssl/custom-certs/client.key"` | STRING |
-| ssh_config                           | Configure OLake Go to connect through an SSH tunnel.  | `{"host": "my-tunnel-host", "port": 22 , "username": "my-tunnel-user", "password": "tunnel-password"}` | OBJECT                                                           |
+| ssh_config                           | Configure OLake Go to connect through an SSH tunnel. Use `password`, or `private_key` (and an optional `passphrase`) for key authentication.  | `{"host": "my-tunnel-host", "port": 22 , "username": "my-tunnel-user", "password": "tunnel-password"}` | OBJECT                                                           |
 
 :::note
 - Requires the OLake Go Postgres source v1.2.0 or later.
-- `preserve_toast_values` can only be set before running the first `discover` and cannot be changed afterwards.
-- Enabling `preserve_toast_values` restricts the `available_update_types` field in discovered streams to `pos` and `dv`.
+- Set `preserve_toast_values` before the first `discover`. The CLI does not block a later change, but changing it causes data discrepancies (see [Preserving TOAST Values](#toast-columns-preserve)).
+- Enabling `preserve_toast_values` restricts the `available_update_types` field in discovered streams to `pos` and `dv`, and `available_write_modes` to `upsert`.
 :::
 
 <span>*</span> See **SSL Mode Details** below for supported modes and example configurations.
@@ -219,7 +223,8 @@ check \
      - `wal_level`: Must be set to `logical`
      - `replication_privilege`: User must have replication privileges
      - `replication_slot`: The specified replication slot must exist
-     - `publication`: The specified publication must exist and include the required tables
+     - `publication`: The specified publication must exist. When a sync starts, OLake Go also checks that every selected table is in it, and fails with an `ALTER PUBLICATION ... ADD TABLE` hint if one is missing.
+     - `wal_sender_timeout` (recommended, not required): `0`. A non-zero value is reported but does not fail the check.
 
 - If all checks pass, OLake Go returns a connection status payload that includes each prerequisite check and `status: SUCCEEDED`. For example:
 
@@ -258,6 +263,14 @@ check \
           "passed": true,
           "recommended_value": "exists",
           "required": true
+        },
+        {
+          "current_value": "0 (disabled)",
+          "description": "Prevents Postgres from dropping the CDC connection during a long sync.",
+          "name": "wal_sender_timeout",
+          "passed": true,
+          "recommended_value": "Set to 0 to disable the timeout, or configure a higher value based on your expected job sync duration",
+          "required": false
         }
       ],
       "status": "SUCCEEDED"
@@ -282,17 +295,17 @@ check \
 
 | Setup | Large values kept? |
 | ----- | ------------------ |
-| Sync Mode | CDC and Strict CDC only. Full refresh and incremental read whole rows, so TOAST preservation is not needed. <br/><br/>**Note:** For Strict CDC inserts are read back from the destination, but updates to non-TOAST columns may still write `__olake_unavailable_value__` for unchanged TOAST columns.|
-| Stream in append mode | No, there is no prior row to read back from |
+| Sync Mode | CDC and Strict CDC only. Full refresh and incremental read whole rows, so TOAST preservation is not needed. <br/><br/>**Note:** With Strict CDC there is no initial load, so an UPDATE to a row that existed before the sync started still writes `__olake_unavailable_value__` for unchanged TOAST columns. Rows first written by CDC are read back normally.|
+| Stream in append mode | Not available. With the setting on, discover offers only upsert and the sync rejects `append_mode: true`. |
 | Table with `REPLICA IDENTITY FULL` | Not needed, Postgres sends the full row |
 | `wal2json` plugin | Not supported (deprecated) |
 
 :::info
-When Preserve TOAST Values is enabled, syncs may take longer. For each update that leaves a large column unchanged, OLake reads the previous value from the destination.
+When Preserve TOAST Values is enabled, syncs may take longer. For each update that leaves a large column unchanged, OLake Go reads the previous value from the destination.
 :::
 
 :::info[Why you should not change this setting after syncs have run]
-The OLake UI disables this field once the source is created. The CLI does not enforce this. `source.json` stays editable and OLake will not block the change. Changing it after syncs have run causes data discrepancies:
+The OLake UI disables this field once the source is created. The CLI does not enforce this. `source.json` stays editable and OLake Go will not block the change. Changing it after syncs have run causes data discrepancies:
 
 - **Turning it on later:** values synced earlier already hold `__olake_unavailable_value__` in the destination, so turning it on will not bring back the intended value.
 - **Turning it off later:** updates from then on write the placeholder again. Values that were already kept stay as they are.
@@ -322,7 +335,7 @@ FATAL failed to ping database: failed to connect to `host=product-team-testing.p
 g_hba.conf entry for host "4.240.65.100", user "product_team", database "postgres", no encryption (SQLSTATE 28000))
 ```
 
-**Solution**: Change the `ssl.mode: disable` to `ssl.mode: allow` to resolve this issue. This is a known issue with Azure Postgres and the solution is to set the `ssl.mode` to `allow` in the connection string.
+**Solution**: Azure Database for PostgreSQL rejects unencrypted connections, so `ssl.mode: disable` fails with this error. Set `ssl.mode` to `require` (encrypted, no certificate checks), or to `verify-ca` or `verify-full` with `server_ca`. `allow` is not one of the supported modes (`disable`, `require`, `verify-ca`, `verify-full`) and fails with `failed to build tls config: 'ssl.server_ca' is required`.
 
 ### 2. Connecting to Supabase
 
@@ -418,6 +431,4 @@ ALTER TABLE <table_name> REPLICA IDENTITY FULL;
 
 ## Changelog
 
-| Date of Release | Version                                                             | Description                          |
-| --------------- | ------------------------------------------------------------------- | ------------------------------------ |
-| 27 August 2025  | [0.1.11](https://github.com/datazip-inc/olake-go/releases/tag/v0.1.11) | override default timeout in Discover |
+Changes to the Postgres connector are listed in the [OLake Go release notes](/docs/release/ingestion/overview/).

@@ -49,10 +49,9 @@ export const BULLETIN_TABS: BulletinTab[] = [
     items: [
       {
         tag: 'Webinar',
-        title: 'Building High-Performance Iceberg Data Platforms, Anywhere',
-        href: 'https://app.livestorm.co/datazip-inc-1/building-high-performance-iceberg-data-platforms-anywhere/live?s=5d46d287-8240-4c95-9016-e18428c82f3c#/',
-        img: '/img/landing/v2/brenna-buuck.webp',
-        external: true
+        title: 'Apache Iceberg for Beginners: Build a Lakehouse Anywhere ft. MinIO',
+        href: '/webinar/w-15-iceberg-for-beginners-minio/',
+        img: '/img/landing/v2/brenna-buuck.webp'
       },
       {
         tag: 'Webinar',
@@ -76,7 +75,7 @@ export const BULLETIN_TABS: BulletinTab[] = [
       },
       {
         tag: 'Docs',
-        title: 'OLake Fusion: compaction, scheduling and maintenance',
+        title: 'OLake Fusion compaction benchmark: 2.06x faster than Spark',
         href: '/docs/fusion/getting-started/compaction/',
         img: '/img/landing/v2/bull-benchmark.webp'
       }

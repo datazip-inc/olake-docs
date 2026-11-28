@@ -1,6 +1,6 @@
 ---
-title: "Schema Evolution & Data Type Changes | OLake"
-description: "Learn how OLake handles schema changes and data type changes in your data pipelines using Apache Iceberg v2."
+title: "Schema Evolution & Data Type Changes | OLake Go"
+description: "Learn how OLake Go handles schema changes and data type changes in your data pipelines, using Apache Iceberg schema evolution and type promotion."
 sidebar_label: Schema Evolution
 sidebar_position: 2
 ---
@@ -20,9 +20,9 @@ Schema evolution refers to changes in your database structure like adding, remov
 
 | Change Type                  | How OLake Go Detects & Handles It                                                                                                                                                                                                                                                                                                                                 | Typical Pipeline Impact                                               | Extra Details & Tips                                                                                                                                                                       |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Adding a column**          | OLake Go runs a *schema discovery* at the start of every sync. When a new source column appears, it is **automatically** added to the Iceberg schema (new field-ID) and starts receiving values immediately. If the source back-fills historical rows, CDC registers them as updates. **No user action required.**                                                     | **No breakage.** Historical rows show `NULL` until back-filled.       | • Monitor write throughput if a back-fill is large.                                                                                                                                       |
-| **Deleting a column** | Schema discovery also detects when a source column has been removed.<br />After discovery confirms the column is no longer in the source, OLake Go updates the Iceberg schema accordingly.<br />The deleted column still exists in the destination schema, so old snapshots remain queryable.                                                                     | **No breakage.** ETL continues with a "virtual" column (null-filled). | • BI tools won't break, but may show the column full of nulls — communicate schema changes.<br />• Run a *rewrite manifests* job later to drop the dead column if storage footprint matters. |
-| **Renaming a column**        | Column renames are also detected during *schema discovery*.<br /><br />When a source column is renamed, OLake Go interprets this as:<br />→ The old column remains in the destination (but no new values are written).<br />→ A new column with the updated name is added and starts receiving incoming data.<br /><br />*WIP:* Because Iceberg keeps immutable field IDs, OLake Go can also just update the column's name on the same field ID (e.g., `customer_id → client_id`) — avoiding data migration entirely. | **No breakage.**                                                      | • Renames are instant — no file rewrites.<br />• Update SQL queries downstream to use the new column name.                                                                                |
+| **Adding a column**          | When records with a new source column arrive, OLake Go adds the column to the Iceberg schema (new field ID) and starts writing its values, as long as **Sync new columns automatically** is on. Since OLake Go v0.10.1, a sync does not re-run schema discovery unless it runs with `--discover-schema`, which OLake UI does not pass. Discovery runs when you open **Edit Streams** in OLake UI or run `discover`. If the source back-fills historical rows, CDC registers them as updates. **No user action required.**                                                     | **No breakage.** Historical rows show `NULL` until back-filled.       | • Monitor write throughput if a back-fill is large.                                                                                                                                       |
+| **Deleting a column** | When a source column is dropped, new rows no longer carry it, so OLake Go writes null for it.<br />The column stays in the Iceberg schema, so old snapshots remain queryable.<br />The next discover (**Edit Streams** in OLake UI, or `discover`) removes it from the stream's column list.                                                                     | **No breakage.** ETL continues with a "virtual" column (null-filled). | • BI tools won't break, but may show the column full of nulls, communicate schema changes.<br />• Run a *rewrite manifests* job later to drop the dead column if storage footprint matters. |
+| **Renaming a column**        | A rename shows up in the incoming records as a new column name.<br /><br />When a source column is renamed, OLake Go interprets this as:<br />→ The old column remains in the destination (but no new values are written).<br />→ A new column with the updated name is added and starts receiving incoming data.<br /><br />*WIP:* Because Iceberg keeps immutable field IDs, OLake Go can also just update the column's name on the same field ID (e.g., `customer_id → client_id`): avoiding data migration entirely. | **No breakage.**                                                      | • Renames are instant, no file rewrites.<br />• Update SQL queries downstream to use the new column name.                                                                                |
 | **JSON / Semi-structured key add / remove / rename** | OLake Go flattens keys to a canonical path inside a single JSON column (or keeps raw JSON).<br />• Added keys appear automatically.<br />• Removed keys vanish from new rows.<br />• Renamed keys are treated as "remove + add" because JSON has no intrinsic field ID.                                                                                      | **No breakage.**                                                      |                                                                                                                                                                                            |
 
 
@@ -53,8 +53,9 @@ OLake Go supports Iceberg v2's widening promotions, where the destination column
 | ------------- | --------------------------- | ----------------------------------------------------- |
 | INT           | LONG (BIGINT)               | Widening integers is safe                             |
 | FLOAT         | DOUBLE                      | Promoting to higher precision works without data loss |
-| DATE          | TIMESTAMP, TIMESTAMP_NS     | Dates can be safely converted to timestamps           |
 | DECIMAL(P, S) | DECIMAL(P', S) where P' > P | Only widening precision is supported                  |
+
+OLake Go writes source `DATE` columns as Iceberg `timestamptz`, so a source change from `DATE` to `TIMESTAMP` lands in the same column type and needs no promotion. Iceberg's own `date` to `timestamp` promotion exists only in table format version 3 ([Iceberg spec, schema evolution](https://iceberg.apache.org/spec/#schema-evolution)).
 
 :::info
 Writing an `INT` value into a `FLOAT` or `DOUBLE` column is supported in Iceberg, as it is considered a safe numeric conversion rather than a schema change.
@@ -80,7 +81,7 @@ Similarly, writing a `BIGINT` value into a `DOUBLE` is also supported.
          When a source value's data type has a smaller range or precision than the destination column's type, OLake Go treats this as a narrowing conversion and handles it seamlessly. For example, if the destination column is defined as BIGINT but the incoming values are INT, OLake Go recognizes that every INT value falls within BIGINT's range and simply stores the values without error. This validation step ensures that compatible, smaller-range types are accepted even when Iceberg v2 would flag a mismatch.
 
       :::tip
-      Any other incompatible data type changes will be captured by OLake Go using a Dead Letter Queue column (DLQ)  (feature coming soon).
+      Any other incompatible data type change fails the sync, as listed under [Unsupported Data Type Conversions](#unsupported-data-type-conversions). A Dead Letter Queue (DLQ) column that would keep these values is on the [OLake Go roadmap](https://github.com/datazip-inc/olake-go/issues/265) and is not available yet.
       :::
   </TabItem>
   <TabItem value="parquet" label="Parquet">
@@ -124,7 +125,7 @@ Which source types land as decimals is listed in each source's Data Type Mapping
 <Tabs queryString="decimal-columns" groupId="decimal-columns">
   <TabItem value="iceberg" label="Iceberg" default>
 
-| OLake Type | Iceberg Type |
+| OLake Go Type | Iceberg Type |
 | --- | --- |
 | `decimal(p,s)`, p up to 38 | `decimal(p, s)` |
 
@@ -141,7 +142,7 @@ Run [Clear Destination](/docs/getting-started/job-level-properties/#8-clear-dest
   </TabItem>
   <TabItem value="parquet" label="Parquet">
 
-| OLake Type | Parquet Type |
+| OLake Go Type | Parquet Type |
 | --- | --- |
 | `decimal(p,s)`, p up to 9 | `INT32`, annotated `DECIMAL(p,s)` |
 | `decimal(p,s)`, p 10 to 18 | `INT64`, annotated `DECIMAL(p,s)` |
@@ -172,14 +173,14 @@ When a new column appears in your source data:
 
 When a new table appears in your source database:
 
-- OLake Go automatically detects the new table on the next scheduled run and lists it in the UI
+- The new table appears in the Streams list the next time you open **Edit Streams** in OLake UI (which runs discover) or run `discover`. Scheduled syncs do not discover new tables
 - The table is synced only when you explicitly enable it for the job
 - Once enabled, OLake Go creates the destination table and starts syncing using your configured sync mode
 
 ### Scenario 3: Table Name Change
 
 When a table name changes in your source database:
-- OLake Go automatically detects the new table name
+- The renamed table appears as a new stream the next time discover runs (**Edit Streams** in OLake UI, or `discover`)
 - The table is added to your destination schema
 - A New table gets created
 - The old table name is retained in the destination schema but will not be populated with new data

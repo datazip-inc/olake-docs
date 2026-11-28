@@ -28,7 +28,8 @@ export const BENCHMARK = {
   rows: [
     { metric: 'Total Compaction Time', fusion: '27m 2s', delta: '2.06x faster', spark: '55m 47s' },
     { metric: 'Compaction Cost/ Job', fusion: '$1.06', delta: '52% less cost', spark: '$2.19' },
-    { metric: 'Config Parameters', fusion: '1', delta: '10x simpler', spark: '10+' }
+    // docs/fusion/getting-started/compaction.mdx: 7 rewrite_data_files parameters vs 1 target-size.
+    { metric: 'Config Parameters', fusion: '1', delta: '7x fewer settings', spark: '7' }
   ] as BenchmarkRow[],
   link: { label: 'View detailed benchmarks', href: '/docs/fusion/getting-started/compaction/' }
 }

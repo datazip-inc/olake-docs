@@ -28,7 +28,7 @@ export const GO_SEO = {
   title: 'OLake Go — Open-Source Data Replication to Apache Iceberg & S3',
   description:
     'Open-source data replication tool that streams databases and streaming sources into Apache Iceberg and S3 with CDC, schema evolution and parallel chunking.',
-  twitterDescription: 'Stream any source into your lakehouse with CDC, schema evolution and parallel chunking — up to 12.5× faster than Fivetran.',
+  twitterDescription: 'Replicate databases, Kafka and S3 into your lakehouse with CDC, schema evolution and parallel chunking, up to 12.5x faster than Fivetran.',
   canonicalUrl: `${SITE_URL}/olake-go/`,
   ogImage: FALLBACK_OG_IMAGE,
   jsonLdSchemas: [
@@ -114,9 +114,9 @@ export const HOME_SEO = {
 }
 
 export const FUSION_SEO = {
-  title: 'OLake Fusion — Automated Apache Iceberg Table Maintenance & Compaction',
-  description: 'Keep Apache Iceberg tables consistently performant and scalable with automated compaction and delete-file cleanup.',
-  twitterDescription: 'Automated Iceberg table maintenance — compaction and cleanup, up to 2× faster than Apache Spark.',
+  title: 'OLake Fusion: Automated Apache Iceberg Table Maintenance & Compaction',
+  description: 'Keep Apache Iceberg tables consistently performant and scalable with automated compaction, delete-file cleanup and scheduled snapshot expiry.',
+  twitterDescription: 'Automated Iceberg table maintenance: compaction and snapshot expiry, 2.06x faster than Apache Spark in our compaction benchmark.',
   canonicalUrl: `${SITE_URL}/olake-fusion/`,
   ogImage: FALLBACK_OG_IMAGE,
   jsonLdSchemas: [
@@ -128,7 +128,7 @@ export const FUSION_SEO = {
         name: 'OLake Fusion',
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Cross-platform',
-        description: 'Automated Apache Iceberg table maintenance: compaction and delete-file cleanup.',
+        description: 'Automated maintenance for Apache Iceberg format version 1 and 2 tables: compaction, delete-file cleanup and scheduled snapshot expiry.',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
         url: `${SITE_URL}/olake-fusion/`,
         publisher: { '@type': 'Organization', name: 'Datazip', url: SITE_URL }

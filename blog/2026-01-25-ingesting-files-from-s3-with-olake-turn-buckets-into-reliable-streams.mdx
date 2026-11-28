@@ -78,7 +78,7 @@ If you run incremental mode, the connector compares each file's `LastModified` t
 
 ### Reading & Parsing
 
-The connector reads files (supports Parquet range reads for efficiency) and decompresses `.gz` transparently.
+The connector reads files (supports Parquet range reads for efficiency) and decompresses `.gz` files once **Compression Type** is set to `gzip`.
 
 ### Schema & Type Mapping
 
@@ -87,6 +87,8 @@ The connector reads files (supports Parquet range reads for efficiency) and deco
 **JSON files:** Primitive types like strings, numbers, and booleans are detected automatically. Nested objects or arrays are stored as JSON strings.
 
 **Parquet files:** OLake Go reads the schema directly from the file metadata, so no inference is needed.
+
+**XML files:** Element text and attribute values are read as strings, and nested elements are stored as JSON strings.
 
 OLake Go automatically figures out column types while reading files, so you don't need to define schemas manually:
 
@@ -145,8 +147,9 @@ S3 buckets almost always end up storing a mix of:
 - CSV exports
 - JSON events/logs
 - Parquet outputs from batch/streaming jobs
+- XML files
 
-OLake Go supports all three and handles them in the "obvious, non-annoying" way.
+OLake Go supports all four (XML since v0.9.0) and handles them in the "obvious, non-annoying" way.
 
 ### CSV (plain or gzipped)
 
@@ -177,9 +180,17 @@ Parquet is the easiest case. OLake Go reads schema directly from Parquet metadat
 **Supported:**
 - `.parquet`
 
-### Compression: you don't need to configure
+### XML (plain or gzipped)
 
-A small but important quality-of-life thing: if your files end with `.gz`, OLake Go automatically decompresses them. That's it. No extra "compression" field, no special mode, no separate connector.
+Since v0.9.0, OLake Go also reads XML. You set a **Row Identifier**, the tag that encloses each record, and element text and attributes land as string columns. Nested elements are stored as JSON strings ([XML file handling](/docs/connectors/s3/#xml-properties)).
+
+**Supported:**
+- `.xml`
+- `.xml.gz`
+
+### Compression: set it once per source
+
+If your files end with `.gz`, set **Compression Type** (`compression`) to `gzip` and OLake Go decompresses them. The default is `none`, and with it discovery skips `.gz` files. Parquet files use their own internal compression, so they need no setting.
 
 This is especially useful for S3 ingestion because `.gz` is often the default for CSV and JSON exports.
 
@@ -225,7 +236,7 @@ The OLake Go S3 Source connector works with Amazon S3 without any version restri
 
 When using LocalStack, a minimum version of 0.12+ is recommended for stable S3 behavior and IAM simulation.
 
-In terms of data formats, the connector supports CSV, JSON, and Parquet files. These formats cover most common data export and analytics use cases, allowing teams to ingest both structured and semi-structured data reliably.
+In terms of data formats, the connector supports CSV, JSON, Parquet and XML files. These formats cover most common data export and analytics use cases, allowing teams to ingest both structured and semi-structured data reliably.
 
 ### Required permissions
 
@@ -311,7 +322,9 @@ Here's a table you can go by just ticking off:
 | Path Prefix | Optional prefix to limit discovery | `data/` |
 | Access Key ID | Optional (use IAM chain for prod) | `<YOUR_KEY>` |
 | Secret Access Key | Optional (use IAM chain for prod) | `<YOUR_SECRET>` |
-| File Format (required) | CSV / JSON / Parquet | `parquet` |
+| File Pattern | Optional regular expression to filter object keys | `.*\.csv$` |
+| File Format (required) | CSV / JSON / Parquet / XML | `parquet` |
+| Compression Type | `none` (default) or `gzip` for `.gz` files | `gzip` |
 | Max Threads | Concurrent file processors | `10` |
 | Retry Count | Retry attempts for transient failures | `3` |
 
@@ -335,7 +348,7 @@ You won't always need to worry about format-specific configuration, especially i
 
 For CSV sources, you can configure a few important options to ensure correct parsing. The delimiter defaults to a comma (`,`), but can be adjusted for semicolon- or tab-separated files. The Has Header setting (enabled by default) tells the connector whether the first row contains column names.
 
-You can also use Skip Rows to ignore metadata or comments at the top of a file, and configure the Quote Character (default `"`) for properly handling quoted fields. Compression does not need to be configured manually—it is inferred automatically from the file extension, so files ending with `.csv.gz` are treated as gzipped CSV files.
+You can also use Skip Rows to ignore metadata or comments at the top of a file, and configure the Quote Character (default `"`) for properly handling quoted fields. For files ending with `.csv.gz`, set Compression Type to `gzip`. With the default `none`, those files are skipped.
 
 Parquet files generally require no tuning at all, since the schema is embedded directly in the file metadata and can be read reliably by the connector. JSON also typically needs no additional configuration, unless different JSON formats (such as JSONL and JSON arrays) are mixed within the same folder. For best results, each JSON format should be kept in its own stream folder.
 
@@ -357,14 +370,15 @@ OLake Go tries to keep ingestion stable and predictable while still giving usefu
 | Parquet | BOOLEAN | boolean | |
 | Parquet | TIMESTAMP_MILLIS | timestamptz | |
 | Parquet | DATE | date | |
-| Parquet | DECIMAL | float | Converted to float64. May result in precision loss for high-precision decimal values. |
+| Parquet | DECIMAL(p,s), p up to 38 | decimal(p,s) | Exact values (since v1.2.0) |
+| Parquet | DECIMAL(p,s), p above 38 | double | Rounds to about 17 significant digits |
+| XML | text content, attributes | string | All scalar element text and attribute values |
+| XML | nested elements | string | Nested elements serialized as JSON strings |
 | All formats | `_last_modified_time` | timestamptz | S3 LastModified metadata (added by connector) |
 
 **Timezone:** OLake Go ingests timestamps in UTC (timestamptz) regardless of source timezone.
 
-Parquet DECIMAL types are converted to float64 during ingestion.
-
-While this works well for analytical use cases, very high-precision or fixed-scale decimal values may lose precision. If exact precision is required (for example, financial data), consider storing values as strings or using a destination that supports native decimal types.
+Since v1.2.0, Parquet DECIMAL columns with a precision up to 38 land as Iceberg `decimal(p,s)`, so fixed-scale values such as financial data keep their exact value. Only a precision above 38 falls back to double, which rounds to about 17 significant digits.
 
 ## Date and time handling (edge cases)
 
@@ -449,7 +463,7 @@ Every other setup we built can't be full-proof if some errors arrive this would 
 
 **Cause:** Files not in folder structure or wrong `path_prefix`.
 
-**Fix:** Ensure `bucket/prefix/stream_name/files` layout. Confirm extensions (`.csv/.json/.parquet`).
+**Fix:** Ensure `bucket/prefix/stream_name/files` layout. Confirm extensions (`.csv/.json/.parquet/.xml`), and set Compression Type to `gzip` for `.gz` files.
 
 ### Schema Inference Failed (CSV)
 
@@ -489,9 +503,9 @@ Every other setup we built can't be full-proof if some errors arrive this would 
 
 ### Files Not Syncing Despite Being Present
 
-**Cause:** Extension mismatch or compression not detected.
+**Cause:** Extension mismatch, or `.gz` files while Compression Type is `none`.
 
-**Fix:** Ensure extensions are correct and files are non-empty: `aws s3 ls s3://bucket/prefix/ --recursive --human-readable`.
+**Fix:** Set Compression Type to `gzip` for `.gz` files. Ensure extensions are correct and files are non-empty: `aws s3 ls s3://bucket/prefix/ --recursive --human-readable`.
 
 ### Out of Memory Errors
 
@@ -541,8 +555,9 @@ And once you're happy with your S3 setup and you're ready to expand your pipelin
         <li><strong>CSV:</strong> Samples rows to infer the safest data types</li>
         <li><strong>JSON:</strong> Extracts primitive types into columns and stores nested objects/arrays as JSON strings</li>
         <li><strong>Parquet:</strong> Reads schema directly from file metadata (no inference required)</li>
+        <li><strong>XML:</strong> Reads element text and attributes as strings, with a Row Identifier naming the record tag (since v0.9.0)</li>
       </ul>
-      <p>Gzip-compressed files (typically <code>.gz</code> for CSV/JSON) are decompressed automatically. Parquet files already use internal compression.</p>
+      <p>Gzip-compressed files (typically <code>.gz</code> for CSV, JSON and XML) are decompressed when Compression Type is set to <code>gzip</code>. Parquet files already use internal compression.</p>
     </div>
   },
   {

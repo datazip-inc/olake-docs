@@ -96,7 +96,7 @@ Discovery is the one phase where the differences between sources show up most cl
 
 - **Relational databases** have real catalogs, so the drivers query them directly (`information_schema` and its equivalents) and get exact column types, nullability, and primary keys.
 - **MongoDB** has no schema to ask for. The driver samples up to 10,000 documents from each end of the collection (newest and oldest, using `$natural` order) and resolves a schema from what it finds, so both old and recent document shapes are represented.
-- **S3** infers the schema from the first file of each stream, using the configured format parser (CSV, JSON, or Parquet).
+- **S3** infers the schema from the first file of each stream, using the configured format parser (CSV, JSON, XML, or Parquet).
 - **Kafka** samples recent messages from every partition of a topic and derives the schema from their decoded payloads.
 
 Discovery is its own phase, run by the `discover` command, not something every sync repeats. Each stream is inspected independently and some inspections are heavy (MongoDB samples thousands of documents per collection), so `discover` runs the per-stream schema work across a worker group whose size is capped by `--max-discover-threads`, 50 by default:
@@ -320,7 +320,7 @@ Every database exposes its change log differently, and OLake Go reads each one n
 | Source | Change log | How OLake Go reads it |
 |---|---|---|
 | **PostgreSQL** | Write-ahead log (WAL) | Logical replication slot with the `pgoutput` plugin, scoped by a publication |
-| **MySQL** | Binlog | Binlog replication protocol, tracking file and position (MariaDB included) |
+| **MySQL** | Binlog | Binlog replication protocol, tracking file and position (MariaDB included), or the GTID (global transaction identifier) set on MySQL with GTID mode on |
 | **MongoDB** | Oplog | Change streams, resumed via resume tokens |
 | **SQL Server** | CDC capture tables | Polled in LSN ranges through the native CDC functions |
 
@@ -446,9 +446,9 @@ Take row 42, inserted mid-load:
 
 - **Backfill** reads it and writes it as a plain append, op_type `r`.
 - **CDC replay** picks up the same insert. Still inside the overlap window, so it gets tagged `i`.
-- Both hash to the same `_olake_id`. On the `i`-tagged copy, the writer doesn't append a second row, it fires an equality delete for that ID plus a fresh data file.
-- Iceberg commits both in one shot. The equality delete wipes out any existing row with that ID, wherever it came from, so the backfill's copy of row 42 is gone the moment the commit lands.
-- Query the table afterward: one row for id 42, not two. Full delete mechanics are in [Upserts: equality and positional deletes](#upserts-equality-and-positional-deletes).
+- Both hash to the same `_olake_id`. On the `i`-tagged copy, the writer doesn't append a second row. In equality mode (`eq`) it fires an equality delete for that ID plus a fresh data file, and in the positional (`pos`) and deletion vector (`dv`) modes it looks up the backfilled copy's location in an index and deletes it by position.
+- Iceberg commits both in one shot. The delete wipes out the existing row with that ID, so the backfill's copy of row 42 is gone the moment the commit lands.
+- Query the table afterward: one row for id 42, not two. Full delete mechanics are in [Upserts: equality deletes, positional deletes and deletion vectors](#upserts-equality-deletes-positional-deletes-and-deletion-vectors).
 
 <div style={{ margin: '2.5rem 0', textAlign: 'center' }}>
 
@@ -466,14 +466,14 @@ One more piece: how does a stream even know if it's still in the overlap window?
 
 - Every backfill chunk commit writes `dedup_inserts: true`, no conditions attached. Backfill still running anywhere on that stream means the window stays open.
 - The first CDC session to finish writes `dedup_inserts: false` into that same property, right next to the log position it just committed.
-- Every CDC session after that checks `dedup_inserts` before tagging anything. Once it reads `false`, row 42 lands as a plain `c` the next time, no delete needed.
+- Every CDC session after that checks `dedup_inserts` before tagging anything. Once it reads `false`, row 42 lands as a plain `c` the next time. In the `pos` and `dv` modes a `c` needs no delete, while `eq` mode still keys one equality delete on it, so an insert and an update to the same row in one sync land as one row.
 - Process dies mid-session, before that `false` gets written? Next run reads the ledger, still finds `true` from the backfill, and stays in dedup mode. Nothing to guess.
 
 ### Bounded sessions and careful acknowledgement
 
 An OLake Go CDC session is not a daemon. The reader notes where the log ends when the session starts, streams changes until it reaches that position (or until nothing new arrives within the configured `initial_wait_time`), and then shuts down: writers flush and commit to the destination before any position is saved. Run it every five minutes and you have near-real-time tables; run it nightly and each run drains whatever accumulated.
 
-Between sessions, the position lives in `state.json` as a bookmark, and every later run resumes from it by reading that file back at startup. What the bookmark contains depends on the source: an LSN for Postgres, binlog coordinates for MySQL (along with the generated server ID OLake Go uses to identify itself as a replica, so later runs reuse the same identity), and a resume token per stream for MongoDB, which is handed back to the change stream via `resumeAfter`.
+Between sessions, the position lives in `state.json` as a bookmark, and every later run resumes from it by reading that file back at startup. What the bookmark contains depends on the source: an LSN for Postgres, binlog coordinates for MySQL, or the GTID set once GTID mode is on (along with the generated server ID OLake Go uses to identify itself as a replica, so later runs reuse the same identity), and a resume token per stream for MongoDB, which is handed back to the change stream via `resumeAfter`.
 
 Whatever the source, every driver follows the same discipline around that bookmark:
 
@@ -510,7 +510,8 @@ sysident, _ := pglogrepl.IdentifySystem(ctx, pgConn)
 err := pglogrepl.StartReplication(ctx, socket.pgConn, socket.ReplicationSlot,
     socket.ConfirmedFlushLSN,
     pglogrepl.StartReplicationOptions{
-        PluginArgs: []string{"proto_version '1'", "publication_names 'olake_publication'"},
+        // the publication name comes from the source config
+        PluginArgs: []string{"proto_version '1'", fmt.Sprintf("publication_names '%s'", p.publication)},
     })
 
 for {
@@ -528,7 +529,7 @@ for {
 }
 ```
 
-The decoding step is where `pgoutput` messages become records. Relation messages describe each table's shape and are cached so later change messages can be decoded against them, begin and commit messages mark transaction boundaries (the session only ever stops at a completed transaction, never mid-way through one), and each insert, update, or delete is converted and pushed to its stream's writer. One practical warning surfaces here too: if a table's replica identity is not `FULL`, unchanged TOAST column values can be missing from update events, and OLake Go logs exactly that so you can fix it on the source.
+The decoding step is where `pgoutput` messages become records. Relation messages describe each table's shape and are cached so later change messages can be decoded against them, begin and commit messages mark transaction boundaries (the session only ever stops at a completed transaction, never mid-way through one), and each insert, update, or delete is converted and pushed to its stream's writer. One practical warning surfaces here too: if a table's replica identity is not `FULL`, unchanged TOAST column values can be missing from update events, and OLake Go logs exactly that so you can fix it on the source. Since v1.2.0, the [`preserve_toast_values`](/docs/connectors/postgres/#toast-columns-preserve) source option instead recovers those values from the destination, for streams using positional deletes or deletion vectors.
 
 The acknowledgement order is the load-bearing detail: the slot's LSN advances only after the destination commit succeeds, which means Postgres keeps WAL around until the lakehouse truly has the data. A crash between commit and acknowledgement is also covered: the committed position stored in the destination is compared against the local state on the next run, and if the destination is ahead, the engine replays exactly up to that position before resuming normal streaming, so the slot, the state file, and the table converge. To trace this failure by failure, with worked examples for each source family, check how [exactly-once delivery works during CDC](/blog/exactly-once-delivery-iceberg#cdc).
 
@@ -658,7 +659,7 @@ A Postgres state file with one stream mid-load looks like this:
 ```json
 {
   "type": "GLOBAL",
-  "version": 6,
+  "version": 9,
   "global": {
     "state": { "lsn": "0/1A2B3C4D" },
     "streams": ["public.orders", "public.users"]
@@ -679,9 +680,9 @@ A Postgres state file with one stream mid-load looks like this:
 }
 ```
 
-Reading it top to bottom: this is a global-state source at state format version 6, the replication log has been consumed and acknowledged up to LSN `0/1A2B3C4D`, two streams are attached to that position, and `public.orders` still has two CTID chunks left to load. Streams whose state holds nothing are not serialized at all, and full refresh streams never store state in the first place, since their contract is to re-read everything anyway.
+Reading it top to bottom: this is a global-state source at state format version 9, the replication log has been consumed and acknowledged up to LSN `0/1A2B3C4D`, two streams are attached to that position, and `public.orders` still has two CTID chunks left to load. Streams whose state holds nothing are not serialized at all, and full refresh streams never store state in the first place, since their contract is to re-read everything anyway.
 
-The `version` field is there for backward compatibility. Parsing behaviors change over time, timestamp strictness, timezone handling for MySQL, integer width mappings, and each state file pins the version it was created with, so an old pipeline keeps the exact semantics it started with instead of silently changing behavior after an upgrade. New state files are stamped with the latest version, currently 6.
+The `version` field is there for backward compatibility. Parsing behaviors change over time, timestamp strictness, timezone handling for MySQL, integer width mappings, and each state file pins the version it was created with, so an old pipeline keeps the exact semantics it started with instead of silently changing behavior after an upgrade. New state files are stamped with the latest version, currently 9.
 
 When you do want to start over, `clear-destination` is the reset path: for the selected streams it drops the destination tables, clears their stream state, and detaches them from the global state, so the next sync treats them as brand new while every other stream keeps its position.
 
@@ -744,7 +745,7 @@ case RestCatalog:
 }
 ```
 
-That is what buys compatibility with Glue, Hive, JDBC, and REST catalogs (Nessie, Polaris, Lakekeeper, Unity, and S3 Tables ride the REST implementation) without reimplementing four catalog integrations and Iceberg's commit protocol in Go.
+That is what buys compatibility with Glue, Hive, JDBC, and REST catalogs (Polaris, Lakekeeper, Snowflake Horizon, Unity, BigLake, S3 Tables, and Nessie ride the REST implementation) without reimplementing four catalog integrations and Iceberg's commit protocol in Go.
 
 The data path is the part OLake Go took back. Originally every record traveled over gRPC and the JVM wrote the Parquet files; today one config flag decides which writer handles the bytes:
 
@@ -752,10 +753,10 @@ The data path is the part OLake Go took back. Originally every record traveled o
 // destination/iceberg/iceberg.go: "arrow_writes" in destination.json
 if i.config.UseArrowWrites {
     i.writer, err = arrowwriter.New(ctx, i.options, i.partitionInfo, i.schema,
-        i.stream, i.server, isUpsertMode(i.stream, i.options.Backfill))
+        i.stream, i.server, upsertMode, indexThread)
     ...
 } else {
-    i.writer = legacywriter.New(i.options, i.schema, i.stream, i.server)
+    i.writer = legacywriter.New(i.options, i.schema, i.stream, i.server, upsertMode, indexThread)
 }
 ```
 
@@ -795,22 +796,27 @@ if sizeSoFar < targetSize {
 
 Data files target 512 MB and delete files 64 MB. Writers are also partition-aware: each record's partition values are computed from the stream's `partition_regex` (with Iceberg transforms like `day` or `identity`), and every partition key gets its own rolling writer, so files land already organized the way the table is partitioned. Finished files are shipped to the JVM as raw bytes over gRPC, and the JVM places them in object storage under paths it allocated. To see how this pipeline was designed, check the [Arrow writer architecture](/blog/olake-arrow-based-iceberg-ingestion#olake-gos-new-arrow-writer-architecture) post.
 
-### Upserts: equality and positional deletes
+### Upserts: equality deletes, positional deletes and deletion vectors
 
 Iceberg has no update statement; a row is replaced by writing a delete for its old version and inserting the new one. OLake Go decides per writer whether that machinery is even needed:
 
 ```go
 // destination/iceberg/iceberg.go
 func isUpsertMode(stream types.StreamInterface, backfill bool) bool {
-    return utils.Ternary(stream.Self().StreamMetadata.AppendMode, false, !backfill).(bool)
+    return utils.Ternary(stream.AppendModeEnabled(), false, !backfill).(bool)
 }
 ```
 
-Backfill writers append, because a fresh load has nothing to replace, and append-only streams always append. Everything else, CDC updates and deletes, incremental rows, overlap-window inserts, runs in upsert mode, where the writer produces two kinds of delete files alongside the data:
+Backfill writers append, because a fresh load has nothing to replace, and append-only streams always append. Everything else, CDC updates and deletes, incremental rows, overlap-window inserts, runs in upsert mode.
+
+Each stream's `update_type` then picks the delete format: `eq` for equality deletes, `pos` for positional deletes (since v0.10.0), or `dv` for deletion vectors (since v0.11.0). In `eq` mode the writer produces two kinds of delete files alongside the data:
 
 ```go
 // destination/iceberg/arrow-writer/writer.go (trimmed)
-if w.upsertMode && (recordOpType == "d" || recordOpType == "u" || recordOpType == "i") {
+if w.indexThread != nil {
+    // pos and dv modes: look the previous version up in the table index
+    w.indexRecord(writer, recordOlakeID, recordOpType, rec.OlakeColumns, filePosition)
+} else if w.upsertMode && (recordOpType == "d" || recordOpType == "u" || recordOpType == "i" || recordOpType == "c") {
     if _, exists := writer.olakeIDPosition[recordOlakeID]; !exists {
         // first sighting: equality delete removes whatever earlier syncs wrote
         writer.equalityDeletes = append(writer.equalityDeletes, recordOlakeID)
@@ -826,6 +832,10 @@ if w.upsertMode && (recordOpType == "d" || recordOpType == "u" || recordOpType =
 ```
 
 The two delete types split the work cleanly. An **equality delete** on `_olake_id` erases the row's previous version wherever an earlier sync put it. A **positional delete** handles repetition inside the current sync: when the same row changes many times in one CDC window, each occurrence positionally deletes the one before it, so only the final version survives, instead of a thousand versions of a hot row being left for query engines to reconcile.
+
+The `pos` and `dv` modes write no equality deletes at all. They keep a durable index from each `_olake_id` to the file and position of its live row, so an update or delete looks up the previous version and deletes it by position. Under `dv`, those positions go to the JVM, which encodes them as Iceberg v3 deletion vectors, one Puffin bitmap per data file, instead of a positional delete file.
+
+Since v0.11.0, discover offers only the formats that the job's target query engines can read, and since v1.1.2 it also drops formats the destination catalog cannot hold. The first available one in the order `eq`, `pos`, `dv` is the default. The matrix lives in `types/query_engine.go` and `types/iceberg_catalog.go`, and the [compatibility page](/docs/understanding/compatibility-engines/#delete-format-support-by-query-engine) lists it per engine.
 
 ### The commit
 
@@ -939,7 +949,7 @@ A replication engine has to be opinionated about types, because the source and t
 
 ### One type system in the middle
 
-Source values are first classified into a small set of OLake Go types, `Int32`, `Int64`, `Float64`, `String`, `Bool`, `Timestamp` at several precisions, `Object`, `Array`. Relational drivers derive these from the catalog's column types; schemaless sources derive them from the values themselves:
+Source values are first classified into a small set of OLake Go types, `Int32`, `Int64`, `Float64`, `String`, `Bool`, `Timestamp` at several precisions, `Object`, `Array`, `Binary`, and `Decimal` (native `decimal(p,s)` since v1.2.0). Relational drivers derive these from the catalog's column types; schemaless sources derive them from the values themselves:
 
 ```go
 // utils/typeutils/datatype.go
@@ -965,11 +975,15 @@ flowchart BT
     TimestampMicro --> TimestampNano["TimestampNano (9)"]
     Float64 --> String["String (5)"]
     TimestampNano --> String
+    String --> Binary["Binary (10)"]
+    FixedBinary["FixedBinary (11)"] --> Binary
 ```
 
 </div>
 
-Two integer widths meet at the wider integer (`Int32` + `Int64` → `Int64`), an integer and a float meet at float (`Int64` + `Float32` → `Float64`), and types on different branches meet at `String`, which sits at the root and can hold anything (`Float64` + `Timestamp` → `String`). The same rule governs discovery and, later, what happens when live data disagrees with the table it is being written to.
+Two integer widths meet at the wider integer (`Int32` + `Int64` → `Int64`), an integer and a float meet at float (`Int64` + `Float32` → `Float64`), and types on different branches meet at `String` (`Float64` + `Timestamp` → `String`). The root is `Binary`, because any value can be carried as raw bytes, and `FixedBinary` widens only to `Binary`, never to text. Two decimals merge into a decimal wide enough for both, and a decimal meeting another number merges at `Float64`.
+
+The same rule governs discovery and, later, what happens when live data disagrees with the table it is being written to.
 
 ### Normalization: columns, or one JSON blob
 
@@ -1028,7 +1042,7 @@ var promotionTransitions = map[string]map[string]bool{
 }
 ```
 
-If a field needs promoting (`int` to `long`, `float` to `double`) or a genuinely new column appears, the table is evolved before the batch is written. Because many writer threads can hit this at once, evolution runs under a per-stream lock, so exactly one thread alters the table while the others wait and then continue against the updated schema:
+If a field needs promoting (`int` to `long`, `float` to `double`, or `decimal(P,S)` to `decimal(P',S)` with P' > P, which `isPromotionRequired` checks next to this table) or a genuinely new column appears, the table is evolved before the batch is written. Because many writer threads can hit this at once, evolution runs under a per-stream lock, so exactly one thread alters the table while the others wait and then continue against the updated schema:
 
 ```go
 // destination/writers.go (trimmed)
@@ -1042,7 +1056,7 @@ if evolution {
 }
 ```
 
-Conflicting types that are not clean promotions, an `int` column that starts receiving strings, converge to their common ancestor exactly as they did in discovery: the column widens to `String` rather than the sync breaking. The reasoning behind evolving in place, and the full set of promotions Iceberg permits, are covered in the [schema evolution docs](/docs/features/schema).
+Inside one batch, values of different types still merge to their common ancestor exactly as they did in discovery. Against an existing column, though, a change that is not a clean promotion, such as an `int` column that starts receiving strings, fails the sync with a schema validation error instead of rewriting the column. The reasoning behind evolving in place, and the full set of promotions Iceberg permits, are covered in the [schema evolution docs](/docs/features/schema).
 
 ## Wrapping up
 

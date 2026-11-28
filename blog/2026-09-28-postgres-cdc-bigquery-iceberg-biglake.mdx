@@ -9,7 +9,7 @@ image: /img/blog/cover/postgres-cdc-bigquery-iceberg-biglake-cover.webp
 ---
 import BlogCTA from '@site/src/components/BlogCTA';
 
-![Postgres CDC to BigQuery via Apache Iceberg on Google BigLake with OLake cover](/img/blog/cover/postgres-cdc-bigquery-iceberg-biglake-cover.webp)
+![Postgres CDC to BigQuery via Apache Iceberg on Google BigLake with OLake Go cover](/img/blog/cover/postgres-cdc-bigquery-iceberg-biglake-cover.webp)
 
 
 For years, streaming Change Data Capture (CDC) events from transactional databases into an analytical data lake required a massive, fragile ecosystem of distributed systems. Teams were forced to stitch together Debezium, Kafka, and Spark or Flink just to manage the relentless, high-velocity stream of transactional mutations without breaking downstream systems. This blog provides a pragmatic guide to bypassing that heavy middleware entirely.
@@ -19,7 +19,7 @@ We will deploy OLake Go, a lightweight ingestion engine, to stream high-volume C
  
 Let's make this concrete by comparing the historical approach with our new architecture:
  
-| Feature Category | Traditional CDC (Debezium + Kafka + Spark) | Modern Lakehouse CDC (OLake + BigLake) |
+| Feature Category | Traditional CDC (Debezium + Kafka + Spark) | Modern Lakehouse CDC (OLake Go + BigLake) |
 | --- | --- | --- |
 | **Architecture Footprint** | Heavy (Multiple distributed clusters) | Lightweight (Single Go binary + Serverless Catalog) |
 | **Schema Evolution** | Brittle, requires schema registry and manual DDL | Automatic on-the-fly metadata updates via REST |
@@ -76,13 +76,13 @@ Let's systematically deconstruct both technologies and examine how they enable a
  
 OLake Go is an open-source data extraction and ingestion engine designed specifically to write transactional data directly into open lakehouse formats, primarily Apache Iceberg.
  
-Earlier ingestion engines relied heavily on Java runtimes that required distributed worker nodes and large memory allocations just to manage steady-state data movement. OLake takes a fundamentally different engineering path: it is compiled and executed as a single, lightweight Go binary.
+Earlier ingestion engines relied heavily on Java runtimes that required distributed worker nodes and large memory allocations just to manage steady-state data movement. OLake Go takes a different path: it reads sources and decodes changes in a single Go binary, and it hands Iceberg writes to one shared Java process on the same host instead of a cluster of workers.
  
 Let's dissect its most critical architectural components:
  
-#### Single-Process Architecture
+#### One Engine, No Cluster
  
-Because OLake Go compiles down to a native Go executable, it completely bypasses the resource overhead of the Java Virtual Machine (JVM). It starts instantly, maintains a predictable and minimal memory footprint, and eliminates the stop-the-world garbage collection pauses that often stall streaming workers under sudden throughput spikes.
+OLake Go reads tables, splits them into chunks and decodes CDC events in a native Go executable. For Iceberg writes, each sync process starts one shared Java Virtual Machine (JVM) that serves every stream, rather than one JVM per stream or chunk ([v0.8.0 release notes](/docs/release/ingestion/v0.8.0/)). There are no distributed worker nodes or stream-processing clusters to size and keep running.
  
 #### Native Parallel Chunking
  
@@ -130,7 +130,7 @@ In this new paradigm, data follows an uninterrupted, straight-line path from tra
 4. **Catalog Commit:** OLake Go sends a single, lightweight HTTPS request to the BigLake Iceberg REST Catalog to append the new snapshot to the table ledger.
 5. **Consumption:** BigQuery reads the updated table manifest through BigLake and immediately exposes the fresh records to analytical queries.
 
-![OLake direct materialization architecture into Google BigLake Iceberg tables](/img/blog/2026/28/olake-biglake-direct-materialization-architecture.webp)
+![OLake Go direct materialization architecture into Google BigLake Iceberg tables](/img/blog/2026/28/olake-biglake-direct-materialization-architecture.webp)
 
 #### Operational and Architectural Benefits
  
@@ -285,7 +285,7 @@ Next, we provision the metadata layer that tracks our Apache Iceberg tables and 
  
 OLake Go requires programmatic authority to deposit Parquet files into your GCS bucket and register table updates in the BigLake Iceberg catalog.
  
-1. Create a dedicated Service Account for the OLake engine.
+1. Create a dedicated Service Account for OLake Go.
    ```bash
    gcloud iam service-accounts create olake-ingestion-sa \
      --display-name="OLake CDC Engine Service Account" \
@@ -299,11 +299,11 @@ OLake Go requires programmatic authority to deposit Parquet files into your GCS 
      --role="roles/storage.objectUser"
    ```
  
-3. Grant the BigLake Admin role.
+3. Grant the BigLake Editor role on the project. Google lists BigLake Editor plus Storage Object User for managing catalog resources and writing table data without credential vending ([Google Cloud Lakehouse docs](https://docs.cloud.google.com/lakehouse/docs/set-up-lakehouse-iceberg-rest-catalog) (checked Nov 2026)), and it is the role the [OLake Go BigLake setup](/docs/writers/iceberg/catalog/rest/?rest-catalog=biglake) asks for.
    ```bash
    gcloud projects add-iam-policy-binding ${PROJECT_ID} \
      --member="serviceAccount:olake-ingestion-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-     --role="roles/biglake.admin"
+     --role="roles/biglake.editor"
    ```
  
 4. Generate and download the Service Account key.
@@ -336,7 +336,7 @@ On your Linux host machine, deploy the OLake Go stack using Docker Compose:
    Username: `admin`, Password: `password`
 #### Resolve the Container Network Boundary
  
-A common pitfall on Linux systems occurs when connecting OLake inside its Docker container to a PostgreSQL instance running directly on the host machine. If you specify `localhost` or `127.0.0.1` in the OLake UI, the container tries to connect to itself and fails with a connection refused error.
+A common pitfall on Linux systems occurs when connecting OLake Go inside its Docker container to a PostgreSQL instance running directly on the host machine. If you specify `localhost` or `127.0.0.1` in the OLake UI, the container tries to connect to itself and fails with a connection refused error.
  
 To bridge this boundary:
  
@@ -381,10 +381,10 @@ In the OLake Go dashboard:
    - **Port:** `5432`
    - **Database Name:** `<your-database>`
    - **Username / Password:** Your PostgreSQL credentials
-   - **Update Method:** CDC
+   - **Enable CDC:** On
    - **Replication Slot:** `olake_cdc_slot`
    - **Publication:** `olake_publication`
-5. Click **Test and Save**.
+5. Click **Create**.
 OLake Go verifies the replication slot's presence and updates its status to `CONNECTED`.
  
 #### Destination Configuration
@@ -397,13 +397,13 @@ Next, we point OLake Go toward Google Cloud Storage and BigLake.
 4. Configure the destination parameters:
    - **Catalog Type:** Select **Big Lake**.
    - **Authentication Type:** GCP
-   - **Catalog Name:** `olake_iceberg` (The namespace OLake Go registers your tables under)
+   - **Catalog Name:** `olake_iceberg` (The name of the Iceberg catalog OLake Go registers your tables under. It defaults to `olake_iceberg` if left empty.)
    - **REST Catalog URI:** Paste your BigLake REST endpoint. It is mostly `https://biglake.googleapis.com/iceberg/v1/restcatalog`
    - **BigLake Catalog Path:** `gs://<BUCKET_NAME>`
    - **GCP Service Account JSON:** `<SERVICE_ACCOUNT_JSON>` (This JSON will be present in the file located at `./olake-sa-key.json`)
    - **GCP Auth Scopes:** `https://www.googleapis.com/auth/cloud-platform`
    - **GCP Project ID:** `<YOUR_GCP_PROJECT_ID>`
-5. Click **Test and Save**.
+5. Click **Create**.
 OLake Go executes a handshake with the BigLake REST Catalog and tests write access to GCS. The status will display `CONNECTED`.
  
 #### Job Orchestration
@@ -420,12 +420,12 @@ With both endpoints authenticated, we create the data sync pipeline.
 8. Under table selection, choose the tables you wish to replicate.
 9. Select the synchronization mode: **Full Refresh + CDC**.
 10. Leave the other settings as default.
-11. Click **Run**.
+11. Click **Create Job**.
 :::note
-Note: OLake Go also have an option to select the type of delete files to be written. When the user selects the Upsert mode, they have an option to select either equality or positional delete files. If the end user wants faster query performance, they can opt for positional delete.
+OLake Go can write equality deletes, positional deletes, or deletion vectors in Upsert mode. If you select BigQuery under **Advanced Settings** > **Target Query Engines**, the **Upsert Type** dropdown offers only **Equality Deletes** and **Positional Deletes**. If the end user wants faster query performance, they can opt for positional delete.
 :::
  
-OLake Go starts immediately. Under the hood, it spins up parallel primary-key iterators to read the existing historical data, writes baseline Parquet files to GCS, and commits the initial snapshot to BigLake. Once the historical backfill completes, the engine seamlessly switches to tailing the PostgreSQL WAL via `olake_cdc_slot`, pushing transactional mutations to GCS and committing new Iceberg snapshots in real time.
+The first sync starts at the next scheduled time, or right away if you choose **Sync Now** from the job's options menu. Under the hood, it spins up parallel primary-key iterators to read the existing historical data, writes baseline Parquet files to GCS, and commits the initial snapshot to BigLake. Once the historical backfill completes, the engine seamlessly switches to tailing the PostgreSQL WAL via `olake_cdc_slot`, pushing transactional mutations to GCS and committing new Iceberg snapshots in real time.
  
 ### Step 4: Verification and Zero-Copy Querying in BigQuery
  
@@ -449,7 +449,9 @@ The modern lakehouse solves this by treating maintenance as a native metadata op
  
 When OLake Go streams live transactional changes, it frequently flushes small batches of records into Google Cloud Storage to keep data fresh. Over a few weeks, a single table might accumulate tens of thousands of small Parquet files. When BigQuery tries to scan the table, opening and reading all those tiny files slows down the query.
  
-File compaction is the process of taking those small Parquet files and rewriting them into large, optimized blocks. Because BigLake and Iceberg decouple the metadata from the storage, you do not need to pause your pipeline to fix this. Instead, you rely on a built-in maintenance engine called OLake Fusion. OLake Fusion runs a background compaction job that quietly reads the small files and rewrites them into large ones. Once the large files are ready, BigLake simply updates its pointer to use the new files. The data remains constantly available to queries while OLake Fusion handles the optimization in the background.
+File compaction is the process of taking those small Parquet files and rewriting them into large, optimized blocks. Because BigLake and Iceberg decouple the metadata from the storage, you do not need to pause your pipeline to fix this. Once the large files are ready, BigLake simply updates its pointer to use the new files, so the data stays available to queries the whole time.
+
+OLake Fusion, the table maintenance tool in the OLake project, does not list BigLake among its [supported catalogs](/docs/fusion/maintenance/catalogs/#compatibility-to-iceberg-catalogs). For these tables, run compaction from an Iceberg engine connected to the BigLake REST catalog, such as Apache Spark with Iceberg's `rewrite_data_files` procedure.
  
 ### Snapshot Expiration and Storage Costs
  
@@ -461,7 +463,7 @@ Apache Iceberg allows you to configure snapshot expiration policies. You can tel
  
 We began by looking at the heavy, complex pipelines that dominated data engineering for the last decade. Moving transactional data into a query engine used to require message brokers, distributed processing clusters, and constant manual oversight. Every component added latency, increased cloud costs, and created a new point of failure.
  
-By moving to a direct materialization model with OLake Go and Google BigLake, we have removed those intermediate steps entirely. The combination of a single-process ingestion engine and a serverless metadata catalog fundamentally changes how data teams operate.
+By moving to a direct materialization model with OLake Go and Google BigLake, we have removed those intermediate steps entirely. The combination of one ingestion engine with no cluster to run and a serverless metadata catalog fundamentally changes how data teams operate.
  
 Instead of polling a database, OLake Go tails the transaction log directly, ensuring no deletes are missed and no database resources are wasted. Instead of translating schemas manually, OLake Go discovers new columns and updates the Iceberg catalog dynamically. Instead of waiting for batch jobs to finish, BigQuery reads the live storage files directly using the REST Catalog as its guide.
  

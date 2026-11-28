@@ -1,5 +1,5 @@
 ---
-title: "Deploy OLake Maintenance on Kubernetes"
+title: "Deploy OLake Fusion on Kubernetes"
 description: "Deploy OLake Fusion on Kubernetes with the official Helm chart next to OLake ingestion, and configure the Spark optimizer used for Iceberg compaction."
 sidebar_position: 2
 ---
@@ -10,13 +10,13 @@ import BrowserOnly from '@docusaurus/BrowserOnly';
 
 # OLake Fusion Kubernetes Installation with Helm
 
-This guide details the process for deploying OLake ingestion and Fusion maintenance together on Kubernetes using the official Helm chart. Fusion is installed alongside the core OLake ingestion stack and provides Iceberg table maintenance and ingestion services.
+This guide details the process for deploying OLake ingestion and Fusion maintenance together on Kubernetes using the official Helm chart. Fusion is installed alongside the OLake Go ingestion stack and provides Iceberg table maintenance.
 
 :::info
 To use Fusion, please ensure the following minimum versions are met:
 
-1. If the installed OLake Helm chart is older than **`olake-0.0.15`** (or **`v0.3.4`**), upgrade to the **latest version**. See [**Upgrading Chart Version**](#upgrading-chart-version) for instructions.
-2. If the installed OLake UI version is older than **`v0.4.0`**, upgrade to the **latest version**. See [**Updating OLake UI Version**](#updating-olake-ui-version) for instructions.
+1. The chart pulls the latest Fusion image. Fusion v0.2.0 and later need Helm chart **`olake-0.0.31`** or later, and S3 log storage needs **`olake-0.0.37`** or later. If the installed chart is older, upgrade it. See [**Upgrading Chart Version**](#upgrading-chart-version) for instructions.
+2. OLake UI **`v0.4.6`** or later is required for Maintenance, and **`v0.9.2`** or later for Cleanup (snapshot expiry). If the installed OLake UI version is older, upgrade to the **latest version**. See [**Updating OLake UI Version**](#updating-olake-ui-version) for instructions.
 :::
 
 <details>
@@ -56,7 +56,7 @@ Ensure the following requirements are met before proceeding:
   | PostgreSQL | 4 GB | 2 |
   | Sync pod (OLake Go) | 8 GB | 4 |
   | Fusion AMS | 8 GB | 4 |
-  | Optimizer | 1 GB | — |
+  | Optimizer | 2 GB | 0.5 |
   | Spark executor | 4 GB | — |
 
 :::note
@@ -93,7 +93,8 @@ helm repo update
 
 **Ingestion + Maintenance:**
 ```bash
-helm install olake olake/olake --set global.storageClass="gp2" --set fusion.enabled=true
+helm install olake olake/olake -n olake --create-namespace \
+  --set global.storageClass="gp2" --set global.logFileStorageMode=s3 --set fusion.enabled=true
 ```
 
 </TabItem>
@@ -102,19 +103,25 @@ helm install olake olake/olake --set global.storageClass="gp2" --set fusion.enab
 
 **Ingestion + Maintenance:**
 ```bash
-helm install olake olake/olake --set fusion.enabled=true
+helm install olake olake/olake -n olake --create-namespace \
+  --set global.logFileStorageMode=s3 --set fusion.enabled=true
 ```
 
 </TabItem>
 
 </Tabs>
 
+:::note
+- `global.logFileStorageMode=s3` stores job configs and logs, including Fusion run logs, in the built-in MinIO, which is meant for development. For production, use external S3; see [S3 Log File Storage Configuration](#s3-log-file-storage-configuration). The chart default is still the deprecated NFS mode.
+- Every command on this page uses the `olake` namespace. Change `-n olake` everywhere if you install elsewhere.
+:::
+
 ### 3. Access OLake UI
 
 Forward the UI service port to local machine:
 
 ```bash
-kubectl port-forward svc/olake-ui 8000:8000
+kubectl port-forward -n olake svc/olake-ui 8000:8000
 ```
 
 Open browser and navigate to: `http://localhost:8000`
@@ -179,13 +186,13 @@ Pull the latest images and restart the deployments without downtime:
 
 ```bash
 # Restart OLake components
-kubectl rollout restart deployment/olake-ui
-kubectl rollout restart deployment/olake-workers
+kubectl rollout restart -n olake deployment/olake-ui
+kubectl rollout restart -n olake deployment/olake-workers
 
 # Restart Fusion and its optimizer. The optimizer is a separate Deployment:
 # restarting only Fusion leaves the optimizer on its old image.
-kubectl rollout restart deployment/olake-fusion
-kubectl rollout restart deployment/olake-fusion-optimizer
+kubectl rollout restart -n olake deployment/olake-fusion
+kubectl rollout restart -n olake deployment/olake-fusion-optimizer
 ```
 
 ### Initial User Setup
@@ -193,7 +200,7 @@ kubectl rollout restart deployment/olake-fusion-optimizer
 Create a Kubernetes secret to replace default credentials:
 
 ```bash
-kubectl create secret generic olake-admin-credentials \
+kubectl create secret generic olake-admin-credentials -n olake \
   --from-literal=username='superadmin' \
   --from-literal=password='a-very-secure-password' \
   --from-literal=email='admin@mycompany.com'
@@ -214,7 +221,7 @@ olakeUI:
 Apply the configuration:
 
 ```bash
-helm upgrade olake olake/olake -f values.yaml --set fusion.enabled=true
+helm upgrade olake olake/olake -n olake --reuse-values -f values.yaml --set fusion.enabled=true
 ```
 
 ### Cloud Integration
@@ -325,18 +332,22 @@ Fusion writes the logs of a run to a local volume in the Fusion pod while the ru
 `<prefix>` is the value of `s3LogFileStorage.prefix`. If the prefix is empty, the keys start at `fusion/`. In S3 mode, the Fusion pod, the optimizer pod and the Spark executor pods do not mount the shared NFS volume.
 
 **Configuration Notes:**
-- **IAM role auth (EKS IRSA):** The role in `s3LogFileStorage.external.role.annotations` is also added to the Fusion service account. If `fusion.serviceAccount.annotations` sets its own role (for example, for AWS Glue access), that role is used instead. In that case, the Fusion role must also grant access to the log bucket. Refer to the [IAM Policy for S3 Log File Storage](/docs/install/kubernetes/#s3-log-file-storage-configuration).
+- **IAM role auth (EKS IRSA):** The role in `s3LogFileStorage.external.role.annotations` is added to the Fusion service account only when nothing else sets the same annotation. A role in `global.jobServiceAccount.annotations` (see [Cloud Integration](#cloud-integration)) takes precedence over it, and a role in `fusion.serviceAccount.annotations` takes precedence over both. Whichever role the Fusion service account gets must also grant access to the log bucket. Refer to the [IAM Policy for S3 Log File Storage](/docs/install/kubernetes/#s3-log-file-storage-configuration).
 - **EKS Pod Identity:** Create a pod identity association for the Fusion service account, in addition to the worker and job service accounts.
-- **Log cleanup:** Fusion does not delete the log objects it uploads. Old Fusion logs are removed by the OLake worker log cleanup when `s3:DeleteObject` is granted. Alternatively, configure an **S3 bucket lifecycle rule** on the `<prefix>/fusion/logs/` prefix.
+- **Log cleanup:** Fusion does not delete the log objects it uploads, and the OLake worker log cleanup skips the `fusion/` folder. To expire old Fusion logs, add an **S3 bucket lifecycle rule** on the `<prefix>/fusion/logs/` prefix.
 
-:::warning Version Requirements
+:::warning[Version Requirements]
 - To use Fusion with S3 log file storage, the following versions are required:
   - OLake Fusion **v0.2.2 and above**.
   - Helm chart **olake-0.0.37 and above**.
 - Switching an existing install from NFS to S3 does not migrate data. Logs of earlier Fusion runs stay on the NFS volume.
 :::
 
-### Persistent Storage Configuration (NFS)
+### Persistent Storage Configuration (NFS - Deprecated)
+
+:::warning
+NFS mode is deprecated and will be removed at the end of 2026. Use [S3 log file storage](#s3-log-file-storage-configuration) for new installs.
+:::
 
 The OLake application components (UI, Worker, and Activity Pods) and Fusion require a shared ReadWriteMany (RWX) volume for coordinating pipeline state and metadata when using NFS storage mode.
 
@@ -377,7 +388,7 @@ Reference a pre-existing Kubernetes Secret containing the database credentials. 
 
 **1. Create the database secret:**
 ```bash
-kubectl create secret generic external-postgres-secret \
+kubectl create secret generic external-postgres-secret -n olake \
   --from-literal=host="postgres-host" \
   --from-literal=port="5432" \
   --from-literal=olake_database="olakeDB" \
@@ -417,7 +428,7 @@ postgresql:
 
 ### Global Environment Variables
 
-Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, and Activity Pods:
+Environment variables defined in `global.env` are automatically propagated to OLake UI, OLake Workers, Activity Pods, and the Fusion and Spark optimizer pods. Use `fusion.env` for variables that only Fusion needs:
 
 ```yaml
 global:
@@ -425,6 +436,16 @@ global:
     OLAKE_SECRET_KEY: "your-secret-encryption-key"
     RUN_MODE: "production"
     # Add any custom environment variables here
+```
+
+### Disabling Telemetry
+
+OLake Fusion sends anonymous usage telemetry to help improve the product. To opt out, set `TELEMETRY_DISABLED` in `fusion.env`:
+
+```yaml
+fusion:
+  env:
+    TELEMETRY_DISABLED: "true"
 ```
 
 ### Private Container Registry
@@ -443,23 +464,24 @@ global:
 
 The following images must be mirrored to the registry before deploying:
 
-| Image | Source |
-|---|---|
-| `library/busybox:latest` | Docker Hub |
-| `curlimages/curl:8.1.2` | Docker Hub |
-| `olakego/ui:latest`, `olakego/ui-worker:latest` | Docker Hub |
-| `olakego/source-*` (e.g. `olakego/source-mongodb:v0.7.0`) | Docker Hub |
-| `temporalio/auto-setup:1.22.3`, `temporalio/ui:2.16.2` | Docker Hub |
-| `library/postgres:14-alpine` | Docker Hub |
-| `olakego/fusion:latest`, `olakego/fusion-spark:latest` | Docker Hub |
-| `sig-storage/nfs-provisioner:v4.0.8` | `registry.k8s.io` (built-in NFS only) |
+| Image | Source | When |
+|---|---|---|
+| `library/busybox:latest` | Docker Hub | Always |
+| `curlimages/curl:latest`, `curlimages/curl:8.1.2` | Docker Hub | Always (signup and post-install Jobs) |
+| `olakego/ui:latest`, `olakego/ui-worker:latest` | Docker Hub | Always |
+| `temporalio/server:1.32.0`, `temporalio/admin-tools:1.32.0` | Docker Hub | Always (built-in Temporal) |
+| `library/postgres:14-alpine` | Docker Hub | Built-in PostgreSQL (`postgresql.enabled: true`) |
+| `olakego/source-*` (e.g. `olakego/source-mongodb:v1.2.2`) | Docker Hub | Each connector version you use |
+| `olakego/fusion:latest`, `olakego/fusion-spark:latest` | Docker Hub | `fusion.enabled: true` |
+| `olakego/minio:RELEASE.2025-04-03T14-56-28Z` | Docker Hub | S3 mode with the built-in MinIO (`s3LogFileStorage.minio.enabled: true`) |
+| `sig-storage/nfs-provisioner:v4.0.8` | `registry.k8s.io` | NFS mode with the built-in NFS server only |
 
 #### Step 2 — Authenticate with the registry
 
 If the registry requires credentials, a Kubernetes docker-registry secret must be created:
 
 ```bash
-kubectl create secret docker-registry my-registry-secret \
+kubectl create secret docker-registry my-registry-secret -n olake \
   --docker-server=registry.example.com \
   --docker-username=<username> \
   --docker-password=<password>
@@ -507,14 +529,19 @@ Currently ES Stack does not have an option to upgrade to maintenance Stack, To u
 
 ```bash
 helm repo update
-helm upgrade olake olake/olake --set fusion.enabled=true
+helm upgrade olake olake/olake -n olake --reset-then-reuse-values --set fusion.enabled=true
 ```
 
 ### Upgrade with New Configuration
 
 ```bash
-helm upgrade olake olake/olake -f new-values.yaml --set fusion.enabled=true
+helm upgrade olake olake/olake -n olake --reset-then-reuse-values -f new-values.yaml --set fusion.enabled=true
 ```
+
+:::note
+- Keep the values you set at install time (for example `global.logFileStorageMode=s3`). An upgrade that passes `-f` or `--set` without one of the reuse flags drops values set earlier with `--set`, and the chart falls back to its defaults, such as NFS mode.
+- `--reset-then-reuse-values` (Helm 3.14 or later) keeps your earlier values and takes the new chart's defaults. `--reuse-values` also keeps them, but it keeps the old chart's defaults too, so settings added in a newer chart version are missing. Use `--reuse-values` only when the chart version does not change. On older Helm versions, keep every setting in one values file and pass it with `-f` on each upgrade.
+:::
 
 :::warning
 For conflict free compaction of OLake-Ingested tables, upgrade **OLake Go** (Ingestion) driver version to **v0.7.0 or higher**.
@@ -525,7 +552,7 @@ For conflict free compaction of OLake-Ingested tables, upgrade **OLake Go** (Ing
 After upgrading, perform a rollout restart of the olake-workers:
 
 ```bash
-kubectl rollout restart deployment/olake-workers
+kubectl rollout restart -n olake deployment/olake-workers
 ```
 
 ## Troubleshooting
@@ -534,13 +561,16 @@ kubectl rollout restart deployment/olake-workers
 
 ```bash
 # OLake UI logs
-kubectl logs -l app.kubernetes.io/name=olake-ui -f
+kubectl logs -n olake -l app.kubernetes.io/name=olake-ui -f
 
 # Fusion logs
-kubectl logs -l app.kubernetes.io/component=fusion -f
+kubectl logs -n olake -l app.kubernetes.io/component=fusion -f
+
+# Spark optimizer (driver) logs
+kubectl logs -n olake -l app.kubernetes.io/component=fusion-optimizer -f
 
 # Temporal server logs
-kubectl logs -l app.kubernetes.io/name=temporal-server -f
+kubectl logs -n olake -l app.kubernetes.io/name=temporal -f
 ```
 
 ### Common Issues
@@ -556,7 +586,7 @@ kubectl logs -l app.kubernetes.io/name=temporal-server -f
 - If pod events show error like `failed to mount volume` in NFS mode, check if the nfs-server pod is up and running
 
 **Database Connection Issues:**
-- Verify PostgreSQL pod is running: `kubectl get pods -l app.kubernetes.io/name=postgresql`
+- Verify PostgreSQL pod is running: `kubectl get pods -n olake -l app.kubernetes.io/name=postgresql`
 - In case, setup is done with External PostgreSQL Configuration, check the following:
   - Check if the host is pointing to Writer instance and not a Reader of the database
   - Check if password contains special characters like `@` or `#` etc. If yes, use a different password
@@ -573,7 +603,7 @@ When upgrading from a previous version, the `olake-signup-init` Job must be dele
 
 ```bash
 kubectl delete job olake-signup-init -n olake
-helm upgrade olake olake/olake --set fusion.enabled=true
+helm upgrade olake olake/olake -n olake --reset-then-reuse-values --set fusion.enabled=true
 ```
 </details>
 
@@ -615,7 +645,7 @@ kubectl annotate secret olake-workers-secret meta.helm.sh/release-name=olake met
 kubectl label secret olake-workers-secret app.kubernetes.io/managed-by=Helm -n olake --overwrite
 
 # 5. Perform the upgrade
-helm upgrade olake olake/olake --set fusion.enabled=true
+helm upgrade olake olake/olake -n olake --reset-then-reuse-values --set fusion.enabled=true
 ```
 </details>
 

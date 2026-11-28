@@ -53,7 +53,7 @@ The architecture is modular: a Core for state, concurrency and monitoring and pl
 | Setup for Postgres parallelism | Manual partition-boundary scripting, pglogical configuration | Full Refresh plus CDC sync mode, minimal config |
 | Full-load throughput | Baseline | Roughly **4.6x faster** in the published test |
 | CDC support | Supported, but one stalled table can block the whole source-to-target flow | Built for sustained CDC, around **1.38x faster** in the same test |
-| Schema evolution | DDL changes can break the pipeline; fallback is a full reload | Automatic schema discovery and evolution |
+| Schema evolution | DDL changes can break the pipeline; fallback is a full reload | Automatic schema evolution at write time |
 | Output format | Oriented toward Amazon targets | Open Iceberg or Parquet, readable by any engine |
 | Compute cost | Baseline | About 4.61x cheaper on compute for the full refresh |
 | Licensing | Managed AWS service | Open source |
@@ -90,7 +90,9 @@ A DDL change on the source is where the two tools differ most in daily use. With
 
 ![AWS DMS Schema Change Full Reload](/img/blog/2026/16/aws-dms-schema-change-full-reload.webp)
 
-OLake Go handles this differently. It detects schema changes during the discovery step and evolves the target tables on its own, so a new column, a renamed field, or a type change upstream is picked up and applied rather than left to break the run. The pipeline keeps moving when the source moves, and a column added upstream does not turn into a reload. Because the destination is Apache Iceberg, which supports schema evolution at the table-format level, those changes are tracked without rewriting existing data, so old records stay queryable alongside the new shape. You can also set alerts on schema changes, so a shift on the source is something you are told about rather than something you find once the data already looks wrong.
+OLake Go handles this differently. It evolves the target Iceberg table at write time from the records it reads, so a column added upstream is added to the table and does not turn into a reload. A renamed column lands as a new column next to the old one, and widening type changes such as INT to BIGINT are applied in place, while incompatible type changes fail the sync ([schema evolution docs](/docs/features/schema/)).
+
+Because the destination is Apache Iceberg, which supports schema evolution at the table-format level, those changes are tracked without rewriting existing data, so old records stay queryable alongside the new shape. Since v0.10.1, a sync re-runs schema discovery only when the `--discover-schema` flag is passed, which also checks the configured streams against the source. Webhook alerts fire when a job fails, so a schema change that stops a sync reaches Slack, Microsoft Teams or another webhook ([alerts docs](/docs/getting-started/alerts-and-notifications/)).
  
  ![OLake Go Schema Evolution Iceberg](/img/blog/2026/16/olake-schema-evolution-iceberg.webp)
 
@@ -184,7 +186,7 @@ Here is the pattern worth remembering. Most teams that struggle with DMS are not
   {
     question: "Q4. Why does a schema change break an AWS DMS pipeline?",
     answer: <div>
-      <p>A DDL change on the source can stall the running task, and the fix most teams trust is a full reload. OLake Go detects schema changes during discovery and evolves the target tables on its own.</p>
+      <p>A DDL change on the source can stall the running task, and the fix most teams trust is a full reload. OLake Go evolves the target Iceberg tables at write time, adding new columns and applying widening type changes without a reload.</p>
     </div>
   },
   {

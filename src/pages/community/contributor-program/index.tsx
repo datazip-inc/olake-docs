@@ -74,7 +74,7 @@ const ContributorProgramPage = () => {
     'url': 'https://olake.io/',
     'name': 'OLake: Open Source Data Replication to Apache Iceberg',
     'description':
-      'Open-source tool for replicating databases to Apache Iceberg and data lakehouses, with change data capture (CDC) from Postgres, MySQL, MongoDB, Oracle, SQL Server, DB2, Kafka and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
+      'Open-source tool for replicating databases, Kafka and S3 to Apache Iceberg and Parquet, with change data capture (CDC) from Postgres, MySQL/MariaDB, MongoDB and SQL Server, streaming from Kafka, and full or incremental sync from Oracle, Db2 and S3. Benchmarked at 580,113 rows per second on a 4-billion-row Postgres full load.',
     'publisher': {
       '@type': 'Organization',
       'name': 'OLake'
@@ -315,7 +315,7 @@ const ContributorProgramPage = () => {
         <PageHero
           badge='OLake Contributor Program'
           title='Join the Contributor Program'
-          description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 10+ contributors making a difference."
+          description="Give back to the community and receive rewards for helping build OLake's connector ecosystem. Join 55+ contributors making a difference."
           actions={
             <>
               <Button

@@ -22,7 +22,7 @@ const CommunityPage = () => {
   const communityData = {
     title: 'OLake 8th Community Meetup',
     summary:
-      "In this community meetup we showcased an end-to-end demo of OLake's latest features, including Oracle CDC, filtering capabilities, incremental sync, and Helm deployment within the OLake UI."
+      "In this community meetup we showcased an end-to-end demo of OLake's latest features, including an early Oracle CDC demo (Oracle CDC is not yet available in OLake Go), filtering capabilities, incremental sync, and Helm deployment within the OLake UI."
   }
 
   return (
@@ -43,7 +43,7 @@ const CommunityPage = () => {
         duration='1 hour'
         summary={communityData.summary}
         bulletPoints={[
-          'Oracle CDC Demo: We demonstrated real-time change capture directly from Oracle databases into OLake pipelines',
+          'Oracle CDC Demo: We demonstrated real-time change capture directly from Oracle databases into OLake pipelines (an early demo; Oracle CDC is not yet available in OLake Go, which syncs Oracle by full refresh or incremental)',
           'Filtering Capabilities: Showcased applying flexible ingestion filters to control data flow and ensure cleaner datasets',
           'Incremental Sync: Explained syncing only changes since the last run for faster and more efficient pipeline executions',
           'Helm Deployment: Demonstrated deploying OLake seamlessly to Kubernetes using Helm charts for simplified setup and scaling',

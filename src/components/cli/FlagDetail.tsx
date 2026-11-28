@@ -157,6 +157,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
                 <li>Storing the <strong>version</strong> in the state file for maintaining backward compatibility.</li>
               </ul>
             </li>
+            <li>On the first run, leave out <code>--state</code>. OLake Go then starts on the current state version and writes the file itself. Do not create the file by hand: an empty <code>{'{}'}</code> state, or one without the current <code>version</code>, loads an older version for the life of the pipeline and turns off newer type handling, so decimals, for example, land as double.</li>
           </ul>
 
           <p>The <code>state.json</code> file is organized into two main sections:</p>
@@ -169,7 +170,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
               <p>MySQL uses <strong>binlog position</strong> for global state tracking to maintain the replication position across all streams.</p>
               <CodeBlock language="json" title="state.json (MySQL)">{`{
   "type": "STREAM",
-  "version": 1,
+  "version": 9,
   "global": {
     "state": {
       "server_id": 261398335,
@@ -191,7 +192,7 @@ olakego/source-[SOURCE-TYPE]:latest \\
               <p>PostgreSQL uses <strong>LSN (Log Sequence Number)</strong> for global state tracking to maintain the replication position across all streams.</p>
               <CodeBlock language="json" title="state.json (PostgreSQL)">{`{
   "type": "STREAM",
-  "version": 1,
+  "version": 9,
   "global": {
     "state": {
       "lsn": "BD7/650015C8"

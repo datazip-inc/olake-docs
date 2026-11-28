@@ -21,7 +21,7 @@ OLake UI provides a complete Docker Compose stack for running the replication sy
 - **Temporal Worker**: Background worker for processing data replication jobs
 - **PostgreSQL**: Primary database for storing job data, configurations, sync state, and Temporal visibility data
 - **Temporal Server**: Workflow orchestration engine for managing job execution
-- **Temporal UI**: Web interface for monitoring workflows and debugging
+- **Temporal UI (optional)**: Web interface for monitoring workflows and debugging. It is not started by default. Start it with `docker compose -f docker-compose-v1.yml --profile debug up -d temporal-ui` and open [http://localhost:8081](http://localhost:8081).
 - **Signup Init**: One-time initialization service that creates the default admin user
 - **Elasticsearch (Legacy only)**: Search and indexing backend for Temporal workflow data (deprecated in new installations)
 
@@ -33,7 +33,7 @@ OLake UI provides a complete Docker Compose stack for running the replication sy
 
 The following requirements must be met before starting:
 - [Docker](https://docs.docker.com/get-docker/) installed (Docker Desktop recommended)
-- [Docker Compose](https://docs.docker.com/compose/) (included with Docker Desktop)
+- [Docker Compose](https://docs.docker.com/compose/) v2, the `docker compose` plugin (included with Docker Desktop). The legacy `docker-compose` 1.x cannot read this compose file.
 - Port 8000 available on the system
 - System Requirements:
   - Minimum: 8 vCPU, 16 GB RAM
@@ -54,7 +54,7 @@ OLake bundles both capabilities together. Get started with a single command — 
 :::
 
 This command will:
-- Download the latest docker-compose.yml file
+- Read the latest `docker-compose-v1.yml` from GitHub (nothing is saved locally)
 - Pull all required Docker images
 - Start all services in the background
 - Create a default admin user automatically
@@ -77,9 +77,17 @@ For detailed job creation instructions, see [Create Jobs](/blog/creating-job-ola
 
 ## Service Configuration
 
+The settings in this section are edits to `docker-compose-v1.yml`. The one-command setup does not save that file, so download it first, edit it, and start the stack from your local copy:
+
+```bash
+curl -sSLo docker-compose-v1.yml https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml
+# edit the file, then:
+docker compose -f docker-compose-v1.yml up -d
+```
+
 ### Changing Admin Credentials
 
-The default admin user can be customized by editing the `docker-compose.yml` file before starting:
+The default admin user can be customized by editing the `docker-compose-v1.yml` file before starting:
 
 ```yaml
 x-signup-defaults:
@@ -101,6 +109,8 @@ To update OLake UI to the latest version, use the following commands based on yo
     curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - down && \
     curl -sSL https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml | docker compose -f - up -d
     ```
+
+    If you run the stack from an edited local copy (see [Service Configuration](#service-configuration)), download the file again, re-apply your edits, and run `docker compose -f docker-compose-v1.yml up -d`. Add `-f external-db.yml` if you use an override file.
     
   </TabItem>
   <TabItem value="legacy" label="Legacy (with Elasticsearch)">
@@ -136,7 +146,7 @@ To update OLake UI to the latest version, use the following commands based on yo
 
 ### Encryption Key Configuration
 
-OLake Go supports encryption of source and destination configurations stored in the database. Configure the encryption key in `docker-compose.yml`:
+OLake Go supports encryption of source and destination configurations stored in the database. Configure the encryption key in `docker-compose-v1.yml`:
 
 - **Custom String**: Provide any string (OLake Go generates SHA-256 hash):
 
@@ -161,65 +171,108 @@ OLake Go supports encryption of source and destination configurations stored in 
 
 ### Customizing Data Directory
 
-The default data directory can be changed by modifying the host persistence path:
+The default data directory can be changed by modifying the host persistence path. Change only the `host_persistence_path` value and keep the rest of the `x-app-defaults` block as shipped:
 
 ```yaml
 x-app-defaults:
   host_persistence_path: &hostPersistencePath /custom/path/to/olake-data
+  amoro_log_persistence_path: &amoroLogPersistencePath ${PWD}/amoro-logs
   worker_config_volume_details: &workerConfigVolumeDetails
     type: bind
     source: *hostPersistencePath
     target: /tmp/olake-config
+  amoro_log_volume_details: &amoroLogVolumeDetails
+    type: bind
+    source: *amoroLogPersistencePath
+    target: /mnt/amoro-logs
 ```
 
-This will create and use `/custom/path/to/olake-data` instead of the default `./olake-data` directory.
+This will create and use `/custom/path/to/olake-data` instead of the default `${PWD}/olake-data` (an `olake-data` folder in the directory where you run `docker compose`). The OLake Fusion service references the `amoro_*` entries, so the file does not parse if you remove them.
 
 ### External PostgreSQL Configuration
 
 OLake Go supports using an **external PostgreSQL instance** instead of the built-in Postgres service included in the docker-compose file. This PostgreSQL stores all job data, configurations, sync state, and Temporal workflow data.
 
-Within the [compose file](https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml), an extension field named `x-db-envs` defines all database configuration values used by OLake Go and Temporal. These values can be modified to point to the external PostgreSQL instance.
+Each service in the [compose file](https://raw.githubusercontent.com/datazip-inc/olake-ui/master/docker-compose-v1.yml) reads its own database settings. Put them in an override file next to `docker-compose-v1.yml`, for example `external-db.yml`, so the shipped file stays unchanged:
 
 ```yaml
-x-db-envs:
-  DB_HOST: &DBHost postgresql
-  DB_PORT: &DBPort 5432
-  DB_USER: &DBUser temporal
-  DB_PASSWORD: &DBPassword temporal
-  DB_SSLMODE: &DBSSLMode disable
-  OLAKE_DB_NAME: &olakeDBName postgres
-  TEMPORAL_DB_NAME: &temporalDBName temporal
+# external-db.yml
+services:
+  olake-ui:
+    environment:
+      OLAKE_POSTGRES_HOST: my-postgres.example.com
+      OLAKE_POSTGRES_PORT: "5432"
+      OLAKE_POSTGRES_USER: olake
+      OLAKE_POSTGRES_PASSWORD: "<password>"
+      OLAKE_POSTGRES_DBNAME: olake
+      OLAKE_POSTGRES_SSLMODE: require   # disable | require | verify-full
+  temporal-worker:
+    environment:
+      DB_HOST: my-postgres.example.com
+      DB_PORT: "5432"
+      DB_USER: olake
+      DB_PASSWORD: "<password>"
+      DB_NAME: olake                    # same database as OLAKE_POSTGRES_DBNAME
+      DB_SSLMODE: require
+  temporal-schema-migrate:
+    environment:
+      POSTGRES_SEEDS: my-postgres.example.com
+      DB_PORT: "5432"
+      POSTGRES_USER: olake
+      POSTGRES_PWD: "<password>"
+      SQL_PASSWORD: "<password>"
+      # only when the connection uses TLS:
+      SQL_TLS: "true"
+      SQL_TLS_DISABLE_HOST_VERIFICATION: "true"
+  temporal:
+    environment:
+      POSTGRES_SEEDS: my-postgres.example.com
+      DB_PORT: "5432"
+      POSTGRES_USER: olake
+      POSTGRES_PWD: "<password>"
+      # only when the connection uses TLS:
+      SQL_TLS_ENABLED: "true"
+      SQL_HOST_VERIFICATION: "false"
 ```
 
-If connection to external PostgreSQL instance is over TLS, the following variables need to be uncommented under `services.temporal.env` section in the compose file:
+Start the stack with both files, and pass both files to every later `docker compose` command for this stack:
 
-```yaml
-  # for TLS enabled external postgres database
-  SQL_TLS: true
-  SQL_TLS_DISABLE_HOST_VERIFICATION: true
-  SQL_TLS_ENABLED: true
-  SQL_HOST_VERIFICATION: false
+```bash
+docker compose -f docker-compose-v1.yml -f external-db.yml up -d
 ```
 
-:::info[**Optional**]
-A separate PostgreSQL container (`postgresql` service) is included by default.
-When an external database is used, this service is not needed and can be stopped after all the services are started and healthy.
+- `olake-ui` and `temporal-worker` must point at the same database, and that database must already exist.
+- Temporal keeps its data in two databases named `temporal` and `temporal_visibility`. The `temporal-schema-migrate` step creates them if the user may create databases. Otherwise, create both first.
+- Temporal's visibility schema uses the `btree_gin` extension. If the user cannot create extensions, run `CREATE EXTENSION IF NOT EXISTS btree_gin;` in `temporal_visibility` first.
+
+:::info
+The built-in `postgresql` service still starts, because `olake-ui` waits for it to be healthy at startup. The OLake Fusion profile's `fusion-db-init` service also always connects to the built-in `postgresql` service (user `temporal`).
 :::
 
 ### Service Environment Variables
 
-Key environment variables that can be customized within `x-envs` section. These variables are automatically injected into the `olake-ui` and `olake-worker` containers:
+Key environment variables can be customized within the `x-envs` section. These variables are automatically injected into the `olake-ui` and `temporal-worker` services (and the OLake Fusion services when the `fusion` profile is on). Keep the keys that are already there and add yours below them:
 
 ```yaml
 x-envs:
   shared: &sharedEnvs
-    CONTAINER_REGISTRY_BASE: ${CONTAINER_REGISTRY_BASE:-registry-1.docker.io}
+    CONTAINER_REGISTRY_BASE: ${CONTAINER_REGISTRY_BASE:-docker.io}
     OLAKE_SECRET_KEY: *encryptionKey
     PERSISTENT_DIR: *hostPersistencePath
+    ENABLE_OPTIMIZATION: ${ENABLE_OPTIMIZATION:-false}
+    # add your keys below this line
     FOO: bar
-    KEY: value
-    NAME: example
 ```
+
+### Custom CA Certificate (TLS-Inspecting Proxies)
+
+If your network uses a TLS-inspecting proxy, OLake UI must trust the proxy's CA. Save the CA file next to `docker-compose-v1.yml` as `custom-ca.crt`, then uncomment this line under `volumes` of the `olake-ui` service:
+
+```yaml
+      - ./custom-ca.crt:/etc/ssl/certs/custom-ca.crt:ro
+```
+
+Create the file before you uncomment the line. Otherwise Docker mounts an empty directory at that path.
 
 ### Disabling Telemetry
 
@@ -235,12 +288,12 @@ x-envs:
 
 External Temporal server can be used instead of the built-in Temporal deployment. It is the primary tool for workflow orchestration of olake jobs.
 
+Add these keys under `x-envs.shared`, below the existing ones:
+
 ```yaml
 x-envs:
   shared: &sharedEnvs
-    CONTAINER_REGISTRY_BASE: ${CONTAINER_REGISTRY_BASE:-registry-1.docker.io}
-    OLAKE_SECRET_KEY: *encryptionKey
-    PERSISTENT_DIR: *hostPersistencePath
+    # ...existing keys...
     TEMPORAL_EXTERNAL: "true"
     TEMPORAL_ADDRESS: "<region>.<cloud>.api.temporal.io:7233"
     TEMPORAL_API_KEY: "<temporal-api-key>"
@@ -348,7 +401,7 @@ x-envs:
 
 :::info[Version Requirements]
 For using S3 storage, the following versions are required:
-- OLake Version **0.12.0 and above**.
+- OLake Go **0.12.0 and above**.
 - OLake UI **0.7.0 and above**.
 - OLake worker **0.4.0 and above**.
 :::
@@ -451,19 +504,14 @@ services:
 #### Monitoring Log Cleaner
 The log cleanup process can be monitored through the logs of the `temporal-worker` service defined in the docker-compose configuration for [olake-ui](https://github.com/datazip-inc/olake-ui).
 
-When the log cleaner starts, it emits a log entry indicating the beginning of the process:
+Every time the cron job runs (daily at midnight in the `temporal-worker` container's timezone), it emits the following log:
 ```text
-Log cleaner started... 
-```
-
-Every time the cron job runs, it emits the following log:
-```text
-Running log cleaner...
+running log cleaner...
 ```
 
 As each log directory is deleted, a log entry is generated showing the full path of the directory being removed:
 ```text
-Deleting folder /path/to/olake/logs
+deleting folder: /path/to/olake-data/<dir>
 ```
 
 ### Temporal Retention Period
@@ -474,7 +522,7 @@ OLake Go includes a configurable retention period for Temporal visibility data t
 Set the `TEMPORAL_RETENTION_PERIOD` environment variable in the `temporal-worker` service within the docker-compose configuration for [olake-ui](https://github.com/datazip-inc/olake-ui) to control how long visibility data is retained:
 
 ```yaml
-# In docker-compose.yml
+# In docker-compose-v1.yml
 services:
   temporal-worker:
     environment:
@@ -489,12 +537,12 @@ The retention period is specified in **hours**. Only job and sync history within
 
 ### Prometheus Metrics Configuration
 
-To expose OLake Go's Prometheus compatible `/metrics` endpoint, add `METRICS_ENABLED: true` under `x-envs.shared` in your `docker-compose.yml` file:
+To expose OLake Go's Prometheus compatible `/metrics` endpoint, add `METRICS_ENABLED: true` under `x-envs.shared` in your `docker-compose-v1.yml` file:
 
 ```yaml
 x-envs:
   shared: &sharedEnvs
-    CONTAINER_REGISTRY_BASE: ${CONTAINER_REGISTRY_BASE:-registry-1.docker.io}
+    CONTAINER_REGISTRY_BASE: ${CONTAINER_REGISTRY_BASE:-docker.io}
     OLAKE_SECRET_KEY: *encryptionKey
     PERSISTENT_DIR: *hostPersistencePath
     ENABLE_OPTIMIZATION: ${ENABLE_OPTIMIZATION:-false}
@@ -510,14 +558,18 @@ When writing in upsert mode, OLake Go supports two Iceberg delete formats:
 1. **Equality deletes:**  the default. No index DB setup is required.
 2. **Positional deletes/Deletion Vector:**  requires a local Pebble DB index store to track file and row positions.
 
-Configure the index database through environment variables on the `temporal-worker` service in your `docker-compose.yml` file only when you want **positional deletes or deletion vector** as the upsert type.
+The index database is configured through environment variables on the `temporal-worker` service in `docker-compose-v1.yml`. It is used only when a stream writes **positional deletes or deletion vector**.
+
+For each job where any stream uses these formats, the worker keeps the index on the host in `./olake-data/index/olake-index-<JobID>` (under the persistence path, if you changed it). It mounts that folder at `/var/lib/olake/index` in the job's sync and Clear Destination containers and points `OLAKE_INDEX_DB_DIR` there, so the index survives between runs. Clear Destination drops the index of every stream it clears.
+
+Keep `olake-data` on a local disk or a block volume. The index needs file locking and reliable `fsync`, so a shared network filesystem such as NFS, Amazon EFS or Azure Files is not supported. If the index folder is lost, results stay correct, but the next sync first rebuilds the index by scanning the whole Iceberg table.
 
 #### Configuration
 
-When using positional deletes or deletion vector, set the following environment variables in the `temporal-worker` service within the docker-compose configuration for [olake-ui](https://github.com/datazip-inc/olake-ui). The values below are defaults and can be adjusted based on your storage and performance requirements:
+These variables are already set to the defaults below in `docker-compose-v1.yml`. Change them only to tune the index store for your storage and performance requirements:
 
 ```yaml
-# In docker-compose.yml
+# In docker-compose-v1.yml
 services:
   temporal-worker:
     environment:
@@ -530,13 +582,13 @@ services:
       OLAKE_INDEX_DB_MAX_OPEN_FILES: 1000  # max open files
 ```
 
-- **`OLAKE_INDEX_DB_DIR`** (string): File path where indexes are stored inside the driver container.
-- **`OLAKE_INDEX_DB_CACHE_SIZE`** (integer): LRU cache size for the Pebble DB, in megabytes (MB).
+- **`OLAKE_INDEX_DB_DIR`** (string): File path where indexes are stored inside the driver container. For jobs that need the index, the worker sets it to the mounted `/var/lib/olake/index`.
+- **`OLAKE_INDEX_DB_CACHE_SIZE`** (integer): block cache for the Pebble DB, per stream. OLake Go v1.2.2 reads this value in bytes (default 128 MB when unset), so the `512` the worker passes gives a very small cache; set it in bytes, for example `536870912` for 512 MB.
 - **`OLAKE_INDEX_DB_MAX_OPEN_FILES`** (integer): Maximum number of files Pebble DB keeps open while reading from the index store. 
 
 :::warning
 Positional deletes, deletion vector and the index DB environment variables above require the versions mentioned below. Upgrade every listed service, missing an update on single component can cause job failures:
-- OLake Version **0.11.0 and above**.
+- OLake Go **0.11.0 and above**.
 - OLake UI **0.6.0 and above**.
 - OLake worker **0.3.11 and above**.
 :::
@@ -552,14 +604,14 @@ For OLake Fusion related configuration options that are not covered in this page
 #### Port Conflicts
 If port binding errors occur:
 1. Check what's using the ports: `lsof -i :8000` (on macOS/Linux)
-2. Stop conflicting services or change ports in `docker-compose.yml`
+2. Stop conflicting services or change ports in `docker-compose-v1.yml`
 
 #### Database Connection Issues
-- Ensure PostgreSQL container is healthy: `docker compose ps`
-- Check PostgreSQL logs: `docker compose logs postgresql`
+- Ensure the PostgreSQL container is healthy: `docker ps --filter name=temporal-postgresql`
+- Check PostgreSQL logs: `docker logs temporal-postgresql`
 
 #### Memory Issues
-- Ensure Docker has at least 4GB RAM allocated
+- Ensure Docker can use at least the minimum memory listed in [Prerequisites](#prerequisites) (16 GB)
 - Check Docker resource usage: `docker stats`
 
 #### Permission Issues
@@ -570,8 +622,8 @@ If port binding errors occur:
 
 The stack can be completely reset with:
 ```bash
-docker compose down -v  # Removes containers and volumes
-docker compose up -d    # Fresh start
+docker compose -f docker-compose-v1.yml down -v  # Removes containers and volumes
+docker compose -f docker-compose-v1.yml up -d    # Fresh start
 ```
 
 **Warning**: This will delete all job data and configurations.

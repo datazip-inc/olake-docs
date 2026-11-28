@@ -23,7 +23,8 @@ const SSL_MODES = {
   },
   'verify-ca': {
     title: 'Verify-CA',
-    description: 'Encrypted connection with CA certificate verification.',
+    description:
+      'Encrypted connection with CA certificate verification. Omit the client certificate and key when not using mutual TLS: a blank value fails validation.',
     sslMode: 'verify-ca',
     inlineRequiredParams: ['server_ca'],
     inlineOptionalParams: ['client_cert', 'client_key'],
@@ -31,9 +32,9 @@ const SSL_MODES = {
     pathOptionalParams: ['client_cert_path', 'client_key_path'],
     inlineExample: {
       mode: 'verify-ca',
-      server_ca: ' ',
-      client_cert: ' ',
-      client_key: ' ',
+      server_ca: '<PEM content>',
+      client_cert: '<PEM content>',
+      client_key: '<PEM content>',
     },
     pathExample: {
       mode: 'verify-ca',
@@ -45,7 +46,8 @@ const SSL_MODES = {
   },
   'verify-full': {
     title: 'Verify-Full',
-    description: 'Encrypted connection with CA and hostname verification.',
+    description:
+      'Encrypted connection with CA and hostname verification. Omit the client certificate and key when not using mutual TLS: a blank value fails validation.',
     sslMode: 'verify-full',
     inlineRequiredParams: ['server_ca'],
     inlineOptionalParams: ['client_cert', 'client_key'],
@@ -53,9 +55,9 @@ const SSL_MODES = {
     pathOptionalParams: ['client_cert_path', 'client_key_path'],
     inlineExample: {
       mode: 'verify-full',
-      server_ca: ' ',
-      client_cert: ' ',
-      client_key: ' ',
+      server_ca: '<PEM content>',
+      client_cert: '<PEM content>',
+      client_key: '<PEM content>',
     },
     pathExample: {
       mode: 'verify-full',

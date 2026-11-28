@@ -255,20 +255,20 @@ Retention is a single setting, but getting it wrong is expensive. It decides how
 | Google Cloud SQL for MySQL | Database flags | Enable point-in-time recovery to turn on binary logging |
 | Azure Database for MySQL | Server parameters | Binary logging is on by default on Flexible Server; adjust `binlog_expire_logs_seconds` as needed |
 
-## OLake for MySQL CDC
+## OLake Go for MySQL CDC
 
 A typical MySQL-to-lakehouse pipeline built from open-source parts has Debezium reading the binlog, Kafka holding the events, and Spark or Flink writing them into Iceberg. Each piece works, but together they add up to three systems to deploy, monitor, and maintain. [OLake Go](/docs/) is an open-source ingestion engine that reads the MySQL binlog itself and writes Apache Iceberg tables (or plain Parquet) directly, with no Kafka, Debezium, Spark, or Flink in between.
 
-For the initial load, OLake Go splits large tables into chunks and reads them in parallel. It checkpoints as it goes, so if a full load fails halfway through a 2 TB table, it resumes the load instead of starting over. Once the snapshot is done, it switches to the binlog and keeps the binlog file, position, and server ID in its state, which is how each sync knows where the previous one stopped.
+For the initial load, OLake Go splits large tables into chunks and reads them in parallel. It checkpoints as it goes, so if a full load fails halfway through a 2 TB table, it resumes the load instead of starting over. Once the snapshot is done, it switches to the binlog and keeps the binlog file, position, and server ID in its state, or the GTID (global transaction identifier) set when GTID mode is on, which is how each sync knows where the previous one stopped.
 
 Each table can run in one of four sync modes: Full Refresh, Full Refresh + CDC, CDC Only, or Full Refresh + Incremental. This helps in mixed setups, where a few lookup tables only need an occasional refresh while the core transactional tables stream continuously.
 
 A few details make day-to-day operations easier:
 
 - **The connection test checks the CDC prerequisites before the first sync runs.** It confirms binlog access, `log_bin`, `binlog_format`, and `binlog_row_image`, flags optional settings such as `binlog_row_metadata` and retention, and shows the current and recommended value for anything that fails, so configuration problems surface before a job fails.
-- **Schema discovery runs at the start of every sync,** so a new column on the source shows up in the Iceberg schema automatically, and dropped or renamed columns don't break the pipeline.
+- **The Iceberg schema evolves at write time,** so a new column on the source shows up in the Iceberg schema automatically, and dropped or renamed columns don't break the pipeline. Since v0.10.1, a sync re-runs schema discovery only when the `--discover-schema` flag is passed.
 - **Every row carries an `_op_type` column** (`r` for snapshot, `c` for insert, `u` for update, `d` for delete) along with `_cdc_timestamp`, so it is easy to see how and when a row last changed.
-- **Tables can be registered in AWS Glue, Hive, JDBC, or REST catalogs,** including Nessie, Polaris, Unity, Lakekeeper, and Amazon S3 Tables.
+- **Tables can be registered in AWS Glue, REST, Hive, or JDBC catalogs,** including Polaris, Lakekeeper, Snowflake Horizon, Unity, Google BigLake, Amazon S3 Tables, and Nessie.
 
 The [MySQL connector](/docs/connectors/mysql) supports MySQL 5.7 and later and MariaDB, on self-managed servers as well as Amazon RDS, Aurora, Google Cloud SQL, and Azure Database for MySQL. It can run from the OLake UI, where setup means creating a MySQL source, an Iceberg destination, and a job that picks tables and sync modes, or from the CLI as a Docker container. Throughput numbers for MySQL full loads and CDC are on the [OLake benchmarks page](/docs/benchmarks/ingestion), and the [MySQL to Iceberg integration guide](/docs/integrations/mysql-to-iceberg) walks through a complete pipeline from start to finish.
 
@@ -282,7 +282,7 @@ Once a binlog pipeline is running it tends to stay running, and most of the inci
 - **The initial snapshot is huge.** Copying billions of rows takes hours, and a long-running read can affect the source. Chunked, parallel snapshots with checkpoints mean a failure only costs the chunk that was in progress.
 - **Two readers share a `server_id`.** Every binlog client needs a unique ID. When a CDC tool and a replica collide, they keep disconnecting each other, and the symptoms look like random network errors until someone checks the IDs.
 - **Managed services set their own limits.** Some managed plans restrict replication privileges, ship with binlog off, or keep binlog files for only a few hours by default. It is worth checking these before designing around them.
-- **Failover moves the position.** A file-and-offset position belongs to one server, so after a primary failover the pipeline may not find its place on the new primary. GTID mode makes positions portable across the replication topology.
+- **Failover moves the position.** A file-and-offset position belongs to one server, so after a primary failover the pipeline may not find its place on the new primary. GTID mode makes positions portable across the replication topology, and OLake Go [resumes from saved GTIDs](/docs/connectors/mysql/#migrate-an-existing-job-to-gtid) after a switchover.
 - **Updates and deletes need merging downstream.** An append-only destination has to turn a stream of change events into the current state of each row. Iceberg handles this with [row-level deletes](/blog/iceberg-delete-formats-cdc-equality-vs-positional-vs-deletion-vectors), but those leave behind small data files and delete files that need regular compaction to keep queries fast.
 - **Data types don't map one to one.** `DECIMAL` precision, `JSON`, `ENUM`, and zero dates like `0000-00-00` all have quirks in the destination. Running a sample table through the pipeline before a full migration catches most of them early.
 

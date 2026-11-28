@@ -44,14 +44,14 @@ const GSoCLandingPage = () => {
   return (
     <CommunityPage
       title='Google Summer of Code at OLake'
-      description='Apply to Google Summer of Code at OLake: a 12+ week open source project guided by mentors, with project ideas, proposal guidelines and a template.'
+      description='OLake took part in Google Summer of Code 2026 (applications closed). Project ideas, proposal guidelines and a template stay up as reference.'
       activePath='/community'
       hero={
         <PageHero
-          badge='GSoC 2026'
+          badge='GSoC 2026 (applications closed)'
           breadcrumbs={<Breadcrumbs type='community' title='Google Summer of Code at OLake' />}
           title='Google Summer of Code at OLake'
-          description='Work with OLake on a 12+ week open source project, guided by mentors. Apply with a strong proposal and build the future of data lakehouse replication.'
+          description='OLake took part in Google Summer of Code 2026, and contributor applications closed on Mar 31, 2026. The ideas, guidelines and template below stay up as reference until Google publishes the next timeline.'
           actions={
             <>
               <Button href='/community/ideas' size='lg'>
@@ -73,7 +73,7 @@ const GSoCLandingPage = () => {
         <meta property='og:title' content='Google Summer of Code at OLake' />
         <meta
           property='og:description'
-          content='Apply to Google Summer of Code at OLake: a 12+ week open source project guided by mentors, with project ideas, proposal guidelines and a template.'
+          content='OLake took part in Google Summer of Code 2026 (applications closed). Project ideas, proposal guidelines and a template stay up as reference.'
         />
         <meta property='og:url' content={canonicalUrl} />
         <meta property='og:image' content='https://olake.io/img/logo/olake-og-card.png' />
@@ -110,7 +110,7 @@ const GSoCLandingPage = () => {
               <li>Read OLake docs (especially the architecture and contributor docs)</li>
               <li>Set up the OLake dev environment locally</li>
               <li>Join the OLake community channels (Slack, GitHub)</li>
-              <li>Pick a project idea (Small / Medium / Large) and talk to the mentors early</li>
+              <li>Pick a project idea and talk to the mentors early</li>
             </BulletList>
           </Column>
           <div className='mt-[28px] flex flex-wrap justify-center gap-[8px] lg:mt-[36px] lg:gap-[12px]'>
@@ -129,7 +129,7 @@ const GSoCLandingPage = () => {
         <Section>
           <SectionHeading
             title='GSoC 2026 timeline'
-            body='Use the official GSoC timeline as the source of truth.'
+            body='Applications for 2026 are closed. Use the official GSoC timeline as the source of truth for the next round.'
             align='center'
           />
           <Column width={680}>
@@ -194,10 +194,10 @@ const GSoCLandingPage = () => {
         </Section>
 
         <Section>
-          <SectionHeading title='Quick links' body='Everything you need to apply.' align='center' />
+          <SectionHeading title='Quick links' body='Everything you need for a future proposal.' align='center' />
           <div className='mt-[28px] grid grid-cols-1 gap-[12px] sm:grid-cols-2 lg:mt-[44px] lg:grid-cols-3 lg:gap-[16px]'>
             <LinkCard href='/community/ideas' icon={<PiLightbulb />} title='Project Ideas'>
-              Browse Small, Medium, and Large projects and pick one to propose.
+              Browse the open project idea and the ones that have shipped.
             </LinkCard>
             <LinkCard
               href='/community/proposal-guidelines'

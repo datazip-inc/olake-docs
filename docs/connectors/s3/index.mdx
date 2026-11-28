@@ -1,6 +1,6 @@
 ---
-title: "OLake S3 Source Connector | Multi-Format Data Sync"
-description: Configure OLake S3 Connector for CSV, JSON, and Parquet files. Supports AWS S3, MinIO, LocalStack with incremental sync and folder-based streams.
+title: "OLake Go S3 Source Connector | Multi-Format Data Sync"
+description: Configure the OLake Go S3 connector for CSV, JSON, XML and Parquet files. Supports AWS S3, MinIO, LocalStack with incremental sync and folder-based streams.
 sidebar_label: S3
 ---
 
@@ -19,9 +19,9 @@ Tested, step-by-step guides take S3 to [Snowflake](/docs/integrations/s3-to-snow
 
 ## Key Features
 
-- **Multi-Format Support**: CSV files (`.csv`, `.csv.gz`), JSON files in JSONL and Array formats (`.json`, `.jsonl`, `.json.gz`), XML files (`.xml`, `.xml.gz`) and Parquet files
-- **Automatic Compression Handling**: Transparent gzip decompression (`.gz` files)
-- **Folder-Based Streams**: Groups files by top-level folder into logical streams. Files are automatically grouped into streams based on folder structure. An example of bucket structure is provided below:
+- **Multi-Format Support**: CSV files (`.csv`, `.csv.gz`), JSON files in JSONL and Array formats (`.json`, `.jsonl`, `.json.gz`, `.jsonl.gz`), XML files (`.xml`, `.xml.gz`) and Parquet files (`.parquet`)
+- **Gzip Support**: Gzip (`.gz`) files are read when Compression is `gzip`. With the default `none`, `.gz` files are skipped. Parquet files are never matched as `.gz`.
+- **Folder-Based Streams**: A stream is the first folder under `path_prefix`, so files are grouped into streams by top-level folder. A file directly under the prefix becomes its own stream, named after the file. An example of bucket structure is provided below:
 
   ```text
   s3://my-bucket/data/
@@ -35,7 +35,7 @@ Tested, step-by-step guides take S3 to [Snowflake](/docs/integrations/s3-to-snow
       └── products.csv.gz
   ```
 
-  In the above example, as a result we get 3 streams created - `users`, `orders`, `products`.
+  In the above example, as a result we get 3 streams created - `users`, `orders`, `products`. The `products.csv.gz` file is read only when Compression is `gzip`.
 
 - **S3-Compatible Services**: AWS S3, MinIO, LocalStack, and other S3 APIs
 
@@ -58,20 +58,32 @@ Tested, step-by-step guides take S3 to [Snowflake](/docs/integrations/s3-to-snow
     **State Example**:
     ```json
     {
-      "users": {
-        "_last_modified_time": "2024-01-15T10:30:00Z"
-      },
-      "orders": {
-        "_last_modified_time": "2024-01-15T11:45:00Z"
-      }
+      "type": "STREAM",
+      "version": 9,
+      "streams": [
+        {
+          "stream": "users",
+          "namespace": "s3",
+          "sync_mode": "incremental",
+          "state": { "_last_modified_time": "2024-01-15T10:30:00Z" }
+        },
+        {
+          "stream": "orders",
+          "namespace": "s3",
+          "sync_mode": "incremental",
+          "state": { "_last_modified_time": "2024-01-15T11:45:00Z" }
+        }
+      ]
     }
     ```
 
     :::warning[File Modifications]
-    If a file's content changes and is re-uploaded to S3, it will be re-synced in incremental mode because S3 updates the LastModified timestamp.
+    If a file's content changes and is re-uploaded to S3, it will be re-synced in incremental mode because S3 updates the LastModified timestamp. S3 streams are append-only, so the re-uploaded file's rows are written again as duplicates.
     :::
 
 </details>
+
+S3 streams are append-only, so they write no delete files and need none of the [index storage](/docs/install/docker-cli/#index-storage) that positional deletes and deletion vectors use.
 
 ## Prerequisites
 
@@ -267,7 +279,7 @@ The namespace prefix is included in the column name to avoid collisions between 
 | Custom Endpoint            | S3 API endpoint URL. Optional for AWS S3; required for S3-compatible storage such as MinIO.                                                 | `https://minio.example.com` |
 | File Pattern               | Regular expression to filter object keys by name.                                                                                           | `.*\.csv$` |
 | File Format `required`     | Format of files in the bucket. OLake Go uses this to determine how to read and process files during sync. Additional format-specific fields appear in this section when applicable. | <ul> <li>`CSV`</li> <li>`JSON`</li> <li>`Parquet`</li> <li>`XML`</li> </ul> |
-| Compression Type           | Compression applied to files in the bucket.                                                                                                 | <ul> <li>`none`</li> <li>`gzip`</li> <li>`zip`</li> </ul> |
+| Compression Type           | Compression applied to files in the bucket. Set `gzip` to include `.gz` files (plain files are still read). The list also shows `zip`, but zip archives are not supported yet: nothing decompresses them and no `.zip` file is discovered. A zip archive saved under a `.csv` name is read as text and writes unreadable rows ([olake-go#1486](https://github.com/datazip-inc/olake-go/issues/1486)). | <ul> <li>`none`</li> <li>`gzip`</li> </ul> |
 | Delimiter                  | Field separator for CSV files. Shown when **File Format** is `CSV`.                                                                         | `,` |
 | Has Header                 | Whether CSV files include a header row. Shown when **File Format** is `CSV`.                                                                | Enabled |
 | Skip Rows                  | Number of rows to skip at the start of each CSV file. Shown when **File Format** is `CSV`.                                                  | `0` |
@@ -300,7 +312,7 @@ Additional fields for CSV files:
 | Skip Rows | Number of rows to skip at the beginning of CSV files | `0` |
 | Quote Character | Quote character for CSV files | `"` |
 
-**Compression**: Automatically detected from file extension (`.csv.gz` = gzipped)
+**Compression**: Set Compression to `gzip` to include `.csv.gz` files (plain files are still read). With the default `none`, `.gz` files are skipped.
 
 </TabItem>
 
@@ -310,14 +322,14 @@ Additional fields for JSON files:
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| Line Delimited | Use line-delimited JSON (JSONL) format instead of JSON array. | `true` |
+| Line Delimited | Use `true` for JSONL and single-object files, and `false` for files that hold one JSON array. Sync does not auto-detect the format. | `true` |
 
 **Supported Formats**:
-- JSONL (newline-delimited): `{"id": 1}\n{"id": 2}`
-- JSON Array: `[{"id": 1}, {"id": 2}]`
-- Single Object: `{"data": [...]}`
+- JSONL (newline-delimited), with Line Delimited `true`: `{"id": 1}\n{"id": 2}`
+- Single Object, with Line Delimited `true`: `{"data": [...]}`
+- JSON Array, with Line Delimited `false`: `[{"id": 1}, {"id": 2}]`
 
-**Compression**: Automatically detected (`.json.gz`, `.jsonl.gz`)
+**Compression**: Set Compression to `gzip` to include `.json.gz` and `.jsonl.gz` files. With the default `none`, they are skipped.
 
 </TabItem>
 
@@ -362,7 +374,7 @@ Additional fields for XML files:
 
     - Once the OLake CLI is setup, create a folder to store configuration files such as `source.json` and `destination.json`.
 
-    The `source.json` file for postgres must contain these mandatory fields.
+    The `source.json` file for S3 must contain these mandatory fields.
 
 ### 2. Provide Configuration Details
 
@@ -423,7 +435,7 @@ An example `source.json` file will look like this:
 
 ### 4. Check Source Connection
 
-To verify the database connection following command needs to be run:
+To verify the S3 connection following command needs to be run:
 
 ```bash title="check command"
 docker run --pull=always \
@@ -460,7 +472,7 @@ check \
 ### 1. Connection Failed - Access Denied
 
 ```logs
-ERROR failed to list objects: AccessDenied: Access Denied
+failed to list objects in bucket: ... AccessDenied: Access Denied
 ```
 
 **Cause**: Insufficient IAM permissions or incorrect credentials
@@ -480,20 +492,23 @@ ERROR failed to list objects: AccessDenied: Access Denied
   }
   ```
 - **AWS Credential Chain Order**:
-  1. Static credentials in config (access_key_id, secret_access_key)
-  2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-  3. IAM role attached to EC2 instance/ECS task
-  4. AWS credentials file (~/.aws/credentials)
+  1. Static credentials in config (access_key_id, secret_access_key), used when both are set
+  2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, or a web identity token through AWS_WEB_IDENTITY_TOKEN_FILE)
+  3. Shared credentials and config files (~/.aws/credentials, ~/.aws/config)
+  4. ECS task role
+  5. EC2 instance profile
+
+  Steps 2 to 5 are the [AWS SDK for Go v2 default chain](https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-gosdk.html) (checked Nov 2026).
 - For MinIO/LocalStack: Ensure credentials match server configuration
 
 ### 2. No Streams Discovered
 
-**Cause**: Files not organized in folders or incorrect path_prefix
+**Cause**: Incorrect path_prefix, file extensions that do not match the file format, or `.gz` files with Compression set to `none`
 
 **Solution**:
-- S3 connector requires folder structure: `bucket/prefix/stream_name/files`
+- A stream is the first folder under `path_prefix` (`bucket/prefix/stream_name/files`). A file directly under the prefix becomes its own stream, named after the file.
 - Check path_prefix matches your structure
-- Verify file extensions match format (`.csv`, `.json`, `.parquet`)
+- Verify file extensions match format (`.csv`, `.json`, `.jsonl`, `.xml`, `.parquet`), and set Compression to `gzip` for `.gz` files
 - Example command to verify:
   ```bash
   aws s3 ls s3://bucket-name/prefix/ --recursive
@@ -502,7 +517,7 @@ ERROR failed to list objects: AccessDenied: Access Denied
 ### 3. Schema Inference Failed - CSV
 
 ```logs
-ERROR failed to infer schema: invalid delimiter or header configuration
+failed to infer schema: ...
 ```
 
 **Cause**: Incorrect CSV configuration
@@ -526,7 +541,7 @@ ERROR failed to infer schema: invalid delimiter or header configuration
 ### 5. Parquet File Cannot Be Read
 
 ```logs
-ERROR failed to read parquet schema: not a parquet file
+failed to open parquet file: ...
 ```
 
 **Cause**: Corrupted file or invalid Parquet format
@@ -566,13 +581,15 @@ ERROR dial tcp: i/o timeout
 
 ### 8. Files Not Syncing Despite Being Present
 
-**Cause**: File extension mismatch or compression not detected
+**Cause**: File extension mismatch, or `.gz` files with Compression set to `none`
 
 **Solution**:
 - Ensure file extensions match format:
   - CSV: `.csv` or `.csv.gz`
   - JSON: `.json`, `.jsonl`, `.json.gz`, `.jsonl.gz`
+  - XML: `.xml` or `.xml.gz`
   - Parquet: `.parquet`
+- `.gz` files are read only when Compression is `gzip`
 - Check file size is non-zero: `aws s3 ls s3://bucket/prefix/ --recursive --human-readable`
 - Verify files are in correct folder structure
 
@@ -606,8 +623,6 @@ FATAL runtime: out of memory
 
 ## Changelog
 
-| Date of Release | Version | Description |
-| --------------- | ------- | ----------- |
-| TBD | v0.4.0 | Initial S3 source connector release |
+The S3 source shipped in OLake Go v0.3.12. Later changes are listed in the [OLake Go release notes](/docs/release/ingestion/overview/).
 
 ---

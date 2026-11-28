@@ -30,10 +30,11 @@ export const FUSION_BENCHMARK = {
       spark: '$2.19'
     },
     {
+      // docs/fusion/getting-started/compaction.mdx: 7 rewrite_data_files parameters vs 1 target-size.
       metric: 'Config Parameters',
       fusion: '1',
-      delta: '10x simpler',
-      spark: '10+'
+      delta: '7x fewer settings',
+      spark: '7'
     }
   ] as FusionBenchmarkRow[]
 }
