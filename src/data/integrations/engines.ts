@@ -326,8 +326,8 @@ export const ENGINES: Record<EngineId, Engine> = {
     id: 'presto',
     label: 'Presto',
     version: '0.299',
-    deletes: { eq: 'partial', pos: 'yes', dv: 'partial' },
-    deletesNote: 'Presto reads position deletes on both Java and native workers. Equality deletes need Java workers; deletion vectors only on Presto C++ 0.299 and later. OLake Go preselects equality deletes for Presto, so switch the streams to positional deletes by hand on native workers.',
+    deletes: { eq: 'partial', pos: 'partial', dv: 'no' },
+    deletesNote: 'Presto Java workers read equality and positional deletes and reject deletion vectors (tested on 0.300). Presto C++ (native) workers fail on any OLake Go table that has a delete file, because of the timestamp with time zone columns OLake Go writes, so use Java workers. OLake Go preselects equality deletes for Presto.',
     recommendedDelete: 'eq',
     targetEngine: { label: 'Presto', value: 'presto' },
     catalogs: {
@@ -341,7 +341,8 @@ export const ENGINES: Record<EngineId, Engine> = {
     docsUrl: 'https://prestodb.io/docs/current/connector/iceberg.html',
     sources: [
       { title: 'Presto: Iceberg connector', url: 'https://prestodb.io/docs/current/connector/iceberg.html', checked: '2026-10-12' },
-      { title: 'Presto: Iceberg connector docs source (Presto C++ limits)', url: 'https://github.com/prestodb/presto/blob/master/presto-docs/src/main/sphinx/connector/iceberg.rst', checked: '2026-11-27' }
+      { title: 'Presto: Iceberg connector docs source (Presto C++ limits)', url: 'https://github.com/prestodb/presto/blob/master/presto-docs/src/main/sphinx/connector/iceberg.rst', checked: '2026-11-27' },
+      { title: 'Presto: issue #28692, a related timestamp with time zone read failure', url: 'https://github.com/prestodb/presto/issues/28692', checked: '2026-11-28' }
     ]
   },
   spark: {
